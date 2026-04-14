@@ -117,7 +117,7 @@ function updateGlobalUI() {
     }
 
     // Cashier badge
-    var cashierEl = document.getElementById('cashierName');
+    var cashierEl = document.getElementById('topbarCashierName');
     if (cashierEl) cashierEl.textContent = shift ? shift.cashierName : '—';
 
     // Notification badge
