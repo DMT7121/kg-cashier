@@ -1,5 +1,5 @@
-/* ── Shift Management View ────────────────── */
-import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, addAudit } from '../store.js';
+/* ── Shift Management View — FIXED ────────── */
+import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState } from '../store.js';
 import { showToast, showModal, hideModal, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
 
 export function render() {
@@ -47,6 +47,10 @@ export function render() {
       <button class="btn btn-danger" style="width:100%;margin-top:20px;" id="btnCloseShift">
         <span class="material-symbols-rounded">stop_circle</span> Đóng ca
       </button>
+
+      <button class="btn btn-outline" style="width:100%;margin-top:10px;" id="btnForceReset">
+        <span class="material-symbols-rounded">restart_alt</span> Hủy ca (không lưu lịch sử)
+      </button>
     `;
   }
 
@@ -60,10 +64,12 @@ export function render() {
 
     <div class="card">
       <div class="card-body">
+        <div id="shiftFormError" style="display:none;padding:10px 14px;margin-bottom:14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;font-weight:600;"></div>
+
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">👤 Tên thu ngân</label>
-            <input type="text" id="cashierName" class="form-input" placeholder="Nhập tên..." value="">
+            <label class="form-label">👤 Tên thu ngân <span style="color:var(--danger);">*</span></label>
+            <input type="text" id="cashierName" class="form-input" placeholder="Nhập tên thu ngân..." required autofocus>
           </div>
           <div class="form-group">
             <label class="form-label"># Số ca</label>
@@ -76,16 +82,16 @@ export function render() {
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">📅 Ngày</label>
-            <input type="date" id="shiftDate" class="form-input" value="${todayStr()}">
+            <label class="form-label">📅 Ngày <span style="color:var(--danger);">*</span></label>
+            <input type="date" id="shiftDate" class="form-input" value="${todayStr()}" required>
           </div>
           <div class="form-group">
             <label class="form-label">💰 Tiền đầu ca (VNĐ)</label>
-            <input type="number" id="startingCash" class="form-input" placeholder="0" value="0">
+            <input type="number" id="startingCash" class="form-input" placeholder="0" value="0" min="0">
           </div>
         </div>
 
-        <button class="btn btn-primary" style="width:100%;margin-top:16px;" id="btnOpenShift">
+        <button class="btn btn-primary" style="width:100%;margin-top:16px;padding:14px 18px;font-size:15px;" id="btnOpenShift">
           <span class="material-symbols-rounded">play_arrow</span> Mở ca
         </button>
       </div>
@@ -95,15 +101,46 @@ export function render() {
 
 let _timer = null;
 
+function _showFormError(msg) {
+  const el = document.getElementById('shiftFormError');
+  if (el) {
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  // Also show toast as backup
+  try { showToast(msg, 'warning'); } catch (e) { /* ignore */ }
+}
+
+function _clearFormError() {
+  const el = document.getElementById('shiftFormError');
+  if (el) el.style.display = 'none';
+}
+
+function _highlightField(fieldId) {
+  const field = document.getElementById(fieldId);
+  if (field) {
+    field.style.borderColor = 'var(--danger)';
+    field.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+    field.focus();
+    setTimeout(() => {
+      field.style.borderColor = '';
+      field.style.boxShadow = '';
+    }, 3000);
+  }
+}
+
 export function init() {
   const shift = getCurrentShift();
 
   if (shift) {
+    // Timer
     _timer = setInterval(() => {
       const el = document.getElementById('shiftTimer');
       if (el) el.textContent = formatDuration(shift.startTime);
     }, 30000);
 
+    // Close shift
     document.getElementById('btnCloseShift')?.addEventListener('click', () => {
       showModal(`
         <div class="modal-title"><span class="material-symbols-rounded" style="color:var(--danger);">stop_circle</span> Đóng ca</div>
@@ -134,33 +171,129 @@ export function init() {
         document.getElementById('btnConfirmClose')?.addEventListener('click', () => {
           try {
             closeShift({
-              notes: document.getElementById('closeNotes').value,
-              cashToKeep: Number(document.getElementById('cashToKeep').value) || 0,
-              cashToDeposit: Number(document.getElementById('cashToDeposit').value) || 0
+              notes: document.getElementById('closeNotes')?.value || '',
+              cashToKeep: Number(document.getElementById('cashToKeep')?.value) || 0,
+              cashToDeposit: Number(document.getElementById('cashToDeposit')?.value) || 0
             });
             hideModal();
             clearInterval(_timer);
             showToast('Đã đóng ca thành công!', 'success');
             window.refreshView?.();
-          } catch (e) { showToast(e.message, 'error'); }
+          } catch (e) {
+            showToast(e.message, 'error');
+            console.error('Close shift error:', e);
+          }
         });
       }, 100);
     });
-  } else {
-    document.getElementById('btnOpenShift')?.addEventListener('click', () => {
-      const name = document.getElementById('cashierName').value.trim();
-      const num = document.getElementById('shiftNumber').value;
-      const date = document.getElementById('shiftDate').value;
-      const cash = document.getElementById('startingCash').value;
 
-      if (!name) { showToast('Vui lòng nhập tên thu ngân', 'warning'); return; }
-      if (!date) { showToast('Vui lòng chọn ngày', 'warning'); return; }
-
-      try {
-        openShift({ cashierName: name, shiftNumber: num, date, startingCash: cash });
-        showToast(`Ca ${num} đã mở thành công!`, 'success');
+    // Force reset (emergency)
+    document.getElementById('btnForceReset')?.addEventListener('click', () => {
+      if (confirm('⚠️ HỦY CA HIỆN TẠI?\n\nCa sẽ bị xóa hoàn toàn, KHÔNG lưu vào lịch sử.\nHành động này không thể hoàn tác!')) {
+        const s = getState();
+        s.currentShift = null;
+        try {
+          localStorage.setItem('kg-cashier-data', JSON.stringify(s));
+        } catch (e) { /* ignore */ }
+        showToast('Đã hủy ca', 'info');
         window.refreshView?.();
-      } catch (e) { showToast(e.message, 'error'); }
+      }
     });
+
+  } else {
+    // ── OPEN SHIFT ──
+    const btnOpen = document.getElementById('btnOpenShift');
+    if (!btnOpen) {
+      console.error('btnOpenShift not found in DOM!');
+      return;
+    }
+
+    btnOpen.addEventListener('click', function handleOpenShift(e) {
+      e.preventDefault();
+      _clearFormError();
+
+      console.log('[Shift] Open button clicked');
+
+      // Get values
+      const nameEl = document.getElementById('cashierName');
+      const numEl = document.getElementById('shiftNumber');
+      const dateEl = document.getElementById('shiftDate');
+      const cashEl = document.getElementById('startingCash');
+
+      if (!nameEl || !numEl || !dateEl || !cashEl) {
+        console.error('[Shift] Form elements not found:', { nameEl, numEl, dateEl, cashEl });
+        alert('Lỗi: Không tìm thấy form. Vui lòng tải lại trang.');
+        return;
+      }
+
+      const name = nameEl.value.trim();
+      const num = numEl.value;
+      const date = dateEl.value;
+      const cash = cashEl.value;
+
+      console.log('[Shift] Values:', { name, num, date, cash });
+
+      // Validate
+      if (!name) {
+        _showFormError('Vui lòng nhập tên thu ngân');
+        _highlightField('cashierName');
+        return;
+      }
+
+      if (!date) {
+        _showFormError('Vui lòng chọn ngày');
+        _highlightField('shiftDate');
+        return;
+      }
+
+      // Check existing shift
+      const existing = getCurrentShift();
+      if (existing) {
+        _showFormError(`Đã có Ca ${existing.shiftNumber} đang mở bởi ${existing.cashierName}. Hãy đóng ca trước.`);
+        return;
+      }
+
+      // Attempt to open
+      try {
+        const result = openShift({
+          cashierName: name,
+          shiftNumber: num,
+          date: date,
+          startingCash: cash
+        });
+        console.log('[Shift] Opened successfully:', result);
+        showToast(`Ca ${num} đã mở thành công! 🎉`, 'success');
+        // Navigate to dashboard
+        if (window.navigateTo) {
+          window.navigateTo('dashboard');
+        } else {
+          window.refreshView?.();
+        }
+      } catch (err) {
+        console.error('[Shift] Open error:', err);
+        _showFormError(err.message || 'Không thể mở ca. Vui lòng thử lại.');
+      }
+    });
+
+    // Also support Enter key to submit
+    const nameInput = document.getElementById('cashierName');
+    const cashInput = document.getElementById('startingCash');
+
+    [nameInput, cashInput].forEach(input => {
+      input?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          btnOpen.click();
+        }
+      });
+    });
+
+    // Clear error on input
+    [nameInput, cashInput, document.getElementById('shiftDate')].forEach(input => {
+      input?.addEventListener('input', _clearFormError);
+    });
+
+    // Auto-focus name field
+    setTimeout(() => nameInput?.focus(), 200);
   }
 }
