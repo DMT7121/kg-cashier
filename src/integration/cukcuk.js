@@ -106,7 +106,8 @@ export async function syncTransactions() {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'CompanyCode': cukcuk.domain.trim().toLowerCase().replace('.cukcuk.vn', '')
       },
       body: JSON.stringify({
         PageIndex: 1,
