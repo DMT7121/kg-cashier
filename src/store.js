@@ -7,6 +7,7 @@
 var _cloudSync = null;
 var _cloudClose = null;
 var _cloudAudit = null;
+var _cloudGetShift = null;
 
 try {
   // Use dynamic import pattern that won't crash module loading
@@ -14,6 +15,7 @@ try {
     _cloudSync = api.syncShiftToCloud;
     _cloudClose = api.closeShiftOnCloud;
     _cloudAudit = api.addAuditLog;
+    _cloudGetShift = api.getCurrentShiftFromCloud;
     console.log('[Store] API module loaded successfully');
   }).catch(function(err) {
     console.warn('[Store] API module failed to load:', err.message);
@@ -33,8 +35,89 @@ var defaultCategories = {
 var state = null;
 var listeners = [];
 
-function defaults() {
+
+
+function getInitialPrintForms() {
   return {
+    checklist: [
+      { section: 'CHECKLIST PHỤC VỤ — ĐẦU CA', items: [
+        { cat: 'VỆ SINH & SETUP', title: 'I. Vệ sinh & setup khu trực', list: [
+          'Vệ sinh sàn & Khu vực chung: Quét và lau sạch tổng thể khu trực, cổng ra vào.',
+          'Bàn ghế: Lau sạch bàn ghế, setup tiêu chuẩn (Chén/Đũa/Ly...).',
+          'Chuẩn bị xô đá: Đảm bảo sạch và đủ đá.',
+          'Kiểm tra Menu: Sắp xếp ngay ngắn, lau sạch bìa.'
+        ]},
+        { cat: 'CA 15H', title: 'II. SETUP & VỆ SINH (CA 15H)', list: [
+          'Bổ sung vật tư tiêu hao: Tăm, Xiên tre, Ống hút, Bao tay, Diêm, Khăn giấy, Hộp mang về...',
+          'Sắp xếp: Gọn gàng tủ đồ, bố trí các Trạm đồ dùng dự phòng.'
+        ]},
+        { cat: 'BÀN ĐẶT', title: 'III. Bàn đặt trước', list: [
+          'Setup bàn đặt: Đúng số lượng, màu sắc, nhu cầu tiệc.',
+          'Đánh dấu: Cắm khăn giấy hoặc đặt bảng "Bàn đặt trước".'
+        ]},
+        { cat: 'BÀN GIAO', title: 'IV. Bàn giao đầu ca', list: [
+          'Nắm bắt thông tin: Khách đặt, món hết, lưu ý đặc biệt từ ca trước.'
+        ]},
+        { cat: 'TRONG CA', title: 'V. Kiểm tra chéo & Bổ sung (Công việc trong ca)', list: [
+          'Kiểm tra vệ sinh liên tục, bổ sung đá/dụng cụ.',
+          'Hỗ trợ các bàn đông khách.',
+          'Kiểm tra tồn kho vật tư tiêu hao.'
+        ]}
+      ]},
+      { section: 'CHECKLIST PHỤC VỤ — CUỐI CA', items: [
+        { cat: 'XUỐNG CA', title: 'VI. Checklist Cuối ca & Xuống ca', list: [
+          'Thu dọn bàn, vệ sinh gầm bàn.',
+          'Tắt các thiết bị điện (Máy lạnh, Đèn sảnh...).',
+          'Dọn dẹp tổng thể và khóa cửa an toàn.',
+          'Bàn giao lại thông tin cho quản lý/ca sau.'
+        ]}
+      ]}
+    ],
+    inventory: {
+      ncc: {
+        title: 'KIỂM KÊ HÀNG HÓA — NHÀ CUNG CẤP (THỊT / HẢI SẢN)',
+        subtitle: 'CÔNG TY HOÀNG TRỌNG / MM MARKET / THÚY / CẢNH',
+        items: [
+          {supplier:'C.THÚY\nMM MARKET', items:['Gà (con)','Sụn gà (kg)','Trứng muối','Thịt bò (kg)','Giò heo (kg)','Xương ống (kg)']},
+          {supplier:'HOÀNG TRỌNG\n0947459191', items:['Chân gà (kg)','Thanh cua (kg)','Bào ngư (kg)','Ba rọi bò (kg)','Ba rọi heo (kg)','Nạc dăm (kg)','Xương ống (kg)','Sườn heo (kg)','Cánh gà (kg)','Ếch (kg)','Mực trứng (kg)']},
+          {supplier:'HUYỀN MỰC\nPHƯỚC THÀNH', items:['Mực Indo (kg)','Tôm Sú size 30 (kg)','Tôm càng size 10 (kg)','Ốc hương (kg)','Mực ống (kg)']}
+        ],
+        rightItems: ['Khô mực','Bê','Cá chim','Bạch tuộc','Mực 1 nắng','Cá hokke','Khoai tây','Sò điệp Nhật','Nghêu','Nọng heo','Bơ bánh mì','Cá diêu hồng','Trứng non','Thú Linh','Ba rọi có da','Phổi bò','Tủy bò','Pate','Khoai tây cọng','Lạp xưởng xông khói','Sò huyết','Ba rọi xông khói','Trâu gác bếp','Bắp bò','Bao tử','Da heo','Mỡ heo','Phô mai sợi']
+      },
+      hangkho: {
+        title: 'KIỂM KÊ HÀNG HÓA — HÀNG KHÔ / GIA VỊ',
+        leftItems: [
+          'Bột bắp','Bột chanh','Bột chiên giòn','Bột gạo','Bột mì','Bột năng','Bột ớt HQ','Bột ớt Việt','Bột xù trắng','Bột nếp','Bột nghệ','Bột cà ri','Đường cát','Đường phèn','Đường thốt nốt','Muối hột','Muối bọt','Muối Tây Ninh','Tiêu đen','Tiêu sọ','Ngũ vị hương','Hoa hồi','Quế cây','Cốm dẹp'
+        ],
+        rightItems: [
+          'Dầu ăn (can 25l)','Giấm táo','Dầu hào','Nước mắm','Nước tương Nhị ca','Nước tương hấp cá LKK','Tương cà','Tương ớt','Tương xí muội','Tương ngọt','Dầu mè','Cà ri dầu','Rượu nếp','Rượu hoa tiêu','Vang trắng','Bánh pía','Bột ngọt','Pate gan','Phô mai Bò cười','Sữa đặc','Sữa tươi ko đường','Chao','Lạp xưởng','Bánh tráng cuốn'
+        ],
+        extraLeft: ['Mì Miliket','Mì trứng','Mì giòn','Miến thái','Mù tạt xanh','Mù tạt vàng','Nước cốt dừa','Bơ đậu phộng'],
+        extraRight: ['Kỉ tử','Nấm mèo','Nấm đông cô','Lá nguyệt quế','Mạch nha','Bơ Tường An','Sốt đồ nướng','Hắc xì dầu'],
+        extraRightTitle: 'KHÁC'
+      },
+      hangrau1: {
+        title: 'KIỂM KÊ HÀNG HÓA — HÀNG RAU 1',
+        leftItems: [
+          'Bắp cải trắng:trái','Bầu:kg','Cà chua bi:kg','Cà chua lớn:kg','Cà tím:kg','Cà pháo:kg','Củ dền:kg','Củ sen:kg','Dưa leo Nhật:kg','Dưa leo nhỏ:kg','Đậu bắp:kg','Đu đủ:kg','Giá:kg','Gừng:kg','Hành phi:kg','Hạt sen:kg','Hẹ:kg','Húng lủi:kg','Khế:kg','Khoai lang:kg','Khoai mỡ:kg','Khoai tây:kg','Khổ qua:kg','Lá chanh:kg'
+        ],
+        rightItems: [
+          'Lá dứa:kg','Lá lốt:kg','Lá mơ:kg','Lá ớt:kg','Lá quế:kg','Măng chua:kg','Măng le:kg','Bưởi:kg','Tảo xoăn:kg','Salad thủy tinh:kg','Salad fries:kg','Cải cầu vồng:kg','Măng tây:kg','Me vắt:kg','Mía cây:kg','Mồng tơi:kg','Mướp:kg','Nấm bạch tuyết:kg','Nấm đông cô:kg','Nấm đùi gà:kg','Nấm kim châm:kg','Nghệ:kg','Ngò gai:kg','Ngò rí:kg'
+        ]
+      },
+      hangrau: {
+        title: 'KIỂM KÊ HÀNG HÓA — HÀNG RAU 2',
+        subtitle: 'NHẬP HÀNG NGÀY',
+        items: [
+          'Tỏi củ:kg','Hành tây:kg','Cà rốt:kg','Thơm lớn:kg','Tắc:kg','Ớt sừng:kg','Sả cây:kg','Tỏi xay:kg','Chanh:kg','Bắp Mỹ:kg','Ớt xiêm xanh:kg','Đậu rồng:kg','Hành tím:kg','Xoài keo:kg','Củ cải trắng:kg','Tiêu xanh:kg','Củ sấn:kg','Rau răm:kg','Đậu đũa:kg','Lá tía tô:kg','Hành lá:kg','Rau muống:kg','Súp lơ xanh:kg','Ớt chuông:kg'
+        ]
+      }
+    }
+  };
+}
+
+function defaults() {
+  const s = {
     currentShift: null,
     shifts: [],
     categories: JSON.parse(JSON.stringify(defaultCategories)),
@@ -47,9 +130,22 @@ function defaults() {
       autoSync: true,
       discrepancyThreshold: 50000,
       shiftWarningHours: 10,
-      requireLogin: false
-    }
+      requireLogin: true,
+      adminPassword: '712121'
+    },
+    printForms: Object.assign(getInitialPrintForms(), {
+      margins: { top: 8, bottom: 8, left: 8, right: 8 },
+      customTemplates: {}
+    })
   };
+  return s;
+}
+
+export function resetPrintForms() {
+  var s = getState();
+  s.printForms.customTemplates = {};
+  save();
+  addAudit('RESET_PRINT_FORMS', 'Khôi phục mẫu in mặc định');
 }
 
 function uid() {
@@ -203,8 +299,9 @@ export function openShift(opts) {
   var shiftNumber = opts.shiftNumber;
   var date = opts.date;
   var startingCash = opts.startingCash;
+  var shiftPassword = opts.shiftPassword || '0000';
 
-  console.log('[Store] openShift called:', cashierName, shiftNumber, date, startingCash);
+  console.log('[Store] openShift called:', cashierName, shiftNumber, date, startingCash, shiftPassword);
 
   var s = getState();
   if (s.currentShift) {
@@ -225,6 +322,7 @@ export function openShift(opts) {
     invoices: [],
     status: 'open',
     notes: '',
+    shiftPassword: shiftPassword,
     cashToKeep: 0,
     cashToDeposit: 0
   };
@@ -441,6 +539,39 @@ export function deleteShiftFromHistory(id) {
 
 export function getCategories() { return getState().categories; }
 
+export function addCategory(type, name) {
+  if (!type || !name) return false;
+  var s = getState();
+  if (!s.categories) s.categories = JSON.parse(JSON.stringify(defaultCategories));
+  if (!s.categories[type]) s.categories[type] = [];
+  var trimmed = name.trim();
+  if (!trimmed) return false;
+  // Check duplicate
+  for (var i = 0; i < s.categories[type].length; i++) {
+    if (s.categories[type][i].toLowerCase() === trimmed.toLowerCase()) return false;
+  }
+  // Insert before "Thu khác" / "Chi khác" (the last item)
+  var lastIdx = s.categories[type].length - 1;
+  var lastItem = s.categories[type][lastIdx];
+  if (lastItem === 'Thu khác' || lastItem === 'Chi khác') {
+    s.categories[type].splice(lastIdx, 0, trimmed);
+  } else {
+    s.categories[type].push(trimmed);
+  }
+  save();
+  addAudit('ADD_CATEGORY', type + ': ' + trimmed);
+  return true;
+}
+
+export function removeCategory(type, name) {
+  var s = getState();
+  if (!s.categories || !s.categories[type]) return false;
+  s.categories[type] = s.categories[type].filter(function(c) { return c !== name; });
+  save();
+  addAudit('REMOVE_CATEGORY', type + ': ' + name);
+  return true;
+}
+
 // ── Cloud Sync ───────────────────────────────
 var _syncTimer = null;
 
@@ -463,6 +594,49 @@ function _syncCurrentShift() {
       try { _cloudSync(cleanShift).catch(function() {}); } catch (e) { /* ignore */ }
     }
   }, 3000);
+}
+
+export async function syncCurrentShiftWithCloud() {
+  if (!_cloudGetShift) return;
+  
+  // If we are currently waiting to push local changes, don't pull (avoid race conditions)
+  if (_syncTimer) return false;
+
+  try {
+    const res = await _cloudGetShift();
+    if (res.success) {
+      const cloudShift = res.shift;
+      const s = getState();
+      
+      // Case 1: Cloud has no open shift (was closed elsewhere)
+      if (!cloudShift && s.currentShift) {
+        s.currentShift = null;
+        save();
+        return true;
+      }
+      
+      // Case 2: Cloud has an open shift
+      if (cloudShift) {
+        // Check if different ID OR if content is different
+        // We compare stringified versions but exclude invoices which might be heavy or local-only for a moment
+        const localCompare = s.currentShift ? JSON.stringify(Object.assign({}, s.currentShift, { invoices: [] })) : '';
+        const cloudCompare = JSON.stringify(Object.assign({}, cloudShift, { invoices: [] }));
+
+        if (!s.currentShift || localCompare !== cloudCompare) {
+          // Merge logic: If it's the same shift, preserve local invoices (as they might not be uploaded yet)
+          if (s.currentShift && s.currentShift.id === cloudShift.id) {
+            cloudShift.invoices = s.currentShift.invoices;
+          }
+          s.currentShift = cloudShift;
+          save();
+          return true;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Store] Cloud sync pull error:', e);
+  }
+  return false;
 }
 
 // ── Analytics Helpers (Feature 4) ────────────
@@ -508,4 +682,17 @@ export function getMonthlyReport() {
     d.setDate(d.getDate() + 1);
   }
   return days;
+}
+
+export function getPrintForms() {
+  var s = getState();
+  if (!s.printForms) s.printForms = getInitialPrintForms();
+  return s.printForms;
+}
+
+export function updatePrintForms(data) {
+  var s = getState();
+  s.printForms = data;
+  save();
+  addAudit('UPDATE_PRINT_FORMS', 'Cập nhật mẫu in');
 }

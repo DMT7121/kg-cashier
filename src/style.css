@@ -364,7 +364,83 @@ a:hover { text-decoration: underline; }
 }
 .form-input::placeholder { color: var(--text-muted); }
 
-select.form-input { cursor: pointer; }
+/* Force dark color scheme for all native form controls */
+.form-input {
+  color-scheme: dark;
+}
+input[type="date"].form-input,
+input[type="number"].form-input {
+  color-scheme: dark;
+}
+input[type="date"].form-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(3) hue-rotate(10deg);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity .2s;
+}
+input[type="date"].form-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* ── Custom Select / Dropdown ──────────────── */
+select.form-input {
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23e8a838' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 8px;
+  padding-right: 38px;
+  background-color: var(--bg-input);
+  color: var(--text);
+  line-height: 1.5;
+}
+select.form-input:hover {
+  border-color: var(--primary);
+  background-color: rgba(255,255,255,.08);
+}
+select.form-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(232,168,56,.15);
+  background-color: rgba(255,255,255,.08);
+}
+
+/* Option styling for native dropdown visibility */
+select.form-input option {
+  background-color: #1e2235;
+  color: #e4e4e7;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+select.form-input option:hover,
+select.form-input option:focus,
+select.form-input option:checked {
+  background: linear-gradient(90deg, rgba(232,168,56,.25), rgba(232,168,56,.08));
+  color: #fff;
+  font-weight: 600;
+}
+select.form-input option:disabled {
+  color: #71717a;
+  font-style: italic;
+}
+select.form-input optgroup {
+  background-color: #161a2b;
+  color: var(--primary);
+  font-weight: 700;
+  font-style: normal;
+  padding: 8px 0;
+}
+
+/* Increase click/touch area for better UX */
+select.form-input {
+  min-height: 42px;
+}
+
 textarea.form-input { resize: vertical; min-height: 60px; }
 
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -1113,3 +1189,37 @@ body.printing-a4 .section-header { display: none !important; }
   .stats-grid { grid-template-columns: 1fr; }
   .clock { display: none; }
 }
+
+/* ── Utility Classes ────────────────────────── */
+.mt-24 { margin-top: 24px; }
+
+/* ── Tag / Badge ────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid rgba(255,255,255,.08);
+}
+.tag-income { background: rgba(34,197,94,.12); color: #4ade80; border-color: rgba(34,197,94,.2); }
+.tag-expense { background: rgba(239,68,68,.12); color: #f87171; border-color: rgba(239,68,68,.2); }
+
+/* ── Form Hint ──────────────────────────────── */
+.form-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* ── Icon Button ────────────────────────────── */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity .2s;
+}
+.btn-icon:hover { opacity: 1; }

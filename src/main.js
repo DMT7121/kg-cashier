@@ -3,7 +3,7 @@
    COMPATIBLE: No optional chaining, global error handling
    ============================================ */
 import './style.css';
-import { getCurrentShift, subscribe, getUnreadCount } from './store.js';
+import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud } from './store.js';
 import { hideModal } from './utils.js';
 
 // ── Global Error Handler — Show on screen ────
@@ -37,6 +37,7 @@ import * as analyticsView from './views/analytics.js';
 import * as staffView from './views/staff.js';
 import * as auditLogView from './views/auditLog.js';
 import * as settingsView from './views/settings.js';
+import * as printFormsView from './views/printForms.js';
 
 // ── View Registry ────────────────────────────
 var views = {
@@ -51,12 +52,31 @@ var views = {
   'staff':        { module: staffView,        title: 'Nhân viên' },
   'audit':        { module: auditLogView,     title: 'Nhật ký' },
   'settings':     { module: settingsView,     title: 'Cài đặt' },
+  'print-forms':  { module: printFormsView,   title: 'Biểu mẫu in' },
 };
 
 var currentView = 'dashboard';
 
 // ── Navigation ───────────────────────────────
 function navigateTo(viewName) {
+  // Sync with cloud to ensure state is fresh
+  syncCurrentShiftWithCloud().then(function(changed) {
+    if (changed) {
+      console.log('[Main] Shift state synchronized from cloud');
+      // Re-run navigation logic if shift presence changed
+      navigateTo(currentView);
+    }
+  });
+
+  // ── Shift Protection Logic ──
+  var shift = getCurrentShift();
+  var isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
+
+  // If shift is open but not validated, force 'shift' view (Unlock screen)
+  if (shift && !isValidated && viewName !== 'shift' && viewName !== 'settings') {
+    viewName = 'shift';
+  }
+
   if (!views[viewName]) viewName = 'dashboard';
   currentView = viewName;
 
@@ -198,6 +218,16 @@ function initApp() {
   // Route
   var hash = location.hash.replace('#', '');
   navigateTo(hash && views[hash] ? hash : 'dashboard');
+
+  // Background polling for cloud sync (Feature: Multi-device real-time sync)
+  setInterval(function() {
+    syncCurrentShiftWithCloud().then(function(changed) {
+      if (changed) {
+        console.log('[Main] Auto-sync: Data refreshed from cloud');
+        renderCurrentView();
+      }
+    });
+  }, 10000); // Check every 10 seconds
 
   console.log('[KG-CASHIER] Ready!');
 }

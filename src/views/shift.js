@@ -1,12 +1,34 @@
-/* ── Shift Management View — FIXED ────────── */
-import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState } from '../store.js';
+import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser } from '../store.js';
 import { showToast, showModal, hideModal, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
+import { getStaffFromCloud } from '../api.js';
+
+let _staffList = [];
 
 export function render() {
   const shift = getCurrentShift();
-  const settings = getSettings();
+  const isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
 
+  // ── CASE 1: Shift is OPEN ──
   if (shift) {
+    if (!isValidated) {
+      return `
+        <div class="empty-state" style="padding:80px 20px;">
+          <span class="material-symbols-rounded" style="font-size:64px;color:var(--warning);margin-bottom:20px;">lock_open</span>
+          <h2>Ca đang mở</h2>
+          <p>Nhân viên <b>${shift.cashierName}</b> đang mở Ca ${shift.shiftNumber}</p>
+          <p class="text-muted">Vui lòng nhập mật khẩu ca để tiếp tục hoặc để đóng ca</p>
+          
+          <div style="max-width:300px;margin:24px auto;">
+            <div class="form-group">
+              <label class="form-label">Mật khẩu ca (mặc định 0000)</label>
+              <input type="password" id="shiftUnlockPass" class="form-input" style="text-align:center;font-size:24px;letter-spacing:4px;" placeholder="••••" autofocus>
+            </div>
+            <button class="btn btn-primary" id="btnUnlockShift" style="width:100%;margin-top:8px;">Xác nhận</button>
+          </div>
+        </div>
+      `;
+    }
+
     const sm = getShiftSummary(shift);
     return `
       <div class="section-header">
@@ -54,11 +76,12 @@ export function render() {
     `;
   }
 
+  // ── CASE 2: No shift open ──
   return `
     <div class="section-header">
       <div>
         <h3>🔓 Mở ca mới</h3>
-        <p>Nhập thông tin để bắt đầu ca làm việc</p>
+        <p>Chọn tài khoản và nhập PIN để bắt đầu làm việc</p>
       </div>
     </div>
 
@@ -68,8 +91,10 @@ export function render() {
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">👤 Tên thu ngân <span style="color:var(--danger);">*</span></label>
-            <input type="text" id="cashierName" class="form-input" placeholder="Nhập tên thu ngân..." required autofocus>
+            <label class="form-label">👤 Nhân viên <span style="color:var(--danger);">*</span></label>
+            <select id="staffSelect" class="form-input" required autofocus>
+              <option value="">-- Đang tải... --</option>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label"># Số ca</label>
@@ -80,6 +105,18 @@ export function render() {
             </select>
           </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">🔑 Mã PIN cá nhân <span style="color:var(--danger);">*</span></label>
+            <input type="password" id="staffPin" class="form-input" placeholder="••••" maxlength="6" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label class="form-label">🔒 Đặt mật khẩu cho ca này</label>
+            <input type="password" id="shiftPassword" class="form-input" placeholder="Mặc định 0000" value="0000">
+          </div>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">📅 Ngày <span style="color:var(--danger);">*</span></label>
@@ -132,8 +169,28 @@ function _highlightField(fieldId) {
 
 export function init() {
   const shift = getCurrentShift();
+  const isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
 
   if (shift) {
+    if (!isValidated) {
+      const input = document.getElementById('shiftUnlockPass');
+      const btn = document.getElementById('btnUnlockShift');
+      const tryUnlock = () => {
+        if (input.value === (shift.shiftPassword || '0000')) {
+          sessionStorage.setItem('shift_validated', shift.id);
+          showToast('Xác thực thành công!', 'success');
+          window.refreshView?.();
+        } else {
+          showToast('Mật khẩu ca không đúng!', 'error');
+          input.value = '';
+          input.focus();
+        }
+      };
+      btn?.addEventListener('click', tryUnlock);
+      input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+      return;
+    }
+
     // Timer
     _timer = setInterval(() => {
       const el = document.getElementById('shiftTimer');
@@ -175,6 +232,7 @@ export function init() {
               cashToKeep: Number(document.getElementById('cashToKeep')?.value) || 0,
               cashToDeposit: Number(document.getElementById('cashToDeposit')?.value) || 0
             });
+            sessionStorage.removeItem('shift_validated');
             hideModal();
             clearInterval(_timer);
             showToast('Đã đóng ca thành công!', 'success');
@@ -194,6 +252,7 @@ export function init() {
         s.currentShift = null;
         try {
           localStorage.setItem('kg-cashier-data', JSON.stringify(s));
+          sessionStorage.removeItem('shift_validated');
         } catch (e) { /* ignore */ }
         showToast('Đã hủy ca', 'info');
         window.refreshView?.();
@@ -202,98 +261,62 @@ export function init() {
 
   } else {
     // ── OPEN SHIFT ──
+    // Load staff
+    getStaffFromCloud().then(res => {
+      if (res.success) {
+        _staffList = res.staff || [];
+        const select = document.getElementById('staffSelect');
+        if (select) {
+          select.innerHTML = '<option value="">-- Chọn nhân viên --</option>' + 
+            _staffList.filter(s => s.status === 'active').map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        }
+      }
+    });
+
     const btnOpen = document.getElementById('btnOpenShift');
-    if (!btnOpen) {
-      console.error('btnOpenShift not found in DOM!');
-      return;
-    }
+    if (!btnOpen) return;
 
     btnOpen.addEventListener('click', function handleOpenShift(e) {
       e.preventDefault();
       _clearFormError();
 
-      console.log('[Shift] Open button clicked');
+      const staffId = document.getElementById('staffSelect').value;
+      const pin = document.getElementById('staffPin').value.trim();
+      const shiftPass = document.getElementById('shiftPassword').value || '0000';
+      const num = document.getElementById('shiftNumber').value;
+      const date = document.getElementById('shiftDate').value;
+      const cash = document.getElementById('startingCash').value;
 
-      // Get values
-      const nameEl = document.getElementById('cashierName');
-      const numEl = document.getElementById('shiftNumber');
-      const dateEl = document.getElementById('shiftDate');
-      const cashEl = document.getElementById('startingCash');
-
-      if (!nameEl || !numEl || !dateEl || !cashEl) {
-        console.error('[Shift] Form elements not found:', { nameEl, numEl, dateEl, cashEl });
-        alert('Lỗi: Không tìm thấy form. Vui lòng tải lại trang.');
+      if (!staffId) { _showFormError('Vui lòng chọn nhân viên'); return; }
+      
+      const staff = _staffList.find(s => s.id === staffId);
+      if (!staff || staff.pin !== pin) {
+        _showFormError('Mã PIN không chính xác!');
+        _highlightField('staffPin');
         return;
       }
 
-      const name = nameEl.value.trim();
-      const num = numEl.value;
-      const date = dateEl.value;
-      const cash = cashEl.value;
+      if (!date) { _showFormError('Vui lòng chọn ngày'); return; }
 
-      console.log('[Shift] Values:', { name, num, date, cash });
-
-      // Validate
-      if (!name) {
-        _showFormError('Vui lòng nhập tên thu ngân');
-        _highlightField('cashierName');
-        return;
-      }
-
-      if (!date) {
-        _showFormError('Vui lòng chọn ngày');
-        _highlightField('shiftDate');
-        return;
-      }
-
-      // Check existing shift
-      const existing = getCurrentShift();
-      if (existing) {
-        _showFormError(`Đã có Ca ${existing.shiftNumber} đang mở bởi ${existing.cashierName}. Hãy đóng ca trước.`);
-        return;
-      }
-
-      // Attempt to open
       try {
         const result = openShift({
-          cashierName: name,
+          cashierName: staff.name,
           shiftNumber: num,
           date: date,
-          startingCash: cash
+          startingCash: cash,
+          shiftPassword: shiftPass
         });
-        console.log('[Shift] Opened successfully:', result);
+        
+        // Auto validate the session for the opener
+        sessionStorage.setItem('shift_validated', result.id);
+        setLoggedInUser(staff);
+
         showToast(`Ca ${num} đã mở thành công! 🎉`, 'success');
-        // Navigate to dashboard
-        if (window.navigateTo) {
-          window.navigateTo('dashboard');
-        } else {
-          window.refreshView?.();
-        }
+        if (window.navigateTo) window.navigateTo('dashboard');
+        else window.refreshView?.();
       } catch (err) {
-        console.error('[Shift] Open error:', err);
-        _showFormError(err.message || 'Không thể mở ca. Vui lòng thử lại.');
+        _showFormError(err.message || 'Không thể mở ca.');
       }
     });
-
-    // Also support Enter key to submit
-    const nameInput = document.getElementById('cashierName');
-    const cashInput = document.getElementById('startingCash');
-
-    [nameInput, cashInput].forEach(input => {
-      input?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          btnOpen.click();
-        }
-      });
-    });
-
-    // Clear error on input
-    [nameInput, cashInput, document.getElementById('shiftDate')].forEach(input => {
-      input?.addEventListener('input', _clearFormError);
-    });
-
-    // Auto-focus name field
-    setTimeout(() => nameInput?.focus(), 200);
   }
 }

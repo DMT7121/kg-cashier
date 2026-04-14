@@ -1,5 +1,5 @@
 /* ── Transactions View (Enhanced w/ Search) ── */
-import { getCurrentShift, addTransaction, removeTransaction, addOtherTransaction, removeOtherTransaction, getCategories } from '../store.js';
+import { getCurrentShift, addTransaction, removeTransaction, addOtherTransaction, removeOtherTransaction, getCategories, addCategory } from '../store.js';
 import { formatCurrency, formatTime, showToast, showModal, hideModal } from '../utils.js';
 
 export function render() {
@@ -99,7 +99,17 @@ function _showTxModal(type) {
       <label class="form-label">Danh mục</label>
       <select id="txCategory" class="form-input">
         ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
+        <option value="__new__" style="color:#e8a838;font-weight:600;">➕ Thêm danh mục mới...</option>
       </select>
+      <div id="newCatWrap" style="display:none;margin-top:8px;">
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="newCatName" class="form-input" placeholder="Nhập tên danh mục mới..." style="flex:1;">
+          <button class="btn btn-primary btn-sm" id="btnAddCat" type="button">
+            <span class="material-symbols-rounded">add</span>
+          </button>
+        </div>
+        <p class="form-hint">VD: Doanh thu bar, Mua đá, Phí giao hàng...</p>
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -128,13 +138,56 @@ function _showTxModal(type) {
   `);
 
   setTimeout(() => {
+    const catSelect = document.getElementById('txCategory');
+    const newCatWrap = document.getElementById('newCatWrap');
+    const newCatInput = document.getElementById('newCatName');
+
+    // Toggle custom category input
+    catSelect?.addEventListener('change', () => {
+      if (catSelect.value === '__new__') {
+        newCatWrap.style.display = 'block';
+        newCatInput?.focus();
+      } else {
+        newCatWrap.style.display = 'none';
+      }
+    });
+
+    // Add new category button
+    document.getElementById('btnAddCat')?.addEventListener('click', () => {
+      const name = newCatInput?.value?.trim();
+      if (!name) { showToast('Nhập tên danh mục', 'warning'); return; }
+      const added = addCategory(type, name);
+      if (!added) { showToast('Danh mục đã tồn tại', 'warning'); return; }
+      // Add new option to select and select it
+      const newOpt = document.createElement('option');
+      newOpt.value = name;
+      newOpt.textContent = name;
+      // Insert before the "Thêm mới" option
+      const addOpt = catSelect.querySelector('option[value="__new__"]');
+      catSelect.insertBefore(newOpt, addOpt);
+      catSelect.value = name;
+      newCatWrap.style.display = 'none';
+      newCatInput.value = '';
+      showToast(`Đã thêm danh mục: ${name}`, 'success');
+    });
+
+    // Enter key on new category input
+    newCatInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btnAddCat')?.click();
+      }
+    });
+
     document.getElementById('txAmount')?.focus();
     document.getElementById('btnSaveTx')?.addEventListener('click', () => {
+      const catValue = catSelect.value;
+      if (catValue === '__new__') { showToast('Hãy thêm danh mục mới hoặc chọn danh mục có sẵn', 'warning'); return; }
       const amount = Number(document.getElementById('txAmount').value);
       if (!amount || amount <= 0) { showToast('Nhập số tiền hợp lệ', 'warning'); return; }
       try {
         addTransaction({
-          type, category: document.getElementById('txCategory').value,
+          type, category: catValue,
           amount, paymentMethod: document.getElementById('txPayment').value,
           note: document.getElementById('txNote').value
         });

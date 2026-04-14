@@ -3,8 +3,22 @@ import { showToast, showModal, hideModal } from '../utils.js';
 import { getStaffFromCloud, saveStaffToCloud, deleteStaffFromCloud } from '../api.js';
 
 let staffList = [];
+let isStaffAuthed = false;
 
 export function render() {
+  if (!isStaffAuthed) {
+    return `
+      <div class="empty-state" style="padding:100px 20px;">
+        <span class="material-symbols-rounded" style="font-size:64px;color:var(--primary);margin-bottom:20px;">lock</span>
+        <h2>Yêu cầu quyền Admin</h2>
+        <p>Vui lòng nhập mật khẩu quản trị để truy cập trang này (712121)</p>
+        <div style="max-width:300px;margin:24px auto;">
+          <input type="password" id="adminPassInput" class="form-input" style="text-align:center;font-size:24px;letter-spacing:4px;" placeholder="••••••" autofocus autocomplete="off">
+          <button class="btn btn-primary" id="btnAdminAuth" style="width:100%;margin-top:16px;">Xác nhận</button>
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="section-header">
       <div>
@@ -123,6 +137,29 @@ function showStaffModal(existing = null) {
 }
 
 export function init() {
+  if (!isStaffAuthed) {
+    const input = document.getElementById('adminPassInput');
+    const btn = document.getElementById('btnAdminAuth');
+    
+    const tryAuth = () => {
+      if (input.value === '712121') {
+        isStaffAuthed = true;
+        window.refreshView?.();
+      } else {
+        showToast('Mật khẩu không chính xác!', 'error');
+        input.value = '';
+        input.focus();
+      }
+    };
+
+    btn?.addEventListener('click', tryAuth);
+    input?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') tryAuth();
+    });
+    input?.focus();
+    return;
+  }
+
   loadStaff();
   document.getElementById('btnAddStaff')?.addEventListener('click', () => showStaffModal());
 }
