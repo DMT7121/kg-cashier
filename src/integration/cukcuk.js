@@ -60,9 +60,12 @@ function _clearCachedToken() {
   try { localStorage.removeItem('cukcuk_token'); } catch(e) { /* ignore */ }
 }
 
-// ── Centralized API Call with Auto-Retry on 401 ──
-// Official CUKCUK pattern: https://graphapi.cukcuk.vn/document/articles/using_authen.html
-// If 401 → clear token → re-login → retry request once
+// ── Centralized API Call with Auto-Retry on Auth Failure ──
+// Official pattern: https://graphapi.cukcuk.vn/document/articles/using_authen.html
+// CUKCUK may return auth errors as:
+//   (A) HTTP 401 status
+//   (B) HTTP 200 + JSON { Success: false, ErrorMessage: "Authorization has been denied..." }
+// Both cases → clear token → re-login → retry once
 async function _cukcukApiCall(url, options, _isRetry) {
   // Ensure we have a valid token
   var auth = await loginAndGetToken();
@@ -77,9 +80,9 @@ async function _cukcukApiCall(url, options, _isRetry) {
   
   var response = await fetch(CUKCUK_API_BASE + url, options);
   
-  // 401 = Token expired → re-login and retry once
+  // Case A: HTTP 401 status
   if (response.status === 401 && !_isRetry) {
-    console.log('[CUKCUK] 401 received, refreshing token...');
+    console.log('[CUKCUK] HTTP 401, refreshing token...');
     _clearCachedToken();
     return _cukcukApiCall(url, options, true);
   }
@@ -88,7 +91,21 @@ async function _cukcukApiCall(url, options, _isRetry) {
     throw new Error('HTTP ' + response.status + ' from ' + url);
   }
   
-  return await response.json();
+  var data = await response.json();
+  
+  // Case B: HTTP 200 but auth error in body
+  if (!_isRetry && data && !data.Success) {
+    var errMsg = (data.ErrorMessage || data.Message || '').toLowerCase();
+    if (errMsg.indexOf('authorization') !== -1 || errMsg.indexOf('denied') !== -1 || 
+        errMsg.indexOf('token') !== -1 || errMsg.indexOf('expired') !== -1 ||
+        errMsg.indexOf('hết hạn') !== -1) {
+      console.log('[CUKCUK] Auth error in body:', data.ErrorMessage || data.Message, '→ refreshing token...');
+      _clearCachedToken();
+      return _cukcukApiCall(url, options, true);
+    }
+  }
+  
+  return data;
 }
 
 // ── HMAC-SHA256 Signature (Web Crypto API) ──
