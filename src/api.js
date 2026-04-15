@@ -130,6 +130,12 @@ export async function saveSettingsToCloud(settings) {
   return apiCall('saveSettings', { settings: settings });
 }
 
+// ── CUKCUK Revenue → Google Sheets ──────────
+export async function syncCukcukRevenueToCloud(invoices, shiftId) {
+  if (!_online) { enqueue('syncCukcukRevenue', { invoices: invoices, shiftId: shiftId }); return { success: false, offline: true }; }
+  return apiCall('syncCukcukRevenue', { invoices: invoices, shiftId: shiftId });
+}
+
 // ── Health Check ─────────────────────────────
 export async function pingAPI() {
   return apiCall('ping');

@@ -1,28 +1,13 @@
-/* ── Dashboard View (Enhanced w/ Charts) ──── */
+/* ── Dashboard View ─────────────────────────── */
 import { getCurrentShift, getShiftSummary, getShiftHistory, getSettings, getNotifications, getUnreadCount, markAllRead } from '../store.js';
-import { formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
+import { formatCurrency, formatDate, formatTime, formatDuration } from '../utils.js';
 
-export function render() {
-  const shift = getCurrentShift();
+function renderShiftDashboard(shift) {
+  if (!shift) return '';
   const summary = getShiftSummary(shift);
   const settings = getSettings();
-  const notifs = getNotifications().slice(0, 5);
-  const unread = getUnreadCount();
-
-  if (!shift) {
-    return `
-      <div class="empty-state">
-        <span class="material-symbols-rounded empty-icon">restaurant</span>
-        <h2>${settings.storeName || "KING's GRILL"}</h2>
-        <p>Chưa có ca nào đang mở.</p>
-        <button class="btn btn-primary" onclick="window.navigateTo('shift')">
-          <span class="material-symbols-rounded">play_arrow</span> Mở ca mới
-        </button>
-      </div>
-      ${_renderRecentShifts()}
-      ${notifs.length ? _renderNotifications(notifs, unread) : ''}
-    `;
-  }
+  const cukcuk = settings.cukcuk;
+  const hasCukcuk = cukcuk && cukcuk.domain && cukcuk.key;
 
   const maxPayment = Math.max(summary.cashIncome, summary.cardIncome, summary.transferIncome, 1);
 
@@ -36,6 +21,44 @@ export function render() {
       </div>
     </div>
 
+    <!-- ═══ CUKCUK POS REVENUE ═══ -->
+    ${hasCukcuk ? `
+    <div class="card" style="margin-bottom:16px;border:1px solid rgba(16,185,129,0.3);background:linear-gradient(135deg, rgba(16,185,129,0.05) 0%, rgba(16,185,129,0.01) 100%);">
+      <div class="card-header" style="border-bottom-color:rgba(16,185,129,0.15);">
+        <h3 style="color:#10b981;display:flex;align-items:center;gap:8px;margin:0;">
+          <span class="material-symbols-rounded">point_of_sale</span> Doanh thu POS (CUKCUK)
+        </h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="cukcukSyncStatus" class="text-muted" style="font-size:11px;"></span>
+          <button class="btn btn-sm" id="btnDashResyncCukcuk" style="white-space:nowrap;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);" title="Xóa toàn bộ dữ liệu CUKCUK cũ và đồng bộ lại từ đầu">
+            <span class="material-symbols-rounded">refresh</span> Sync lại
+          </button>
+          <button class="btn btn-success btn-sm" id="btnDashSyncCukcuk" style="white-space:nowrap;">
+            <span class="material-symbols-rounded">sync</span> Đồng bộ
+          </button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:16px 20px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div style="text-align:center;padding:12px;background:rgba(16,185,129,0.08);border-radius:10px;">
+            <div class="text-muted" style="font-size:11px;margin-bottom:6px;">💰 Doanh thu bán hàng (CUKCUK)</div>
+            <div style="font-size:28px;font-weight:800;color:#10b981;">${formatCurrency(summary.cukcukRevenue)}</div>
+            <div style="font-size:12px;color:#10b981;margin-top:4px;">${summary.cukcukBills} bill thanh toán</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:rgba(59,130,246,0.08);border-radius:10px;">
+            <div class="text-muted" style="font-size:11px;margin-bottom:6px;">✍️ Thu nhập thủ công khác</div>
+            <div style="font-size:28px;font-weight:800;color:var(--info);">${formatCurrency(summary.manualIncome)}</div>
+            <div style="font-size:12px;color:var(--info);margin-top:4px;">${summary.manualBills} khoản</div>
+          </div>
+        </div>
+        <p class="text-muted" style="font-size:10px;margin:10px 0 0;text-align:center;opacity:0.6;">
+          CUKCUK = bill từ POS, tự động đồng bộ mỗi 2 phút · Thu thủ công = giao dịch nhập tay trên webapp
+        </p>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- ═══ TỔNG HỢP THU CHI (Webapp) ═══ -->
     <div class="stats-grid">
       <div class="stat-card stat-primary">
         <div class="stat-icon"><span class="material-symbols-rounded">account_balance_wallet</span></div>
@@ -47,22 +70,16 @@ export function render() {
       <div class="stat-card stat-success">
         <div class="stat-icon"><span class="material-symbols-rounded">trending_up</span></div>
         <div class="stat-info">
-          <span class="stat-label">Tổng doanh thu</span>
+          <span class="stat-label">Tổng THU trong ca</span>
           <span class="stat-value">${formatCurrency(summary.totalIncome)}</span>
+          <span class="stat-sub text-muted" style="font-size:10px;">${hasCukcuk ? 'CUKCUK: ' + formatCurrency(summary.cukcukRevenue) + ' + Khác: ' + formatCurrency(summary.manualIncome) : summary.billCount + ' bill'}</span>
         </div>
       </div>
       <div class="stat-card stat-danger">
         <div class="stat-icon"><span class="material-symbols-rounded">trending_down</span></div>
         <div class="stat-info">
-          <span class="stat-label">Tổng chi</span>
+          <span class="stat-label">Tổng CHI trong ca</span>
           <span class="stat-value">${formatCurrency(summary.totalExpense)}</span>
-        </div>
-      </div>
-      <div class="stat-card stat-info">
-        <div class="stat-icon"><span class="material-symbols-rounded">receipt_long</span></div>
-        <div class="stat-info">
-          <span class="stat-label">Số bill</span>
-          <span class="stat-value">${summary.billCount}</span>
         </div>
       </div>
       <div class="stat-card" style="border-left-color: var(--primary);">
@@ -70,10 +87,12 @@ export function render() {
         <div class="stat-info">
           <span class="stat-label">Tiền mặt kỳ vọng</span>
           <span class="stat-value">${formatCurrency(summary.expectedCash)}</span>
+          <span class="stat-sub text-muted" style="font-size:10px;">= Đầu ca + TM thu − TM chi ± Khác</span>
         </div>
       </div>
     </div>
 
+    <!-- ═══ PAYMENT BREAKDOWN + RECENT ═══ -->
     <div class="dashboard-grid">
       <!-- Payment Breakdown -->
       <div class="card">
@@ -83,11 +102,16 @@ export function render() {
             { label: 'Tiền mặt', icon: 'payments', value: summary.cashIncome, color: 'var(--success)' },
             { label: 'Quẹt thẻ', icon: 'credit_card', value: summary.cardIncome, color: 'var(--info)' },
             { label: 'Chuyển khoản', icon: 'swap_horiz', value: summary.transferIncome, color: 'var(--primary)' }
-          ].map(pm => `
+          ].map(item => `
             <div class="payment-row">
-              <div class="payment-label"><span class="material-symbols-rounded" style="font-size:18px;color:${pm.color};">${pm.icon}</span> ${pm.label}</div>
-              <div class="payment-bar-track"><div class="payment-bar-fill" style="width:${Math.round(pm.value / maxPayment * 100)}%;background:${pm.color};"></div></div>
-              <div class="payment-amount">${formatCurrency(pm.value)}</div>
+              <div class="payment-label">
+                <span class="material-symbols-rounded" style="color:${item.color};font-size:18px;">${item.icon}</span>
+                <span>${item.label}</span>
+              </div>
+              <div class="payment-bar-wrap">
+                <div class="payment-bar" style="width:${(item.value / maxPayment * 100)}%;background:${item.color};"></div>
+              </div>
+              <span class="payment-value">${formatCurrency(item.value)}</span>
             </div>
           `).join('')}
         </div>
@@ -95,77 +119,133 @@ export function render() {
 
       <!-- Recent Transactions -->
       <div class="card">
-        <div class="card-header">
-          <h3>📋 Giao dịch gần đây</h3>
-          <button class="btn btn-outline btn-sm" onclick="window.navigateTo('transactions')">Xem tất cả →</button>
-        </div>
-        <div class="card-body" style="max-height:250px;overflow:auto;">
-          ${(shift.transactions || []).slice(-5).reverse().map(tx => `
-            <div class="tx-preview-item">
-              <span class="material-symbols-rounded" style="color:${tx.type === 'income' ? 'var(--success)' : 'var(--danger)'};">${tx.type === 'income' ? 'south_west' : 'north_east'}</span>
-              <div class="tx-preview-info">
-                <strong>${tx.category}</strong>
-                <small>${formatTime(tx.timestamp)} · ${tx.paymentMethod === 'cash' ? 'Tiền mặt' : tx.paymentMethod === 'card' ? 'Thẻ' : 'CK'}</small>
+        <div class="card-header"><h3>🕒 Giao dịch gần đây</h3></div>
+        <div class="card-body" style="max-height:240px;overflow-y:auto;">
+          ${(shift.transactions || []).slice(-8).reverse().map(tx => {
+            const isCukcuk = tx.note && tx.note.indexOf('[CUKCUK]') !== -1;
+            return `
+              <div class="tx-row">
+                <div class="tx-info">
+                  <span class="tx-type ${tx.type === 'income' ? 'type-income' : 'type-expense'}">${tx.type === 'income' ? '↑' : '↓'}</span>
+                  <div>
+                    <span class="tx-cat">${isCukcuk ? '🔗 ' : ''}${tx.category}</span>
+                    <span class="tx-note">${tx.note ? tx.note.substring(0, 50) : ''}</span>
+                  </div>
+                </div>
+                <span class="tx-amount ${tx.type === 'income' ? 'amount-in' : 'amount-out'}">${tx.type === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}</span>
               </div>
-              <span class="${tx.type === 'income' ? 'amount-in' : 'amount-out'}">${tx.type === 'income' ? '+' : '−'}${formatCurrency(tx.amount)}</span>
-            </div>
-          `).join('') || '<p class="text-muted text-center" style="padding:20px;">Chưa có giao dịch</p>'}
+            `;
+          }).join('') || '<div class="text-muted text-center" style="padding:20px;">Chưa có giao dịch</div>'}
         </div>
       </div>
     </div>
 
-    ${notifs.length ? _renderNotifications(notifs, unread) : ''}
+    <!-- ═══ RECENT SHIFTS ═══ -->
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header"><h3>📋 Ca gần đây</h3></div>
+      <div class="card-body" style="max-height:200px;overflow-y:auto;">
+        ${(function() {
+          const history = getShiftHistory().slice(0, 5);
+          if (history.length === 0) return '<div class="text-muted text-center" style="padding:20px;">Chưa có lịch sử ca</div>';
+          return history.map(function(sh) {
+            const sm = getShiftSummary(sh);
+            return '<div class="tx-row" style="cursor:pointer;" onclick="window.navigateTo(\'history\')">' +
+              '<div class="tx-info">' +
+                '<span class="tx-type type-income">Ca' + sh.shiftNumber + '</span>' +
+                '<div>' +
+                  '<span class="tx-cat">' + sh.cashierName + ' — ' + formatDate(sh.date) + '</span>' +
+                  '<span class="tx-note">' + formatTime(sh.startTime) + ' → ' + formatTime(sh.endTime) + '</span>' +
+                '</div>' +
+              '</div>' +
+              '<span class="tx-amount amount-in">' + formatCurrency(sm.totalIncome) + '</span>' +
+            '</div>';
+          }).join('');
+        })()}
+      </div>
+    </div>
   `;
 }
 
-function _renderRecentShifts() {
-  const history = getShiftHistory().slice(0, 3);
-  if (!history.length) return '';
-  return `
-    <div class="card" style="margin-top:20px;">
-      <div class="card-header"><h3>📊 Ca gần nhất</h3></div>
-      <div class="card-body">
-        ${history.map(sh => {
-          const sm = getShiftSummary(sh);
-          return `<div class="tx-preview-item">
-            <span class="material-symbols-rounded" style="color:var(--primary);">work_history</span>
-            <div class="tx-preview-info">
-              <strong>Ca ${sh.shiftNumber} — ${sh.cashierName}</strong>
-              <small>${formatDate(sh.date)}</small>
-            </div>
-            <span class="amount-in">${formatCurrency(sm.totalIncome)}</span>
-          </div>`;
-        }).join('')}
+export function render() {
+  const shift = getCurrentShift();
+  if (!shift) {
+    return `
+      <div class="empty-state">
+        <span class="material-symbols-rounded empty-icon">storefront</span>
+        <h2>Chào mừng đến KING's GRILL</h2>
+        <p>Mở ca để bắt đầu quản lý thu chi</p>
+        <button class="btn btn-primary" onclick="window.navigateTo('shift')">
+          <span class="material-symbols-rounded">play_arrow</span> Mở ca
+        </button>
       </div>
-    </div>`;
-}
-
-function _renderNotifications(notifs, unread) {
-  return `
-    <div class="card" style="margin-top:20px;">
-      <div class="card-header">
-        <h3>🔔 Thông báo ${unread > 0 ? `<span class="notif-badge">${unread}</span>` : ''}</h3>
-        ${unread > 0 ? '<button class="btn btn-outline btn-sm" id="btnMarkAllRead">Đánh dấu đã đọc</button>' : ''}
-      </div>
-      <div class="card-body">
-        ${notifs.map(n => `
-          <div class="notif-item ${n.read ? '' : 'unread'}">
-            <span class="material-symbols-rounded" style="color:${n.type === 'success' ? 'var(--success)' : n.type === 'warning' ? 'var(--warning)' : 'var(--info)'};">
-              ${n.type === 'success' ? 'check_circle' : n.type === 'warning' ? 'warning' : 'info'}
-            </span>
-            <div style="flex:1;">
-              <p style="margin:0;">${n.message}</p>
-              <small class="text-muted">${formatTime(n.timestamp)}</small>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    </div>`;
+    `;
+  }
+  return renderShiftDashboard(shift);
 }
 
 export function init() {
-  document.getElementById('btnMarkAllRead')?.addEventListener('click', () => {
-    markAllRead();
-    window.refreshView?.();
+  // CUKCUK sync button on dashboard
+  document.getElementById('btnDashSyncCukcuk')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnDashSyncCukcuk');
+    const status = document.getElementById('cukcukSyncStatus');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-rounded">hourglass_top</span> Đang đồng bộ...';
+    }
+    if (status) status.textContent = '⏳';
+    try {
+      const { syncTransactions } = await import('../integration/cukcuk.js');
+      const result = await syncTransactions();
+      if (result && result.success) {
+        if (status) status.textContent = '✅ ' + result.synced + ' mới / ' + result.total + ' tổng';
+        if (result.synced > 0) window.refreshView?.();
+      } else {
+        if (status) status.textContent = '❌ ' + (result?.message || 'Lỗi').substring(0, 30);
+      }
+    } catch(e) {
+      if (status) status.textContent = '❌ Lỗi';
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-rounded">sync</span> Đồng bộ';
+    }
+  });
+
+  // CUKCUK RE-SYNC button (clear old + refetch all)
+  document.getElementById('btnDashResyncCukcuk')?.addEventListener('click', async () => {
+    if (!confirm('Xóa toàn bộ dữ liệu CUKCUK cũ trong ca và đồng bộ lại từ đầu?\n\nThao tác này sẽ:\n• Xóa tất cả bill CUKCUK đã sync\n• Lấy lại từ đầu với đầy đủ chi tiết thanh toán\n\nTiếp tục?')) return;
+    
+    const btn = document.getElementById('btnDashResyncCukcuk');
+    const status = document.getElementById('cukcukSyncStatus');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-rounded">hourglass_top</span> Đang xử lý...';
+    }
+    if (status) status.textContent = '🔄 Re-sync...';
+    try {
+      const { resyncAllTransactions } = await import('../integration/cukcuk.js');
+      const result = await resyncAllTransactions();
+      if (result && result.success) {
+        var msg = '✅ ' + result.synced + ' bill';
+        if (result.payments) {
+          var p = result.payments;
+          var parts = [];
+          if (p.cash > 0) parts.push('TM: ' + p.cash.toLocaleString('vi-VN'));
+          if (p.card > 0) parts.push('Thẻ: ' + p.card.toLocaleString('vi-VN'));
+          if (p.transfer > 0) parts.push('CK: ' + p.transfer.toLocaleString('vi-VN'));
+          if (parts.length > 0) msg += ' (' + parts.join(' | ') + ')';
+        }
+        if (status) status.textContent = msg;
+        window.refreshView?.();
+      } else {
+        if (status) status.textContent = '❌ ' + (result?.message || 'Lỗi').substring(0, 40);
+      }
+    } catch(e) {
+      if (status) status.textContent = '❌ ' + e.message;
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-rounded">refresh</span> Sync lại';
+    }
   });
 }

@@ -3,7 +3,16 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   server: {
     port: 3000,
-    open: true
+    open: true,
+    // CORS Proxy for CUKCUK API - routes /cukcuk-api/* to graphapi.cukcuk.vn
+    proxy: {
+      '/cukcuk-api': {
+        target: 'https://graphapi.cukcuk.vn',
+        changeOrigin: true,
+        rewrite: function(path) { return path.replace(/^\/cukcuk-api/, ''); },
+        secure: true
+      }
+    }
   },
   build: {
     // Target older Chromium for Cốc Cốc browser compatibility

@@ -47,6 +47,8 @@ function _handleCashierRequest(e) {
       // Settings
       case 'getSettings':     result = _getSettings(); break;
       case 'saveSettings':    result = _saveSettings(data); break;
+      // CUKCUK Revenue (monthly sheets)
+      case 'syncCukcukRevenue': result = _syncCukcukRevenue(data); break;
       // Health
       case 'ping':            result = { success: true, message: 'pong', timestamp: new Date().toISOString() }; break;
       default:
@@ -202,7 +204,8 @@ function _getStaff() {
   const headers = ['id','name','pin','role','status','createdAt'];
   _getSheet('KG_STAFF', headers); // ensure exists
   const rows = _getSheetData('KG_STAFF');
-  return { success: true, staff: rows.map(r => ({ ...r, pin: r.pin ? '****' : '' })) };
+  // Return full staff data including PIN for client-side verification (internal tool)
+  return { success: true, staff: rows };
 }
 
 function _saveStaff(data) {
@@ -412,4 +415,150 @@ function cashier_initAllSheets() {
   });
 
   Logger.log('✅ KG-Cashier sheets and folders initialized');
+}
+
+// ══════════════════════════════════════════════
+//  CUKCUK REVENUE — Monthly Google Sheets Sync
+//  Sheet per month: CUKCUK_T04-2026, CUKCUK_T05-2026...
+//  Webapp pushes data here; no loading back.
+// ══════════════════════════════════════════════
+
+const CUKCUK_HEADERS = [
+  'RefId',        // Unique invoice ID from CUKCUK
+  'RefNo',        // Bill number
+  'RefDate',      // Invoice date
+  'TableName',    // Table name
+  'EmployeeName', // Cashier name
+  'Amount',       // Total invoice amount
+  'CashAmount',   // Paid by cash
+  'CardAmount',   // Paid by card
+  'TransferAmount', // Paid by transfer
+  'PaymentInfo',  // Payment method summary
+  'ShiftId',      // Which shift synced this
+  'SyncedAt'      // When it was synced
+];
+
+function _syncCukcukRevenue(data) {
+  if (!data || !data.invoices || !Array.isArray(data.invoices)) {
+    return { success: false, message: 'No invoices data' };
+  }
+
+  const ss = SpreadsheetApp.openById(CASHIER_SS_ID);
+  const invoices = data.invoices;
+  const shiftId = data.shiftId || '';
+  const now = new Date().toISOString();
+  
+  // Group invoices by month
+  const byMonth = {};
+  invoices.forEach(inv => {
+    let monthKey = 'unknown';
+    try {
+      const d = new Date(inv.refDate);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const y = d.getFullYear();
+      monthKey = 'T' + m + '-' + y;
+    } catch(e) {
+      monthKey = 'unknown';
+    }
+    if (!byMonth[monthKey]) byMonth[monthKey] = [];
+    byMonth[monthKey].push(inv);
+  });
+  
+  let totalInserted = 0;
+  let totalUpdated = 0;
+  
+  // Process each month
+  for (const monthKey in byMonth) {
+    const sheetName = 'CUKCUK_' + monthKey;
+    let sheet = ss.getSheetByName(sheetName);
+    
+    // Create sheet if not exists
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(CUKCUK_HEADERS);
+      // Format header
+      const headerRange = sheet.getRange(1, 1, 1, CUKCUK_HEADERS.length);
+      headerRange.setFontWeight('bold');
+      headerRange.setBackground('#10b981');
+      headerRange.setFontColor('#ffffff');
+      // Freeze header
+      sheet.setFrozenRows(1);
+      // Set column widths
+      sheet.setColumnWidth(1, 280); // RefId
+      sheet.setColumnWidth(2, 120); // RefNo
+      sheet.setColumnWidth(3, 160); // RefDate
+      sheet.setColumnWidth(4, 100); // Table
+      sheet.setColumnWidth(5, 120); // Employee
+      sheet.setColumnWidth(6, 130); // Amount
+      sheet.setColumnWidth(7, 130); // Cash
+      sheet.setColumnWidth(8, 130); // Card
+      sheet.setColumnWidth(9, 130); // Transfer
+      sheet.setColumnWidth(10, 150); // PaymentInfo
+      sheet.setColumnWidth(11, 200); // ShiftId
+      sheet.setColumnWidth(12, 160); // SyncedAt
+    }
+    
+    // Build existing RefId index for fast lookup (upsert)
+    const lastRow = sheet.getLastRow();
+    const existingRefIds = {};
+    if (lastRow > 1) {
+      const refIdCol = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = 0; i < refIdCol.length; i++) {
+        existingRefIds[String(refIdCol[i][0])] = i + 2; // row number (1-indexed, +1 for header)
+      }
+    }
+    
+    // Process invoices for this month
+    const monthInvoices = byMonth[monthKey];
+    const newRows = [];
+    
+    for (let i = 0; i < monthInvoices.length; i++) {
+      const inv = monthInvoices[i];
+      const refId = String(inv.refId || '');
+      
+      const row = [
+        refId,
+        inv.refNo || '',
+        inv.refDate || '',
+        inv.tableName || '',
+        inv.employeeName || '',
+        inv.amount || 0,
+        inv.cashAmount || 0,
+        inv.cardAmount || 0,
+        inv.transferAmount || 0,
+        inv.paymentInfo || '',
+        shiftId,
+        now
+      ];
+      
+      if (existingRefIds[refId]) {
+        // Update existing row
+        sheet.getRange(existingRefIds[refId], 1, 1, row.length).setValues([row]);
+        totalUpdated++;
+      } else {
+        // New row
+        newRows.push(row);
+        totalInserted++;
+      }
+    }
+    
+    // Batch append new rows
+    if (newRows.length > 0) {
+      sheet.getRange(lastRow + 1, 1, newRows.length, CUKCUK_HEADERS.length).setValues(newRows);
+    }
+    
+    // Format amount columns as number
+    if (sheet.getLastRow() > 1) {
+      const amtRange = sheet.getRange(2, 6, sheet.getLastRow() - 1, 4); // Amount, Cash, Card, Transfer
+      amtRange.setNumberFormat('#,##0');
+    }
+  }
+  
+  return {
+    success: true,
+    message: 'Đã đồng bộ ' + totalInserted + ' mới, cập nhật ' + totalUpdated + ' hóa đơn',
+    inserted: totalInserted,
+    updated: totalUpdated,
+    total: invoices.length
+  };
 }

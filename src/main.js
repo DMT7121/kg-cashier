@@ -227,7 +227,37 @@ function initApp() {
         renderCurrentView();
       }
     });
-  }, 10000); // Check every 10 seconds
+  }, 5000); // Check every 5 seconds for real-time updates
+
+  // CUKCUK auto-sync: always active when shift is open and CUKCUK is configured
+  // Sync immediately on load, then every 2 minutes
+  function _triggerCukcukSync(isInitial) {
+    try {
+      var shift = getCurrentShift();
+      if (!shift) return;
+      var settings = JSON.parse(localStorage.getItem('kg-cashier-data') || '{}');
+      var cukcuk = settings.settings && settings.settings.cukcuk;
+      if (!cukcuk || !cukcuk.key) return;
+      
+      console.log('[Main] CUKCUK auto-sync' + (isInitial ? ' (initial)' : '') + ' triggered');
+      import('./integration/cukcuk.js').then(function(mod) {
+        mod.syncTransactions().then(function(result) {
+          if (result && result.success && result.synced > 0) {
+            console.log('[Main] CUKCUK auto-sync: Added ' + result.synced + ' invoices');
+            renderCurrentView();
+          }
+        }).catch(function() {});
+      }).catch(function() {});
+    } catch(e) {
+      console.warn('[Main] CUKCUK auto-sync error:', e);
+    }
+  }
+
+  // Immediate sync on load (with 3s delay to let UI settle)
+  setTimeout(function() { _triggerCukcukSync(true); }, 3000);
+
+  // Then every 2 minutes
+  setInterval(function() { _triggerCukcukSync(false); }, 120000);
 
   console.log('[KG-CASHIER] Ready!');
 }

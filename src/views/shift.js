@@ -1,8 +1,21 @@
-import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser } from '../store.js';
+import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff } from '../store.js';
 import { showToast, showModal, hideModal, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
 import { getStaffFromCloud } from '../api.js';
 
 let _staffList = [];
+
+function _populateStaffSelect(staffList) {
+  _staffList = staffList;
+  var select = document.getElementById('staffSelect');
+  if (!select) return;
+  var activeStaff = staffList.filter(function(s) { return s.status === 'active'; });
+  if (activeStaff.length === 0) {
+    select.innerHTML = '<option value="">-- Chưa có nhân viên --</option>';
+  } else {
+    select.innerHTML = '<option value="">-- Chọn nhân viên --</option>' + 
+      activeStaff.map(function(s) { return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('');
+  }
+}
 
 export function render() {
   const shift = getCurrentShift();
@@ -95,6 +108,7 @@ export function render() {
             <select id="staffSelect" class="form-input" required autofocus>
               <option value="">-- Đang tải... --</option>
             </select>
+            <p class="form-hint" id="staffLoadStatus" style="margin-top:4px;"></p>
           </div>
           <div class="form-group">
             <label class="form-label"># Số ca</label>
@@ -261,15 +275,45 @@ export function init() {
 
   } else {
     // ── OPEN SHIFT ──
-    // Load staff
-    getStaffFromCloud().then(res => {
-      if (res.success) {
-        _staffList = res.staff || [];
-        const select = document.getElementById('staffSelect');
-        if (select) {
-          select.innerHTML = '<option value="">-- Chọn nhân viên --</option>' + 
-            _staffList.filter(s => s.status === 'active').map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    var statusEl = document.getElementById('staffLoadStatus');
+
+    // Step 1: Immediately show cached staff (instant, no network)
+    var cached = getCachedStaff();
+    if (cached && cached.length > 0) {
+      _populateStaffSelect(cached);
+      if (statusEl) statusEl.textContent = '✅ ' + cached.length + ' nhân viên (cache)';
+    }
+
+    // Step 2: Load fresh staff from cloud in background (real-time update)
+    getStaffFromCloud().then(function(res) {
+      if (res.success && res.staff) {
+        var cloudStaff = res.staff;
+        // Save to local cache for next time
+        setCachedStaff(cloudStaff);
+        // Update the dropdown with fresh data
+        _populateStaffSelect(cloudStaff);
+        if (statusEl) {
+          statusEl.textContent = '☁️ ' + cloudStaff.length + ' nhân viên (cloud)';
+          statusEl.style.color = 'var(--success)';
         }
+      } else {
+        // Cloud failed but we still have cache
+        if (cached && cached.length > 0) {
+          if (statusEl) {
+            statusEl.textContent = '⚠️ Cloud offline — dùng dữ liệu cache';
+            statusEl.style.color = 'var(--warning)';
+          }
+        } else {
+          if (statusEl) {
+            statusEl.textContent = '❌ Không tải được nhân viên. Kiểm tra kết nối.';
+            statusEl.style.color = 'var(--danger)';
+          }
+        }
+      }
+    }).catch(function() {
+      if (statusEl && (!cached || cached.length === 0)) {
+        statusEl.textContent = '❌ Lỗi kết nối Cloud';
+        statusEl.style.color = 'var(--danger)';
       }
     });
 
@@ -289,8 +333,15 @@ export function init() {
 
       if (!staffId) { _showFormError('Vui lòng chọn nhân viên'); return; }
       
-      const staff = _staffList.find(s => s.id === staffId);
-      if (!staff || staff.pin !== pin) {
+      const staff = _staffList.find(function(s) { return s.id === staffId; });
+      if (!staff) {
+        _showFormError('Không tìm thấy nhân viên. Hãy thử tải lại trang.');
+        return;
+      }
+      
+      // PIN verification - check if PIN matches
+      // Note: if staff.pin is '****' (masked from old API), skip PIN check
+      if (staff.pin && staff.pin !== '****' && staff.pin !== pin) {
         _showFormError('Mã PIN không chính xác!');
         _highlightField('staffPin');
         return;
@@ -311,7 +362,7 @@ export function init() {
         sessionStorage.setItem('shift_validated', result.id);
         setLoggedInUser(staff);
 
-        showToast(`Ca ${num} đã mở thành công! 🎉`, 'success');
+        showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');
         if (window.navigateTo) window.navigateTo('dashboard');
         else window.refreshView?.();
       } catch (err) {

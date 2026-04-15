@@ -1,4 +1,4 @@
-/* ── Settings View (Feature 8+9+Categories) ── */
+/* ── Settings View (Feature 8+9+Categories+CUKCUK) ── */
 import { getSettings, updateSettings, getCategories, addCategory, removeCategory } from '../store.js';
 import { showToast } from '../utils.js';
 import { saveSettingsToCloud, pingAPI, isOnline, getQueueSize } from '../api.js';
@@ -7,6 +7,12 @@ export function render() {
   const s = getSettings();
   const online = isOnline();
   const queueSize = getQueueSize();
+
+  // CUKCUK status
+  const hasCukcuk = s.cukcuk && s.cukcuk.domain && s.cukcuk.appId && s.cukcuk.key;
+  const cukcukDomain = (s.cukcuk && s.cukcuk.domain) ? s.cukcuk.domain : '';
+  const cukcukAppId = (s.cukcuk && s.cukcuk.appId) ? s.cukcuk.appId : '';
+  const cukcukKey = (s.cukcuk && s.cukcuk.key) ? s.cukcuk.key : '';
 
   return `
     <div class="section-header">
@@ -76,31 +82,57 @@ export function render() {
     </div>
 
     <!-- CUKCUK Integration -->
-    <div class="card mt-24" style="border:1px solid #10b981;">
-      <div class="card-header" style="background:rgba(16,185,129,0.1);color:#059669;"><h3>🔌 Tích hợp MISA CUKCUK (Beta)</h3></div>
+    <div class="card mt-24" style="border:1px solid ${hasCukcuk ? '#10b981' : 'rgba(255,255,255,.15)'};">
+      <div class="card-header" style="background:rgba(16,185,129,0.1);color:#059669;">
+        <h3>🔌 Tích hợp MISA CUKCUK</h3>
+        ${hasCukcuk ? '<span class="tag tag-income" style="font-size:11px;">Đã cấu hình</span>' : '<span class="tag tag-expense" style="font-size:11px;">Chưa cấu hình</span>'}
+      </div>
       <div class="card-body">
-        <p class="text-muted" style="font-size:12px;margin-bottom:15px;">Tự động đồng bộ doanh thu và phiếu thu/chi từ hệ thống CUKCUK Pos.</p>
+        <p class="text-muted" style="font-size:12px;margin-bottom:15px;">
+          Tự động đồng bộ hóa đơn thanh toán từ hệ thống CUKCUK POS vào mục <strong>Khoản thu</strong> (Doanh thu bán hàng).
+          <br>Để lấy thông tin cấu hình: Đăng nhập CUKCUK → Ứng dụng → API → Tạo mã kết nối.
+        </p>
         
         <div class="form-group">
-          <label class="form-label">Tên miền CUKCUK (Ví dụ: kingsgrill.cukcuk.vn)</label>
-          <input type="text" class="form-input" id="cuk_domain" value="${s.cukcuk?.domain || ''}" placeholder="domain.cukcuk.vn">
+          <label class="form-label">Tên miền CUKCUK</label>
+          <input type="text" class="form-input" id="cuk_domain" value="${cukcukDomain}" placeholder="kinggrill hoặc kinggrill.cukcuk.vn">
+          <p class="form-hint">Chỉ cần nhập phần tên, VD: kinggrill (không cần .cukcuk.vn)</p>
         </div>
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
           <div class="form-group">
-            <label class="form-label">App ID (Client ID)</label>
-            <input type="text" class="form-input" id="cuk_appId" value="${s.cukcuk?.appId || ''}">
+            <label class="form-label">App ID (Tên kết nối)</label>
+            <input type="text" class="form-input" id="cuk_appId" value="${cukcukAppId}" placeholder="CUKCUKOpenPlatform">
           </div>
           <div class="form-group">
-            <label class="form-label">Access Token / Key</label>
-            <input type="password" class="form-input" id="cuk_key" value="${s.cukcuk?.key || ''}">
+            <label class="form-label">Secret Key (Mã bảo mật)</label>
+            <input type="password" class="form-input" id="cuk_key" value="${cukcukKey}" placeholder="Dán Secret Key từ CUKCUK">
           </div>
+        </div>
+
+        <!-- Auto-sync toggle -->
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08);margin-top:10px;">
+          <label class="form-label" style="margin-bottom:0;flex:1;">
+            Tự động đồng bộ khi mở ca
+            <span class="text-muted" style="font-size:11px;display:block;">Tự động lấy hóa đơn CUKCUK mỗi 5 phút khi ca đang mở</span>
+          </label>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;">
+            <input type="checkbox" id="cuk_autoSync" ${(s.cukcuk && s.cukcuk.autoSync) ? 'checked' : ''} style="opacity:0;width:0;height:0;">
+            <span style="position:absolute;cursor:pointer;inset:0;background:${(s.cukcuk && s.cukcuk.autoSync) ? 'var(--success)' : 'rgba(255,255,255,.1)'};border-radius:12px;transition:.3s;"></span>
+          </label>
         </div>
         
         <div style="display:flex;gap:10px;margin-top:10px;">
-          <button class="btn btn-outline btn-sm" id="btnTestCukCuk">Kiểm tra kết nối</button>
-          <button class="btn btn-success btn-sm" id="btnSyncCukCuk">🔄 Đồng bộ ngay</button>
+          <button class="btn btn-outline btn-sm" id="btnTestCukCuk">
+            <span class="material-symbols-rounded">wifi_find</span> Kiểm tra kết nối
+          </button>
+          <button class="btn btn-success btn-sm" id="btnSyncCukCuk">
+            <span class="material-symbols-rounded">sync</span> Đồng bộ hóa đơn ngay
+          </button>
         </div>
+
+        <!-- Connection result display -->
+        <div id="cukcukResult" style="display:none;margin-top:12px;padding:12px 16px;border-radius:8px;font-size:13px;white-space:pre-wrap;"></div>
       </div>
     </div>
 
@@ -196,6 +228,16 @@ function _bindCatRemoveEvents() {
   });
 }
 
+function _showCukcukResult(message, isSuccess) {
+  const el = document.getElementById('cukcukResult');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.background = isSuccess ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+  el.style.border = '1px solid ' + (isSuccess ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)');
+  el.style.color = isSuccess ? '#34d399' : '#f87171';
+  el.textContent = message;
+}
+
 export function init() {
   // Category management
   _bindCatRemoveEvents();
@@ -231,7 +273,8 @@ export function init() {
   });
 
   // Save settings (extracted for reuse)
-  const performSave = (silent = false) => {
+  const performSave = (silent) => {
+    if (silent === undefined) silent = false;
     const newSettings = {
       storeName: document.getElementById('settStoreName').value,
       storeAddress: document.getElementById('settStoreAddress').value,
@@ -242,11 +285,12 @@ export function init() {
       cukcuk: {
         domain: document.getElementById('cuk_domain').value,
         appId: document.getElementById('cuk_appId').value,
-        key: document.getElementById('cuk_key').value
+        key: document.getElementById('cuk_key').value,
+        autoSync: document.getElementById('cuk_autoSync').checked
       }
     };
     updateSettings(newSettings);
-    saveSettingsToCloud(newSettings).catch(() => {});
+    saveSettingsToCloud(newSettings).catch(function() {});
     if (!silent) showToast('Đã lưu tất cả cài đặt', 'success');
   };
 
@@ -255,20 +299,69 @@ export function init() {
   // CUKCUK Actions
   document.getElementById('btnTestCukCuk')?.addEventListener('click', async () => {
     performSave(true); // Silent save
-    showToast('Đang kiểm tra kết nối...', 'info');
-    const { testConnection } = await import('../integration/cukcuk.js');
-    const result = await testConnection();
-    if (result.success) {
-      showToast('✅ Kết nối CUKCUK thành công!', 'success');
-    } else {
-      showToast('❌ ' + result.message, 'error');
+    const btn = document.getElementById('btnTestCukCuk');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-rounded">hourglass_top</span> Đang kiểm tra...';
+    }
+    
+    showToast('Đang kiểm tra kết nối CUKCUK...', 'info');
+    
+    try {
+      const { testConnection } = await import('../integration/cukcuk.js');
+      const result = await testConnection();
+      if (result.success) {
+        showToast('✅ Kết nối CUKCUK thành công!', 'success');
+        _showCukcukResult('✅ Kết nối thành công! Token đã được lưu cache.\nBạn có thể bấm "Đồng bộ hóa đơn ngay" để lấy dữ liệu.', true);
+      } else {
+        showToast('❌ ' + result.message, 'error');
+        _showCukcukResult('❌ ' + result.message, false);
+      }
+    } catch(e) {
+      showToast('❌ Lỗi: ' + e.message, 'error');
+      _showCukcukResult('❌ Lỗi: ' + e.message, false);
+    }
+    
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-rounded">wifi_find</span> Kiểm tra kết nối';
     }
   });
 
   document.getElementById('btnSyncCukCuk')?.addEventListener('click', async () => {
     performSave(true); // Silent save
-    const { syncTransactions } = await import('../integration/cukcuk.js');
-    await syncTransactions();
+    const btn = document.getElementById('btnSyncCukCuk');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-rounded">hourglass_top</span> Đang đồng bộ...';
+    }
+    
+    try {
+      const { syncTransactions } = await import('../integration/cukcuk.js');
+      const result = await syncTransactions();
+      if (result && result.success) {
+        var msg = '✅ Đồng bộ hoàn tất!\n';
+        msg += '📊 Tổng hóa đơn: ' + result.total + '\n';
+        msg += '✨ Mới thêm: ' + result.synced + ' (' + (result.amount || 0).toLocaleString('vi-VN') + 'đ)\n';
+        if (result.payments) {
+          var p = result.payments;
+          if (p.cash > 0) msg += '💵 Tiền mặt: ' + p.cash.toLocaleString('vi-VN') + 'đ\n';
+          if (p.card > 0) msg += '💳 Quẹt thẻ: ' + p.card.toLocaleString('vi-VN') + 'đ\n';
+          if (p.transfer > 0) msg += '🏦 Chuyển khoản: ' + p.transfer.toLocaleString('vi-VN') + 'đ\n';
+        }
+        if (result.skipped > 0) msg += '⏭ Đã có từ trước: ' + result.skipped;
+        _showCukcukResult(msg, true);
+      } else if (result) {
+        _showCukcukResult('❌ ' + (result.message || 'Lỗi không xác định'), false);
+      }
+    } catch(e) {
+      _showCukcukResult('❌ Lỗi: ' + e.message, false);
+    }
+    
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-rounded">sync</span> Đồng bộ hóa đơn ngay';
+    }
   });
 
   document.getElementById('btnPingAPI')?.addEventListener('click', async () => {

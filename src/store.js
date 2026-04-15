@@ -26,6 +26,7 @@ try {
 
 var STORAGE_KEY = 'kg-cashier-data';
 var SESSION_KEY = 'kg-cashier-session';
+var STAFF_CACHE_KEY = 'kg-cashier-staff';
 
 var defaultCategories = {
   income: ['Doanh thu bán hàng', 'Doanh thu dịch vụ', 'Thu hồi nợ', 'Thu khác'],
@@ -480,15 +481,27 @@ export function getShiftSummary(shift) {
   var otherTxs = shift.otherTransactions || [];
 
   var totalIncome = 0, totalExpense = 0, cashIncome = 0, cardIncome = 0, transferIncome = 0, cashExpense = 0, otherIncome = 0, otherExpense = 0, billCount = 0;
+  // CUKCUK breakdown
+  var cukcukRevenue = 0, cukcukBills = 0;
+  var manualIncome = 0, manualBills = 0;
 
   for (var i = 0; i < txs.length; i++) {
     var t = txs[i];
+    var isCukcuk = t.note && t.note.indexOf('[CUKCUK]') !== -1;
     if (t.type === 'income') {
       totalIncome += t.amount;
       billCount++;
       if (t.paymentMethod === 'cash') cashIncome += t.amount;
       else if (t.paymentMethod === 'card') cardIncome += t.amount;
       else if (t.paymentMethod === 'transfer') transferIncome += t.amount;
+      // Separate CUKCUK vs manual
+      if (isCukcuk) {
+        cukcukRevenue += t.amount;
+        cukcukBills++;
+      } else {
+        manualIncome += t.amount;
+        manualBills++;
+      }
     } else {
       totalExpense += t.amount;
       if (t.paymentMethod === 'cash') cashExpense += t.amount;
@@ -523,7 +536,12 @@ export function getShiftSummary(shift) {
     discrepancy: discrepancy,
     revenue: totalIncome,
     billCount: billCount,
-    netTotal: expectedCash
+    netTotal: expectedCash,
+    // CUKCUK breakdown
+    cukcukRevenue: cukcukRevenue,
+    cukcukBills: cukcukBills,
+    manualIncome: manualIncome,
+    manualBills: manualBills
   };
 }
 
@@ -593,7 +611,7 @@ function _syncCurrentShift() {
       }
       try { _cloudSync(cleanShift).catch(function() {}); } catch (e) { /* ignore */ }
     }
-  }, 3000);
+  }, 1500); // 1.5s debounce for near real-time sync
 }
 
 export async function syncCurrentShiftWithCloud() {
@@ -695,4 +713,32 @@ export function updatePrintForms(data) {
   s.printForms = data;
   save();
   addAudit('UPDATE_PRINT_FORMS', 'Cập nhật mẫu in');
+}
+
+// ── Staff Cache (localStorage) ───────────────
+// Staff is cached locally so the shift open form always has data immediately
+export function getCachedStaff() {
+  try {
+    var saved = localStorage.getItem(STAFF_CACHE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.warn('[Store] Staff cache read error:', e);
+  }
+  return [];
+}
+
+export function setCachedStaff(staffList) {
+  try {
+    localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(staffList));
+  } catch (e) {
+    console.warn('[Store] Staff cache write error:', e);
+  }
+}
+
+export function clearCachedStaff() {
+  try {
+    localStorage.removeItem(STAFF_CACHE_KEY);
+  } catch (e) { /* ignore */ }
 }

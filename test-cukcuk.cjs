@@ -10,9 +10,9 @@ function generateSignatureHex(payloadStr, secret) {
 
 async function testApi() {
   const loginTime = new Date().toISOString().split('.')[0] + 'Z';
-  const appId = "DemoCUKCUK";
-  const domain = "demo.cukcuk.vn";
-  const secret = "invalid_secret";
+  const appId = "CUKCUKOpenPlatform";
+  const domain = "kinggrill";
+  const secret = "838678be15cd8c84f3cb28cd943a4279c22d89e9bf9f69095927f2af20c129e4";
 
   const variants = [
     { name: "Alphabetical", payloadStr: JSON.stringify({ AppID: appId, Domain: domain, LoginTime: loginTime }) },

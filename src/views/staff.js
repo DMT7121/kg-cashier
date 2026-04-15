@@ -1,6 +1,7 @@
 /* ── Staff Management View (Feature 6) ─────── */
 import { showToast, showModal, hideModal } from '../utils.js';
 import { getStaffFromCloud, saveStaffToCloud, deleteStaffFromCloud } from '../api.js';
+import { setCachedStaff } from '../store.js';
 
 let staffList = [];
 let isStaffAuthed = false;
@@ -45,6 +46,8 @@ async function loadStaff() {
 
   if (result.success) {
     staffList = result.staff || [];
+    // Always save staff to local cache so shift view can use them immediately
+    setCachedStaff(staffList);
   }
 
   if (loading) loading.style.display = 'none';
@@ -74,20 +77,29 @@ async function loadStaff() {
         </div>
       `).join('');
 
-      // Bind events
+      // Bind edit events
+      grid.querySelectorAll('[data-edit-staff]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const staff = staffList.find(s => s.id === btn.dataset.editStaff);
+          if (staff) showStaffModal(staff);
+        });
+      });
+
+      // Bind delete events
       grid.querySelectorAll('[data-delete-staff]').forEach(btn => {
         btn.addEventListener('click', async () => {
           if (!confirm('Xóa nhân viên này?')) return;
           const result = await deleteStaffFromCloud(btn.dataset.deleteStaff);
           showToast(result.message, result.success ? 'success' : 'error');
-          if (result.success) loadStaff();
+          if (result.success) loadStaff(); // Reload also updates cache
         });
       });
     }
   }
 }
 
-function showStaffModal(existing = null) {
+function showStaffModal(existing) {
+  if (!existing) existing = null;
   showModal(`
     <div class="modal-title">
       <span class="material-symbols-rounded">person_add</span>
@@ -95,7 +107,7 @@ function showStaffModal(existing = null) {
     </div>
     <div class="form-group">
       <label class="form-label">Họ tên</label>
-      <input type="text" id="staffName" class="form-input" value="${existing?.name || ''}" placeholder="Nhập họ tên...">
+      <input type="text" id="staffName" class="form-input" value="${existing ? existing.name : ''}" placeholder="Nhập họ tên...">
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -105,9 +117,9 @@ function showStaffModal(existing = null) {
       <div class="form-group">
         <label class="form-label">Vai trò</label>
         <select id="staffRole" class="form-input">
-          <option value="cashier" ${existing?.role === 'cashier' ? 'selected' : ''}>Thu ngân</option>
-          <option value="manager" ${existing?.role === 'manager' ? 'selected' : ''}>Quản lý</option>
-          <option value="admin" ${existing?.role === 'admin' ? 'selected' : ''}>Admin</option>
+          <option value="cashier" ${existing && existing.role === 'cashier' ? 'selected' : ''}>Thu ngân</option>
+          <option value="manager" ${existing && existing.role === 'manager' ? 'selected' : ''}>Quản lý</option>
+          <option value="admin" ${existing && existing.role === 'admin' ? 'selected' : ''}>Admin</option>
         </select>
       </div>
     </div>
@@ -128,10 +140,10 @@ function showStaffModal(existing = null) {
       if (!name) { showToast('Nhập họ tên', 'warning'); return; }
       if (!pin || pin.length < 4) { showToast('PIN cần ít nhất 4 số', 'warning'); return; }
 
-      const result = await saveStaffToCloud({ id: existing?.id, name, pin, role, status: 'active' });
+      const result = await saveStaffToCloud({ id: existing ? existing.id : undefined, name: name, pin: pin, role: role, status: 'active' });
       hideModal();
       showToast(result.message, result.success ? 'success' : 'error');
-      if (result.success) loadStaff();
+      if (result.success) loadStaff(); // Reload also updates cache
     });
   }, 100);
 }

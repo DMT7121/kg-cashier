@@ -27,7 +27,27 @@ export function render() {
   const incomeTxs = txs.filter(t => t.type === 'income');
   const expenseTxs = txs.filter(t => t.type === 'expense');
 
-  // Group income by category
+  // Separate CUKCUK bills from manual transactions
+  const cukcukTxs = incomeTxs.filter(t => t.note && t.note.indexOf('[CUKCUK]') !== -1);
+  const manualIncomeTxs = incomeTxs.filter(t => !t.note || t.note.indexOf('[CUKCUK]') === -1);
+
+  // Group CUKCUK income by category
+  const cukcukByCategory = {};
+  cukcukTxs.forEach(tx => {
+    if (!cukcukByCategory[tx.category]) cukcukByCategory[tx.category] = { cash: 0, card: 0, transfer: 0, count: 0 };
+    cukcukByCategory[tx.category][tx.paymentMethod || 'cash'] += tx.amount;
+    cukcukByCategory[tx.category].count++;
+  });
+
+  // Group manual income by category
+  const manualByCategory = {};
+  manualIncomeTxs.forEach(tx => {
+    if (!manualByCategory[tx.category]) manualByCategory[tx.category] = { cash: 0, card: 0, transfer: 0, count: 0 };
+    manualByCategory[tx.category][tx.paymentMethod || 'cash'] += tx.amount;
+    manualByCategory[tx.category].count++;
+  });
+
+  // Group ALL income by category (for backward compat)
   const incomeByCategory = {};
   incomeTxs.forEach(tx => {
     if (!incomeByCategory[tx.category]) incomeByCategory[tx.category] = { cash: 0, card: 0, transfer: 0, count: 0 };
@@ -106,30 +126,70 @@ export function render() {
         <div class="a4-two-col">
           <!-- CỘT TRÁI: DOANH THU -->
           <div class="a4-col">
-            <div class="a4-section-title a4-income-title">▌DOANH THU</div>
+            ${sm.cukcukBills > 0 ? `
+            <div class="a4-section-title a4-income-title">▌DOANH THU BÁN HÀNG (CUKCUK POS)</div>
             <table class="a4-table">
               <thead>
                 <tr><th>Danh mục</th><th>SL</th><th class="r">Mặt</th><th class="r">Thẻ</th><th class="r">CK</th><th class="r">Tổng</th></tr>
               </thead>
               <tbody>
-                ${Object.entries(incomeByCategory).map(([cat, v]) => {
+                ${Object.entries(cukcukByCategory).map(([cat, v]) => {
                   const total = v.cash + v.card + v.transfer;
-                  return `<tr>
-                    <td class="a4-cat-name">${cat}</td>
-                    <td>${v.count}</td>
-                    <td class="r">${v.cash > 0 ? formatCurrency(v.cash) : '—'}</td>
-                    <td class="r">${v.card > 0 ? formatCurrency(v.card) : '—'}</td>
-                    <td class="r">${v.transfer > 0 ? formatCurrency(v.transfer) : '—'}</td>
-                    <td class="r a4-bold">${formatCurrency(total)}</td>
-                  </tr>`;
-                }).join('') || '<tr><td colspan="6" class="a4-empty">Không có</td></tr>'}
+                  return '<tr>' +
+                    '<td class="a4-cat-name">' + cat + '</td>' +
+                    '<td>' + v.count + '</td>' +
+                    '<td class="r">' + (v.cash > 0 ? formatCurrency(v.cash) : '—') + '</td>' +
+                    '<td class="r">' + (v.card > 0 ? formatCurrency(v.card) : '—') + '</td>' +
+                    '<td class="r">' + (v.transfer > 0 ? formatCurrency(v.transfer) : '—') + '</td>' +
+                    '<td class="r a4-bold">' + formatCurrency(total) + '</td>' +
+                  '</tr>';
+                }).join('')}
               </tbody>
               <tfoot>
                 <tr class="a4-total-row">
-                  <td colspan="2"><strong>TỔNG (${sm.billCount} bill)</strong></td>
-                  <td class="r"><strong>${formatCurrency(sm.cashIncome)}</strong></td>
-                  <td class="r"><strong>${formatCurrency(sm.cardIncome)}</strong></td>
-                  <td class="r"><strong>${formatCurrency(sm.transferIncome)}</strong></td>
+                  <td colspan="2"><strong>CUKCUK (${sm.cukcukBills} bill)</strong></td>
+                  <td class="r" colspan="3"></td>
+                  <td class="r"><strong>${formatCurrency(sm.cukcukRevenue)}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+            ` : ''}
+
+            ${sm.manualBills > 0 ? `
+            <div class="a4-section-title" style="margin-top:6px;color:#3b82f6;">▌THU NHẬP THỦ CÔNG</div>
+            <table class="a4-table">
+              <thead>
+                <tr><th>Danh mục</th><th>SL</th><th class="r">Mặt</th><th class="r">Thẻ</th><th class="r">CK</th><th class="r">Tổng</th></tr>
+              </thead>
+              <tbody>
+                ${Object.entries(manualByCategory).map(([cat, v]) => {
+                  const total = v.cash + v.card + v.transfer;
+                  return '<tr>' +
+                    '<td class="a4-cat-name">' + cat + '</td>' +
+                    '<td>' + v.count + '</td>' +
+                    '<td class="r">' + (v.cash > 0 ? formatCurrency(v.cash) : '—') + '</td>' +
+                    '<td class="r">' + (v.card > 0 ? formatCurrency(v.card) : '—') + '</td>' +
+                    '<td class="r">' + (v.transfer > 0 ? formatCurrency(v.transfer) : '—') + '</td>' +
+                    '<td class="r a4-bold">' + formatCurrency(total) + '</td>' +
+                  '</tr>';
+                }).join('')}
+              </tbody>
+              <tfoot>
+                <tr class="a4-total-row">
+                  <td colspan="2"><strong>Thủ công (${sm.manualBills})</strong></td>
+                  <td class="r" colspan="3"></td>
+                  <td class="r"><strong>${formatCurrency(sm.manualIncome)}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+            ` : ''}
+
+            ${sm.billCount === 0 ? '<div class="a4-empty-box">Không có doanh thu</div>' : ''}
+
+            <table class="a4-table" style="margin-top:4px;">
+              <tfoot>
+                <tr class="a4-highlight-row">
+                  <td><strong>TỔNG DOANH THU (${sm.billCount} bill)</strong></td>
                   <td class="r"><strong>${formatCurrency(sm.totalIncome)}</strong></td>
                 </tr>
               </tfoot>
@@ -191,13 +251,15 @@ export function render() {
             <div class="a4-section-title a4-summary-title">▌TỔNG KẾT</div>
             <table class="a4-table a4-summary-table">
               <tbody>
-                <tr><td>Doanh thu (${sm.billCount} bill)</td><td class="r a4-income">${formatCurrency(sm.totalIncome)}</td></tr>
+                ${sm.cukcukBills > 0 ? '<tr><td>DT bán hàng CUKCUK (' + sm.cukcukBills + ' bill)</td><td class="r a4-income">' + formatCurrency(sm.cukcukRevenue) + '</td></tr>' : ''}
+                ${sm.manualBills > 0 ? '<tr><td>Thu thủ công (' + sm.manualBills + ' khoản)</td><td class="r a4-income">' + formatCurrency(sm.manualIncome) + '</td></tr>' : ''}
                 <tr class="a4-indent"><td>├ Tiền mặt</td><td class="r">${formatCurrency(sm.cashIncome)}</td></tr>
                 <tr class="a4-indent"><td>├ Quẹt thẻ</td><td class="r">${formatCurrency(sm.cardIncome)}</td></tr>
                 <tr class="a4-indent"><td>└ Chuyển khoản</td><td class="r">${formatCurrency(sm.transferIncome)}</td></tr>
+                <tr style="border-top:1px solid rgba(255,255,255,0.1);"><td><strong>Tổng THU (${sm.billCount} bill)</strong></td><td class="r a4-income"><strong>${formatCurrency(sm.totalIncome)}</strong></td></tr>
                 <tr><td>Chi phí trong ca</td><td class="r a4-expense">−${formatCurrency(sm.totalExpense)}</td></tr>
-                ${sm.otherIncome > 0 ? `<tr><td>Thu khác</td><td class="r a4-income">+${formatCurrency(sm.otherIncome)}</td></tr>` : ''}
-                ${sm.otherExpense > 0 ? `<tr><td>Chi khác</td><td class="r a4-expense">−${formatCurrency(sm.otherExpense)}</td></tr>` : ''}
+                ${sm.otherIncome > 0 ? '<tr><td>Thu khác</td><td class="r a4-income">+' + formatCurrency(sm.otherIncome) + '</td></tr>' : ''}
+                ${sm.otherExpense > 0 ? '<tr><td>Chi khác</td><td class="r a4-expense">−' + formatCurrency(sm.otherExpense) + '</td></tr>' : ''}
                 <tr><td>Tiền đầu ca</td><td class="r">${formatCurrency(target.startingCash)}</td></tr>
               </tbody>
               <tfoot>
