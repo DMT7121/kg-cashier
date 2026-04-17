@@ -108,47 +108,109 @@ export function getInvoiceCount() {
   return Object.keys(store.invoices).length;
 }
 
-// ── Query by Date ──
+// ── Working Day Boundaries ──
+// A "working day" runs from 12:00 PM (noon) to 06:00 AM the next morning.
+// All period filters use actual timestamps (refDate) for accurate filtering.
 
-/** Get invoices for a specific date (YYYY-MM-DD) */
-export function getInvoicesByDate(dateStr) {
-  return getAllInvoices().filter(function(inv) {
-    return inv.date === dateStr;
-  });
+/**
+ * Get the working day date string for a given timestamp.
+ * Before 06:00 AM = previous calendar day.
+ */
+function _workingDayDate(dt) {
+  var d = new Date(dt);
+  if (d.getHours() < 6) {
+    d.setDate(d.getDate() - 1);
+  }
+  return _dateStr(d);
 }
 
-/** Get invoices in date range [fromDate, toDate] inclusive */
-export function getInvoicesByDateRange(fromDate, toDate) {
-  return getAllInvoices().filter(function(inv) {
+/**
+ * Get period time boundaries as { start: Date, end: Date }
+ * start = 12:00 PM on the first day of the period
+ * end = 06:00 AM on the day after the last day of the period
+ */
+function _getPeriodBounds(period) {
+  var now = new Date();
+  var start, end;
+
+  switch (period) {
+    case 'day': {
+      // Today: 12:00 PM today → 06:00 AM tomorrow
+      // If before 6AM, "today" is actually yesterday
+      var today = new Date(now);
+      if (today.getHours() < 6) {
+        today.setDate(today.getDate() - 1);
+      }
+      start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0);
+      var tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      end = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 6, 0, 0);
+      break;
+    }
+    case 'week': {
+      // Week: Monday 12:00 PM → next Monday 06:00 AM
+      var monday = new Date(now);
+      if (monday.getHours() < 6) monday.setDate(monday.getDate() - 1);
+      var dayOfWeek = monday.getDay(); // 0=Sun, 1=Mon...
+      var diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // days since Monday
+      monday.setDate(monday.getDate() - diff);
+      start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), 12, 0, 0);
+      var nextMonday = new Date(monday);
+      nextMonday.setDate(nextMonday.getDate() + 7);
+      end = new Date(nextMonday.getFullYear(), nextMonday.getMonth(), nextMonday.getDate(), 6, 0, 0);
+      break;
+    }
+    case 'month': {
+      // Month: 1st 12:00 PM → 1st of next month 06:00 AM
+      var workingDay = new Date(now);
+      if (workingDay.getHours() < 6) workingDay.setDate(workingDay.getDate() - 1);
+      start = new Date(workingDay.getFullYear(), workingDay.getMonth(), 1, 12, 0, 0);
+      var nextMonth = new Date(workingDay.getFullYear(), workingDay.getMonth() + 1, 1);
+      end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), nextMonth.getDate(), 6, 0, 0);
+      break;
+    }
+    case 'quarter': {
+      // Quarter: Q-start 1st 12:00 PM → Q-end+1 1st 06:00 AM
+      var wd = new Date(now);
+      if (wd.getHours() < 6) wd.setDate(wd.getDate() - 1);
+      var qStart = Math.floor(wd.getMonth() / 3) * 3; // 0,3,6,9
+      start = new Date(wd.getFullYear(), qStart, 1, 12, 0, 0);
+      var qEnd = qStart + 3;
+      end = new Date(wd.getFullYear(), qEnd, 1, 6, 0, 0);
+      break;
+    }
+    case 'year':
+    default: {
+      // Year: Jan 1 12:00 PM → Jan 1 next year 06:00 AM
+      var wy = new Date(now);
+      if (wy.getHours() < 6) wy.setDate(wy.getDate() - 1);
+      start = new Date(wy.getFullYear(), 0, 1, 12, 0, 0);
+      end = new Date(wy.getFullYear() + 1, 0, 1, 6, 0, 0);
+      break;
+    }
+  }
+
+  return { start: start, end: end };
+}
+
+/** Get invoices for a named period using timestamp-based filtering */
+export function getInvoicesForPeriod(period) {
+  var bounds = _getPeriodBounds(period);
+  var all = getAllInvoices();
+
+  return all.filter(function(inv) {
+    // Use refDate (original CUKCUK datetime) for accurate time-based filtering
+    if (inv.refDate) {
+      var dt = new Date(inv.refDate);
+      if (!isNaN(dt.getTime())) {
+        return dt >= bounds.start && dt < bounds.end;
+      }
+    }
+    // Fallback: use date string (less accurate but works for older data)
+    var fromDate = _dateStr(bounds.start);
+    var toDate = _dateStr(bounds.end);
     return inv.date >= fromDate && inv.date <= toDate;
   });
-}
-
-/** Get start date for a period */
-function _getPeriodStartDate(period) {
-  var today = new Date();
-  switch (period) {
-    case 'year':
-      return today.getFullYear() + '-01-01';
-    case 'quarter':
-      var qMonth = Math.floor(today.getMonth() / 3) * 3;
-      return today.getFullYear() + '-' + String(qMonth + 1).padStart(2, '0') + '-01';
-    case 'month':
-      return today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-01';
-    case 'week':
-      var d = new Date(today);
-      d.setDate(d.getDate() - 6);
-      return _dateStr(d);
-    default: // 'day'
-      return _todayStr();
-  }
-}
-
-/** Get invoices for a named period */
-export function getInvoicesForPeriod(period) {
-  var fromDate = _getPeriodStartDate(period);
-  var toDate = _todayStr();
-  return getInvoicesByDateRange(fromDate, toDate);
 }
 
 // ── Revenue Summaries ──
@@ -226,20 +288,12 @@ export function getDailyBreakdown(period) {
   });
 }
 
-/** Get revenue for today (working day) */
+/** Get revenue for today (working day) using period bounds */
 export function getTodayRevenue() {
-  // Working day: if before 6AM, counts as yesterday
-  var now = new Date();
-  var workingDate;
-  if (now.getHours() < 6) {
-    var yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    workingDate = _dateStr(yesterday);
-  } else {
-    workingDate = _dateStr(now);
-  }
-
-  var invoices = getInvoicesByDate(workingDate);
+  var bounds = _getPeriodBounds('day');
+  var invoices = getInvoicesForPeriod('day');
+  var workingDate = _dateStr(bounds.start);
+  
   var result = { date: workingDate, total: 0, cash: 0, card: 0, transfer: 0, bills: invoices.length, lastSync: '' };
 
   for (var i = 0; i < invoices.length; i++) {
@@ -258,6 +312,13 @@ export function getTodayRevenue() {
   }
 
   return result;
+}
+
+/** Get invoices for a specific date (YYYY-MM-DD) — utility */
+export function getInvoicesByDate(dateStr) {
+  return getAllInvoices().filter(function(inv) {
+    return inv.date === dateStr;
+  });
 }
 
 // ── Google Sheets Tracking ──

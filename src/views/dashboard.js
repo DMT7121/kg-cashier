@@ -32,17 +32,39 @@ function renderShiftDashboard(shift) {
 
     <!-- ═══ CUKCUK POS REVENUE ═══ -->
     ${hasCukcuk ? (() => {
-      // Read CUKCUK revenue from Invoice Store (source of truth)
+      // Read CUKCUK revenue from Invoice Store using working day boundaries
+      // Working day: 12:00 PM today → 06:00 AM tomorrow
       var cukRev = { total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
       try {
         var storeData = localStorage.getItem('cukcuk_invoice_store');
         if (storeData) {
           var parsed = JSON.parse(storeData);
-          var shiftDate = shift.date || '';
           if (parsed && parsed.invoices) {
+            // Calculate working day bounds
+            var now = new Date();
+            var workDay = new Date(now);
+            if (workDay.getHours() < 6) workDay.setDate(workDay.getDate() - 1);
+            var dayStart = new Date(workDay.getFullYear(), workDay.getMonth(), workDay.getDate(), 12, 0, 0);
+            var dayNext = new Date(workDay);
+            dayNext.setDate(dayNext.getDate() + 1);
+            var dayEnd = new Date(dayNext.getFullYear(), dayNext.getMonth(), dayNext.getDate(), 6, 0, 0);
+            
             for (var k in parsed.invoices) {
-              if (parsed.invoices.hasOwnProperty(k) && parsed.invoices[k].date === shiftDate) {
-                var inv = parsed.invoices[k];
+              if (!parsed.invoices.hasOwnProperty(k)) continue;
+              var inv = parsed.invoices[k];
+              // Filter by refDate timestamp (working day boundaries)
+              var inRange = false;
+              if (inv.refDate) {
+                var dt = new Date(inv.refDate);
+                if (!isNaN(dt.getTime())) {
+                  inRange = dt >= dayStart && dt < dayEnd;
+                }
+              }
+              if (!inRange && inv.date) {
+                // Fallback: match shift date
+                inRange = inv.date === (shift.date || '');
+              }
+              if (inRange) {
                 cukRev.total += inv.amount || 0;
                 cukRev.bills++;
                 (inv.payments || []).forEach(function(p) {
@@ -224,7 +246,7 @@ function _renderRevenuePeriod() {
   
   import('../integration/invoiceStore.js').then(function(store) {
     var rev = store.getRevenueSummary(_revenuePeriod);
-    var periodLabels = { month: 'Tháng này', quarter: 'Quý này', year: 'Năm nay', week: '7 ngày', day: 'Hôm nay' };
+    var periodLabels = { month: 'Tháng này', quarter: 'Quý này', year: 'Năm nay', week: 'Tuần này', day: 'Hôm nay' };
     var periodLabel = periodLabels[_revenuePeriod] || _revenuePeriod;
     
     var dateRange = '';

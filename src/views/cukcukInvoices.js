@@ -37,7 +37,7 @@ export function render() {
 
   var periodLabels = {
     day: 'Hôm nay',
-    week: '7 ngày',
+    week: 'Tuần này',
     month: 'Tháng này',
     quarter: 'Quý này',
     year: 'Năm nay'
@@ -66,7 +66,7 @@ export function render() {
     <!-- ═══ PERIOD SELECTOR ═══ -->
     <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;" id="periodSelector">
       <button class="rev-period-btn ${_currentPeriod === 'day' ? 'active' : ''}" data-period="day">📅 Hôm nay</button>
-      <button class="rev-period-btn ${_currentPeriod === 'week' ? 'active' : ''}" data-period="week">📆 7 ngày</button>
+      <button class="rev-period-btn ${_currentPeriod === 'week' ? 'active' : ''}" data-period="week">📆 Tuần này</button>
       <button class="rev-period-btn ${_currentPeriod === 'month' ? 'active' : ''}" data-period="month">🗓️ Tháng</button>
       <button class="rev-period-btn ${_currentPeriod === 'quarter' ? 'active' : ''}" data-period="quarter">📊 Quý</button>
       <button class="rev-period-btn ${_currentPeriod === 'year' ? 'active' : ''}" data-period="year">📈 Năm</button>
