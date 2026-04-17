@@ -246,8 +246,7 @@ function _renderRevenuePeriod() {
   
   import('../integration/invoiceStore.js').then(function(store) {
     var rev = store.getRevenueSummary(_revenuePeriod);
-    var periodLabels = { month: 'Tháng này', quarter: 'Quý này', year: 'Năm nay', week: 'Tuần này', day: 'Hôm nay' };
-    var periodLabel = periodLabels[_revenuePeriod] || _revenuePeriod;
+    var periodLabel = rev.periodLabel || _revenuePeriod;
     
     var dateRange = '';
     if (rev.firstDate && rev.lastDate) {

@@ -9,6 +9,8 @@ import { getSettings, getCurrentShift } from '../store.js';
 
 var _currentPeriod = 'day';
 
+function _pad2(n) { return n < 10 ? '0' + n : String(n); }
+
 export function render() {
   var settings = getSettings();
   var hasCukcuk = settings.cukcuk && settings.cukcuk.domain && settings.cukcuk.key;
@@ -43,11 +45,26 @@ export function render() {
     year: 'Năm nay'
   };
 
+  // Smart period label from bounds
+  var boundsLabel = '';
+  var boundsTimeInfo = '';
+  try {
+    var store = _getInvoiceStore();
+    if (store && store.getPeriodBounds) {
+      var b = store.getPeriodBounds(_currentPeriod);
+      boundsLabel = b.label;
+      var fmt = function(d) {
+        return _pad2(d.getDate()) + '/' + _pad2(d.getMonth()+1) + '/' + d.getFullYear() + ' ' + _pad2(d.getHours()) + ':' + _pad2(d.getMinutes());
+      };
+      boundsTimeInfo = '⏰ ' + fmt(b.start) + ' → ' + fmt(b.end);
+    }
+  } catch(e) {}
+
   return `
     <div class="section-header">
       <div>
         <h3>🧾 Hóa đơn CUKCUK</h3>
-        <p>Doanh thu từ hệ thống POS — ${periodLabels[_currentPeriod]}</p>
+        <p>Doanh thu từ hệ thống POS — ${boundsLabel || periodLabels[_currentPeriod]}</p>
       </div>
       <div class="btn-group">
         ${hasCukcuk && shift ? `
@@ -64,13 +81,14 @@ export function render() {
     </div>
 
     <!-- ═══ PERIOD SELECTOR ═══ -->
-    <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;" id="periodSelector">
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="periodSelector">
       <button class="rev-period-btn ${_currentPeriod === 'day' ? 'active' : ''}" data-period="day">📅 Hôm nay</button>
       <button class="rev-period-btn ${_currentPeriod === 'week' ? 'active' : ''}" data-period="week">📆 Tuần này</button>
       <button class="rev-period-btn ${_currentPeriod === 'month' ? 'active' : ''}" data-period="month">🗓️ Tháng</button>
       <button class="rev-period-btn ${_currentPeriod === 'quarter' ? 'active' : ''}" data-period="quarter">📊 Quý</button>
       <button class="rev-period-btn ${_currentPeriod === 'year' ? 'active' : ''}" data-period="year">📈 Năm</button>
     </div>
+    ${boundsTimeInfo ? `<div class="text-muted" style="font-size:11px;margin-bottom:16px;padding:6px 12px;background:var(--bg-secondary);border-radius:6px;display:inline-block;">${boundsTimeInfo}</div>` : ''}
 
     <!-- ═══ OVERVIEW STATS ═══ -->
     <div class="stats-grid">
@@ -112,7 +130,7 @@ export function render() {
           <span class="material-symbols-rounded" style="color:#10b981;font-size:18px;">credit_score</span>
           Hình thức thanh toán
         </h3>
-        <span class="text-muted" style="font-size:11px;">${periodLabels[_currentPeriod]}</span>
+        <span class="text-muted" style="font-size:11px;">${boundsLabel || periodLabels[_currentPeriod]}</span>
       </div>
       <div class="card-body">
         ${_renderPaymentBar('💵 Tiền mặt', totalCash, totalRevenue, 'var(--success)')}

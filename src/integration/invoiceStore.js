@@ -109,15 +109,44 @@ export function getInvoiceCount() {
 }
 
 // ── Working Day Boundaries ──
-// A "working day" runs from 12:00 PM (noon) to 06:00 AM the next morning.
-// All period filters use actual timestamps (refDate) for accurate filtering.
+// Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau
+// Tất cả bộ lọc dùng refDate timestamp (thời gian gốc từ CUKCUK)
 
 /**
- * Get the working day date string for a given timestamp.
- * Before 06:00 AM = previous calendar day.
+ * Robust date parser — handles ISO, .NET /Date()/, and various formats
+ */
+function _parseDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  
+  // .NET JSON format: "/Date(1234567890000)/"
+  if (typeof val === 'string') {
+    var netMatch = val.match(/\/Date\((\d+)\)\//);
+    if (netMatch) return new Date(parseInt(netMatch[1]));
+  }
+  
+  var d = new Date(val);
+  if (!isNaN(d.getTime())) return d;
+  
+  // Try dd/mm/yyyy HH:mm
+  if (typeof val === 'string') {
+    var parts = val.match(/(\d{2})\/(\d{2})\/(\d{4})\s*(\d{2})?:?(\d{2})?/);
+    if (parts) {
+      return new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]),
+                       parseInt(parts[4] || 0), parseInt(parts[5] || 0));
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Xác định ngày làm việc từ một timestamp.
+ * Trước 06:00 AM = thuộc ngày hôm trước.
  */
 function _workingDayDate(dt) {
-  var d = new Date(dt);
+  var d = _parseDate(dt);
+  if (!d) return _todayStr();
   if (d.getHours() < 6) {
     d.setDate(d.getDate() - 1);
   }
@@ -125,101 +154,110 @@ function _workingDayDate(dt) {
 }
 
 /**
- * Get period time boundaries as { start: Date, end: Date }
- * start = 12:00 PM on the first day of the period
- * end = 06:00 AM on the day after the last day of the period
+ * Tính boundaries (mốc thời gian) cho từng kỳ
+ * 
+ * Hôm nay:  12:00 PM hôm nay → 06:00 AM hôm sau
+ * Tuần này: 12:00 PM thứ 2   → 06:00 AM thứ 2 tuần sau
+ * Tháng:    12:00 PM ngày 01  → 06:00 AM ngày 01 tháng sau
+ * Quý:      12:00 PM ngày 01 đầu quý → 06:00 AM ngày 01 quý sau
+ * Năm:      12:00 PM 01/01    → 06:00 AM 01/01 năm sau
+ * 
+ * @returns {{ start: Date, end: Date, label: string }}
  */
-function _getPeriodBounds(period) {
+export function getPeriodBounds(period) {
   var now = new Date();
-  var start, end;
+  var start, end, label;
+
+  // Xác định ngày làm việc hiện tại
+  var workNow = new Date(now);
+  if (workNow.getHours() < 6) workNow.setDate(workNow.getDate() - 1);
 
   switch (period) {
     case 'day': {
-      // Today: 12:00 PM today → 06:00 AM tomorrow
-      // If before 6AM, "today" is actually yesterday
-      var today = new Date(now);
-      if (today.getHours() < 6) {
-        today.setDate(today.getDate() - 1);
-      }
-      start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0);
-      var tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      end = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 6, 0, 0);
+      start = new Date(workNow.getFullYear(), workNow.getMonth(), workNow.getDate(), 12, 0, 0);
+      var nextDay = new Date(workNow);
+      nextDay.setDate(nextDay.getDate() + 1);
+      end = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate(), 6, 0, 0);
+      label = 'Hôm nay (' + _pad2(workNow.getDate()) + '/' + _pad2(workNow.getMonth()+1) + ')';
       break;
     }
     case 'week': {
-      // Week: Monday 12:00 PM → next Monday 06:00 AM
-      var monday = new Date(now);
-      if (monday.getHours() < 6) monday.setDate(monday.getDate() - 1);
-      var dayOfWeek = monday.getDay(); // 0=Sun, 1=Mon...
-      var diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // days since Monday
-      monday.setDate(monday.getDate() - diff);
-      start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), 12, 0, 0);
-      var nextMonday = new Date(monday);
-      nextMonday.setDate(nextMonday.getDate() + 7);
-      end = new Date(nextMonday.getFullYear(), nextMonday.getMonth(), nextMonday.getDate(), 6, 0, 0);
+      var dayOfWeek = workNow.getDay(); // 0=CN, 1=T2...
+      var daysToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      var mon = new Date(workNow);
+      mon.setDate(mon.getDate() - daysToMon);
+      start = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate(), 12, 0, 0);
+      var nextMon = new Date(mon);
+      nextMon.setDate(nextMon.getDate() + 7);
+      end = new Date(nextMon.getFullYear(), nextMon.getMonth(), nextMon.getDate(), 6, 0, 0);
+      label = 'Tuần (' + _pad2(mon.getDate()) + '/' + _pad2(mon.getMonth()+1) + ' → ' + _pad2(nextMon.getDate()) + '/' + _pad2(nextMon.getMonth()+1) + ')';
       break;
     }
     case 'month': {
-      // Month: 1st 12:00 PM → 1st of next month 06:00 AM
-      var workingDay = new Date(now);
-      if (workingDay.getHours() < 6) workingDay.setDate(workingDay.getDate() - 1);
-      start = new Date(workingDay.getFullYear(), workingDay.getMonth(), 1, 12, 0, 0);
-      var nextMonth = new Date(workingDay.getFullYear(), workingDay.getMonth() + 1, 1);
-      end = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), nextMonth.getDate(), 6, 0, 0);
+      start = new Date(workNow.getFullYear(), workNow.getMonth(), 1, 12, 0, 0);
+      var nm = new Date(workNow.getFullYear(), workNow.getMonth() + 1, 1);
+      end = new Date(nm.getFullYear(), nm.getMonth(), nm.getDate(), 6, 0, 0);
+      label = 'Tháng ' + (workNow.getMonth() + 1) + '/' + workNow.getFullYear();
       break;
     }
     case 'quarter': {
-      // Quarter: Q-start 1st 12:00 PM → Q-end+1 1st 06:00 AM
-      var wd = new Date(now);
-      if (wd.getHours() < 6) wd.setDate(wd.getDate() - 1);
-      var qStart = Math.floor(wd.getMonth() / 3) * 3; // 0,3,6,9
-      start = new Date(wd.getFullYear(), qStart, 1, 12, 0, 0);
-      var qEnd = qStart + 3;
-      end = new Date(wd.getFullYear(), qEnd, 1, 6, 0, 0);
+      var qStart = Math.floor(workNow.getMonth() / 3) * 3;
+      start = new Date(workNow.getFullYear(), qStart, 1, 12, 0, 0);
+      end = new Date(workNow.getFullYear(), qStart + 3, 1, 6, 0, 0);
+      label = 'Quý ' + (Math.floor(qStart / 3) + 1) + '/' + workNow.getFullYear();
       break;
     }
     case 'year':
     default: {
-      // Year: Jan 1 12:00 PM → Jan 1 next year 06:00 AM
-      var wy = new Date(now);
-      if (wy.getHours() < 6) wy.setDate(wy.getDate() - 1);
-      start = new Date(wy.getFullYear(), 0, 1, 12, 0, 0);
-      end = new Date(wy.getFullYear() + 1, 0, 1, 6, 0, 0);
+      start = new Date(workNow.getFullYear(), 0, 1, 12, 0, 0);
+      end = new Date(workNow.getFullYear() + 1, 0, 1, 6, 0, 0);
+      label = 'Năm ' + workNow.getFullYear();
       break;
     }
   }
 
-  return { start: start, end: end };
+  return { start: start, end: end, label: label };
 }
 
-/** Get invoices for a named period using timestamp-based filtering */
-export function getInvoicesForPeriod(period) {
-  var bounds = _getPeriodBounds(period);
-  var all = getAllInvoices();
+function _pad2(n) { return n < 10 ? '0' + n : String(n); }
 
-  return all.filter(function(inv) {
-    // Use refDate (original CUKCUK datetime) for accurate time-based filtering
-    if (inv.refDate) {
-      var dt = new Date(inv.refDate);
-      if (!isNaN(dt.getTime())) {
-        return dt >= bounds.start && dt < bounds.end;
-      }
+/**
+ * Kiểm tra hóa đơn có nằm trong khoảng thời gian không
+ */
+function _isInBounds(inv, bounds) {
+  // Ưu tiên dùng refDate (thời gian thực từ CUKCUK)
+  if (inv.refDate) {
+    var dt = _parseDate(inv.refDate);
+    if (dt) {
+      return dt >= bounds.start && dt < bounds.end;
     }
-    // Fallback: use date string (less accurate but works for older data)
-    var fromDate = _dateStr(bounds.start);
-    var toDate = _dateStr(bounds.end);
-    return inv.date >= fromDate && inv.date <= toDate;
+  }
+  // Fallback: dùng trường date (ít chính xác hơn)
+  if (inv.date) {
+    var fromStr = _dateStr(bounds.start);
+    var toStr = _dateStr(bounds.end);
+    return inv.date >= fromStr && inv.date <= toStr;
+  }
+  return false;
+}
+
+/** Lọc hóa đơn theo kỳ — chính xác theo timestamp */
+export function getInvoicesForPeriod(period) {
+  var bounds = getPeriodBounds(period);
+  return getAllInvoices().filter(function(inv) {
+    return _isInBounds(inv, bounds);
   });
 }
 
 // ── Revenue Summaries ──
 
-/** Get aggregate revenue summary for a period */
+/** Tổng hợp doanh thu theo kỳ */
 export function getRevenueSummary(period) {
   var invoices = getInvoicesForPeriod(period);
+  var bounds = getPeriodBounds(period);
   var result = {
     period: period,
+    periodLabel: bounds.label,
     totalRevenue: 0,
     totalCash: 0,
     totalCard: 0,
@@ -237,9 +275,12 @@ export function getRevenueSummary(period) {
   for (var i = 0; i < invoices.length; i++) {
     var inv = invoices[i];
     result.totalRevenue += inv.amount || 0;
-    dateSet[inv.date] = true;
-    if (!result.firstDate || inv.date < result.firstDate) result.firstDate = inv.date;
-    if (!result.lastDate || inv.date > result.lastDate) result.lastDate = inv.date;
+    
+    // Nhóm theo ngày làm việc
+    var wDay = inv.refDate ? _workingDayDate(inv.refDate) : (inv.date || '');
+    dateSet[wDay] = true;
+    if (!result.firstDate || wDay < result.firstDate) result.firstDate = wDay;
+    if (!result.lastDate || wDay > result.lastDate) result.lastDate = wDay;
 
     var payments = inv.payments || [];
     for (var j = 0; j < payments.length; j++) {
@@ -258,31 +299,32 @@ export function getRevenueSummary(period) {
   return result;
 }
 
-/** Get daily breakdown array for a period, sorted desc */
+/** Phân tích doanh thu theo ngày làm việc, sắp xếp giảm dần */
 export function getDailyBreakdown(period) {
   var invoices = getInvoicesForPeriod(period);
   var days = {};
 
   for (var i = 0; i < invoices.length; i++) {
     var inv = invoices[i];
-    var date = inv.date;
-    if (!days[date]) {
-      days[date] = { date: date, total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
+    // Nhóm theo ngày làm việc (trước 6h sáng = ngày trước)
+    var wDay = inv.refDate ? _workingDayDate(inv.refDate) : (inv.date || 'unknown');
+    
+    if (!days[wDay]) {
+      days[wDay] = { date: wDay, total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
     }
-    days[date].total += inv.amount || 0;
-    days[date].bills++;
+    days[wDay].total += inv.amount || 0;
+    days[wDay].bills++;
 
     var payments = inv.payments || [];
     for (var j = 0; j < payments.length; j++) {
       switch (payments[j].method) {
-        case 'cash': days[date].cash += payments[j].amount || 0; break;
-        case 'card': days[date].card += payments[j].amount || 0; break;
-        case 'transfer': days[date].transfer += payments[j].amount || 0; break;
+        case 'cash': days[wDay].cash += payments[j].amount || 0; break;
+        case 'card': days[wDay].card += payments[j].amount || 0; break;
+        case 'transfer': days[wDay].transfer += payments[j].amount || 0; break;
       }
     }
   }
 
-  // Sort descending by date
   return Object.values(days).sort(function(a, b) {
     return a.date > b.date ? -1 : 1;
   });
@@ -290,7 +332,7 @@ export function getDailyBreakdown(period) {
 
 /** Get revenue for today (working day) using period bounds */
 export function getTodayRevenue() {
-  var bounds = _getPeriodBounds('day');
+  var bounds = getPeriodBounds('day');
   var invoices = getInvoicesForPeriod('day');
   var workingDate = _dateStr(bounds.start);
   
