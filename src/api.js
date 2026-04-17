@@ -136,6 +136,15 @@ export async function syncCukcukRevenueToCloud(invoices, shiftId) {
   return apiCall('syncCukcukRevenue', { invoices: invoices, shiftId: shiftId });
 }
 
+// ── Config API (fast staff loading) ─────────
+export async function getConfigFromCloud() {
+  return apiCall('getConfig');
+}
+
+export async function saveConfigToCloud(key, value) {
+  return apiCall('saveConfig', { key: key, value: value });
+}
+
 // ── Health Check ─────────────────────────────
 export async function pingAPI() {
   return apiCall('ping');

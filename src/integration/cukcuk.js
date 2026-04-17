@@ -1,6 +1,7 @@
-import { addTransaction, getCurrentShift, getSettings, getState } from '../store.js';
+import { getCurrentShift, getSettings, getState, getShiftHistory, getShiftSummary } from '../store.js';
 import { showToast } from '../utils.js';
 import { syncCukcukRevenueToCloud } from '../api.js';
+import * as invoiceStore from './invoiceStore.js';
 
 /**
  * CUKCUK API Helper - Official Integration
@@ -9,6 +10,11 @@ import { syncCukcukRevenueToCloud } from '../api.js';
  * Login response: { Data: { AccessToken, CompanyCode, Domain, AppID } }
  * SAInvoices response: { Data: [ { RefId, RefNo, Amount, TableName, ... } ] }
  * SAInvoice Detail: { SAInvoicePayments: [ { PaymentType, Amount, PaymentName } ] }
+ * 
+ * === AUTO-SYNC BY DATE ===
+ * System auto-loads CUKCUK invoices for TODAY's date only.
+ * Payment methods (cash/card/transfer) are auto-detected from PaymentName.
+ * Revenue totals are synced for weekly/monthly tracking.
  */
 
 // ── API Base URL ──
@@ -22,6 +28,31 @@ var _cachedToken = null;
 var _cachedCompanyCode = null;
 var _cachedTokenTime = 0;
 var TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours (official CUKCUK TTL)
+
+// ── Daily Revenue Cache ──
+var DAILY_REVENUE_KEY = 'cukcuk_daily_revenue';
+var CACHE_VERSION_KEY = 'cukcuk_cache_version';
+var CACHE_VERSION = 2; // Bump to force reset of corrupted cache
+
+// ── Auto-migrate: clear corrupted cache from old versions ──
+(function _migrateCacheIfNeeded() {
+  try {
+    var ver = localStorage.getItem(CACHE_VERSION_KEY);
+    if (!ver || parseInt(ver) < CACHE_VERSION) {
+      localStorage.removeItem(DAILY_REVENUE_KEY);
+      localStorage.removeItem('cukcuk_sync_meta');
+      // Clear all synced ref indexes
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf('cukcuk_synced_refs_') === 0) keysToRemove.push(key);
+      }
+      for (var j = 0; j < keysToRemove.length; j++) localStorage.removeItem(keysToRemove[j]);
+      localStorage.setItem(CACHE_VERSION_KEY, String(CACHE_VERSION));
+      console.log('[CUKCUK] Cache migrated to v' + CACHE_VERSION + ' — old corrupted data cleared');
+    }
+  } catch(e) { /* ignore */ }
+})();
 
 function _getCachedToken() {
   if (_cachedToken && (Date.now() - _cachedTokenTime) < TOKEN_TTL) {
@@ -73,12 +104,18 @@ async function _cukcukApiCall(url, options, _isRetry) {
     return { _authFailed: true, message: auth.message };
   }
   
-  // Set auth headers
-  if (!options.headers) options.headers = {};
-  options.headers['Authorization'] = 'Bearer ' + auth.token;
-  options.headers['CompanyCode'] = auth.companyCode;
+  // Set auth headers — clone options to avoid mutating on retry
+  var reqHeaders = {};
+  if (options.headers) {
+    for (var hk in options.headers) reqHeaders[hk] = options.headers[hk];
+  }
+  reqHeaders['Authorization'] = 'Bearer ' + auth.token;
+  reqHeaders['CompanyCode'] = auth.companyCode;
   
-  var response = await fetch(CUKCUK_API_BASE + url, options);
+  var fetchOpts = { method: options.method || 'GET', headers: reqHeaders };
+  if (options.body) fetchOpts.body = options.body;
+  
+  var response = await fetch(CUKCUK_API_BASE + url, fetchOpts);
   
   // Case A: HTTP 401 status
   if (response.status === 401 && !_isRetry) {
@@ -134,6 +171,49 @@ function _getCleanDomain(rawDomain) {
   d = d.replace(/\.cukcuk\.vn\/?$/, '');
   d = d.replace(/\/$/, '');
   return d;
+}
+
+// ── Working Day Logic ──
+// Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau
+// VD: Ca ngày 16/04 = 16/04 12:00:00 → 17/04 05:59:59
+function _getWorkingDayStr() {
+  var now = new Date();
+  // If before 6:00 AM, the working day is YESTERDAY
+  if (now.getHours() < 6) {
+    now.setDate(now.getDate() - 1);
+  }
+  var y = now.getFullYear();
+  var m = String(now.getMonth() + 1).padStart(2, '0');
+  var d = String(now.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+
+/**
+ * Get the CUKCUK API date range for a given shift date.
+ * Working day: shiftDate 12:00:00 → shiftDate+1 05:59:59
+ * @param {string} shiftDate - YYYY-MM-DD of the shift
+ */
+function _getWorkingDayRange(shiftDate) {
+  if (!shiftDate) shiftDate = _getWorkingDayStr();
+  // Start: shiftDate at 12:00:00 (noon)
+  var from = shiftDate + 'T12:00:00';
+  // End: next day at 05:59:59
+  var d = new Date(shiftDate + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  var nextY = d.getFullYear();
+  var nextM = String(d.getMonth() + 1).padStart(2, '0');
+  var nextD = String(d.getDate()).padStart(2, '0');
+  var to = nextY + '-' + nextM + '-' + nextD + 'T05:59:59';
+  return { from: from, to: to, date: shiftDate };
+}
+
+// Keep simple today helper for cache keys
+function _getTodayStr() {
+  var now = new Date();
+  var y = now.getFullYear();
+  var m = String(now.getMonth() + 1).padStart(2, '0');
+  var d = String(now.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
 }
 
 // ── Login & Get Token ──
@@ -198,12 +278,22 @@ export async function loginAndGetToken() {
     } else {
       _clearCachedToken();
       var errMsg = data.ErrorMessage || data.Message || 'Lỗi không xác định';
+      var errLower = errMsg.toLowerCase();
       
-      if (errMsg.toLowerCase().indexOf('invalid signature') !== -1) {
-        errMsg = 'Chữ ký không hợp lệ. Vui lòng:\n' +
-          '1) Vào https://' + cleanDomain + '.cukcuk.vn → Ứng dụng → API\n' +
-          '2) Bấm "TẠO MÃ KẾT NỐI" → lấy Secret Key mới\n' +
-          '3) Copy vào Cài đặt → CUKCUK';
+      if (errLower.indexOf('invalid signature') !== -1 || errLower.indexOf('chữ ký') !== -1) {
+        errMsg = '🔑 Secret Key đã hết hạn hoặc không hợp lệ!\n\n' +
+          'Cách fix:\n' +
+          '1) Vào https://' + cleanDomain + '.cukcuk.vn\n' +
+          '2) Thiết lập → Ứng dụng → API\n' +
+          '3) Bấm "TẠO MÃ KẾT NỐI" → Copy Secret Key mới\n' +
+          '4) Dán vào Cài đặt → CUKCUK → Lưu';
+      } else if (errLower.indexOf('authorization') !== -1 || errLower.indexOf('denied') !== -1) {
+        errMsg = '🔒 Xác thực bị từ chối!\n\n' +
+          'Token có thể đã hết hạn. Vui lòng:\n' +
+          '1) Kiểm tra Secret Key trong Cài đặt → CUKCUK\n' +
+          '2) Nếu vẫn lỗi, vào https://' + cleanDomain + '.cukcuk.vn\n' +
+          '   → Thiết lập → Ứng dụng → API\n' +
+          '3) Bấm "TẠO MÃ KẾT NỐI" → lấy Secret Key mới';
       }
       
       console.warn('[CUKCUK] Login failed:', data);
@@ -289,6 +379,290 @@ function _mapPayment(payment) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+//   DAILY REVENUE CACHE — Theo dõi doanh thu hàng ngày
+//   Lưu doanh thu theo ngày để đồng bộ tuần/tháng nhanh hơn
+// ══════════════════════════════════════════════════════════════
+
+function _getDailyRevenueCache() {
+  try {
+    var saved = localStorage.getItem(DAILY_REVENUE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch(e) { /* ignore */ }
+  return {};
+}
+
+function _saveDailyRevenueCache(cache) {
+  try {
+    localStorage.setItem(DAILY_REVENUE_KEY, JSON.stringify(cache));
+  } catch(e) { /* ignore */ }
+}
+
+/**
+ * Recalculate daily revenue from shift transactions (SOURCE OF TRUTH).
+ * This is IDEMPOTENT — call it 100 times, same result.
+ * Scans all CUKCUK transactions in the shift, sums by payment method.
+ */
+function _recalcDailyRevenue(dateStr, shift) {
+  if (!shift || !shift.transactions) return;
+  
+  var cash = 0, card = 0, transfer = 0, bills = 0;
+  var seenRefs = {}; // Track unique bill refs to count bills (not payment splits)
+  
+  for (var i = 0; i < shift.transactions.length; i++) {
+    var tx = shift.transactions[i];
+    if (!tx.note || tx.note.indexOf('[CUKCUK]') === -1) continue;
+    if (tx.type !== 'income') continue;
+    
+    var amt = tx.amount || 0;
+    switch (tx.paymentMethod) {
+      case 'card': card += amt; break;
+      case 'transfer': transfer += amt; break;
+      default: cash += amt;
+    }
+    
+    // Count unique bills (extract RefId from note)
+    var refMatch = tx.note.match(/\[Ref:CUKCUK-([^\]]+)\]/);
+    if (refMatch && !seenRefs[refMatch[1]]) {
+      seenRefs[refMatch[1]] = true;
+      bills++;
+    }
+  }
+  
+  var cache = _getDailyRevenueCache();
+  cache[dateStr] = {
+    cash: cash,
+    card: card,
+    transfer: transfer,
+    total: cash + card + transfer,
+    bills: bills,
+    lastSync: new Date().toISOString()
+  };
+  _saveDailyRevenueCache(cache);
+  console.log('[CUKCUK] Daily revenue RECALC for', dateStr, ': total=' + cache[dateStr].total + ' (' + bills + ' bills)');
+}
+
+/**
+ * Get daily revenue summaries for a date range.
+ * @param {string} period - 'week' | 'month' | 'quarter' | 'year'
+ * @returns {Array} of { date, total, cash, card, transfer, bills }
+ */
+export function getDailyRevenueSummary(period) {
+  var cache = _getDailyRevenueCache();
+  var today = new Date();
+  var days = [];
+  var numDays;
+  
+  switch (period) {
+    case 'year':
+      // From Jan 1 of current year
+      numDays = Math.ceil((today - new Date(today.getFullYear(), 0, 1)) / 86400000) + 1;
+      break;
+    case 'quarter':
+      // Current quarter (Q1=Jan-Mar, Q2=Apr-Jun, etc.)
+      var qStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
+      numDays = Math.ceil((today - qStart) / 86400000) + 1;
+      break;
+    case 'month':
+      numDays = today.getDate();
+      break;
+    default: // 'week'
+      numDays = 7;
+  }
+  
+  for (var i = numDays - 1; i >= 0; i--) {
+    var d = new Date(today);
+    d.setDate(d.getDate() - i);
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    var dateStr = y + '-' + m + '-' + dd;
+    
+    var cached = cache[dateStr];
+    if (cached) {
+      days.push({
+        date: dateStr,
+        total: cached.total,
+        cash: cached.cash,
+        card: cached.card,
+        transfer: cached.transfer,
+        bills: cached.bills,
+        source: 'cukcuk',
+        lastSync: cached.lastSync
+      });
+    } else {
+      var shifts = getShiftHistory().filter(function(s) { return s.date === dateStr; });
+      var dayTotal = 0, dayCash = 0, dayCard = 0, dayTransfer = 0, dayBills = 0;
+      for (var j = 0; j < shifts.length; j++) {
+        var sm = getShiftSummary(shifts[j]);
+        dayTotal += sm.totalIncome;
+        dayCash += sm.cashIncome;
+        dayCard += sm.cardIncome;
+        dayTransfer += sm.transferIncome;
+        dayBills += sm.billCount;
+      }
+      days.push({
+        date: dateStr,
+        total: dayTotal,
+        cash: dayCash,
+        card: dayCard,
+        transfer: dayTransfer,
+        bills: dayBills,
+        source: dayTotal > 0 ? 'history' : 'none',
+        lastSync: ''
+      });
+    }
+  }
+  
+  return days;
+}
+
+/**
+ * Get aggregate revenue summary with date range info.
+ * @param {string} period - 'week' | 'month' | 'quarter' | 'year'
+ */
+export function getRevenueSummary(period) {
+  var days = getDailyRevenueSummary(period);
+  var result = {
+    period: period,
+    days: days,
+    totalRevenue: 0,
+    totalCash: 0,
+    totalCard: 0,
+    totalTransfer: 0,
+    totalBills: 0,
+    avgDaily: 0,
+    daysWithData: 0,
+    firstDate: '',
+    lastDate: '',
+    periodLabel: ''
+  };
+  
+  for (var i = 0; i < days.length; i++) {
+    result.totalRevenue += days[i].total;
+    result.totalCash += days[i].cash;
+    result.totalCard += days[i].card;
+    result.totalTransfer += days[i].transfer;
+    result.totalBills += days[i].bills;
+    if (days[i].total > 0) {
+      result.daysWithData++;
+      if (!result.firstDate) result.firstDate = days[i].date;
+      result.lastDate = days[i].date;
+    }
+  }
+  
+  result.avgDaily = result.daysWithData > 0 ? Math.round(result.totalRevenue / result.daysWithData) : 0;
+  
+  // Generate readable period label
+  var now = new Date();
+  switch (period) {
+    case 'year':
+      result.periodLabel = 'Năm ' + now.getFullYear();
+      break;
+    case 'quarter':
+      var q = Math.floor(now.getMonth() / 3) + 1;
+      result.periodLabel = 'Quý ' + q + '/' + now.getFullYear();
+      break;
+    case 'month':
+      result.periodLabel = 'Tháng ' + (now.getMonth() + 1) + '/' + now.getFullYear();
+      break;
+    default:
+      result.periodLabel = '7 ngày gần nhất';
+  }
+  
+  return result;
+}
+
+// ══════════════════════════════════════════════════════════════
+//   SYNCED REFID INDEX — Ghi nhận thông minh hóa đơn đã sync
+//   Dùng Set trong localStorage để tra cứu O(1) thay vì O(n×m)
+// ══════════════════════════════════════════════════════════════
+
+var SYNCED_REFS_PREFIX = 'cukcuk_synced_refs_';
+var SYNC_META_KEY = 'cukcuk_sync_meta';
+
+/**
+ * Get the Set of already-synced RefIDs for a given date.
+ * Stored as JSON array in localStorage for persistence.
+ */
+function _getSyncedRefIds(dateStr) {
+  try {
+    var saved = localStorage.getItem(SYNCED_REFS_PREFIX + dateStr);
+    if (saved) {
+      var arr = JSON.parse(saved);
+      // Use object as Set for IE/old browser compat
+      var set = {};
+      for (var i = 0; i < arr.length; i++) set[arr[i]] = true;
+      return set;
+    }
+  } catch(e) { /* ignore */ }
+  return {};
+}
+
+/**
+ * Add a RefID to the synced index for today.
+ */
+function _addSyncedRefId(dateStr, refId) {
+  try {
+    var saved = localStorage.getItem(SYNCED_REFS_PREFIX + dateStr);
+    var arr = saved ? JSON.parse(saved) : [];
+    if (arr.indexOf(refId) === -1) {
+      arr.push(refId);
+      localStorage.setItem(SYNCED_REFS_PREFIX + dateStr, JSON.stringify(arr));
+    }
+  } catch(e) { /* ignore */ }
+}
+
+/**
+ * Get sync metadata (last known total, last sync time).
+ */
+function _getSyncMeta() {
+  try {
+    var saved = localStorage.getItem(SYNC_META_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch(e) { /* ignore */ }
+  return { lastTotal: 0, lastSyncTime: '', lastDate: '' };
+}
+
+function _setSyncMeta(meta) {
+  try {
+    localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+  } catch(e) { /* ignore */ }
+}
+
+/**
+ * Clear synced index for a date (used by resync).
+ */
+function _clearSyncedRefIds(dateStr) {
+  try {
+    localStorage.removeItem(SYNCED_REFS_PREFIX + dateStr);
+  } catch(e) { /* ignore */ }
+}
+
+/**
+ * Clean up old synced indexes (keep only last 3 days).
+ */
+function _cleanupOldSyncIndexes() {
+  try {
+    var today = new Date();
+    var keepDates = {};
+    for (var i = 0; i < 3; i++) {
+      var d = new Date(today);
+      d.setDate(d.getDate() - i);
+      keepDates[d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')] = true;
+    }
+    for (var k = 0; k < localStorage.length; k++) {
+      var key = localStorage.key(k);
+      if (key && key.indexOf(SYNCED_REFS_PREFIX) === 0) {
+        var dateStr = key.replace(SYNCED_REFS_PREFIX, '');
+        if (!keepDates[dateStr]) {
+          localStorage.removeItem(key);
+        }
+      }
+    }
+  } catch(e) { /* ignore */ }
+}
+
 // ── Force Re-Sync: Clear old CUKCUK data and re-fetch with payment details ──
 export async function resyncAllTransactions() {
   var shift = getCurrentShift();
@@ -297,227 +671,232 @@ export async function resyncAllTransactions() {
     return { success: false };
   }
   
-  // Remove all existing CUKCUK transactions from current shift
-  var txList = shift.transactions || [];
+  var todayStr = shift.date || _getWorkingDayStr();
+  
+  // Remove today's invoices from Invoice Store
+  var allInvoices = invoiceStore.getAllInvoices();
   var removedCount = 0;
-  var newTxList = [];
-  for (var i = 0; i < txList.length; i++) {
-    if (txList[i].note && txList[i].note.indexOf('[CUKCUK]') !== -1) {
-      removedCount++;
-    } else {
-      newTxList.push(txList[i]);
-    }
+  for (var i = 0; i < allInvoices.length; i++) {
+    if (allInvoices[i].date === todayStr) removedCount++;
   }
-  shift.transactions = newTxList;
+  // Clear and re-add non-today invoices
+  var keepInvoices = allInvoices.filter(function(inv) { return inv.date !== todayStr; });
+  invoiceStore.clearAll();
+  invoiceStore.bulkUpsert(keepInvoices);
   
-  // Save cleaned state
-  var s = getState();
-  s.currentShift = shift;
-  // Trigger save
-  try {
-    localStorage.setItem('kg_cashier_state', JSON.stringify(s));
-  } catch(e) { /* ignore */ }
+  // Clear the synced RefID index so everything re-downloads
+  _clearSyncedRefIds(todayStr);
+  _setSyncMeta({ lastTotal: 0, lastSyncTime: '', lastDate: todayStr });
   
-  console.log('[CUKCUK] Removed ' + removedCount + ' old CUKCUK transactions. Re-syncing...');
-  showToast('🔄 Đã xóa ' + removedCount + ' giao dịch cũ. Đang đồng bộ lại...', 'info');
+  console.log('[CUKCUK] Removed ' + removedCount + ' invoices for ' + todayStr + '. Re-syncing...');
+  showToast('🔄 Đã xóa ' + removedCount + ' hóa đơn. Đang đồng bộ lại...', 'info');
   
   // Now sync fresh
   return await syncTransactions();
 }
 
-// ── Sync Transactions from CUKCUK → Webapp Revenue ──
+// ══════════════════════════════════════════════════════════════
+//   MAIN SYNC — Đồng bộ thông minh, chỉ tải hóa đơn MỚI
+//   
+//   Chiến lược:
+//   1. Kiểm tra tổng hóa đơn từ CUKCUK API
+//   2. So sánh với số đã sync → nếu bằng nhau → skip (0 API calls)
+//   3. Chỉ tải chi tiết thanh toán cho hóa đơn CHƯA có
+//   4. Dùng localStorage Set cho tra cứu O(1)
+// ══════════════════════════════════════════════════════════════
 export async function syncTransactions() {
   var shift = getCurrentShift();
   if (!shift) {
-    showToast('Bạn cần mở ca trước khi đồng bộ', 'warning');
     return { success: false, message: 'Chưa mở ca' };
   }
 
   var settings = getSettings();
   var cukcuk = settings.cukcuk;
   if (!cukcuk || !cukcuk.key) {
-    showToast('Vui lòng cấu hình CUKCUK API trong Cài đặt', 'error');
     return { success: false, message: 'Chưa cấu hình' };
   }
 
-  showToast('🔄 Đang đồng bộ hóa đơn từ CUKCUK...', 'info');
-
   try {
-    // 1. Determine date range from shift
-    var fromDate = shift.startTime || new Date().toISOString();
-    var toDate = shift.endTime || new Date().toISOString();
+    // ═══ Use SHIFT DATE for working day range ═══
+    var shiftDate = shift.date || _getWorkingDayStr();
+    var workingDay = _getWorkingDayRange(shiftDate);
+    var fromDate = workingDay.from;
+    var toDate = workingDay.to;
+    var todayStr = shiftDate;
     
-    console.log('[CUKCUK] Sync range:', fromDate, '→', toDate);
+    // Clean up old indexes periodically
+    _cleanupOldSyncIndexes();
+    
+    // Load the synced RefID index for today (O(1) lookups)
+    var syncedRefs = _getSyncedRefIds(todayStr);
+    var syncedCount = Object.keys(syncedRefs).length;
+    var syncMeta = _getSyncMeta();
+    
+    console.log('[CUKCUK] Smart sync for', todayStr, '| Already synced:', syncedCount, 'refs');
 
-    // 2. Fetch ALL pages of invoices (auto-retry on 401 via _cukcukApiCall)
-    var allInvoices = [];
-    var page = 1;
-    var maxPages = 20;
-    var apiTotal = 0;
-
-    while (page <= maxPages) {
-      var data = await _fetchInvoices(fromDate, toDate, page);
-      
-      if (data._authFailed) {
-        showToast('❌ ' + (data.message || 'Đăng nhập thất bại'), 'error');
-        return { success: false, message: data.message };
-      }
-
-      if (!data.Success) {
-        var errDetail = data.ErrorMessage || data.Message || 'Lỗi API';
-        throw new Error(errDetail);
-      }
-
-      var pageInvoices = [];
-      if (data.Data) {
-        if (Array.isArray(data.Data)) pageInvoices = data.Data;
-        else if (data.Data.PageData) pageInvoices = data.Data.PageData;
-        else if (data.Data.Items) pageInvoices = data.Data.Items;
-      }
-      
-      if (data.Total) apiTotal = data.Total;
-      allInvoices = allInvoices.concat(pageInvoices);
-      console.log('[CUKCUK] Page ' + page + ': ' + pageInvoices.length + ' invoices (' + allInvoices.length + '/' + apiTotal + ')');
-      
-      if (page > 1) {
-        showToast('📥 Trang ' + page + '... (' + allInvoices.length + '/' + apiTotal + ' hóa đơn)', 'info');
-      }
-
-      if (pageInvoices.length < 100) break;
-      page++;
+    // ═══ STEP 1: Fetch page 1 to get total count ═══
+    var data = await _fetchInvoices(fromDate, toDate, 1);
+    
+    if (data._authFailed) {
+      return { success: false, message: data.message };
     }
 
-    console.log('[CUKCUK] Total fetched: ' + allInvoices.length + ' invoices');
+    if (!data.Success) {
+      var errDetail = data.ErrorMessage || data.Message || 'Lỗi API';
+      throw new Error(errDetail);
+    }
 
-    // 4. Filter new invoices (not yet synced)
+    var firstPageInvoices = [];
+    if (data.Data) {
+      if (Array.isArray(data.Data)) firstPageInvoices = data.Data;
+      else if (data.Data.PageData) firstPageInvoices = data.Data.PageData;
+      else if (data.Data.Items) firstPageInvoices = data.Data.Items;
+    }
+    
+    var apiTotal = data.Total || firstPageInvoices.length;
+
+    // ═══ STEP 2: Quick check — if API total == synced count → nothing new ═══
+    if (apiTotal > 0 && apiTotal <= syncedCount) {
+      console.log('[CUKCUK] ✓ No new invoices. API total:', apiTotal, ', synced:', syncedCount);
+      // Silent — no toast for background sync when nothing changed
+      _recalcDailyRevenue(todayStr, shift);
+      return { success: true, synced: 0, total: apiTotal, skipped: syncedCount, amount: 0, date: todayStr, smart: true };
+    }
+
+    // ═══ STEP 3: Filter page 1 for new invoices only ═══
     var newInvoices = [];
-    var skippedCount = 0;
-    var txList = shift.transactions || [];
-
-    for (var i = 0; i < allInvoices.length; i++) {
-      var inv = allInvoices[i];
-      var refId = inv.RefId || inv.RefID || ('idx-' + i);
-      var txId = 'CUKCUK-' + refId;
-      
-      var exists = false;
-      for (var j = 0; j < txList.length; j++) {
-        if (txList[j].note && txList[j].note.indexOf(txId) !== -1) {
-          exists = true;
-          break;
-        }
-      }
-
-      if (exists) {
-        skippedCount++;
-      } else {
+    
+    for (var i = 0; i < firstPageInvoices.length; i++) {
+      var inv = firstPageInvoices[i];
+      var refId = String(inv.RefId || inv.RefID || ('idx-' + i));
+      if (!syncedRefs[refId]) {
         newInvoices.push(inv);
       }
     }
 
-    console.log('[CUKCUK] New invoices to process: ' + newInvoices.length + ', skipped: ' + skippedCount);
-
-    if (newInvoices.length === 0) {
-      if (skippedCount > 0) {
-        showToast('✅ Tất cả ' + skippedCount + ' hóa đơn đã được đồng bộ.', 'info');
-      } else {
-        showToast('ℹ️ Không có hóa đơn mới từ CUKCUK.', 'info');
+    // ═══ STEP 4: If page 1 had 100 items and we need more, fetch remaining pages ═══
+    if (firstPageInvoices.length >= 100 && apiTotal > firstPageInvoices.length) {
+      var page = 2;
+      var maxPages = 20;
+      while (page <= maxPages) {
+        var pageData = await _fetchInvoices(fromDate, toDate, page);
+        if (pageData._authFailed || !pageData.Success) break;
+        
+        var pageInvoices = [];
+        if (pageData.Data) {
+          if (Array.isArray(pageData.Data)) pageInvoices = pageData.Data;
+          else if (pageData.Data.PageData) pageInvoices = pageData.Data.PageData;
+          else if (pageData.Data.Items) pageInvoices = pageData.Data.Items;
+        }
+        
+        // Only add invoices NOT in our synced index
+        for (var pi = 0; pi < pageInvoices.length; pi++) {
+          var pInv = pageInvoices[pi];
+          var pRefId = String(pInv.RefId || pInv.RefID || ('p' + page + '-' + pi));
+          if (!syncedRefs[pRefId]) {
+            newInvoices.push(pInv);
+          }
+        }
+        
+        console.log('[CUKCUK] Page ' + page + ': ' + pageInvoices.length + ' total, ' + newInvoices.length + ' new');
+        if (pageInvoices.length < 100) break;
+        page++;
       }
-      return { success: true, synced: 0, total: allInvoices.length, skipped: skippedCount, amount: 0 };
     }
 
-    // 5. Fetch payment details for new invoices
-    showToast('🔍 Đang lấy chi tiết thanh toán ' + newInvoices.length + ' hóa đơn...', 'info');
+    console.log('[CUKCUK] Smart filter: ' + newInvoices.length + ' new out of ' + apiTotal + ' total (skipped ' + syncedCount + ')');
+
+    // ═══ STEP 5: Nothing new after filtering ═══
+    if (newInvoices.length === 0) {
+      // No new data — daily cache is already up to date, skip
+      _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
+      return { success: true, synced: 0, total: apiTotal, skipped: syncedCount, amount: 0, date: todayStr, smart: true };
+    }
+
+    // ═══ STEP 6: Process ONLY new invoices → save to Invoice Store ═══
+    showToast('📥 ' + newInvoices.length + ' hóa đơn mới từ CUKCUK...', 'info');
     
     var count = 0;
     var totalAmount = 0;
     var paymentStats = { cash: 0, card: 0, transfer: 0 };
-    var sheetData = []; // Collect data for Google Sheets push
+    var sheetData = [];
 
     for (var k = 0; k < newInvoices.length; k++) {
       var inv = newInvoices[k];
-      var refId = inv.RefId || inv.RefID || ('idx-' + k);
-      var txId = 'CUKCUK-' + refId;
+      var refId = String(inv.RefId || inv.RefID || ('idx-' + k));
       var refNo = inv.RefNo || '';
       var tableName = inv.TableName || '';
       var employeeName = inv.EmployeeName || '';
       var refDate = inv.RefDate || '';
       var amount = inv.Amount || 0;
       
-      if (amount <= 0) continue;
-
-      // Format date
-      var dateStr = '';
-      if (refDate) {
-        try { dateStr = new Date(refDate).toLocaleDateString('vi-VN'); } catch(e) { /* ignore */ }
+      if (amount <= 0) {
+        // Still mark as synced so we don't re-check next time
+        _addSyncedRefId(todayStr, refId);
+        continue;
       }
 
-      // Fetch detail to get payment breakdown (auto-retry on 401)
+      // Skip if already in Invoice Store (global dedup)
+      if (invoiceStore.hasInvoice(refId)) {
+        _addSyncedRefId(todayStr, refId);
+        continue;
+      }
+
+      // Fetch detail to get payment breakdown
       var detail = await _fetchInvoiceDetail(refId);
-      
       var payments = (detail && detail.SAInvoicePayments) ? detail.SAInvoicePayments : null;
       
-      // Compute payment amounts for sheet
+      var invoicePayments = [];
       var invCash = 0, invCard = 0, invTransfer = 0;
-      var payInfoParts = [];
 
       if (payments && payments.length > 0) {
-        // Create separate transaction for each payment method
         for (var p = 0; p < payments.length; p++) {
           var pmt = payments[p];
           var pmtAmount = pmt.Amount || 0;
           if (pmtAmount <= 0) continue;
           
           var mapped = _mapPayment(pmt);
-          var pmtMethod = mapped.method;
-          var pmtLabel = mapped.label;
-          
-          // Track per-method
-          if (pmtMethod === 'cash') invCash += pmtAmount;
-          else if (pmtMethod === 'card') invCard += pmtAmount;
-          else if (pmtMethod === 'transfer') invTransfer += pmtAmount;
-          payInfoParts.push(pmtLabel + ': ' + pmtAmount.toLocaleString('vi-VN'));
-          
-          // Build note with payment info
-          var noteText = '[CUKCUK] Bill ' + refNo;
-          if (tableName) noteText += ' - ' + tableName;
-          if (payments.length > 1) noteText += ' [' + pmtLabel + ']';
-          if (dateStr) noteText += ' (' + dateStr + ')';
-          noteText += ' [Ref:' + txId + ']';
-
-          addTransaction({
-            type: 'income',
-            category: 'Doanh thu bán hàng',
+          invoicePayments.push({
+            method: mapped.method,
             amount: pmtAmount,
-            paymentMethod: pmtMethod,
-            note: noteText
+            label: mapped.label
           });
-          
-          paymentStats[pmtMethod] = (paymentStats[pmtMethod] || 0) + pmtAmount;
-          totalAmount += pmtAmount;
-        }
-        count++;
-      } else {
-        // No detail/payment info → fallback: add as single cash transaction
-        invCash = amount;
-        payInfoParts.push('Tiền mặt: ' + amount.toLocaleString('vi-VN'));
-        
-        var noteText = '[CUKCUK] Bill ' + refNo;
-        if (tableName) noteText += ' - ' + tableName;
-        if (dateStr) noteText += ' (' + dateStr + ')';
-        noteText += ' [Ref:' + txId + ']';
 
-        addTransaction({
-          type: 'income',
-          category: 'Doanh thu bán hàng',
-          amount: amount,
-          paymentMethod: 'cash',
-          note: noteText
-        });
-        
-        paymentStats.cash += amount;
-        totalAmount += amount;
-        count++;
+          if (mapped.method === 'cash') invCash += pmtAmount;
+          else if (mapped.method === 'card') invCard += pmtAmount;
+          else if (mapped.method === 'transfer') invTransfer += pmtAmount;
+        }
+      } else {
+        // No detail → assume all cash
+        invCash = amount;
+        invoicePayments.push({ method: 'cash', amount: amount, label: 'Tiền mặt' });
       }
+
+      // ★ Save to Invoice Store (SINGLE record per bill)
+      var invoiceRecord = {
+        refId: refId,
+        refNo: refNo,
+        refDate: refDate,
+        date: todayStr,
+        tableName: tableName,
+        employeeName: employeeName,
+        amount: amount,
+        payments: invoicePayments,
+        syncedAt: new Date().toISOString(),
+        pushedToSheets: false
+      };
+      
+      invoiceStore.upsertInvoice(invoiceRecord);
+      
+      // Track stats
+      paymentStats.cash += invCash;
+      paymentStats.card += invCard;
+      paymentStats.transfer += invTransfer;
+      totalAmount += amount;
+      count++;
+
+      // ★ Mark RefId as synced (for API-level dedup)
+      _addSyncedRefId(todayStr, refId);
 
       // Collect for Google Sheets
       sheetData.push({
@@ -530,26 +909,31 @@ export async function syncTransactions() {
         cashAmount: invCash,
         cardAmount: invCard,
         transferAmount: invTransfer,
-        paymentInfo: payInfoParts.join(' + ')
+        paymentInfo: invoicePayments.map(function(pp) { return pp.label + ': ' + pp.amount.toLocaleString('vi-VN'); }).join(' + ')
       });
 
       // Progress every 10 invoices
       if (k > 0 && k % 10 === 0) {
-        showToast('📥 Xử lý ' + k + '/' + newInvoices.length + ' hóa đơn...', 'info');
+        showToast('📥 Xử lý ' + k + '/' + newInvoices.length + ' hóa đơn mới...', 'info');
       }
       
-      // Small delay to avoid API rate limiting (50ms between detail calls)
+      // Small delay to avoid API rate limiting
       if (k < newInvoices.length - 1) {
         await new Promise(function(r) { setTimeout(r, 50); });
       }
     }
 
-    // 6. Push to Google Sheets (fire-and-forget, non-blocking)
+    // 7. Update sync meta (Invoice Store is now the source of truth for revenue)
+    _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
+
+    // 8. Push to Google Sheets (fire-and-forget) + mark as pushed
     if (sheetData.length > 0) {
-      console.log('[CUKCUK] Pushing ' + sheetData.length + ' invoices to Google Sheets...');
+      console.log('[CUKCUK] Pushing ' + sheetData.length + ' NEW invoices to Google Sheets...');
+      var pushedRefIds = sheetData.map(function(sd) { return sd.refId; });
       syncCukcukRevenueToCloud(sheetData, shift.id).then(function(res) {
         if (res && res.success) {
           console.log('[CUKCUK→Sheets] ✅ ' + res.message);
+          invoiceStore.markPushedToSheets(pushedRefIds);
         } else {
           console.warn('[CUKCUK→Sheets] ⚠️ ' + (res && res.message || 'Failed'));
         }
@@ -558,18 +942,18 @@ export async function syncTransactions() {
       });
     }
 
-    // 7. Report results
+    // 9. Report results
     var statsMsg = '';
     if (paymentStats.cash > 0) statsMsg += 'TM: ' + paymentStats.cash.toLocaleString('vi-VN') + 'đ ';
     if (paymentStats.card > 0) statsMsg += '| Thẻ: ' + paymentStats.card.toLocaleString('vi-VN') + 'đ ';
     if (paymentStats.transfer > 0) statsMsg += '| CK: ' + paymentStats.transfer.toLocaleString('vi-VN') + 'đ';
 
     if (count > 0) {
-      showToast('✅ Đồng bộ ' + count + ' hóa đơn (' + totalAmount.toLocaleString('vi-VN') + 'đ) — ' + statsMsg, 'success');
+      showToast('✅ +' + count + ' hóa đơn mới (' + totalAmount.toLocaleString('vi-VN') + 'đ) — ' + statsMsg, 'success');
       if (window.refreshView) window.refreshView();
     }
 
-    return { success: true, synced: count, total: allInvoices.length, skipped: skippedCount, amount: totalAmount, payments: paymentStats };
+    return { success: true, synced: count, total: apiTotal, skipped: syncedCount, amount: totalAmount, payments: paymentStats, date: todayStr, smart: true };
 
   } catch (e) {
     console.error('[CUKCUK Sync Error]', e);
@@ -577,6 +961,7 @@ export async function syncTransactions() {
     return { success: false, message: e.message };
   }
 }
+
 
 // ── Connection Status ──
 export function getConnectionStatus() {
@@ -593,3 +978,25 @@ export function getConnectionStatus() {
     message: cached ? 'Đã kết nối' : 'Chưa đăng nhập'
   };
 }
+
+/**
+ * Get the last sync time for today
+ */
+export function getLastSyncInfo() {
+  var todayRevenue = invoiceStore.getTodayRevenue();
+  if (todayRevenue && todayRevenue.bills > 0) {
+    return {
+      date: todayRevenue.date,
+      lastSync: todayRevenue.lastSync,
+      total: todayRevenue.total,
+      bills: todayRevenue.bills,
+      cash: todayRevenue.cash,
+      card: todayRevenue.card,
+      transfer: todayRevenue.transfer
+    };
+  }
+  return null;
+}
+
+// ── Export Invoice Store for direct access ──
+export { invoiceStore };

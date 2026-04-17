@@ -356,13 +356,52 @@ function _printHTML(html) {
       @page { size: A4 portrait; margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm; }
       body { margin: 0; padding: 0; background: #fff; }
       * { box-sizing: border-box; }
+      /* Auto-fit container */
+      .a4-autofit {
+        width: 100%;
+        transform-origin: top left;
+        page-break-after: avoid;
+        page-break-inside: avoid;
+      }
+      @media print {
+        body { overflow: hidden; }
+        .a4-autofit { page-break-after: avoid; }
+      }
     </style>
-  </head><body>${html}</body></html>`);
+  </head><body>
+    <div class="a4-autofit" id="autoFitContent">${html}</div>
+    <script>
+      // ═══ Auto-Fit A4: shrink content to fit exactly 1 page ═══
+      (function() {
+        var content = document.getElementById('autoFitContent');
+        if (!content) return;
+        
+        // A4 dimensions in px (at 96dpi): 210mm x 297mm
+        // minus margins
+        var mTop = ${m.top}, mBottom = ${m.bottom}, mLeft = ${m.left}, mRight = ${m.right};
+        var pageH = (297 - mTop - mBottom) * 3.7795;  // mm to px
+        var pageW = (210 - mLeft - mRight) * 3.7795;
+        
+        // Measure actual content height
+        var contentH = content.scrollHeight;
+        
+        if (contentH > pageH) {
+          // Calculate scale factor to fit
+          var scale = pageH / contentH;
+          // Don't shrink below 60%
+          scale = Math.max(scale, 0.60);
+          content.style.transform = 'scale(' + scale + ')';
+          content.style.transformOrigin = 'top left';
+          content.style.width = (100 / scale) + '%';
+        }
+      })();
+    </script>
+  </body></html>`);
   win.document.close();
   setTimeout(function() { 
     win.focus();
     win.print(); 
-  }, 400);
+  }, 600);
 }
 
 // ─── Visual Editor Logic ──────────────────────────
@@ -377,12 +416,24 @@ function _openVisualEditor(templateKey, initialHtml) {
         <div class="modal-title">🛠️ Trình thiết kế mẫu in KING's GRILL Pro</div>
         
         <!-- Toolbar -->
-        <div style="background:#f8f9fa;padding:12px;display:flex;gap:12px;border-bottom:1px solid #dee2e6;flex-wrap:wrap;box-shadow:0 2px 4px rgba(0,0,0,0.05);align-items:center;">
+        <div style="background:#f8f9fa;padding:8px 12px;display:flex;gap:8px;border-bottom:1px solid #dee2e6;flex-wrap:wrap;box-shadow:0 2px 4px rgba(0,0,0,0.05);align-items:center;">
           <!-- Text Formatting -->
           <div class="btn-group" style="display:flex;background:#fff;border-radius:6px;border:1px solid #ddd;overflow:hidden;">
             <button class="btn btn-sm btn-ghost" style="padding:4px 8px;" onclick="document.getElementById('editFrame').contentWindow.document.execCommand('bold')" title="In đậm"><b>B</b></button>
             <button class="btn btn-sm btn-ghost" style="padding:4px 8px;" onclick="document.getElementById('editFrame').contentWindow.document.execCommand('italic')" title="In nghiêng"><i>I</i></button>
             <button class="btn btn-sm btn-ghost" style="padding:4px 8px;" onclick="document.getElementById('editFrame').contentWindow.document.execCommand('underline')" title="Gạch chân"><u>U</u></button>
+          </div>
+
+          <!-- Font Size -->
+          <div class="btn-group" style="display:flex;background:#fff;border-radius:6px;border:1px solid #ddd;overflow:hidden;align-items:center;padding:0 4px;">
+            <select id="editorFontSize" style="border:none;font-size:11px;padding:2px;cursor:pointer;background:transparent;" title="Cỡ chữ">
+              <option value="1">8px</option>
+              <option value="2" selected>10px</option>
+              <option value="3">12px</option>
+              <option value="4">14px</option>
+              <option value="5">18px</option>
+              <option value="6">24px</option>
+            </select>
           </div>
 
           <!-- Color & Alignment -->
@@ -399,32 +450,45 @@ function _openVisualEditor(templateKey, initialHtml) {
             <button class="btn btn-sm btn-ghost" id="btnEditorRotate" title="Xoay chữ trong ô (90°)">🔄 Xoay</button>
           </div>
 
-          <!-- Table General -->
+          <!-- Table -->
           <div class="btn-group" style="display:flex;background:#fff;border-radius:6px;border:1px solid #ddd;overflow:hidden;">
             <button class="btn btn-sm btn-ghost" id="btnEditorInsertTable" title="Chèn bảng">➕ Bảng</button>
           </div>
 
-          <!-- Row/Col management -->
+          <!-- Row/Col -->
           <div class="btn-group" style="display:flex;background:#fff;border-radius:6px;border:1px solid #ddd;overflow:hidden;">
-            <button class="btn btn-sm btn-ghost" id="btnEditorAddRow" title="Thêm dòng dưới">➕ Dòng</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorAddRow" title="Thêm dòng dưới">+ Dòng</button>
             <button class="btn btn-sm btn-ghost" id="btnEditorDelRow" style="color:red;" title="Xóa dòng">- Dòng</button>
-            <button class="btn btn-sm btn-ghost" id="btnEditorAddCol" title="Thêm cột phải">➕ Cột</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorAddCol" title="Thêm cột phải">+ Cột</button>
             <button class="btn btn-sm btn-ghost" id="btnEditorDelCol" style="color:red;" title="Xóa cột">- Cột</button>
           </div>
 
           <!-- Cell Merging -->
           <div class="btn-group" style="display:flex;background:#fff;border-radius:6px;border:1px solid #ddd;overflow:hidden;">
-            <button class="btn btn-sm btn-ghost" id="btnEditorMergeRight" title="Gộp ngang">🔗 Gộp Ngang</button>
-            <button class="btn btn-sm btn-ghost" id="btnEditorMergeDown" title="Gộp dọc">🔗 Gộp Dọc</button>
-            <button class="btn btn-sm btn-ghost" id="btnEditorSplitCell" title="Hủy gộp">✂️ Hủy</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorMergeRight" title="Gộp ngang">🔗 Ngang</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorMergeDown" title="Gộp dọc">🔗 Dọc</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorSplitCell" title="Hủy gộp">✂️</button>
+          </div>
+
+          <!-- Quick Insert -->
+          <div class="btn-group" style="display:flex;background:#e8f5e9;border-radius:6px;border:1px solid #a5d6a7;overflow:hidden;">
+            <button class="btn btn-sm btn-ghost" id="btnEditorAddText" title="Chèn đoạn văn bản" style="color:#2e7d32;">📝 Văn bản</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorAddHeading" title="Chèn tiêu đề" style="color:#2e7d32;">📌 Tiêu đề</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorAddCheckbox" title="Chèn checkbox" style="color:#2e7d32;">☑️ Check</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorAddSignature" title="Chèn khung ký tên" style="color:#2e7d32;">✍️ Ký tên</button>
+            <button class="btn btn-sm btn-ghost" id="btnEditorAddDivider" title="Chèn đường kẻ" style="color:#2e7d32;">➖ Kẻ</button>
           </div>
 
           <div style="flex:1;"></div>
-          <span style="font-size:10px;color:#6c757d;align-self:center;white-space:nowrap;"><b>{{YEAR}}</b> | Tab: Di chuyển</span>
+          <span id="editorA4Status" style="font-size:10px;color:#6c757d;align-self:center;white-space:nowrap;">📐 Đang đo...</span>
         </div>
 
         <div style="flex:1;background:#e9ecef;padding:20px;overflow:auto;display:flex;justify-content:center;">
-          <iframe id="editFrame" style="width:210mm;height:297mm;background:#fff;border:none;box-shadow:0 0 20px rgba(0,0,0,0.15);border-radius:2px;"></iframe>
+          <div style="position:relative;">
+            <iframe id="editFrame" style="width:210mm;height:297mm;background:#fff;border:none;box-shadow:0 0 20px rgba(0,0,0,0.15);border-radius:2px;"></iframe>
+            <!-- A4 page boundary indicator -->
+            <div id="a4PageLine" style="position:absolute;left:0;right:0;height:2px;background:repeating-linear-gradient(90deg,#ef4444 0,#ef4444 8px,transparent 8px,transparent 16px);opacity:0.6;pointer-events:none;display:none;" title="Giới hạn trang A4"></div>
+          </div>
         </div>
 
         <div class="modal-footer" style="background:#fff;border-top:1px solid #eee;padding:12px 24px;">
@@ -452,10 +516,73 @@ function _openVisualEditor(templateKey, initialHtml) {
     </head><body contenteditable="true">${editableHtml}</body></html>`);
     doc.close();
 
+    // ── A4 Height Monitor ──
+    var a4MaxH = 277 * 3.7795; // 297mm - 20mm margins ≈ 277mm usable
+    function _checkA4Fit() {
+      var statusEl = document.getElementById('editorA4Status');
+      var lineEl = document.getElementById('a4PageLine');
+      if (!statusEl) return;
+      try {
+        var h = doc.body.scrollHeight;
+        var pct = Math.round(h / a4MaxH * 100);
+        if (h <= a4MaxH) {
+          statusEl.textContent = '✅ Vừa 1 trang A4 (' + pct + '%)';
+          statusEl.style.color = '#22c55e';
+          if (lineEl) lineEl.style.display = 'none';
+        } else {
+          statusEl.textContent = '⚠️ Tràn trang (' + pct + '%) — Sẽ tự co khi in';
+          statusEl.style.color = '#ef4444';
+          if (lineEl) {
+            lineEl.style.display = 'block';
+            lineEl.style.top = (a4MaxH + 20 * 3.7795) + 'px'; // add top padding offset
+          }
+        }
+      } catch(e) {}
+    }
+    // Monitor every 500ms
+    var _a4Timer = setInterval(_checkA4Fit, 500);
+    // Stop when modal closes
+    frame.addEventListener('load', function() { setTimeout(_checkA4Fit, 200); });
+    var origHide = window.hideModal;
+    window.hideModal = function() { clearInterval(_a4Timer); if (origHide) origHide(); };
+
+    // ── Font Size ──
+    document.getElementById('editorFontSize').onchange = (e) => {
+      doc.execCommand('fontSize', false, e.target.value);
+    };
+
     // Color Picker logic
     document.getElementById('editorColorPicker').oninput = (e) => {
       doc.execCommand('foreColor', false, e.target.value);
     };
+
+    // ── Quick Insert Buttons ──
+    document.getElementById('btnEditorAddText')?.addEventListener('click', () => {
+      doc.execCommand('insertHTML', false, '<p style="margin:4px 0;">Nhập nội dung tại đây...</p>');
+      _checkA4Fit();
+    });
+    document.getElementById('btnEditorAddHeading')?.addEventListener('click', () => {
+      doc.execCommand('insertHTML', false, '<div style="text-align:center;font-weight:bold;font-size:14px;margin:8px 0;text-transform:uppercase;">TIÊU ĐỀ MỚI</div>');
+      _checkA4Fit();
+    });
+    document.getElementById('btnEditorAddCheckbox')?.addEventListener('click', () => {
+      doc.execCommand('insertHTML', false, '<p style="margin:2px 0;">☐ Hạng mục kiểm tra mới</p>');
+      _checkA4Fit();
+    });
+    document.getElementById('btnEditorAddSignature')?.addEventListener('click', () => {
+      doc.execCommand('insertHTML', false, 
+        '<table style="border:none !important;margin-top:12px;"><tr>' +
+        '<td style="border:none !important;text-align:center;width:33%;padding:4px;"><b>Người lập</b><br><br><br><br>(Ký tên & ghi rõ)</td>' +
+        '<td style="border:none !important;text-align:center;width:33%;padding:4px;"><b>Quản lý</b><br><br><br><br>(Ký tên & ghi rõ)</td>' +
+        '<td style="border:none !important;text-align:center;width:33%;padding:4px;"><b>Phê duyệt</b><br><br><br><br>(Ký tên & ghi rõ)</td>' +
+        '</tr></table>'
+      );
+      _checkA4Fit();
+    });
+    document.getElementById('btnEditorAddDivider')?.addEventListener('click', () => {
+      doc.execCommand('insertHTML', false, '<hr style="border:none;border-top:1.5px solid #000;margin:8px 0;">');
+      _checkA4Fit();
+    });
 
     // Rotation logic
     document.getElementById('btnEditorRotate').onclick = () => {

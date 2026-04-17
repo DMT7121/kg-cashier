@@ -65,16 +65,16 @@ export function render() {
           </div>
           <div class="form-group" style="display:flex;align-items:center;gap:12px;padding:10px 0;">
             <label class="form-label" style="margin-bottom:0;flex:1;">Tự động đồng bộ Cloud</label>
-            <label style="position:relative;display:inline-block;width:44px;height:24px;">
-              <input type="checkbox" id="settAutoSync" ${s.autoSync !== false ? 'checked' : ''} style="opacity:0;width:0;height:0;">
-              <span style="position:absolute;cursor:pointer;inset:0;background:${s.autoSync !== false ? 'var(--success)' : 'rgba(255,255,255,.1)'};border-radius:12px;transition:.3s;"></span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settAutoSync" ${s.autoSync !== false ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
             </label>
           </div>
           <div class="form-group" style="display:flex;align-items:center;gap:12px;padding:10px 0;">
             <label class="form-label" style="margin-bottom:0;flex:1;">Yêu cầu đăng nhập PIN</label>
-            <label style="position:relative;display:inline-block;width:44px;height:24px;">
-              <input type="checkbox" id="settRequireLogin" ${s.requireLogin ? 'checked' : ''} style="opacity:0;width:0;height:0;">
-              <span style="position:absolute;cursor:pointer;inset:0;background:${s.requireLogin ? 'var(--success)' : 'rgba(255,255,255,.1)'};border-radius:12px;transition:.3s;"></span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settRequireLogin" ${s.requireLogin ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
             </label>
           </div>
         </div>
@@ -116,9 +116,9 @@ export function render() {
             Tự động đồng bộ khi mở ca
             <span class="text-muted" style="font-size:11px;display:block;">Tự động lấy hóa đơn CUKCUK mỗi 5 phút khi ca đang mở</span>
           </label>
-          <label style="position:relative;display:inline-block;width:44px;height:24px;">
-            <input type="checkbox" id="cuk_autoSync" ${(s.cukcuk && s.cukcuk.autoSync) ? 'checked' : ''} style="opacity:0;width:0;height:0;">
-            <span style="position:absolute;cursor:pointer;inset:0;background:${(s.cukcuk && s.cukcuk.autoSync) ? 'var(--success)' : 'rgba(255,255,255,.1)'};border-radius:12px;transition:.3s;"></span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="cuk_autoSync" ${(s.cukcuk && s.cukcuk.autoSync) ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
           </label>
         </div>
         

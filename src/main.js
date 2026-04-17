@@ -38,6 +38,7 @@ import * as staffView from './views/staff.js';
 import * as auditLogView from './views/auditLog.js';
 import * as settingsView from './views/settings.js';
 import * as printFormsView from './views/printForms.js';
+import * as cukcukInvoicesView from './views/cukcukInvoices.js';
 
 // ── View Registry ────────────────────────────
 var views = {
@@ -46,6 +47,7 @@ var views = {
   'transactions': { module: transactionsView, title: 'Giao dịch' },
   'cash-count':   { module: cashCountView,    title: 'Kiểm kê tiền' },
   'invoices':     { module: invoicesView,     title: 'Hóa đơn / Chứng từ' },
+  'cukcuk':       { module: cukcukInvoicesView, title: 'Hóa đơn CUKCUK' },
   'report':       { module: reportView,       title: 'Báo cáo bàn giao' },
   'analytics':    { module: analyticsView,    title: 'Phân tích' },
   'history':      { module: historyView,      title: 'Lịch sử ca' },
@@ -59,12 +61,12 @@ var currentView = 'dashboard';
 
 // ── Navigation ───────────────────────────────
 function navigateTo(viewName) {
-  // Sync with cloud to ensure state is fresh
+  // Sync with cloud to ensure state is fresh (fire-and-forget, no re-navigation)
   syncCurrentShiftWithCloud().then(function(changed) {
     if (changed) {
       console.log('[Main] Shift state synchronized from cloud');
-      // Re-run navigation logic if shift presence changed
-      navigateTo(currentView);
+      // Only re-render the current view, do NOT re-call navigateTo to avoid infinite loop
+      renderCurrentView();
     }
   });
 
@@ -219,6 +221,41 @@ function initApp() {
   var hash = location.hash.replace('#', '');
   navigateTo(hash && views[hash] ? hash : 'dashboard');
 
+  // ── MIGRATION: Move CUKCUK data from shift.transactions to Invoice Store ──
+  try {
+    var migrationDone = localStorage.getItem('cukcuk_migration_v2');
+    if (!migrationDone) {
+      import('./integration/invoiceStore.js').then(function(store) {
+        var shift = getCurrentShift();
+        var state = JSON.parse(localStorage.getItem('kg-cashier-data') || '{}');
+        var history = state.shiftHistory || [];
+        var migrated = store.migrateFromShifts(shift, history);
+        
+        if (migrated > 0) {
+          console.log('[Migration] ✅ Migrated ' + migrated + ' CUKCUK invoices to Invoice Store');
+          // Clean CUKCUK transactions from current shift
+          if (shift) {
+            var cleaned = store.removeCukcukFromTransactions(shift.transactions);
+            shift.transactions = cleaned;
+            state.currentShift = shift;
+          }
+          // Clean from history too
+          for (var h = 0; h < history.length; h++) {
+            history[h].transactions = store.removeCukcukFromTransactions(history[h].transactions);
+          }
+          state.shiftHistory = history;
+          localStorage.setItem('kg-cashier-data', JSON.stringify(state));
+          console.log('[Migration] ✅ Cleaned CUKCUK data from shift transactions');
+        }
+        localStorage.setItem('cukcuk_migration_v2', 'done');
+      }).catch(function(e) {
+        console.warn('[Migration] Error:', e);
+      });
+    }
+  } catch(e) {
+    console.warn('[Migration] Error:', e);
+  }
+
   // Background polling for cloud sync (Feature: Multi-device real-time sync)
   setInterval(function() {
     syncCurrentShiftWithCloud().then(function(changed) {
@@ -230,7 +267,8 @@ function initApp() {
   }, 5000); // Check every 5 seconds for real-time updates
 
   // CUKCUK auto-sync: always active when shift is open and CUKCUK is configured
-  // Sync immediately on load, then every 2 minutes
+  // Loads invoices for TODAY's date only, auto-detects payment methods
+  // Immediate sync on page load, then every 2 minutes for continuous updates
   function _triggerCukcukSync(isInitial) {
     try {
       var shift = getCurrentShift();
@@ -239,12 +277,19 @@ function initApp() {
       var cukcuk = settings.settings && settings.settings.cukcuk;
       if (!cukcuk || !cukcuk.key) return;
       
-      console.log('[Main] CUKCUK auto-sync' + (isInitial ? ' (initial)' : '') + ' triggered');
+      var today = new Date();
+      var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      console.log('[Main] CUKCUK auto-sync' + (isInitial ? ' (initial)' : '') + ' for date: ' + todayStr);
+      
       import('./integration/cukcuk.js').then(function(mod) {
         mod.syncTransactions().then(function(result) {
-          if (result && result.success && result.synced > 0) {
-            console.log('[Main] CUKCUK auto-sync: Added ' + result.synced + ' invoices');
-            renderCurrentView();
+          if (result && result.success) {
+            if (result.synced > 0) {
+              console.log('[Main] CUKCUK auto-sync: Added ' + result.synced + ' invoices for ' + (result.date || todayStr));
+              renderCurrentView();
+            } else {
+              console.log('[Main] CUKCUK auto-sync: No new invoices for ' + (result.date || todayStr) + ' (total: ' + result.total + ')');
+            }
           }
         }).catch(function() {});
       }).catch(function() {});
@@ -256,7 +301,7 @@ function initApp() {
   // Immediate sync on load (with 3s delay to let UI settle)
   setTimeout(function() { _triggerCukcukSync(true); }, 3000);
 
-  // Then every 2 minutes
+  // Then every 2 minutes for continuous live updates
   setInterval(function() { _triggerCukcukSync(false); }, 120000);
 
   console.log('[KG-CASHIER] Ready!');

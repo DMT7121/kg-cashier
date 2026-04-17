@@ -1,6 +1,6 @@
 import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff } from '../store.js';
 import { showToast, showModal, hideModal, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
-import { getStaffFromCloud } from '../api.js';
+import { getStaffFromCloud, getConfigFromCloud } from '../api.js';
 
 let _staffList = [];
 
@@ -105,10 +105,22 @@ export function render() {
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">👤 Nhân viên <span style="color:var(--danger);">*</span></label>
-            <select id="staffSelect" class="form-input" required autofocus>
-              <option value="">-- Đang tải... --</option>
-            </select>
-            <p class="form-hint" id="staffLoadStatus" style="margin-top:4px;"></p>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <select id="staffSelect" class="form-input" required autofocus style="flex:1;">
+                <option value="">-- Chọn nhân viên --</option>
+              </select>
+              <button class="btn btn-outline btn-sm" id="btnRefreshStaffList" type="button" title="Tải lại danh sách nhân viên từ Cloud" style="white-space:nowrap;height:42px;">
+                <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <p class="form-hint" id="staffLoadStatus" style="margin:0;flex:1;"></p>
+              <button class="btn btn-sm" id="btnManualName" type="button" style="font-size:11px;padding:2px 8px;background:transparent;color:var(--text-muted);border:1px dashed var(--border);">✏️ Nhập tên thủ công</button>
+            </div>
+            <div id="manualNameBox" style="display:none;margin-top:8px;">
+              <input type="text" id="manualStaffName" class="form-input" placeholder="Nhập tên nhân viên..." style="background:rgba(245,158,11,0.05);border-color:rgba(245,158,11,0.3);">
+              <p class="form-hint" style="color:var(--warning);margin-top:2px;">⚡ Mở ca nhanh — không cần PIN</p>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label"># Số ca</label>
@@ -120,7 +132,7 @@ export function render() {
           </div>
         </div>
 
-        <div class="form-row">
+        <div class="form-row" id="pinRow">
           <div class="form-group">
             <label class="form-label">🔑 Mã PIN cá nhân <span style="color:var(--danger);">*</span></label>
             <input type="password" id="staffPin" class="form-input" placeholder="••••" maxlength="6" inputmode="numeric">
@@ -205,10 +217,17 @@ export function init() {
       return;
     }
 
-    // Timer
+    // Timer — clear any existing timer first to prevent accumulation
+    if (_timer) clearInterval(_timer);
     _timer = setInterval(() => {
       const el = document.getElementById('shiftTimer');
-      if (el) el.textContent = formatDuration(shift.startTime);
+      if (el) {
+        el.textContent = formatDuration(shift.startTime);
+      } else {
+        // View no longer visible, stop timer
+        clearInterval(_timer);
+        _timer = null;
+      }
     }, 30000);
 
     // Close shift
@@ -276,45 +295,107 @@ export function init() {
   } else {
     // ── OPEN SHIFT ──
     var statusEl = document.getElementById('staffLoadStatus');
+    var _isManualMode = false;
 
-    // Step 1: Immediately show cached staff (instant, no network)
+    // Toggle manual name input
+    document.getElementById('btnManualName')?.addEventListener('click', function() {
+      _isManualMode = !_isManualMode;
+      var box = document.getElementById('manualNameBox');
+      var pinRow = document.getElementById('pinRow');
+      var select = document.getElementById('staffSelect');
+      if (_isManualMode) {
+        if (box) box.style.display = 'block';
+        if (pinRow) pinRow.style.display = 'none';
+        if (select) select.disabled = true;
+        this.textContent = '📋 Chọn từ danh sách';
+        document.getElementById('manualStaffName')?.focus();
+      } else {
+        if (box) box.style.display = 'none';
+        if (pinRow) pinRow.style.display = '';
+        if (select) select.disabled = false;
+        this.textContent = '✏️ Nhập tên thủ công';
+      }
+    });
+
+    // Reusable staff loading function
+    function _loadStaffFromCloud(isManual) {
+      if (isManual) {
+        if (statusEl) {
+          statusEl.textContent = '⏳ Đang tải lại từ Cloud...';
+          statusEl.style.color = 'var(--info)';
+        }
+      }
+      
+      // Try fast config API first, then fallback to full staff API
+      getConfigFromCloud().then(function(configRes) {
+        if (configRes.success && configRes.config && configRes.config.staff) {
+          var configStaff = configRes.config.staff;
+          setCachedStaff(configStaff);
+          _populateStaffSelect(configStaff);
+          if (statusEl) {
+            statusEl.textContent = '✅ ' + configStaff.length + ' nhân viên';
+            statusEl.style.color = 'var(--success)';
+          }
+          return;
+        }
+        // Fallback to full staff API
+        return getStaffFromCloud().then(function(res) {
+          if (res.success && res.staff) {
+            setCachedStaff(res.staff);
+            _populateStaffSelect(res.staff);
+            if (statusEl) {
+              statusEl.textContent = '✅ ' + res.staff.length + ' nhân viên';
+              statusEl.style.color = 'var(--success)';
+            }
+          } else if (isManual) {
+            if (statusEl) {
+              statusEl.textContent = '⚠️ Không tải được — dùng "Nhập tên thủ công"';
+              statusEl.style.color = 'var(--warning)';
+            }
+          }
+        });
+      }).catch(function() {
+        // Config failed, try direct staff API
+        getStaffFromCloud().then(function(res) {
+          if (res.success && res.staff) {
+            setCachedStaff(res.staff);
+            _populateStaffSelect(res.staff);
+            if (statusEl) {
+              statusEl.textContent = '✅ ' + res.staff.length + ' nhân viên';
+              statusEl.style.color = 'var(--success)';
+            }
+          }
+        }).catch(function() {
+          if (statusEl && (!getCachedStaff() || getCachedStaff().length === 0)) {
+            statusEl.textContent = '❌ Offline — dùng "Nhập tên thủ công"';
+            statusEl.style.color = 'var(--danger)';
+          }
+        });
+      });
+    }
+
+    // Step 1: Immediately show cached staff (instant, no network wait)
     var cached = getCachedStaff();
     if (cached && cached.length > 0) {
       _populateStaffSelect(cached);
-      if (statusEl) statusEl.textContent = '✅ ' + cached.length + ' nhân viên (cache)';
+      if (statusEl) {
+        statusEl.textContent = '✅ ' + cached.length + ' nhân viên';
+        statusEl.style.color = 'var(--success)';
+      }
+    } else {
+      if (statusEl) {
+        statusEl.textContent = '⏳ Đang tải...';
+        statusEl.style.color = 'var(--text-muted)';
+      }
     }
 
-    // Step 2: Load fresh staff from cloud in background (real-time update)
-    getStaffFromCloud().then(function(res) {
-      if (res.success && res.staff) {
-        var cloudStaff = res.staff;
-        // Save to local cache for next time
-        setCachedStaff(cloudStaff);
-        // Update the dropdown with fresh data
-        _populateStaffSelect(cloudStaff);
-        if (statusEl) {
-          statusEl.textContent = '☁️ ' + cloudStaff.length + ' nhân viên (cloud)';
-          statusEl.style.color = 'var(--success)';
-        }
-      } else {
-        // Cloud failed but we still have cache
-        if (cached && cached.length > 0) {
-          if (statusEl) {
-            statusEl.textContent = '⚠️ Cloud offline — dùng dữ liệu cache';
-            statusEl.style.color = 'var(--warning)';
-          }
-        } else {
-          if (statusEl) {
-            statusEl.textContent = '❌ Không tải được nhân viên. Kiểm tra kết nối.';
-            statusEl.style.color = 'var(--danger)';
-          }
-        }
-      }
-    }).catch(function() {
-      if (statusEl && (!cached || cached.length === 0)) {
-        statusEl.textContent = '❌ Lỗi kết nối Cloud';
-        statusEl.style.color = 'var(--danger)';
-      }
+    // Step 2: Load fresh staff from cloud in background (silent update)
+    _loadStaffFromCloud(false);
+
+    // Manual refresh button
+    document.getElementById('btnRefreshStaffList')?.addEventListener('click', function() {
+      _loadStaffFromCloud(true);
+      showToast('🔄 Tải lại danh sách nhân viên...', 'info');
     });
 
     const btnOpen = document.getElementById('btnOpenShift');
@@ -324,34 +405,46 @@ export function init() {
       e.preventDefault();
       _clearFormError();
 
-      const staffId = document.getElementById('staffSelect').value;
-      const pin = document.getElementById('staffPin').value.trim();
+      var staffName = '';
+      var staffId = '';
+
+      if (_isManualMode) {
+        // Manual mode — use typed name
+        staffName = (document.getElementById('manualStaffName')?.value || '').trim();
+        if (!staffName) { _showFormError('Vui lòng nhập tên nhân viên'); return; }
+        staffId = 'manual-' + Date.now();
+      } else {
+        // Normal mode — use selected staff
+        staffId = document.getElementById('staffSelect').value;
+        if (!staffId) { _showFormError('Vui lòng chọn nhân viên'); return; }
+        
+        const staff = _staffList.find(function(s) { return s.id === staffId; });
+        if (!staff) {
+          _showFormError('Không tìm thấy nhân viên. Hãy thử tải lại trang.');
+          return;
+        }
+        
+        // PIN verification
+        var pin = document.getElementById('staffPin').value.trim();
+        var staffPin = String(staff.pin || '');
+        if (staffPin && staffPin !== '****' && staffPin !== pin) {
+          _showFormError('Mã PIN không chính xác!');
+          _highlightField('staffPin');
+          return;
+        }
+        staffName = staff.name;
+      }
+
       const shiftPass = document.getElementById('shiftPassword').value || '0000';
       const num = document.getElementById('shiftNumber').value;
       const date = document.getElementById('shiftDate').value;
       const cash = document.getElementById('startingCash').value;
 
-      if (!staffId) { _showFormError('Vui lòng chọn nhân viên'); return; }
-      
-      const staff = _staffList.find(function(s) { return s.id === staffId; });
-      if (!staff) {
-        _showFormError('Không tìm thấy nhân viên. Hãy thử tải lại trang.');
-        return;
-      }
-      
-      // PIN verification - check if PIN matches
-      // Note: if staff.pin is '****' (masked from old API), skip PIN check
-      if (staff.pin && staff.pin !== '****' && staff.pin !== pin) {
-        _showFormError('Mã PIN không chính xác!');
-        _highlightField('staffPin');
-        return;
-      }
-
       if (!date) { _showFormError('Vui lòng chọn ngày'); return; }
 
       try {
         const result = openShift({
-          cashierName: staff.name,
+          cashierName: staffName,
           shiftNumber: num,
           date: date,
           startingCash: cash,
@@ -360,7 +453,10 @@ export function init() {
         
         // Auto validate the session for the opener
         sessionStorage.setItem('shift_validated', result.id);
-        setLoggedInUser(staff);
+        if (!_isManualMode) {
+          const staff = _staffList.find(function(s) { return s.id === staffId; });
+          if (staff) setLoggedInUser(staff);
+        }
 
         showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');
         if (window.navigateTo) window.navigateTo('dashboard');

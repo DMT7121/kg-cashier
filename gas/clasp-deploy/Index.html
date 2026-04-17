@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hệ Thống Quản Lý Sheet Pro</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #333;
+      background: #f8f9fa;
+    }
+
+    .container {
+      max-width: 100%;
+      padding: 10px;
+    }
+
+    /* Tab Navigation */
+    .tab-navigation {
+      display: flex;
+      border-bottom: 2px solid #e9ecef;
+      margin-bottom: 15px;
+      background: white;
+      border-radius: 8px 8px 0 0;
+      overflow: hidden;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      background: #f8f9fa;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6c757d;
+      transition: all 0.3s ease;
+      border-bottom: 3px solid transparent;
+      position: relative;
+    }
+
+    .tab-button:hover {
+      background: #e9ecef;
+      color: #495057;
+      transform: translateY(-1px);
+    }
+
+    .tab-button.active {
+      background: white;
+      color: #0066cc;
+      border-bottom-color: #0066cc;
+      box-shadow: 0 -2px 8px rgba(0,102,204,0.1);
+    }
+
+    .tab-button.active::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #0066cc, #00aaff);
+    }
+
+    /* Tab Content */
+    .tab-content {
+      display: none;
+      background: white;
+      border-radius: 0 0 8px 8px;
+      padding: 15px;
+      min-height: 500px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      border: 1px solid #e9ecef;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Form Elements */
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #495057;
+      font-size: 11px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #e9ecef;
+      border-radius: 6px;
+      font-size: 12px;
+      transition: all 0.3s ease;
+      background: #fff;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: #0066cc;
+      box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+      transform: translateY(-1px);
+    }
+
+    .form-control-sm {
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+
+    /* Enhanced Buttons */
+    .btn {
+      display: inline-block;
+      padding: 10px 15px;
+      margin: 3px;
+      border: none;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255,255,255,0.3);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.3s, height 0.3s;
+    }
+
+    .btn:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0066cc, #0052a3);
+      color: white;
+      box-shadow: 0 4px 15px rgba(0,102,204,0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,102,204,0.4);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #28a745, #1e7e34);
+      color: white;
+      box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+    }
+
+    .btn-success:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(40,167,69,0.4);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, #ffc107, #e0a800);
+      color: #212529;
+      box-shadow: 0 4px 15px rgba(255,193,7,0.3);
+    }
+
+    .btn-warning:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255,193,7,0.4);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #dc3545, #c82333);
+      color: white;
+      box-shadow: 0 4px 15px rgba(220,53,69,0.3);
+    }
+
+    .btn-danger:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(220,53,69,0.4);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #6c757d, #545b62);
+      color: white;
+      box-shadow: 0 4px 15px rgba(108,117,125,0.3);
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(108,117,125,0.4);
+    }
+
+    .btn-sm {
+      padding: 8px 12px;
+      font-size: 10px;
+    }
+
+    .btn-block {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    /* FIXED: Disabled button state */
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn:disabled::before {
+      display: none;
+    }
+
+    /* Component Configuration */
+    .component-config {
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 12px;
+      background: linear-gradient(145deg, #f8f9fa, #ffffff);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .component-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .component-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .component-fields .form-group {
+      margin-bottom: 8px;
+    }
+
+    /* Enhanced Sheet List */
+    .sheet-list {
+      max-height: 320px;
+      overflow-y: auto;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      background: white;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .sheet-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 15px;
+      border-bottom: 1px solid #f1f3f4;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .sheet-item:hover {
+      background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+      transform: translateX(5px);
+    }
+
+    .sheet-item:last-child {
+      border-bottom: none;
+    }
+
+    .sheet-item.pinned {
+      background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+      border-left: 4px solid #2196f3;
+      font-weight: 600;
+    }
+
+    .sheet-item.pinned::before {
+      content: '📌';
+      position: absolute;
+      left: 5px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 8px;
+    }
+
+    /* FIXED: Sheet checkbox styling */
+    .sheet-checkbox {
+      margin-right: 12px;
+      transform: scale(1.2);
+      cursor: pointer;
+    }
+
+    .sheet-name {
+      flex: 1;
+      font-size: 11px;
+      font-weight: 500;
+      color: #495057;
+      cursor: pointer;
+    }
+
+    .sheet-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* FIXED: Selected sheet highlighting */
+    .sheet-item.selected {
+      background: linear-gradient(135deg, #e8f4fd, #d1ecf1);
+      border-left: 4px solid #0066cc;
+    }
+
+    /* FIXED: Selection counter */
+    .selection-counter {
+      font-size: 10px;
+      color: #0066cc;
+      font-weight: 600;
+      padding: 4px 8px;
+      background: rgba(0,102,204,0.1);
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+
+    /* Enhanced Action Buttons Grid */
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    /* Enhanced Automation Switches */
+    .automation-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: linear-gradient(145deg, #ffffff, #f8f9fa);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      transition: all 0.3s ease;
+    }
+
+    .automation-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .automation-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #495057;
+    }
+
+    /* Enhanced Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 28px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #ccc, #999);
+      transition: .4s;
+      border-radius: 28px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 22px;
+      width: 22px;
+      left: 3px;
+      bottom: 3px;
+      background: linear-gradient(135deg, #ffffff, #f0f0f0);
+      transition: .4s;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    input:checked + .slider {
+      background: linear-gradient(135deg, #0066cc, #0052a3);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    /* Enhanced Progress and Logs */
+    .progress-container {
+      margin: 20px 0;
+      padding: 15px;
+      background: linear-gradient(145deg, #f8f9fa, #ffffff);
+      border-radius: 8px;
+      border: 2px solid #e9ecef;
+      display: none;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 24px;
+      background: linear-gradient(135deg, #e9ecef, #dee2e6);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #28a745, #20c997, #17a2b8);
+      transition: width 0.6s ease;
+      border-radius: 12px;
+      position: relative;
+      animation: progressShine 2s infinite;
+    }
+
+    @keyframes progressShine {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .logs-container {
+      max-height: 200px;
+      overflow-y: auto;
+      background: linear-gradient(145deg, #f8f9fa, #ffffff);
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      display: none;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .log-entry {
+      margin-bottom: 4px;
+      color: #495057;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: all 0.2s ease;
+      word-wrap: break-word;
+    }
+
+    .log-entry:hover {
+      background: rgba(0,102,204,0.1);
+    }
+
+    .log-entry.success {
+      color: #28a745;
+      background: rgba(40,167,69,0.1);
+    }
+
+    .log-entry.error {
+      color: #dc3545;
+      background: rgba(220,53,69,0.1);
+    }
+
+    .log-entry.info {
+      color: #0066cc;
+      background: rgba(0,102,204,0.1);
+    }
+
+    .log-entry.warning {
+      color: #ffc107;
+      background: rgba(255,193,7,0.1);
+    }
+
+    /* Enhanced Alert Messages */
+    .alert {
+      padding: 12px 15px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .alert-success {
+      background: linear-gradient(135deg, #d4edda, #c3e6cb);
+      color: #155724;
+      border-color: #c3e6cb;
+    }
+
+    .alert-danger {
+      background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+      color: #721c24;
+      border-color: #f5c6cb;
+    }
+
+    .alert-info {
+      background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+      color: #0c5460;
+      border-color: #bee5eb;
+    }
+
+    .alert-warning {
+      background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+      color: #856404;
+      border-color: #ffeaa7;
+    }
+
+    /* Enhanced Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+      background: linear-gradient(145deg, #ffffff, #f8f9fa);
+      margin: 10% auto;
+      padding: 25px;
+      border-radius: 12px;
+      width: 85%;
+      max-width: 450px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        transform: translateY(-50px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #495057;
+    }
+
+    .close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #6c757d;
+      transition: all 0.3s ease;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .close:hover {
+      color: #495057;
+      background: rgba(0,0,0,0.1);
+      transform: rotate(90deg);
+    }
+
+    /* Loading Spinner */
+    .spinner {
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #0066cc;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* FIXED: Status indicators */
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status-indicator.success {
+      background: #28a745;
+    }
+
+    .status-indicator.error {
+      background: #dc3545;
+    }
+
+    .status-indicator.warning {
+      background: #ffc107;
+    }
+
+    .status-indicator.info {
+      background: #17a2b8;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 400px) {
+      .container {
+        padding: 8px;
+      }
+
+      .tab-button {
+        font-size: 9px;
+        padding: 10px 6px;
+      }
+
+      .component-fields {
+        grid-template-columns: 1fr;
+      }
+
+      .action-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-content {
+        width: 95%;
+        margin: 5% auto;
+        padding: 20px;
+      }
+    }
+
+    /* Utilities */
+    .text-center { text-align: center; }
+    .text-muted { color: #6c757d; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-3 { margin-bottom: 12px; }
+    .mt-2 { margin-top: 8px; }
+    .d-none { display: none; }
+    .d-flex { display: flex; }
+    .justify-content-between { justify-content: space-between; }
+    .align-items-center { align-items: center; }
+
+    /* Custom Scrollbar */
+    .sheet-list::-webkit-scrollbar,
+    .logs-container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .sheet-list::-webkit-scrollbar-track,
+    .logs-container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    .sheet-list::-webkit-scrollbar-thumb,
+    .logs-container::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #0066cc, #0052a3);
+      border-radius: 4px;
+    }
+
+    .sheet-list::-webkit-scrollbar-thumb:hover,
+    .logs-container::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, #0052a3, #004080);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+      <button class="tab-button active" onclick="switchTab('config')">
+        ⚙️ CẤU HÌNH
+      </button>
+      <button class="tab-button" onclick="switchTab('management')">
+        📊 QUẢN LÝ & THAO TÁC
+      </button>
+      <button class="tab-button" onclick="switchTab('automation')">
+        🤖 TỰ ĐỘNG HÓA
+      </button>
+    </div>
+
+    <!-- Progress and Logs -->
+    <div id="progressContainer" class="progress-container">
+      <div class="progress-bar">
+        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+      </div>
+      <div id="progressText" class="text-center text-muted">Đang xử lý...</div>
+    </div>
+
+    <div id="logsContainer" class="logs-container">
+      <div id="logsContent"></div>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+
+    <!-- Tab: Configuration -->
+    <div id="configTab" class="tab-content active">
+      <div class="form-group">
+        <label class="form-label">📝 Tên Cấu Hình</label>
+        <input type="text" id="configName" class="form-control" placeholder="VD: PHIẾU TIỆC, LỊCH ĐẶT BÀN...">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">🏗️ Thành Phần Cấu Hình</label>
+        <div id="componentsContainer">
+          <!-- Components will be added here -->
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="addComponent()">
+          ➕ Thêm Thành Phần
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">📅 Định Dạng Ngày (nếu có [NGÀY])</label>
+        <select id="dateFormat" class="form-control">
+          <option value="DD/MM/YYYY">DD/MM/YYYY (25/09/2025)</option>
+          <option value="DD.MM.YY">DD.MM.YY (25.09.25)</option>
+          <option value="DD-MM-YYYY">DD-MM-YYYY (25-09-2025)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">🔗 ID Spreadsheet Làm Việc Khác</label>
+        <input type="text" id="externalSpreadsheetId" class="form-control" 
+               placeholder="Nhập ID spreadsheet..." onblur="checkExternalSpreadsheet()">
+        <div id="externalSpreadsheetInfo" class="mt-2 text-muted"></div>
+        <div class="mt-2">
+          <label class="d-flex align-items-center">
+            <input type="checkbox" id="enableExternalWork" class="sheet-checkbox">
+            <span class="form-label mb-0">Tương tác, làm việc thêm trong spreadsheet này</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <button type="button" class="btn btn-success btn-block" onclick="saveConfiguration()">
+          💾 Lưu Cấu Hình
+        </button>
+        <button type="button" class="btn btn-secondary btn-block" onclick="loadConfigurationsList()">
+          📂 Tải Danh Sách Cấu Hình
+        </button>
+      </div>
+
+      <div id="configsList"></div>
+    </div>
+
+    <!-- Tab: Sheet Management -->
+    <div id="managementTab" class="tab-content">
+      <div class="form-group">
+        <label class="form-label">🔍 Tìm Kiếm Sheet</label>
+        <input type="text" id="searchSheets" class="form-control" 
+               placeholder="Nhập từ khóa..." onkeyup="searchSheets()">
+      </div>
+
+      <div class="form-group">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label mb-0">📋 Danh Sách Sheet</label>
+          <div class="d-flex align-items-center">
+            <span id="selectionCounter" class="selection-counter">0 được chọn</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSelectAll()">
+              ☑️ Chọn/Bỏ Tất Cả
+            </button>
+          </div>
+        </div>
+        <div id="sheetsList" class="sheet-list">
+          <div class="text-center text-muted" style="padding: 20px;">
+            <div class="spinner"></div>
+            Đang tải danh sách sheet...
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">🎯 Chọn Cấu Hình</label>
+        <select id="selectedConfig" class="form-control">
+          <option value="">-- Chọn cấu hình --</option>
+        </select>
+      </div>
+
+      <div class="action-buttons">
+        <button type="button" class="btn btn-primary btn-sm" onclick="sortSheetsAscending()">
+          ⬆️ Sắp Xếp Tăng
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="sortSheetsDescending()">
+          ⬇️ Sắp Xếp Giảm
+        </button>
+        <button type="button" class="btn btn-warning btn-sm" onclick="renameSheets()">
+          ✏️ Đổi Tên Sheet
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="hideOldSheets()">
+          👁️ Ẩn Sheet Cũ
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="hideSelectedSheets()">
+          🙈 Ẩn Sheet Chọn
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="deleteSelectedSheets()">
+          🗑️ Xóa Sheet Chọn
+        </button>
+        <button type="button" class="btn btn-success btn-sm" onclick="copyPasteValues()">
+          📋 Copy & Paste Values
+        </button>
+        <button type="button" class="btn btn-success btn-sm" onclick="copyPasteValuesWithExclusion()">
+          📝 Copy & Paste (Loại Trừ)
+        </button>
+        <button type="button" id="addBookingBtn" class="btn btn-primary btn-sm d-none" onclick="addBookingSchedule()">
+          📅 Thêm Lịch Đặt Bàn
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab: Automation -->
+    <div id="automationTab" class="tab-content">
+      <div class="form-group">
+        <label class="form-label">🤖 Thiết Lập Tự Động Hóa</label>
+        <div class="text-muted mb-3">Bật/tắt các chức năng tự động hóa cho hệ thống (Sử dụng Advanced Sheets API v4)</div>
+      </div>
+
+      <div class="automation-item">
+        <div class="automation-label">✏️ Tự động đổi tên sheet khi chỉnh sửa</div>
+        <label class="switch">
+          <input type="checkbox" id="autoRenameToggle" onchange="toggleAutomation('autoRename', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="automation-item" id="autoBookingItem" style="display: none;">
+        <div class="automation-label">📅 Tự động thêm lịch đặt bàn khi chỉnh sửa</div>
+        <label class="switch">
+          <input type="checkbox" id="autoBookingToggle" onchange="toggleAutomation('autoBooking', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="automation-item">
+        <div class="automation-label">👁️ Tự động ẩn sheet cũ (00:15 hằng ngày)</div>
+        <label class="switch">
+          <input type="checkbox" id="autoHideToggle" onchange="toggleAutomation('autoHideOld', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="automation-item">
+        <div class="automation-label">⬆️ Tự động sắp xếp tăng dần (00:00 hằng ngày)</div>
+        <label class="switch">
+          <input type="checkbox" id="autoSortAscToggle" onchange="toggleAutomation('autoSortAsc', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="automation-item">
+        <div class="automation-label">⬇️ Tự động sắp xếp giảm dần (00:00 hằng ngày)</div>
+        <label class="switch">
+          <input type="checkbox" id="autoSortDescToggle" onchange="toggleAutomation('autoSortDesc', this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="mt-3">
+        <div class="alert alert-info">
+          <strong>🚀 Advanced Sheets API v4 Features:</strong><br>
+          • Xử lý hàng loạt siêu nhanh với batch operations<br>
+          • Tối ưu hiệu suất vượt trội so với thông thường<br>
+          • Chỉ bật được một trong hai chức năng sắp xếp tự động<br>
+          • Các trigger sẽ tự động xóa khi tắt chức năng
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Exclusion Ranges -->
+  <div id="exclusionModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">📝 Nhập Vùng Loại Trừ</h3>
+        <button type="button" class="close" onclick="closeExclusionModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Các ô/dải ô loại trừ (mỗi dòng một range)</label>
+          <textarea id="exclusionRanges" class="form-control" rows="5" 
+                    placeholder="VD:&#10;A1:B10&#10;D5&#10;F1:F20"></textarea>
+        </div>
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-secondary" onclick="closeExclusionModal()">Hủy</button>
+          <button type="button" class="btn btn-primary" onclick="applyCopyPasteWithExclusion()">Áp Dụng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============== GLOBAL VARIABLES - FIXED ==============
+    let currentTab = 'config';
+    let allSheets = [];
+    let selectedSheets = []; // FIXED: Proper tracking with detailed logging
+    let allSelectState = false;
+    let componentsCount = 0;
+    let isProcessing = false; // FIXED: Prevent multiple simultaneous operations
+
+    // ============== INITIALIZATION ==============
+    document.addEventListener('DOMContentLoaded', function() {
+      loadInitialData();
+    });
+
+    function loadInitialData() {
+      showProgress('🚀 Khởi tạo Advanced Sheets API v4...', 10);
+      addLog('System starting with Advanced Sheets API v4...', 'info');
+      
+      Promise.all([
+        loadConfigurationsList(),
+        loadSheetsList(),
+        loadAutomationStatus()
+      ]).then(() => {
+        hideProgress();
+        addLog('System ready! ✅', 'success');
+        showAlert('🚀 Hệ thống đã sẵn sàng với Advanced Sheets API v4!', 'success');
+      }).catch(error => {
+        hideProgress();
+        addLog('System initialization failed: ' + error.message, 'error');
+        showAlert('❌ Lỗi khởi tạo: ' + error.message, 'danger');
+      });
+    }
+
+    // ============== TAB MANAGEMENT ==============
+    function switchTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+
+      // Remove active class from all buttons
+      document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Show selected tab
+      document.getElementById(tabName + 'Tab').classList.add('active');
+      event.target.classList.add('active');
+
+      currentTab = tabName;
+
+      // Load tab-specific data
+      if (tabName === 'management') {
+        loadSheetsList();
+        loadConfigurationsList();
+      } else if (tabName === 'automation') {
+        loadAutomationStatus();
+      }
+
+      addLog(`Switched to ${tabName} tab`, 'info');
+    }
+
+    // ============== CONFIGURATION MANAGEMENT ==============
+    function addComponent() {
+      componentsCount++;
+      const container = document.getElementById('componentsContainer');
+      const componentDiv = document.createElement('div');
+      componentDiv.className = 'component-config';
+      componentDiv.id = 'component_' + componentsCount;
+      
+      componentDiv.innerHTML = `
+        <div class="component-header">
+          <span class="form-label">🔧 Thành phần ${componentsCount}</span>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeComponent(${componentsCount})">
+            ❌ Xóa
+          </button>
+        </div>
+        <div class="component-fields">
+          <div class="form-group">
+            <label class="form-label">Tên thành phần</label>
+            <input type="text" class="form-control form-control-sm" 
+                   placeholder="VD: [NGÀY], [SỐ BÀN]" id="componentName_${componentsCount}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Dạng giá trị</label>
+            <select class="form-control form-control-sm" id="valueType_${componentsCount}" 
+                    onchange="toggleValueInput(${componentsCount})">
+              <option value="static">Giá trị tĩnh</option>
+              <option value="dynamic">Giá trị động</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Giá trị</label>
+          <input type="text" class="form-control form-control-sm" 
+                 placeholder="Nhập giá trị..." id="componentValue_${componentsCount}">
+        </div>
+        <div class="form-group">
+          <label class="d-flex align-items-center">
+            <input type="checkbox" class="sheet-checkbox" id="addSpace_${componentsCount}">
+            <span class="form-label mb-0">Thêm khoảng trắng</span>
+          </label>
+        </div>
+      `;
+      
+      container.appendChild(componentDiv);
+      addLog(`Added component ${componentsCount}`, 'info');
+    }
+
+    function removeComponent(id) {
+      const component = document.getElementById('component_' + id);
+      if (component) {
+        component.remove();
+        addLog(`Removed component ${id}`, 'info');
+      }
+    }
+
+    function toggleValueInput(id) {
+      const valueType = document.getElementById('valueType_' + id).value;
+      const valueInput = document.getElementById('componentValue_' + id);
+      
+      if (valueType === 'dynamic') {
+        valueInput.placeholder = 'VD: G1, A2, F5...';
+      } else {
+        valueInput.placeholder = 'VD: 📅, 🍽️, Prefix...';
+      }
+    }
+
+    function saveConfiguration() {
+      if (isProcessing) {
+        showAlert('⚠️ Đang xử lý, vui lòng đợi...', 'warning');
+        return;
+      }
+
+      const configName = document.getElementById('configName').value.trim();
+      if (!configName) {
+        showAlert('❌ Vui lòng nhập tên cấu hình!', 'danger');
+        return;
+      }
+
+      const components = [];
+      const componentElements = document.querySelectorAll('.component-config');
+      
+      componentElements.forEach(element => {
+        const id = element.id.split('_')[1];
+        const name = document.getElementById('componentName_' + id).value.trim();
+        const valueType = document.getElementById('valueType_' + id).value;
+        const value = document.getElementById('componentValue_' + id).value.trim();
+        const addSpace = document.getElementById('addSpace_' + id).checked;
+
+        if (name && value) {
+          components.push({
+            name: name,
+            valueType: valueType,
+            value: value,
+            addSpace: addSpace
+          });
+        }
+      });
+
+      if (components.length === 0) {
+        showAlert('❌ Vui lòng thêm ít nhất một thành phần!', 'danger');
+        return;
+      }
+
+      const config = {
+        name: configName,
+        components: components,
+        dateFormat: document.getElementById('dateFormat').value,
+        externalSpreadsheetId: document.getElementById('externalSpreadsheetId').value.trim(),
+        enableExternalWork: document.getElementById('enableExternalWork').checked
+      };
+
+      isProcessing = true;
+      showProgress('💾 Đang lưu cấu hình với Advanced API...', 50);
+      addLog('Saving configuration: ' + configName, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          isProcessing = false;
+          hideProgress();
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog('Configuration saved successfully: ' + configName, 'success');
+            loadConfigurationsList();
+            checkBookingButtonVisibility();
+          } else {
+            showAlert(response.message, 'danger');
+            addLog('Save configuration failed: ' + response.message, 'error');
+          }
+        })
+        .withFailureHandler(error => {
+          isProcessing = false;
+          hideProgress();
+          showAlert('❌ Lỗi khi lưu cấu hình: ' + error.message, 'danger');
+          addLog('Save configuration error: ' + error.message, 'error');
+        })
+        .saveConfiguration(config);
+    }
+
+    function loadConfigurationsList() {
+      addLog('Loading configurations...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(configs => {
+          displayConfigurationsList(configs);
+          populateConfigSelect(configs);
+          checkBookingButtonVisibility();
+          addLog(`Loaded ${configs.length} configurations`, 'success');
+        })
+        .withFailureHandler(error => {
+          console.error('Error loading configurations:', error);
+          addLog('Load configurations error: ' + error.message, 'error');
+        })
+        .loadConfigurations();
+    }
+
+    function displayConfigurationsList(configs) {
+      const container = document.getElementById('configsList');
+      
+      if (configs.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center">📝 Chưa có cấu hình nào</div>';
+        return;
+      }
+
+      let html = '<div class="form-group"><label class="form-label">📋 Danh Sách Cấu Hình Đã Lưu</label>';
+      
+      configs.forEach(config => {
+        const lastModified = config.lastModified 
+          ? new Date(config.lastModified).toLocaleDateString('vi-VN') 
+          : 'N/A';
+        
+        html += `
+          <div class="automation-item">
+            <div>
+              <div class="automation-label">${config.name}</div>
+              <div class="text-muted" style="font-size: 10px;">
+                ${config.components.length} thành phần • ${lastModified}
+                ${config.externalSpreadsheetId ? ' • 🔗 Có spreadsheet ngoài' : ''}
+                ${config.version ? ' • v' + config.version : ''}
+              </div>
+            </div>
+            <div>
+              <button type="button" class="btn btn-primary btn-sm" onclick="loadConfiguration('${config.name}')">
+                📂 Tải
+              </button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="deleteConfiguration('${config.name}')">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function populateConfigSelect(configs) {
+      const select = document.getElementById('selectedConfig');
+      select.innerHTML = '<option value="">-- Chọn cấu hình --</option>';
+      
+      configs.forEach(config => {
+        const option = document.createElement('option');
+        option.value = config.name;
+        option.textContent = config.name + (config.version ? ` (v${config.version})` : '');
+        select.appendChild(option);
+      });
+    }
+
+    function loadConfiguration(configName) {
+      addLog('Loading configuration: ' + configName, 'info');
+      
+      google.script.run
+        .withSuccessHandler(configs => {
+          const config = configs.find(c => c.name === configName);
+          if (config) {
+            populateConfigForm(config);
+            showAlert(`✅ Đã tải cấu hình "${configName}"`, 'success');
+            addLog('Configuration loaded: ' + configName, 'success');
+          }
+        })
+        .loadConfigurations();
+    }
+
+    function populateConfigForm(config) {
+      document.getElementById('configName').value = config.name;
+      document.getElementById('dateFormat').value = config.dateFormat || 'DD/MM/YYYY';
+      document.getElementById('externalSpreadsheetId').value = config.externalSpreadsheetId || '';
+      document.getElementById('enableExternalWork').checked = config.enableExternalWork || false;
+
+      // Clear existing components
+      document.getElementById('componentsContainer').innerHTML = '';
+      componentsCount = 0;
+
+      // Add components
+      config.components.forEach(component => {
+        addComponent();
+        const currentId = componentsCount;
+        document.getElementById('componentName_' + currentId).value = component.name;
+        document.getElementById('valueType_' + currentId).value = component.valueType;
+        document.getElementById('componentValue_' + currentId).value = component.value;
+        document.getElementById('addSpace_' + currentId).checked = component.addSpace;
+        toggleValueInput(currentId);
+      });
+
+      checkExternalSpreadsheet();
+    }
+
+    function deleteConfiguration(configName) {
+      if (confirm(`🗑️ Bạn có chắc chắn muốn xóa cấu hình "${configName}"?`)) {
+        addLog('Deleting configuration: ' + configName, 'info');
+        
+        google.script.run
+          .withSuccessHandler(response => {
+            if (response.success) {
+              showAlert(response.message, 'success');
+              addLog('Configuration deleted: ' + configName, 'success');
+              loadConfigurationsList();
+            } else {
+              showAlert(response.message, 'danger');
+              addLog('Delete configuration failed: ' + response.message, 'error');
+            }
+          })
+          .deleteConfiguration(configName);
+      }
+    }
+
+    function checkExternalSpreadsheet() {
+      const spreadsheetId = document.getElementById('externalSpreadsheetId').value.trim();
+      const infoDiv = document.getElementById('externalSpreadsheetInfo');
+
+      if (!spreadsheetId) {
+        infoDiv.innerHTML = '';
+        checkBookingButtonVisibility();
+        return;
+      }
+
+      infoDiv.innerHTML = '<div class="spinner"></div>🔍 Kiểm tra spreadsheet với Advanced API...';
+      addLog('Checking external spreadsheet: ' + spreadsheetId, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          if (response.success) {
+            infoDiv.innerHTML = `
+              <div class="alert alert-success">
+                ✅ <strong>${response.name}</strong><br>
+                <a href="${response.url}" target="_blank" style="font-size: 10px;">🔗 Mở spreadsheet</a>
+              </div>
+            `;
+            addLog('External spreadsheet verified: ' + response.name, 'success');
+          } else {
+            infoDiv.innerHTML = `
+              <div class="alert alert-danger">
+                ❌ ${response.message}
+              </div>
+            `;
+            addLog('External spreadsheet check failed: ' + response.message, 'error');
+          }
+          checkBookingButtonVisibility();
+        })
+        .withFailureHandler(error => {
+          infoDiv.innerHTML = `
+            <div class="alert alert-danger">
+              ❌ Lỗi: ${error.message}
+            </div>
+          `;
+          addLog('External spreadsheet error: ' + error.message, 'error');
+          checkBookingButtonVisibility();
+        })
+        .getSpreadsheetInfo(spreadsheetId);
+    }
+
+    function checkBookingButtonVisibility() {
+      const spreadsheetId = document.getElementById('externalSpreadsheetId').value.trim();
+      const bookingBtn = document.getElementById('addBookingBtn');
+      const autoBookingItem = document.getElementById('autoBookingItem');
+      
+      const isBookingSpreadsheet = spreadsheetId === '1R_oCd3xadulFLR74FTKqtRnqcRkkc7pMqw53q8HrjMY';
+      
+      if (isBookingSpreadsheet) {
+        bookingBtn.classList.remove('d-none');
+        autoBookingItem.style.display = 'block';
+        addLog('Booking features enabled', 'info');
+      } else {
+        bookingBtn.classList.add('d-none');
+        autoBookingItem.style.display = 'none';
+      }
+    }
+
+    // ============== SHEET MANAGEMENT WITH ADVANCED API - FIXED ==============
+    function loadSheetsList() {
+      showProgress('📊 Đang tải danh sách sheet với Advanced API v4...', 20);
+      addLog('Loading sheets with Advanced Sheets API v4...', 'info');
+
+      google.script.run
+        .withSuccessHandler(sheets => {
+          allSheets = sheets;
+          displaySheetsList(sheets);
+          hideProgress();
+          addLog(`Loaded ${sheets.length} sheets successfully`, 'success');
+        })
+        .withFailureHandler(error => {
+          hideProgress();
+          showAlert('❌ Lỗi khi tải danh sách sheet: ' + error.message, 'danger');
+          addLog('Load sheets error: ' + error.message, 'error');
+        })
+        .getAllSheets();
+    }
+
+    function displaySheetsList(sheets) {
+      const container = document.getElementById('sheetsList');
+      
+      if (sheets.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted">📄 Không có sheet nào</div>';
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(pinnedSheets => {
+          let html = '';
+          
+          sheets.forEach(sheet => {
+            const isPinned = pinnedSheets.includes(sheet.name);
+            const itemClass = isPinned ? 'sheet-item pinned' : 'sheet-item';
+            const sizeInfo = `${sheet.rowCount}x${sheet.columnCount}`;
+            
+            html += `
+              <div class="${itemClass}" id="sheet-item-${sheet.sheetId}">
+                <input type="checkbox" class="sheet-checkbox" value="${sheet.name}" 
+                       onchange="updateSelectedSheets()" data-sheet-id="${sheet.sheetId}">
+                <div class="sheet-name" onclick="toggleSheetSelection('${sheet.name}', ${sheet.sheetId})">
+                  <div>${sheet.name}</div>
+                  <div class="text-muted" style="font-size: 9px;">${sizeInfo} • ID: ${sheet.sheetId}</div>
+                </div>
+                <div class="sheet-actions">
+                  <button type="button" class="btn btn-secondary btn-sm" 
+                          onclick="pinSheet('${sheet.name}')" title="Ghim">
+                    ${isPinned ? '📌' : '📍'}
+                  </button>
+                  <button type="button" class="btn btn-warning btn-sm" 
+                          onclick="toggleSheetVisibility('${sheet.name}')" title="Ẩn/Hiện">
+                    ${sheet.isHidden ? '👁️' : '🙈'}
+                  </button>
+                </div>
+              </div>
+            `;
+          });
+          
+          container.innerHTML = html;
+          updateSelectionCounter(); // FIXED: Update counter after display
+        })
+        .getPinnedSheets();
+    }
+
+    function searchSheets() {
+      const keyword = document.getElementById('searchSheets').value.trim();
+      addLog('Searching sheets: ' + keyword, 'info');
+
+      if (keyword === '') {
+        displaySheetsList(allSheets);
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(filteredSheets => {
+          displaySheetsList(filteredSheets);
+          addLog(`Found ${filteredSheets.length} matching sheets`, 'info');
+        })
+        .searchSheets(keyword);
+    }
+
+    // FIXED: Proper sheet selection tracking with detailed logging
+    function updateSelectedSheets() {
+      const checkboxes = document.querySelectorAll('.sheet-checkbox:checked');
+      const previousCount = selectedSheets.length;
+      selectedSheets = Array.from(checkboxes).map(cb => cb.value.trim()); // FIXED: Trim spaces
+      
+      // FIXED: Update visual selection
+      document.querySelectorAll('.sheet-item').forEach(item => {
+        const checkbox = item.querySelector('.sheet-checkbox');
+        if (checkbox && checkbox.checked) {
+          item.classList.add('selected');
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+      
+      updateSelectionCounter();
+      
+      // FIXED: Detailed logging
+      if (selectedSheets.length !== previousCount) {
+        addLog(`Selection changed: ${previousCount} → ${selectedSheets.length}`, 'info');
+        addLog(`Currently selected sheets: [${selectedSheets.join(', ')}]`, 'info');
+      }
+    }
+
+    // FIXED: Update selection counter
+    function updateSelectionCounter() {
+      const counter = document.getElementById('selectionCounter');
+      counter.textContent = `${selectedSheets.length} được chọn`;
+    }
+
+    // FIXED: Toggle individual sheet selection
+    function toggleSheetSelection(sheetName, sheetId) {
+      const checkbox = document.querySelector(`[data-sheet-id="${sheetId}"]`);
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        updateSelectedSheets();
+        addLog(`Toggled selection for: ${sheetName}`, 'info');
+      }
+    }
+
+    function toggleSelectAll() {
+      const checkboxes = document.querySelectorAll('.sheet-checkbox');
+      allSelectState = !allSelectState;
+      
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = allSelectState;
+      });
+      
+      updateSelectedSheets();
+      addLog(`${allSelectState ? 'Selected' : 'Deselected'} all sheets`, 'info');
+    }
+
+    function pinSheet(sheetName) {
+      addLog('Pinning sheet: ' + sheetName, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog('Sheet pinned: ' + sheetName, 'success');
+            loadSheetsList();
+          } else {
+            showAlert(response.message, 'danger');
+            addLog('Pin sheet failed: ' + response.message, 'error');
+          }
+        })
+        .pinSheet(sheetName);
+    }
+
+    function toggleSheetVisibility(sheetName) {
+      addLog('Toggling visibility for: ' + sheetName, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog('Sheet visibility toggled: ' + sheetName, 'success');
+            loadSheetsList();
+          } else {
+            showAlert(response.message, 'danger');
+            addLog('Toggle visibility failed: ' + response.message, 'error');
+          }
+        })
+        .toggleSheetVisibility(sheetName);
+    }
+
+    // ============== ADVANCED SHEET OPERATIONS - FIXED ==============
+    function sortSheetsAscending() {
+      executeAdvancedSheetOperation('sortSheetsAscending', '⬆️ Đang sắp xếp tăng dần với Advanced API...');
+    }
+
+    function sortSheetsDescending() {
+      executeAdvancedSheetOperation('sortSheetsDescending', '⬇️ Đang sắp xếp giảm dần với Advanced API...');
+    }
+
+    function renameSheets() {
+      const configName = document.getElementById('selectedConfig').value;
+      if (!configName) {
+        showAlert('❌ Vui lòng chọn cấu hình trước!', 'danger');
+        return;
+      }
+
+      // FIXED: Proper validation with detailed logging
+      if (selectedSheets.length === 0) {
+        showAlert('❌ Vui lòng chọn ít nhất một sheet!', 'danger');
+        addLog('Rename sheets failed: No sheets selected', 'error');
+        return;
+      }
+
+      if (isProcessing) {
+        showAlert('⚠️ Đang xử lý, vui lòng đợi...', 'warning');
+        return;
+      }
+
+      isProcessing = true;
+      showProgress('✏️ Đang đổi tên sheet với Advanced API...', 30);
+      addLog(`Starting rename operation for ${selectedSheets.length} sheets`, 'info');
+      addLog(`Using config: ${configName}`, 'info');
+      addLog(`Selected sheets: [${selectedSheets.join(', ')}]`, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          isProcessing = false;
+          hideProgress();
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog('Rename operation completed: ' + response.message, 'success');
+            loadSheetsList();
+          } else {
+            showAlert(response.message, 'danger');
+            addLog('Rename operation failed: ' + response.message, 'error');
+          }
+        })
+        .withFailureHandler(error => {
+          isProcessing = false;
+          hideProgress();
+          showAlert('❌ Lỗi kết nối: ' + error.message, 'danger');
+          addLog('Rename operation connection error: ' + error.message, 'error');
+        })
+        .renameSheets(selectedSheets, configName);
+    }
+
+    function hideOldSheets() {
+      executeAdvancedSheetOperation('hideOldSheets', '👁️ Đang ẩn sheet cũ với Advanced API...');
+    }
+
+    function hideSelectedSheets() {
+      if (selectedSheets.length === 0) {
+        showAlert('❌ Vui lòng chọn ít nhất một sheet!', 'danger');
+        return;
+      }
+      executeAdvancedSheetOperation('hideSelectedSheets', '🙈 Đang ẩn sheet đã chọn với Advanced API...', selectedSheets);
+    }
+
+    function deleteSelectedSheets() {
+      if (selectedSheets.length === 0) {
+        showAlert('❌ Vui lòng chọn ít nhất một sheet!', 'danger');
+        return;
+      }
+
+      if (confirm(`🗑️ Bạn có chắc chắn muốn xóa ${selectedSheets.length} sheet đã chọn?`)) {
+        executeAdvancedSheetOperation('deleteSelectedSheets', '🗑️ Đang xóa sheet với Advanced API...', selectedSheets);
+      }
+    }
+
+    function copyPasteValues() {
+      if (selectedSheets.length === 0) {
+        showAlert('❌ Vui lòng chọn ít nhất một sheet!', 'danger');
+        return;
+      }
+      executeAdvancedSheetOperation('copyPasteValues', '📋 Đang copy-paste values với Advanced API...', selectedSheets);
+    }
+
+    function copyPasteValuesWithExclusion() {
+      if (selectedSheets.length === 0) {
+        showAlert('❌ Vui lòng chọn ít nhất một sheet!', 'danger');
+        return;
+      }
+      document.getElementById('exclusionModal').style.display = 'block';
+    }
+
+    function closeExclusionModal() {
+      document.getElementById('exclusionModal').style.display = 'none';
+      document.getElementById('exclusionRanges').value = '';
+    }
+
+    function applyCopyPasteWithExclusion() {
+      const rangesText = document.getElementById('exclusionRanges').value.trim();
+      const excludeRanges = rangesText ? rangesText.split('\n').map(r => r.trim()).filter(r => r) : [];
+      
+      closeExclusionModal();
+      
+      showProgress('📝 Đang copy-paste với loại trừ (Advanced API)...', 40);
+      addLog(`Copy-paste with exclusion: ${excludeRanges.length} ranges excluded`, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          hideProgress();
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog('Copy-paste with exclusion completed: ' + response.message, 'success');
+            loadSheetsList();
+          } else {
+            showAlert(response.message, 'danger');
+            addLog('Copy-paste with exclusion failed: ' + response.message, 'error');
+          }
+        })
+        .copyPasteValues(selectedSheets, excludeRanges);
+    }
+
+    // FIXED: Add booking schedule with comprehensive validation and logging
+    function addBookingSchedule() {
+      const configName = document.getElementById('selectedConfig').value;
+      if (!configName) {
+        showAlert('❌ Vui lòng chọn cấu hình trước!', 'danger');
+        addLog('Booking schedule failed: No configuration selected', 'error');
+        return;
+      }
+
+      // FIXED: Comprehensive validation with detailed logging
+      if (selectedSheets.length === 0) {
+        showAlert('❌ Vui lòng chọn ít nhất một sheet!', 'danger');
+        addLog('Booking schedule failed: No sheets selected', 'error');
+        return;
+      }
+
+      if (isProcessing) {
+        showAlert('⚠️ Đang xử lý, vui lòng đợi...', 'warning');
+        return;
+      }
+
+      // FIXED: Additional validation for booking spreadsheet
+      const externalSpreadsheetId = document.getElementById('externalSpreadsheetId').value.trim();
+      if (externalSpreadsheetId !== '1R_oCd3xadulFLR74FTKqtRnqcRkkc7pMqw53q8HrjMY') {
+        showAlert('❌ Chức năng đặt bàn chỉ khả dụng cho spreadsheet booking!', 'danger');
+        addLog('Booking schedule failed: Invalid external spreadsheet ID', 'error');
+        return;
+      }
+
+      isProcessing = true;
+      showProgress('📅 Đang thêm lịch đặt bàn với Advanced API...', 50);
+      
+      // FIXED: Comprehensive logging for booking operation
+      addLog(`🚀 Starting booking schedule operation`, 'info');
+      addLog(`📊 Total sheets selected: ${selectedSheets.length}`, 'info');
+      addLog(`📋 Configuration: ${configName}`, 'info');
+      addLog(`📑 Selected sheets: [${selectedSheets.join(', ')}]`, 'info');
+      addLog(`🎯 Target spreadsheet: ${externalSpreadsheetId}`, 'info');
+      
+      // FIXED: Clean sheet names before sending
+      const cleanedSheets = selectedSheets.map(sheet => sheet.trim());
+
+      google.script.run
+        .withSuccessHandler(response => {
+          isProcessing = false;
+          hideProgress();
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog('✅ Booking schedule completed successfully: ' + response.message, 'success');
+          } else {
+            showAlert(response.message, 'danger');
+            addLog('❌ Booking schedule failed: ' + response.message, 'error');
+          }
+        })
+        .withFailureHandler(error => {
+          isProcessing = false;
+          hideProgress();
+          showAlert('❌ Lỗi kết nối booking: ' + error.message, 'danger');
+          addLog('❌ Booking schedule connection error: ' + error.message, 'error');
+        })
+        .addBookingSchedule(cleanedSheets, configName);
+    }
+
+    function executeAdvancedSheetOperation(functionName, progressMessage, ...args) {
+      if (isProcessing) {
+        showAlert('⚠️ Đang xử lý, vui lòng đợi...', 'warning');
+        return;
+      }
+
+      isProcessing = true;
+      showProgress(progressMessage, 40);
+      addLog(`Executing ${functionName} with Advanced API`, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          isProcessing = false;
+          hideProgress();
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog(`${functionName} completed: ${response.message}`, 'success');
+            loadSheetsList();
+          } else {
+            showAlert(response.message, 'danger');
+            addLog(`${functionName} failed: ${response.message}`, 'error');
+          }
+        })
+        .withFailureHandler(error => {
+          isProcessing = false;
+          hideProgress();
+          showAlert('❌ Lỗi thao tác: ' + error.message, 'danger');
+          addLog(`${functionName} error: ${error.message}`, 'error');
+        })
+        [functionName](...args);
+    }
+
+    // ============== ADVANCED AUTOMATION ==============
+    function loadAutomationStatus() {
+      addLog('Loading automation status...', 'info');
+
+      google.script.run
+        .withSuccessHandler(status => {
+          document.getElementById('autoRenameToggle').checked = status.autoRename || false;
+          document.getElementById('autoBookingToggle').checked = status.autoBooking || false;
+          document.getElementById('autoHideToggle').checked = status.autoHideOld || false;
+          document.getElementById('autoSortAscToggle').checked = status.autoSortAsc || false;
+          document.getElementById('autoSortDescToggle').checked = status.autoSortDesc || false;
+          addLog('Automation status loaded', 'success');
+        })
+        .getAutomationStatus();
+    }
+
+    function toggleAutomation(triggerType, enabled) {
+      // Handle mutual exclusivity for sorting
+      if (triggerType === 'autoSortAsc' && enabled) {
+        document.getElementById('autoSortDescToggle').checked = false;
+      } else if (triggerType === 'autoSortDesc' && enabled) {
+        document.getElementById('autoSortAscToggle').checked = false;
+      }
+
+      showProgress(`🤖 ${enabled ? 'Bật' : 'Tắt'} tự động hóa với Advanced API...`, 60);
+      addLog(`${enabled ? 'Enabling' : 'Disabling'} automation: ${triggerType}`, 'info');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          hideProgress();
+          if (response.success) {
+            showAlert(response.message, 'success');
+            addLog(`Automation ${triggerType}: ${response.message}`, 'success');
+          } else {
+            showAlert(response.message, 'danger');
+            addLog(`Automation ${triggerType} failed: ${response.message}`, 'error');
+            // Revert toggle state on error
+            document.getElementById(triggerType + 'Toggle').checked = !enabled;
+          }
+        })
+        .withFailureHandler(error => {
+          hideProgress();
+          showAlert('❌ Lỗi khi thiết lập tự động hóa: ' + error.message, 'danger');
+          addLog(`Automation ${triggerType} error: ${error.message}`, 'error');
+          // Revert toggle state on error
+          document.getElementById(triggerType + 'Toggle').checked = !enabled;
+        })
+        .setAutomationTrigger(triggerType, enabled);
+    }
+
+    // ============== ENHANCED UI UTILITIES - FIXED ==============
+    function showProgress(message, percentage) {
+      const container = document.getElementById('progressContainer');
+      const fill = document.getElementById('progressFill');
+      const text = document.getElementById('progressText');
+
+      container.style.display = 'block';
+      fill.style.width = percentage + '%';
+      text.textContent = message;
+
+      // Auto-hide after 5 seconds if at 100%
+      if (percentage >= 100) {
+        setTimeout(hideProgress, 3000);
+      }
+    }
+
+    function hideProgress() {
+      document.getElementById('progressContainer').style.display = 'none';
+    }
+
+    function showAlert(message, type) {
+      const container = document.getElementById('alertContainer');
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.innerHTML = message;
+      container.appendChild(alertDiv);
+
+      // Auto-remove after 6 seconds
+      setTimeout(() => {
+        if (alertDiv.parentNode) {
+          alertDiv.style.animation = 'slideOut 0.3s ease-in';
+          setTimeout(() => {
+            if (alertDiv.parentNode) {
+              alertDiv.parentNode.removeChild(alertDiv);
+            }
+          }, 300);
+        }
+      }, 6000);
+    }
+
+    // FIXED: Enhanced logging with better formatting and status indicators
+    function addLog(message, type = 'info') {
+      const container = document.getElementById('logsContainer');
+      const content = document.getElementById('logsContent');
+      
+      container.style.display = 'block';
+      
+      const timestamp = new Date().toLocaleTimeString('vi-VN');
+      const logDiv = document.createElement('div');
+      logDiv.className = `log-entry ${type}`;
+      
+      const icon = {
+        'info': 'ℹ️',
+        'success': '✅',
+        'error': '❌',
+        'warning': '⚠️'
+      }[type] || 'ℹ️';
+      
+      // FIXED: Better formatting for long messages
+      const formattedMessage = message.length > 100 
+        ? message.substring(0, 100) + '...' 
+        : message;
+      
+      logDiv.innerHTML = `
+        <span class="status-indicator ${type}"></span>
+        <strong>[${timestamp}]</strong> ${formattedMessage}
+      `;
+      
+      if (message.length > 100) {
+        logDiv.title = message; // Show full message on hover
+      }
+      
+      content.appendChild(logDiv);
+
+      // Auto-scroll to bottom
+      container.scrollTop = container.scrollHeight;
+
+      // Limit logs to 50 entries for better performance
+      const logs = content.children;
+      while (logs.length > 50) {
+        content.removeChild(logs[0]);
+      }
+    }
+
+    // ============== EVENT HANDLERS ==============
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      const modal = document.getElementById('exclusionModal');
+      if (event.target === modal) {
+        closeExclusionModal();
+      }
+    }
+
+    // Handle Enter key in search
+    document.getElementById('searchSheets').addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        searchSheets();
+      }
+    });
+
+    // FIXED: Prevent form submission on Enter key
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') {
+        event.preventDefault();
+      }
+    });
+
+    // Initialize first component
+    addComponent();
+
+    // Add enhanced CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideOut {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+
+      .alert {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .alert::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #0066cc, #00aaff);
+        animation: progressBar 6s linear;
+      }
+
+      @keyframes progressBar {
+        from { width: 100%; }
+        to { width: 0%; }
+      }
+
+      .log-entry {
+        border-left: 3px solid transparent;
+      }
+
+      .log-entry.success {
+        border-left-color: #28a745;
+      }
+
+      .log-entry.error {
+        border-left-color: #dc3545;
+      }
+
+      .log-entry.warning {
+        border-left-color: #ffc107;
+      }
+
+      .log-entry.info {
+        border-left-color: #17a2b8;
+      }
+    `;
+    document.head.appendChild(style);
+  </script>
+</body>
+</html>

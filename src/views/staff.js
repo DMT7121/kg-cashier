@@ -1,10 +1,11 @@
-/* ── Staff Management View (Feature 6) ─────── */
+/* ── Staff Management View (Feature 6) — Realtime ── */
 import { showToast, showModal, hideModal } from '../utils.js';
 import { getStaffFromCloud, saveStaffToCloud, deleteStaffFromCloud } from '../api.js';
 import { setCachedStaff } from '../store.js';
 
 let staffList = [];
 let isStaffAuthed = false;
+let _refreshTimer = null;
 
 export function render() {
   if (!isStaffAuthed) {
@@ -26,76 +27,107 @@ export function render() {
         <h3>👥 Quản lý nhân viên thu ngân</h3>
         <p>Tạo tài khoản, phân quyền, và quản lý PIN đăng nhập</p>
       </div>
-      <button class="btn btn-primary btn-sm" id="btnAddStaff">
-        <span class="material-symbols-rounded">person_add</span> Thêm nhân viên
-      </button>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" id="btnRefreshStaff">
+          <span class="material-symbols-rounded">refresh</span> Tải lại
+        </button>
+        <button class="btn btn-primary btn-sm" id="btnAddStaff">
+          <span class="material-symbols-rounded">person_add</span> Thêm nhân viên
+        </button>
+      </div>
     </div>
 
-    <div id="staffLoading" class="text-center text-muted" style="padding: 40px;">
-      Đang tải danh sách nhân viên từ Cloud...
+    <!-- Realtime status indicator -->
+    <div id="staffSyncBar" style="display:flex;align-items:center;gap:8px;padding:8px 14px;margin-bottom:16px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:8px;font-size:12px;color:var(--text-muted);">
+      <span class="material-symbols-rounded" style="font-size:16px;color:#10b981;">cloud_sync</span>
+      <span id="staffSyncStatus">Đang tải danh sách nhân viên...</span>
+      <span style="margin-left:auto;font-size:10px;" id="staffSyncTime"></span>
     </div>
 
-    <div id="staffGrid" class="staff-grid" style="display:none;"></div>
+    <div id="staffGrid" class="staff-grid"></div>
   `;
 }
 
-async function loadStaff() {
-  const loading = document.getElementById('staffLoading');
-  const grid = document.getElementById('staffGrid');
+async function loadStaff(silent) {
+  if (!silent) {
+    var statusEl = document.getElementById('staffSyncStatus');
+    if (statusEl) statusEl.textContent = '⏳ Đang tải từ Cloud...';
+  }
+
   const result = await getStaffFromCloud();
 
   if (result.success) {
     staffList = result.staff || [];
     // Always save staff to local cache so shift view can use them immediately
     setCachedStaff(staffList);
-  }
+    _renderStaffGrid();
 
-  if (loading) loading.style.display = 'none';
-  if (grid) {
-    grid.style.display = 'grid';
-    if (staffList.length === 0) {
-      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:40px;">
-        <span class="material-symbols-rounded empty-icon" style="font-size:48px;">group</span>
-        <h3>Chưa có nhân viên</h3>
-        <p>Thêm nhân viên để quản lý ca và phân quyền</p>
-      </div>`;
-    } else {
-      grid.innerHTML = staffList.map(s => `
-        <div class="staff-card">
-          <div class="staff-avatar" style="background: ${s.role === 'admin' ? 'var(--primary-glow)' : s.role === 'manager' ? 'var(--info-bg)' : 'var(--success-bg)'};">
-            <span class="material-symbols-rounded" style="color: ${s.role === 'admin' ? 'var(--primary)' : s.role === 'manager' ? 'var(--info)' : 'var(--success)'};">${s.role === 'admin' ? 'admin_panel_settings' : s.role === 'manager' ? 'supervisor_account' : 'person'}</span>
-          </div>
-          <div class="staff-info">
-            <h4>${s.name}</h4>
-            <span class="tag ${s.role === 'admin' ? 'tag-transfer' : s.role === 'manager' ? 'tag-card' : 'tag-cash'}">${s.role === 'admin' ? 'Admin' : s.role === 'manager' ? 'Quản lý' : 'Thu ngân'}</span>
-            <span class="tag ${s.status === 'active' ? 'tag-income' : 'tag-expense'}">${s.status === 'active' ? 'Hoạt động' : 'Khóa'}</span>
-          </div>
-          <div class="staff-actions">
-            <button class="btn-icon" data-edit-staff="${s.id}" title="Sửa"><span class="material-symbols-rounded">edit</span></button>
-            <button class="btn-icon" data-delete-staff="${s.id}" title="Xóa" style="color:var(--danger);"><span class="material-symbols-rounded">delete</span></button>
-          </div>
-        </div>
-      `).join('');
-
-      // Bind edit events
-      grid.querySelectorAll('[data-edit-staff]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const staff = staffList.find(s => s.id === btn.dataset.editStaff);
-          if (staff) showStaffModal(staff);
-        });
-      });
-
-      // Bind delete events
-      grid.querySelectorAll('[data-delete-staff]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          if (!confirm('Xóa nhân viên này?')) return;
-          const result = await deleteStaffFromCloud(btn.dataset.deleteStaff);
-          showToast(result.message, result.success ? 'success' : 'error');
-          if (result.success) loadStaff(); // Reload also updates cache
-        });
-      });
+    var statusEl = document.getElementById('staffSyncStatus');
+    var timeEl = document.getElementById('staffSyncTime');
+    if (statusEl) statusEl.textContent = '✅ ' + staffList.length + ' nhân viên — Realtime từ Cloud';
+    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString('vi-VN');
+  } else {
+    var statusEl = document.getElementById('staffSyncStatus');
+    if (statusEl) {
+      statusEl.textContent = '⚠️ Không tải được — ' + (result.message || 'Kiểm tra kết nối');
+      statusEl.style.color = 'var(--warning)';
     }
   }
+}
+
+function _renderStaffGrid() {
+  const grid = document.getElementById('staffGrid');
+  if (!grid) return;
+
+  if (staffList.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:40px;">
+      <span class="material-symbols-rounded empty-icon" style="font-size:48px;">group</span>
+      <h3>Chưa có nhân viên</h3>
+      <p>Thêm nhân viên để quản lý ca và phân quyền</p>
+    </div>`;
+  } else {
+    grid.innerHTML = staffList.map(s => `
+      <div class="staff-card">
+        <div class="staff-avatar" style="background: ${s.role === 'admin' ? 'var(--primary-glow)' : s.role === 'manager' ? 'var(--info-bg)' : 'var(--success-bg)'};">
+          <span class="material-symbols-rounded" style="color: ${s.role === 'admin' ? 'var(--primary)' : s.role === 'manager' ? 'var(--info)' : 'var(--success)'};">${s.role === 'admin' ? 'admin_panel_settings' : s.role === 'manager' ? 'supervisor_account' : 'person'}</span>
+        </div>
+        <div class="staff-info">
+          <h4>${s.name}</h4>
+          <span class="tag ${s.role === 'admin' ? 'tag-transfer' : s.role === 'manager' ? 'tag-card' : 'tag-cash'}">${s.role === 'admin' ? 'Admin' : s.role === 'manager' ? 'Quản lý' : 'Thu ngân'}</span>
+          <span class="tag ${s.status === 'active' ? 'tag-income' : 'tag-expense'}">${s.status === 'active' ? 'Hoạt động' : 'Khóa'}</span>
+        </div>
+        <div class="staff-actions">
+          <button class="btn-icon" data-edit-staff="${s.id}" title="Sửa"><span class="material-symbols-rounded">edit</span></button>
+          <button class="btn-icon" data-delete-staff="${s.id}" title="Xóa" style="color:var(--danger);"><span class="material-symbols-rounded">delete</span></button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  _bindStaffEvents();
+}
+
+function _bindStaffEvents() {
+  const grid = document.getElementById('staffGrid');
+  if (!grid) return;
+
+  // Bind edit events
+  grid.querySelectorAll('[data-edit-staff]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const staff = staffList.find(s => s.id === btn.dataset.editStaff);
+      if (staff) showStaffModal(staff);
+    });
+  });
+
+  // Bind delete events
+  grid.querySelectorAll('[data-delete-staff]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Xóa nhân viên này?')) return;
+      const result = await deleteStaffFromCloud(btn.dataset.deleteStaff);
+      showToast(result.message, result.success ? 'success' : 'error');
+      if (result.success) loadStaff(); // Reload also updates cache
+    });
+  });
 }
 
 function showStaffModal(existing) {
@@ -143,12 +175,18 @@ function showStaffModal(existing) {
       const result = await saveStaffToCloud({ id: existing ? existing.id : undefined, name: name, pin: pin, role: role, status: 'active' });
       hideModal();
       showToast(result.message, result.success ? 'success' : 'error');
-      if (result.success) loadStaff(); // Reload also updates cache
+      if (result.success) loadStaff(); // Reload also updates cache + config
     });
   }, 100);
 }
 
 export function init() {
+  // Clear any previous refresh timer
+  if (_refreshTimer) {
+    clearInterval(_refreshTimer);
+    _refreshTimer = null;
+  }
+
   if (!isStaffAuthed) {
     const input = document.getElementById('adminPassInput');
     const btn = document.getElementById('btnAdminAuth');
@@ -172,6 +210,19 @@ export function init() {
     return;
   }
 
+  // Initial load
   loadStaff();
+
+  // Realtime auto-refresh every 10 seconds
+  _refreshTimer = setInterval(function() {
+    loadStaff(true); // silent refresh
+  }, 10000);
+
+  // Manual refresh button
+  document.getElementById('btnRefreshStaff')?.addEventListener('click', () => {
+    showToast('🔄 Đang tải lại...', 'info');
+    loadStaff();
+  });
+
   document.getElementById('btnAddStaff')?.addEventListener('click', () => showStaffModal());
 }

@@ -2,13 +2,14 @@
    PHIẾU BÀN GIAO CA — Smart A4 Print Sheet
    Tự động co giãn nội dung vừa đúng 1 trang A4
    ═══════════════════════════════════════════════ */
-import { getCurrentShift, getShiftSummary, getSettings, getShiftHistory } from '../store.js';
+import { getCurrentShift, getSettings, getShiftHistory } from '../store.js';
 import { formatCurrency, formatDate, formatTime, denominations, showToast } from '../utils.js';
 
 export function render() {
   const shift = getCurrentShift();
   // Cho phép xem report của ca mở hoặc ca cuối cùng trong lịch sử
-  const lastClosed = getShiftHistory()?.[0];
+  const history = getShiftHistory();
+  const lastClosed = history.length > 0 ? history[0] : null;
   const target = shift || lastClosed;
 
   if (!target) {
@@ -20,24 +21,43 @@ export function render() {
     </div>`;
   }
 
-  const sm = getShiftSummary(target);
   const settings = getSettings();
   const txs = target.transactions || [];
   const otherTxs = target.otherTransactions || [];
-  const incomeTxs = txs.filter(t => t.type === 'income');
+  // Manual transactions only (CUKCUK data comes from Invoice Store now)
+  const manualIncomeTxs = txs.filter(t => t.type === 'income' && (!t.note || t.note.indexOf('[CUKCUK]') === -1));
   const expenseTxs = txs.filter(t => t.type === 'expense');
 
-  // Separate CUKCUK bills from manual transactions
-  const cukcukTxs = incomeTxs.filter(t => t.note && t.note.indexOf('[CUKCUK]') !== -1);
-  const manualIncomeTxs = incomeTxs.filter(t => !t.note || t.note.indexOf('[CUKCUK]') === -1);
-
-  // Group CUKCUK income by category
-  const cukcukByCategory = {};
-  cukcukTxs.forEach(tx => {
-    if (!cukcukByCategory[tx.category]) cukcukByCategory[tx.category] = { cash: 0, card: 0, transfer: 0, count: 0 };
-    cukcukByCategory[tx.category][tx.paymentMethod || 'cash'] += tx.amount;
-    cukcukByCategory[tx.category].count++;
-  });
+  // Load CUKCUK revenue from Invoice Store for this shift's date
+  var cukcukRevenue = { total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
+  try {
+    var invStoreModule = null;
+    // Sync load from cache if available
+    var storeData = localStorage.getItem('cukcuk_invoice_store');
+    if (storeData) {
+      var parsed = JSON.parse(storeData);
+      var shiftDate = target.date || '';
+      if (parsed && parsed.invoices) {
+        for (var key in parsed.invoices) {
+          if (parsed.invoices.hasOwnProperty(key)) {
+            var inv = parsed.invoices[key];
+            if (inv.date === shiftDate) {
+              cukcukRevenue.total += inv.amount || 0;
+              cukcukRevenue.bills++;
+              var payments = inv.payments || [];
+              for (var pi = 0; pi < payments.length; pi++) {
+                switch (payments[pi].method) {
+                  case 'cash': cukcukRevenue.cash += payments[pi].amount || 0; break;
+                  case 'card': cukcukRevenue.card += payments[pi].amount || 0; break;
+                  case 'transfer': cukcukRevenue.transfer += payments[pi].amount || 0; break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch(e) { /* ignore */ }
 
   // Group manual income by category
   const manualByCategory = {};
@@ -47,13 +67,11 @@ export function render() {
     manualByCategory[tx.category].count++;
   });
 
-  // Group ALL income by category (for backward compat)
-  const incomeByCategory = {};
-  incomeTxs.forEach(tx => {
-    if (!incomeByCategory[tx.category]) incomeByCategory[tx.category] = { cash: 0, card: 0, transfer: 0, count: 0 };
-    incomeByCategory[tx.category][tx.paymentMethod || 'cash'] += tx.amount;
-    incomeByCategory[tx.category].count++;
-  });
+  // Combined income = CUKCUK + manual for total calculation
+  const totalManualIncome = manualIncomeTxs.reduce((s, t) => s + t.amount, 0);
+  const combinedIncome = cukcukRevenue.total + totalManualIncome;
+
+
 
   // Group expense by category
   const expenseByCategory = {};
@@ -63,7 +81,8 @@ export function render() {
   });
 
   // Cash count rows (only non-zero)
-  const cashRows = denominations.filter(d => (target.cashCount?.[d.value] || 0) > 0);
+  const cc = target.cashCount || {};
+  const cashRows = denominations.filter(d => (cc[d.value] || 0) > 0);
 
   const isOpen = target.status === 'open';
   const now = new Date();
@@ -126,30 +145,27 @@ export function render() {
         <div class="a4-two-col">
           <!-- CỘT TRÁI: DOANH THU -->
           <div class="a4-col">
-            ${sm.cukcukBills > 0 ? `
+            ${cukcukRevenue.bills > 0 ? `
             <div class="a4-section-title a4-income-title">▌DOANH THU BÁN HÀNG (CUKCUK POS)</div>
             <table class="a4-table">
               <thead>
-                <tr><th>Danh mục</th><th>SL</th><th class="r">Mặt</th><th class="r">Thẻ</th><th class="r">CK</th><th class="r">Tổng</th></tr>
+                <tr><th>Danh mục</th><th>SL</th><th class="r">TM</th><th class="r">Thẻ</th><th class="r">CK</th><th class="r">Tổng</th></tr>
               </thead>
               <tbody>
-                ${Object.entries(cukcukByCategory).map(([cat, v]) => {
-                  const total = v.cash + v.card + v.transfer;
-                  return '<tr>' +
-                    '<td class="a4-cat-name">' + cat + '</td>' +
-                    '<td>' + v.count + '</td>' +
-                    '<td class="r">' + (v.cash > 0 ? formatCurrency(v.cash) : '—') + '</td>' +
-                    '<td class="r">' + (v.card > 0 ? formatCurrency(v.card) : '—') + '</td>' +
-                    '<td class="r">' + (v.transfer > 0 ? formatCurrency(v.transfer) : '—') + '</td>' +
-                    '<td class="r a4-bold">' + formatCurrency(total) + '</td>' +
-                  '</tr>';
-                }).join('')}
+                <tr>
+                  <td class="a4-cat-name">Doanh thu bán hàng</td>
+                  <td>${cukcukRevenue.bills}</td>
+                  <td class="r">${cukcukRevenue.cash > 0 ? formatCurrency(cukcukRevenue.cash) : '—'}</td>
+                  <td class="r">${cukcukRevenue.card > 0 ? formatCurrency(cukcukRevenue.card) : '—'}</td>
+                  <td class="r">${cukcukRevenue.transfer > 0 ? formatCurrency(cukcukRevenue.transfer) : '—'}</td>
+                  <td class="r a4-bold">${formatCurrency(cukcukRevenue.total)}</td>
+                </tr>
               </tbody>
               <tfoot>
                 <tr class="a4-total-row">
-                  <td colspan="2"><strong>CUKCUK (${sm.cukcukBills} bill)</strong></td>
+                  <td colspan="2"><strong>CUKCUK (${cukcukRevenue.bills} bill)</strong></td>
                   <td class="r" colspan="3"></td>
-                  <td class="r"><strong>${formatCurrency(sm.cukcukRevenue)}</strong></td>
+                  <td class="r"><strong>${formatCurrency(cukcukRevenue.total)}</strong></td>
                 </tr>
               </tfoot>
             </table>

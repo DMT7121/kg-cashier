@@ -2,6 +2,15 @@
 import { getCurrentShift, getShiftSummary, getShiftHistory, getSettings, getNotifications, getUnreadCount, markAllRead } from '../store.js';
 import { formatCurrency, formatDate, formatTime, formatDuration } from '../utils.js';
 
+let _revenuePeriod = 'month'; // default view
+
+function _formatDateVN(dateStr) {
+  if (!dateStr) return '';
+  var parts = dateStr.split('-');
+  if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
+  return dateStr;
+}
+
 function renderShiftDashboard(shift) {
   if (!shift) return '';
   const summary = getShiftSummary(shift);
@@ -22,11 +31,35 @@ function renderShiftDashboard(shift) {
     </div>
 
     <!-- ═══ CUKCUK POS REVENUE ═══ -->
-    ${hasCukcuk ? `
+    ${hasCukcuk ? (() => {
+      // Read CUKCUK revenue from Invoice Store (source of truth)
+      var cukRev = { total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
+      try {
+        var storeData = localStorage.getItem('cukcuk_invoice_store');
+        if (storeData) {
+          var parsed = JSON.parse(storeData);
+          var shiftDate = shift.date || '';
+          if (parsed && parsed.invoices) {
+            for (var k in parsed.invoices) {
+              if (parsed.invoices.hasOwnProperty(k) && parsed.invoices[k].date === shiftDate) {
+                var inv = parsed.invoices[k];
+                cukRev.total += inv.amount || 0;
+                cukRev.bills++;
+                (inv.payments || []).forEach(function(p) {
+                  if (p.method === 'cash') cukRev.cash += p.amount || 0;
+                  else if (p.method === 'card') cukRev.card += p.amount || 0;
+                  else if (p.method === 'transfer') cukRev.transfer += p.amount || 0;
+                });
+              }
+            }
+          }
+        }
+      } catch(e) {}
+      return `
     <div class="card" style="margin-bottom:16px;border:1px solid rgba(16,185,129,0.3);background:linear-gradient(135deg, rgba(16,185,129,0.05) 0%, rgba(16,185,129,0.01) 100%);">
       <div class="card-header" style="border-bottom-color:rgba(16,185,129,0.15);">
         <h3 style="color:#10b981;display:flex;align-items:center;gap:8px;margin:0;">
-          <span class="material-symbols-rounded">point_of_sale</span> Doanh thu POS (CUKCUK)
+          <span class="material-symbols-rounded">point_of_sale</span> Doanh thu POS — ${new Date().toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric'})}
         </h3>
         <div style="display:flex;align-items:center;gap:8px;">
           <span id="cukcukSyncStatus" class="text-muted" style="font-size:11px;"></span>
@@ -42,8 +75,8 @@ function renderShiftDashboard(shift) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
           <div style="text-align:center;padding:12px;background:rgba(16,185,129,0.08);border-radius:10px;">
             <div class="text-muted" style="font-size:11px;margin-bottom:6px;">💰 Doanh thu bán hàng (CUKCUK)</div>
-            <div style="font-size:28px;font-weight:800;color:#10b981;">${formatCurrency(summary.cukcukRevenue)}</div>
-            <div style="font-size:12px;color:#10b981;margin-top:4px;">${summary.cukcukBills} bill thanh toán</div>
+            <div style="font-size:28px;font-weight:800;color:#10b981;">${formatCurrency(cukRev.total)}</div>
+            <div style="font-size:12px;color:#10b981;margin-top:4px;">${cukRev.bills} bill thanh toán</div>
           </div>
           <div style="text-align:center;padding:12px;background:rgba(59,130,246,0.08);border-radius:10px;">
             <div class="text-muted" style="font-size:11px;margin-bottom:6px;">✍️ Thu nhập thủ công khác</div>
@@ -52,8 +85,27 @@ function renderShiftDashboard(shift) {
           </div>
         </div>
         <p class="text-muted" style="font-size:10px;margin:10px 0 0;text-align:center;opacity:0.6;">
-          CUKCUK = bill từ POS, tự động đồng bộ mỗi 2 phút · Thu thủ công = giao dịch nhập tay trên webapp
+          Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau · Tự động đồng bộ mỗi 2 phút
         </p>
+      </div>
+    </div>`;
+    })() : ''}
+
+    <!-- ═══ DOANH THU CUKCUK THEO KỲ ═══ -->
+    ${hasCukcuk ? `
+    <div class="card" style="margin-bottom:16px;border:1px solid rgba(99,102,241,0.25);background:linear-gradient(135deg, rgba(99,102,241,0.04) 0%, rgba(99,102,241,0.01) 100%);">
+      <div class="card-header" style="border-bottom-color:rgba(99,102,241,0.15);">
+        <h3 style="color:#6366f1;display:flex;align-items:center;gap:8px;margin:0;">
+          <span class="material-symbols-rounded">bar_chart</span> Tổng doanh thu CUKCUK
+        </h3>
+        <div style="display:flex;gap:4px;" id="revenuePeriodBtns">
+          <button class="btn btn-sm rev-period-btn ${_revenuePeriod === 'month' ? 'active' : ''}" data-period="month">Tháng</button>
+          <button class="btn btn-sm rev-period-btn ${_revenuePeriod === 'quarter' ? 'active' : ''}" data-period="quarter">Quý</button>
+          <button class="btn btn-sm rev-period-btn ${_revenuePeriod === 'year' ? 'active' : ''}" data-period="year">Năm</button>
+        </div>
+      </div>
+      <div class="card-body" id="revenuePeriodContent" style="padding:16px 20px;">
+        <div class="text-muted text-center" style="padding:20px;">⏳ Đang tải...</div>
       </div>
     </div>
     ` : ''}
@@ -166,6 +218,54 @@ function renderShiftDashboard(shift) {
   `;
 }
 
+function _renderRevenuePeriod() {
+  var container = document.getElementById('revenuePeriodContent');
+  if (!container) return;
+  
+  import('../integration/invoiceStore.js').then(function(store) {
+    var rev = store.getRevenueSummary(_revenuePeriod);
+    var periodLabels = { month: 'Tháng này', quarter: 'Quý này', year: 'Năm nay', week: '7 ngày', day: 'Hôm nay' };
+    var periodLabel = periodLabels[_revenuePeriod] || _revenuePeriod;
+    
+    var dateRange = '';
+    if (rev.firstDate && rev.lastDate) {
+      dateRange = _formatDateVN(rev.firstDate) + ' → ' + _formatDateVN(rev.lastDate);
+    } else {
+      dateRange = 'Chưa có dữ liệu';
+    }
+    
+    container.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">📊 ${periodLabel}</div>
+        <div style="font-size:36px;font-weight:900;color:#6366f1;letter-spacing:-1px;">${formatCurrency(rev.totalRevenue)}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
+          📅 ${dateRange} · ${rev.daysWithData} ngày có doanh thu
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+        <div style="text-align:center;padding:10px;background:rgba(16,185,129,0.08);border-radius:8px;">
+          <div style="font-size:10px;color:var(--text-muted);">💵 Tiền mặt</div>
+          <div style="font-size:16px;font-weight:700;color:#10b981;margin-top:4px;">${formatCurrency(rev.totalCash)}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:rgba(59,130,246,0.08);border-radius:8px;">
+          <div style="font-size:10px;color:var(--text-muted);">💳 Thẻ</div>
+          <div style="font-size:16px;font-weight:700;color:#3b82f6;margin-top:4px;">${formatCurrency(rev.totalCard)}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:rgba(168,85,247,0.08);border-radius:8px;">
+          <div style="font-size:10px;color:var(--text-muted);">🏦 Chuyển khoản</div>
+          <div style="font-size:16px;font-weight:700;color:#a855f7;margin-top:4px;">${formatCurrency(rev.totalTransfer)}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 12px;background:var(--bg-secondary);border-radius:8px;font-size:11px;">
+        <span>📋 ${rev.totalBills} bill tổng cộng</span>
+        <span>📊 TB/ngày: <strong style="color:#6366f1;">${formatCurrency(rev.avgDaily)}</strong></span>
+      </div>
+    `;
+  }).catch(function() {
+    container.innerHTML = '<div class="text-muted text-center">Không tải được dữ liệu</div>';
+  });
+}
+
 export function render() {
   const shift = getCurrentShift();
   if (!shift) {
@@ -184,6 +284,19 @@ export function render() {
 }
 
 export function init() {
+  // Revenue period selector buttons
+  document.querySelectorAll('.rev-period-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _revenuePeriod = btn.dataset.period;
+      document.querySelectorAll('.rev-period-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      _renderRevenuePeriod();
+    });
+  });
+  
+  // Initial revenue render
+  _renderRevenuePeriod();
+
   // CUKCUK sync button on dashboard
   document.getElementById('btnDashSyncCukcuk')?.addEventListener('click', async () => {
     const btn = document.getElementById('btnDashSyncCukcuk');
@@ -199,6 +312,7 @@ export function init() {
       if (result && result.success) {
         if (status) status.textContent = '✅ ' + result.synced + ' mới / ' + result.total + ' tổng';
         if (result.synced > 0) window.refreshView?.();
+        _renderRevenuePeriod(); // Update period revenue too
       } else {
         if (status) status.textContent = '❌ ' + (result?.message || 'Lỗi').substring(0, 30);
       }

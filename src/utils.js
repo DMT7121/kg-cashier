@@ -13,7 +13,7 @@ export function formatDate(dateStr) {
     const d = new Date(dateStr);
     if (isNaN(d)) return dateStr;
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  } catch { return dateStr; }
+  } catch (e) { return dateStr; }
 }
 
 export function formatDateTime(dateStr) {
@@ -23,7 +23,7 @@ export function formatDateTime(dateStr) {
     if (isNaN(d)) return dateStr;
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) + ' ' +
            d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  } catch { return dateStr; }
+  } catch (e) { return dateStr; }
 }
 
 export function formatTime(dateStr) {
@@ -86,18 +86,26 @@ export function showToast(message, type = 'info', duration = 3500) {
 }
 
 // ── Modal ────────────────────────────────────
-export function showModal(contentHTML) {
+export function showModal(contentHTML, size) {
   const overlay = document.getElementById('modalOverlay');
   const body = document.getElementById('modalBody');
   if (overlay && body) {
     body.innerHTML = contentHTML;
+    // Support 'large' size for editors
+    if (size === 'large') {
+      body.classList.add('modal-large');
+    } else {
+      body.classList.remove('modal-large');
+    }
     overlay.classList.add('active');
   }
 }
 
 export function hideModal() {
   const overlay = document.getElementById('modalOverlay');
+  const body = document.getElementById('modalBody');
   if (overlay) overlay.classList.remove('active');
+  if (body) body.classList.remove('modal-large');
 }
 
 // ── Download helpers ─────────────────────────
