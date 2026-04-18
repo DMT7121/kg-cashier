@@ -71,8 +71,32 @@ export function render() {
   const totalManualIncome = manualIncomeTxs.reduce((s, t) => s + t.amount, 0);
   const combinedIncome = cukcukRevenue.total + totalManualIncome;
 
-
-
+  // Build summary object (sm) — combining CUKCUK + manual data
+  const totalExpenseAmt = expenseTxs.reduce((s, t) => s + t.amount, 0);
+  const manualCash = manualIncomeTxs.filter(t => (t.paymentMethod || 'cash') === 'cash').reduce((s, t) => s + t.amount, 0);
+  const manualCard = manualIncomeTxs.filter(t => t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
+  const manualTransfer = manualIncomeTxs.filter(t => t.paymentMethod === 'transfer').reduce((s, t) => s + t.amount, 0);
+  const otherIncomeAmt = otherTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const otherExpenseAmt = otherTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const cashCountTotal = denominations.reduce((s, d) => s + (d.value * (cc[d.value] || 0)), 0);
+  const expectedCash = (target.startingCash || 0) + manualCash + cukcukRevenue.cash - totalExpenseAmt + otherIncomeAmt - otherExpenseAmt;
+  const sm = {
+    manualBills: manualIncomeTxs.length,
+    manualIncome: totalManualIncome,
+    cukcukBills: cukcukRevenue.bills,
+    cukcukRevenue: cukcukRevenue.total,
+    totalIncome: combinedIncome,
+    totalExpense: totalExpenseAmt,
+    cashIncome: manualCash + cukcukRevenue.cash,
+    cardIncome: manualCard + cukcukRevenue.card,
+    transferIncome: manualTransfer + cukcukRevenue.transfer,
+    billCount: cukcukRevenue.bills + manualIncomeTxs.length,
+    otherIncome: otherIncomeAmt,
+    otherExpense: otherExpenseAmt,
+    expectedCash: expectedCash,
+    cashCountTotal: cashCountTotal,
+    discrepancy: cashCountTotal - expectedCash
+  };
   // Group expense by category
   const expenseByCategory = {};
   expenseTxs.forEach(tx => {
