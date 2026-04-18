@@ -39,6 +39,7 @@ import * as auditLogView from './views/auditLog.js';
 import * as settingsView from './views/settings.js';
 import * as printFormsView from './views/printForms.js';
 import * as cukcukInvoicesView from './views/cukcukInvoices.js';
+import * as drinkInventoryView from './views/drinkInventory.js';
 
 // ── View Registry ────────────────────────────
 var views = {
@@ -55,6 +56,7 @@ var views = {
   'audit':        { module: auditLogView,     title: 'Nhật ký' },
   'settings':     { module: settingsView,     title: 'Cài đặt' },
   'print-forms':  { module: printFormsView,   title: 'Biểu mẫu in' },
+  'drink-inventory': { module: drinkInventoryView, title: 'Kiểm kho đồ uống' },
 };
 
 var currentView = 'dashboard';
