@@ -626,30 +626,33 @@ export async function syncCurrentShiftWithCloud() {
       const cloudShift = res.shift;
       const s = getState();
       
-      // Case 1: Cloud has no open shift (was closed elsewhere)
+      // Case 1: Cloud has no open shift but local does → shift was closed on another device
       if (!cloudShift && s.currentShift) {
         s.currentShift = null;
         save();
         return true;
       }
       
-      // Case 2: Cloud has an open shift
-      if (cloudShift) {
-        // Check if different ID OR if content is different
-        // We compare stringified versions but exclude invoices which might be heavy or local-only for a moment
-        const localCompare = s.currentShift ? JSON.stringify(Object.assign({}, s.currentShift, { invoices: [] })) : '';
+      // Case 2: Cloud has an open shift AND local also has an open shift with SAME ID
+      // → Sync updates (transactions, cash count, etc.) from other devices
+      if (cloudShift && s.currentShift && s.currentShift.id === cloudShift.id) {
+        const localCompare = JSON.stringify(Object.assign({}, s.currentShift, { invoices: [] }));
         const cloudCompare = JSON.stringify(Object.assign({}, cloudShift, { invoices: [] }));
 
-        if (!s.currentShift || localCompare !== cloudCompare) {
-          // Merge logic: If it's the same shift, preserve local invoices (as they might not be uploaded yet)
-          if (s.currentShift && s.currentShift.id === cloudShift.id) {
-            cloudShift.invoices = s.currentShift.invoices;
-          }
+        if (localCompare !== cloudCompare) {
+          // Same shift, different content → merge cloud data but keep local invoices
+          cloudShift.invoices = s.currentShift.invoices;
           s.currentShift = cloudShift;
           save();
           return true;
         }
       }
+      
+      // Case 3: Cloud has an open shift but local does NOT
+      // → Do NOT auto-apply! This prevents the "phantom shift" bug where a stale
+      //   cloud shift keeps reappearing. The user must explicitly open a shift.
+      //   (Previously this would silently set s.currentShift = cloudShift, causing
+      //    the "Admin đang mở ca" notification when nobody actually opened a shift)
     }
   } catch (e) {
     console.warn('[Store] Cloud sync pull error:', e);
