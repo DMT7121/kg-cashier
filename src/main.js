@@ -318,8 +318,8 @@ function initApp() {
   // Immediate sync on load (with 3s delay to let UI settle)
   setTimeout(function() { _triggerCukcukSync(true); }, 3000);
 
-  // Then every 45 seconds for near-realtime updates (smart sync skips instantly when no new data)
-  _globalIntervals.push(setInterval(function() { _triggerCukcukSync(false); }, 45000));
+  // Then every 30 seconds for near-realtime updates (smart sync skips instantly when no new data)
+  _globalIntervals.push(setInterval(function() { _triggerCukcukSync(false); }, 30000));
 
   // Cleanup intervals on page unload
   window.addEventListener('beforeunload', function() {

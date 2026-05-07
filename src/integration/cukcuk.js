@@ -32,7 +32,7 @@ var TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours (official CUKCUK TTL)
 // ── Daily Revenue Cache ──
 var DAILY_REVENUE_KEY = 'cukcuk_daily_revenue';
 var CACHE_VERSION_KEY = 'cukcuk_cache_version';
-var CACHE_VERSION = 2; // Bump to force reset of corrupted cache
+var CACHE_VERSION = 3; // Bump: force re-sync with tax-inclusive amounts
 
 // ── Auto-migrate: clear corrupted cache from old versions ──
 (function _migrateCacheIfNeeded() {
@@ -846,7 +846,7 @@ export async function syncTransactions() {
     var allSyncedRefIds = []; // Collect for bulk write
     var BATCH_SIZE = 5;       // Parallel concurrency limit
 
-    // Pre-filter: skip zero-amount and already-stored invoices
+    // Pre-filter: skip zero-amount invoices, allow updates for existing ones
     var toProcess = [];
     for (var k = 0; k < newInvoices.length; k++) {
       var inv = newInvoices[k];
@@ -856,7 +856,6 @@ export async function syncTransactions() {
       allSyncedRefIds.push(refId); // Always mark as seen
       
       if (amount <= 0) continue;
-      if (invoiceStore.hasInvoice(refId)) continue;
       
       toProcess.push({ inv: inv, refId: refId });
     }
@@ -886,8 +885,10 @@ export async function syncTransactions() {
         var tableName = inv.TableName || '';
         var employeeName = inv.EmployeeName || '';
         var refDate = inv.RefDate || '';
-        var amount = inv.Amount || 0;
         var payments = (detail && detail.SAInvoicePayments) ? detail.SAInvoicePayments : null;
+        
+        // ★ Use detail Amount (tax-inclusive) if available, fallback to list Amount
+        var detailAmount = (detail && detail.Amount) ? detail.Amount : (inv.Amount || 0);
         
         var invoicePayments = [];
         var invCash = 0, invCard = 0, invTransfer = 0;
@@ -906,11 +907,21 @@ export async function syncTransactions() {
             else if (mapped.method === 'transfer') invTransfer += pmtAmount;
           }
         } else {
-          invCash = amount;
-          invoicePayments.push({ method: 'cash', amount: amount, label: 'Tiền mặt' });
+          // No payment detail — use tax-inclusive amount, default to cash
+          invCash = detailAmount;
+          invoicePayments.push({ method: 'cash', amount: detailAmount, label: 'Tiền mặt' });
         }
 
-        var effectiveAmount = (invoicePayments.length > 0) ? (invCash + invCard + invTransfer) : amount;
+        // ★ effectiveAmount = sum of payments (tax-inclusive)
+        var effectiveAmount = (invCash + invCard + invTransfer) || detailAmount;
+        
+        // ★ Check if existing record needs update (payment/amount changed)
+        var existingInv = invoiceStore.getInvoice(refId);
+        if (existingInv && existingInv.amount === effectiveAmount) {
+          // No change — skip
+          continue;
+        }
+        
         invoiceRecords.push({
           refId: refId, refNo: refNo, refDate: refDate, date: todayStr,
           tableName: tableName, employeeName: employeeName,
@@ -921,12 +932,12 @@ export async function syncTransactions() {
         paymentStats.cash += invCash;
         paymentStats.card += invCard;
         paymentStats.transfer += invTransfer;
-        totalAmount += amount;
+        totalAmount += effectiveAmount;
         count++;
 
         sheetData.push({
           refId: refId, refNo: refNo, refDate: refDate,
-          tableName: tableName, employeeName: employeeName, amount: amount,
+          tableName: tableName, employeeName: employeeName, amount: effectiveAmount,
           cashAmount: invCash, cardAmount: invCard, transferAmount: invTransfer,
           paymentInfo: invoicePayments.map(function(pp) { return pp.label + ': ' + pp.amount.toLocaleString('vi-VN'); }).join(' + ')
         });
