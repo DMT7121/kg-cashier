@@ -337,6 +337,17 @@ export function openShift(opts) {
   return s.currentShift;
 }
 
+/** Cập nhật tiền đầu ca (bổ sung thêm tiền mặt vào quỹ) */
+export function updateStartingCash(newAmount) {
+  var s = getState();
+  if (!s.currentShift) throw new Error('Chưa có ca đang mở.');
+  var old = s.currentShift.startingCash || 0;
+  s.currentShift.startingCash = Number(newAmount) || 0;
+  save();
+  addAudit('UPDATE_STARTING_CASH', 'Tiền đầu ca: ' + old.toLocaleString() + ' → ' + s.currentShift.startingCash.toLocaleString());
+  return s.currentShift;
+}
+
 export function closeShift(opts) {
   if (!opts) opts = {};
   var s = getState();

@@ -1,4 +1,4 @@
-import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff } from '../store.js';
+import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff, updateStartingCash } from '../store.js';
 import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
 import { getStaffFromCloud, getConfigFromCloud } from '../api.js';
 
@@ -59,7 +59,7 @@ export function render() {
             <div><span class="text-muted">Ngày</span><strong>${formatDate(shift.date)}</strong></div>
             <div><span class="text-muted">Bắt đầu</span><strong>${formatTime(shift.startTime)}</strong></div>
             <div><span class="text-muted">Thời gian</span><strong id="shiftTimer">${formatDuration(shift.startTime)}</strong></div>
-            <div><span class="text-muted">Tiền đầu ca</span><strong>${formatCurrency(shift.startingCash)}</strong></div>
+            <div><span class="text-muted">Tiền đầu ca</span><strong>${formatCurrency(shift.startingCash)} <button class="btn btn-sm" id="btnEditStartingCash" title="Bổ sung tiền đầu ca" style="padding:2px 6px;font-size:11px;vertical-align:middle;background:transparent;border:1px dashed var(--border);color:var(--text-muted);cursor:pointer;">✏️</button></strong></div>
           </div>
 
           <div class="shift-quick-stats">
@@ -295,6 +295,41 @@ export function init() {
         showToast('Đã hủy ca', 'info');
         window.refreshView?.();
       }
+    });
+
+    // Edit starting cash
+    document.getElementById('btnEditStartingCash')?.addEventListener('click', () => {
+      showModal(`
+        <div class="modal-title"><span class="material-symbols-rounded" style="color:var(--warning);">account_balance_wallet</span> Bổ sung tiền đầu ca</div>
+        <p style="margin-bottom:12px;color:var(--text-muted);">Hiện tại: <strong>${formatCurrency(shift.startingCash)}</strong></p>
+        <div class="form-group">
+          <label class="form-label">Số tiền mới (tổng tiền đầu ca)</label>
+          <input type="number" id="newStartingCash" class="form-input" value="${shift.startingCash}" min="0" style="font-size:18px;font-weight:700;text-align:right;">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
+          <button class="btn btn-primary" id="btnConfirmStartingCash">
+            <span class="material-symbols-rounded">check</span> Cập nhật
+          </button>
+        </div>
+      `);
+      setTimeout(() => {
+        const input = document.getElementById('newStartingCash');
+        input?.focus();
+        input?.select();
+        document.getElementById('btnConfirmStartingCash')?.addEventListener('click', () => {
+          try {
+            const val = Number(input?.value) || 0;
+            updateStartingCash(val);
+            hideModal();
+            showToast('✅ Tiền đầu ca: ' + formatCurrency(val), 'success');
+            window.refreshView?.();
+          } catch (e) {
+            showToast(e.message, 'error');
+          }
+        });
+        input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('btnConfirmStartingCash')?.click(); });
+      }, 100);
     });
 
   } else {
