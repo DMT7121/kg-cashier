@@ -828,12 +828,10 @@ export async function syncTransactions() {
     // Clean up old indexes periodically
     _cleanupOldSyncIndexes();
     
-    // Load the synced RefID index for today (O(1) lookups)
-    var syncedRefs = _getSyncedRefIds(todayStr);
-    var syncedCount = Object.keys(syncedRefs).length;
-    var syncMeta = _getSyncMeta();
+    // Use invoiceStore as source of truth for already-synced count
+    var storedCount = invoiceStore.getCountByDate(todayStr);
     
-    console.log('[CUKCUK] Smart sync for', todayStr, '| Already synced:', syncedCount, 'refs');
+    console.log('[CUKCUK] Smart sync for', todayStr, '| Already in store:', storedCount);
 
     // ═══ STEP 1: Fetch page 1 to get total count ═══
     var data = await _fetchInvoices(fromDate, toDate, 1);
@@ -882,25 +880,14 @@ export async function syncTransactions() {
       }
     }
 
-    // ═══ STEP 2b: Quick skip — if count unchanged AND all TODAY invoices confirmed ═══
-    if (apiTotal > 0 && apiTotal <= syncedCount) {
-      // Count matches — only do a lightweight check for unconfirmed invoices
-      var hasUnconfirmed = false;
-      for (var qi = 0; qi < allApiInvoices.length; qi++) {
-        var qInv = allApiInvoices[qi];
-        var qRefId = String(qInv.RefId || qInv.RefID || ('idx-' + qi));
-        var qExisting = invoiceStore.getInvoice(qRefId);
-        if (!qExisting || !qExisting.confirmed || qExisting.amount !== (qInv.Amount || 0)) {
-          hasUnconfirmed = true; break;
-        }
-      }
-      if (!hasUnconfirmed) {
-        // All invoices confirmed and amounts match — truly nothing to do
-        return { success: true, synced: 0, total: apiTotal, skipped: syncedCount, amount: 0, date: todayStr, smart: true };
-      }
+    // ═══ STEP 2b: Quick skip — if total count unchanged ═══
+    if (apiTotal > 0 && apiTotal <= storedCount) {
+      // No new invoices — nothing to do
+      console.log('[CUKCUK] Quick skip: API total (' + apiTotal + ') <= stored (' + storedCount + ')');
+      return { success: true, synced: 0, total: apiTotal, skipped: storedCount, amount: 0, date: todayStr, smart: true };
     }
 
-    // ═══ STEP 3: Smart diff — detect NEW, CHANGED, or UNCONFIRMED invoices ═══
+    // ═══ STEP 3: Only process NEW invoices (not already in store) ═══
     var toProcess = [];
     var allSyncedRefIds = [];
 
@@ -915,16 +902,10 @@ export async function syncTransactions() {
       var existing = invoiceStore.getInvoice(refId);
       
       if (!existing) {
-        // NEW invoice
+        // Only fetch detail for genuinely NEW invoices
         toProcess.push({ inv: inv, refId: refId, reason: 'new' });
-      } else if (existing.amount !== apiAmount) {
-        // Amount CHANGED
-        toProcess.push({ inv: inv, refId: refId, reason: 'amount_changed' });
-      } else if (!existing.confirmed) {
-        // Not yet confirmed via detail API — need to verify payment
-        toProcess.push({ inv: inv, refId: refId, reason: 'unconfirmed' });
       }
-      // confirmed invoices with matching amount → skip (already verified)
+      // Existing invoices → skip entirely. Use per-invoice sync button (🔄) to refresh.
     }
 
     console.log('[CUKCUK] Scanned ' + allApiInvoices.length + ' invoices, ' + toProcess.length + ' need detail fetch');
@@ -1002,29 +983,7 @@ export async function syncTransactions() {
 
         // ★ effectiveAmount = sum of payments (tax-inclusive)
         var effectiveAmount = (invCash + invCard + invTransfer) || detailAmount;
-        
-        // ★ Compare with existing — skip if amount AND payment breakdown are identical
-        var existingInv = invoiceStore.getInvoice(refId);
-        if (existingInv) {
-          var sameAmount = existingInv.amount === effectiveAmount;
-          var samePayments = existingInv.payments && existingInv.payments.length === invoicePayments.length;
-          if (samePayments) {
-            for (var cp = 0; cp < invoicePayments.length; cp++) {
-              if (!existingInv.payments[cp] || existingInv.payments[cp].method !== invoicePayments[cp].method || existingInv.payments[cp].amount !== invoicePayments[cp].amount) {
-                samePayments = false; break;
-              }
-            }
-          }
-          if (sameAmount && samePayments) {
-            // Data unchanged — but mark as confirmed so we don't re-check next cycle
-            if (!existingInv.confirmed) {
-              existingInv.confirmed = true;
-              invoiceStore.upsertInvoice(existingInv);
-            }
-            continue;
-          }
-          console.log('[CUKCUK] Updating ' + refId + ' (' + r.item.reason + ')');
-        }
+        // (NEW invoice only — existing invoices are skipped at STEP 3)
         
         invoiceRecords.push({
           refId: refId, refNo: refNo, refDate: refDate, date: todayStr,

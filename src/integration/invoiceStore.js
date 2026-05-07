@@ -108,6 +108,18 @@ export function getInvoiceCount() {
   return Object.keys(store.invoices).length;
 }
 
+/** Get invoice count for a specific date (working day YYYY-MM-DD) */
+export function getCountByDate(dateStr) {
+  var store = _load();
+  var count = 0;
+  for (var key in store.invoices) {
+    if (store.invoices.hasOwnProperty(key) && store.invoices[key].date === dateStr) {
+      count++;
+    }
+  }
+  return count;
+}
+
 // ── Working Day Boundaries ──
 // Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau
 // Tất cả bộ lọc dùng refDate timestamp (thời gian gốc từ CUKCUK)
