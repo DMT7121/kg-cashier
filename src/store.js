@@ -442,28 +442,45 @@ export function removeOtherTransaction(id) {
 }
 
 // ── Cash count ───────────────────────────────
-export function updateCashCount(counts, pinnedCash) {
+export function updateCashCount(counts, pinnedCash, keepCash, handoverCash) {
   var s = getState();
   if (!s.currentShift) throw new Error('Chưa mở ca');
   var newCounts = {};
   for (var key in counts) { newCounts[key] = counts[key]; }
   s.currentShift.cashCount = newCounts;
-  // Save pinned cash (ghim két) if provided
+
+  // Save denomination breakdown: ghim, giữ, giao
   if (pinnedCash) {
     var newPins = {};
     for (var pk in pinnedCash) { if (pinnedCash[pk] > 0) newPins[pk] = pinnedCash[pk]; }
     s.currentShift.pinnedCash = newPins;
-    // Auto-calculate cashToKeep (sum of pinned) and cashToDeposit (total - pinned)
-    var totalCount = 0, totalPinned = 0;
-    for (var d in newCounts) { totalCount += Number(d) * Number(newCounts[d]); }
-    for (var p in newPins) { totalPinned += Number(p) * Number(newPins[p]); }
-    s.currentShift.cashToKeep = totalPinned;
-    s.currentShift.cashToDeposit = Math.max(0, totalCount - totalPinned);
   }
+  if (keepCash) {
+    var newKeep = {};
+    for (var kk in keepCash) { if (keepCash[kk] > 0) newKeep[kk] = keepCash[kk]; }
+    s.currentShift.keepCash = newKeep;
+  }
+  if (handoverCash) {
+    var newHand = {};
+    for (var hk in handoverCash) { if (handoverCash[hk] > 0) newHand[hk] = handoverCash[hk]; }
+    s.currentShift.handoverCash = newHand;
+  }
+
+  // Auto-calculate cashToKeep and cashToDeposit
+  var totalKet = 0, totalGiao = 0;
+  var pc = s.currentShift.pinnedCash || {};
+  var kc = s.currentShift.keepCash || {};
+  var hc = s.currentShift.handoverCash || {};
+  for (var d in newCounts) {
+    totalKet += Number(d) * ((pc[d] || 0) + (kc[d] || 0));
+    totalGiao += Number(d) * (hc[d] || 0);
+  }
+  s.currentShift.cashToKeep = totalKet;
+  s.currentShift.cashToDeposit = totalGiao;
+
   save();
-  var total = 0;
-  for (var d2 in counts) { total += Number(d2) * Number(counts[d2]); }
-  addAudit('UPDATE_CASH_COUNT', 'Tổng: ' + total.toLocaleString('vi-VN') + 'đ');
+  var total = totalKet + totalGiao;
+  addAudit('UPDATE_CASH_COUNT', 'Két: ' + totalKet.toLocaleString('vi-VN') + ' | Giao: ' + totalGiao.toLocaleString('vi-VN') + ' | Tổng: ' + total.toLocaleString('vi-VN') + 'đ');
   _syncCurrentShift();
 }
 

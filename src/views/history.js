@@ -101,24 +101,29 @@ function _showShiftDetail(shiftId) {
 
       ${(function() {
         var pc = sh.pinnedCash || {};
-        var cc2 = sh.cashCount || {};
-        var hasPins = Object.keys(pc).length > 0;
-        if (!hasPins) return '';
-        var keepHtml = '';
-        var handHtml = '';
-        var keepTotal = 0, handTotal = 0;
+        var kc = sh.keepCash || {};
+        var hc = sh.handoverCash || {};
+        var hasData = Object.keys(pc).length > 0 || Object.keys(kc).length > 0 || Object.keys(hc).length > 0;
+        if (!hasData) return '';
+        var ketHtml = '', handHtml = '';
+        var ketTotal = 0, handTotal = 0;
         for (var i = 0; i < denominations.length; i++) {
           var dv = denominations[i].value;
           var dl = denominations[i].label;
-          var cq = cc2[dv] || 0;
           var pq = pc[dv] || 0;
-          var hq = Math.max(0, cq - pq);
-          if (pq > 0) { keepHtml += '<tr><td>' + pq + ' x ' + dl + '</td><td>' + formatCurrency(dv * pq) + '</td></tr>'; keepTotal += dv * pq; }
+          var kq = kc[dv] || 0;
+          var hq = hc[dv] || 0;
+          var ketQ = pq + kq;
+          if (ketQ > 0) {
+            var det = (pq > 0 && kq > 0) ? ' (' + pq + ' ghim + ' + kq + ' giữ)' : (pq > 0 ? ' (ghim)' : ' (giữ)');
+            ketHtml += '<tr><td>' + ketQ + ' x ' + dl + det + '</td><td>' + formatCurrency(dv * ketQ) + '</td></tr>';
+            ketTotal += dv * ketQ;
+          }
           if (hq > 0) { handHtml += '<tr><td>' + hq + ' x ' + dl + '</td><td>' + formatCurrency(dv * hq) + '</td></tr>'; handTotal += dv * hq; }
         }
         var out = '';
-        if (keepHtml) out += '<h4 style="margin:12px 0 4px;color:var(--primary);">📌 Tiền giữ lại (két)</h4><table class="report-table">' + keepHtml + '<tr><td><strong>Tổng</strong></td><td><strong>' + formatCurrency(keepTotal) + '</strong></td></tr></table>';
-        if (handHtml) out += '<h4 style="margin:12px 0 4px;color:var(--success);">🤝 Tiền bàn giao</h4><table class="report-table">' + handHtml + '<tr><td><strong>Tổng</strong></td><td><strong>' + formatCurrency(handTotal) + '</strong></td></tr></table>';
+        if (ketHtml) out += '<h4 style="margin:12px 0 4px;color:var(--primary);">📌 Tiền két (giữ lại)</h4><table class="report-table">' + ketHtml + '<tr><td><strong>Tổng két</strong></td><td><strong>' + formatCurrency(ketTotal) + '</strong></td></tr></table>';
+        if (handHtml) out += '<h4 style="margin:12px 0 4px;color:var(--success);">🤝 Tiền bàn giao</h4><table class="report-table">' + handHtml + '<tr><td><strong>Tổng bàn giao</strong></td><td><strong>' + formatCurrency(handTotal) + '</strong></td></tr></table>';
         return out;
       })()}
 

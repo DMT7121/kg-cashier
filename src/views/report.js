@@ -408,40 +408,47 @@ function _buildHandoverHTML(revSummary) {
 
             ${(function() {
               var pc = target.pinnedCash || {};
-              var hasPins = Object.keys(pc).length > 0;
-              if (!hasPins && !(target.cashToKeep > 0)) return '';
+              var kc = target.keepCash || {};
+              var hc = target.handoverCash || {};
+              var hasData = Object.keys(pc).length > 0 || Object.keys(kc).length > 0 || Object.keys(hc).length > 0;
+              if (!hasData) return '';
 
-              var keepRows = '';
-              var handoverRows = '';
-              var keepTotal = 0;
-              var handoverTotal = 0;
+              var ketRows = '';
+              var handRows = '';
+              var ketTotal = 0;
+              var handTotal = 0;
 
               for (var di = 0; di < denominations.length; di++) {
                 var dv = denominations[di].value;
                 var dl = denominations[di].label;
-                var countQty = cc[dv] || 0;
                 var pinQty = pc[dv] || 0;
-                var handQty = Math.max(0, countQty - pinQty);
-                if (pinQty > 0) {
-                  keepRows += '<tr><td>' + pinQty + ' x ' + dl + '</td><td class="r">' + fc(dv * pinQty) + '</td></tr>';
-                  keepTotal += dv * pinQty;
+                var keepQty = kc[dv] || 0;
+                var handQty = hc[dv] || 0;
+                var ketQty = pinQty + keepQty;
+                if (ketQty > 0) {
+                  var detail = '';
+                  if (pinQty > 0 && keepQty > 0) detail = ' (' + pinQty + ' ghim + ' + keepQty + ' giữ)';
+                  else if (pinQty > 0) detail = ' (ghim)';
+                  else detail = ' (giữ)';
+                  ketRows += '<tr><td>' + ketQty + ' x ' + dl + detail + '</td><td class="r">' + fc(dv * ketQty) + '</td></tr>';
+                  ketTotal += dv * ketQty;
                 }
                 if (handQty > 0) {
-                  handoverRows += '<tr><td>' + handQty + ' x ' + dl + '</td><td class="r">' + fc(dv * handQty) + '</td></tr>';
-                  handoverTotal += dv * handQty;
+                  handRows += '<tr><td>' + handQty + ' x ' + dl + '</td><td class="r">' + fc(dv * handQty) + '</td></tr>';
+                  handTotal += dv * handQty;
                 }
               }
 
               var html = '';
-              if (keepRows) {
+              if (ketRows) {
                 html += '<div class="a4-section-title" style="color:#e8a838;margin-top:10px;">▌TIỀN GIỮ LẠI (KÉT)</div>';
-                html += '<table class="a4-table"><tbody>' + keepRows + '</tbody>';
-                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng giữ lại</strong></td><td class="r"><strong>' + fc(keepTotal) + '</strong></td></tr></tfoot></table>';
+                html += '<table class="a4-table"><tbody>' + ketRows + '</tbody>';
+                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng két</strong></td><td class="r"><strong>' + fc(ketTotal) + '</strong></td></tr></tfoot></table>';
               }
-              if (handoverRows) {
+              if (handRows) {
                 html += '<div class="a4-section-title" style="color:#22c55e;margin-top:10px;">▌TIỀN BÀN GIAO</div>';
-                html += '<table class="a4-table"><tbody>' + handoverRows + '</tbody>';
-                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng bàn giao</strong></td><td class="r"><strong>' + fc(handoverTotal) + '</strong></td></tr></tfoot></table>';
+                html += '<table class="a4-table"><tbody>' + handRows + '</tbody>';
+                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng bàn giao</strong></td><td class="r"><strong>' + fc(handTotal) + '</strong></td></tr></tfoot></table>';
               }
               return html;
             })()}

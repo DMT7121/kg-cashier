@@ -750,14 +750,49 @@ tr:hover td { background: rgba(255,255,255,.02); }
 .tx-preview-info strong { font-size: 13px; display: block; }
 .tx-preview-info small { font-size: 11px; color: var(--text-muted); }
 
-/* ── Denomination Grid ────────────────────── */
-.denomination-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 16px;
+/* ── Cash Count Layout ────────────────────── */
+.cc-denom-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.cc-denom-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); transition: border-color .2s; flex-wrap: wrap;
 }
+.cc-denom-row:hover { border-color: var(--border-hover); }
+.cc-denom-badge {
+  font-size: 11px; font-weight: 700; color: #fff; padding: 4px 8px;
+  border-radius: 6px; min-width: 62px; text-align: center; white-space: nowrap;
+}
+.cc-inputs { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.cc-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cc-label { font-size: 10px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.cc-input-group { display: flex; align-items: center; gap: 2px; }
+.cc-num-input {
+  width: 52px; text-align: center; padding: 6px 2px;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: var(--font); font-size: 16px; font-weight: 700; outline: none;
+}
+.cc-num-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(232,168,56,.15); }
+.cc-subtotals {
+  display: flex; gap: 6px; width: 100%; padding-top: 4px;
+  border-top: 1px dashed var(--border); margin-top: 4px; font-size: 11px; font-weight: 600;
+}
+.cc-sub-ket { color: var(--primary); }
+.cc-sub-giao { color: var(--success); }
+.cc-sub-total { margin-left: auto; color: var(--text); }
+.cc-summary-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.cc-summary-item {
+  flex: 1; min-width: 140px; padding: 12px 14px; border-radius: var(--radius-sm);
+  display: flex; flex-direction: column; gap: 4px; font-size: 13px;
+}
+.cc-summary-item strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.cc-ket-bg { background: rgba(232,168,56,.08); border: 1px solid rgba(232,168,56,.2); }
+.cc-ket-bg strong { color: var(--primary); }
+.cc-giao-bg { background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2); }
+.cc-giao-bg strong { color: var(--success); }
+.cc-total-bg { background: var(--primary-glow); border: 1px solid rgba(232,168,56,.3); }
+.cc-total-bg strong { color: var(--primary); }
 
+/* ── Denomination Grid (legacy) ───────────── */
 .denomination-card {
   display: flex;
   align-items: center;
