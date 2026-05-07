@@ -190,12 +190,11 @@ function _renderTabContent() {
     var daily = store.getDailyBreakdown(_activeTab, _refDate);
     var unpushed = store.getUnpushedInvoices().length;
 
-    var html = _buildRevenueReport(rev, daily, unpushed);
+    var html = '<div class="rpt-revenue-section">' + _buildRevenueReport(rev, daily, unpushed) + '</div>';
 
     // Tab "Ngày" → thêm Phiếu bàn giao ca (cho ngày được chọn)
     if (_activeTab === 'day') {
-      html += '<div style="margin-top:24px;border-top:2px solid var(--border);padding-top:20px;"></div>';
-      html += _buildHandoverHTML(rev);
+      html += '<div class="rpt-handover-section">' + _buildHandoverHTML(rev) + '</div>';
     }
 
     container.innerHTML = html;

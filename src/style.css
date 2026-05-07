@@ -1144,17 +1144,26 @@ tr:hover td { background: rgba(255,255,255,.02); }
   button, input, select { display: none !important; }
   .main-content { margin: 0 !important; padding: 0 !important; }
   .a4-sheet { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+  .a4-two-col { grid-template-columns: 1.4fr 1fr !important; }
+  .a4-signatures { grid-template-columns: 1fr 1fr 1fr !important; }
   .stats-grid, .card { break-inside: avoid; }
 }
 
-/* Also apply when body has .printing-a4 class */
+/* .printing-a4: ONLY print the A4 handover sheet */
 body.printing-a4 .sidebar,
 body.printing-a4 .topbar,
 body.printing-a4 .no-print,
 body.printing-a4 .rpt-tabs,
 body.printing-a4 #rptDatePicker,
-body.printing-a4 .btn-group,
-body.printing-a4 .section-header { display: none !important; }
+body.printing-a4 .section-header,
+body.printing-a4 .rpt-revenue-section { display: none !important; }
+body.printing-a4 .rpt-handover-section .btn,
+body.printing-a4 .rpt-handover-section .btn-group { display: none !important; }
+body.printing-a4 .main-content { margin: 0 !important; padding: 0 !important; }
+body.printing-a4 .view-container { padding: 0 !important; }
+
+/* Handover section spacing */
+.rpt-handover-section { margin-top: 24px; border-top: 2px solid var(--border); padding-top: 20px; }
 
 /* ── Analytics Chart Bars ─────────────────── */
 .chart-bars {
