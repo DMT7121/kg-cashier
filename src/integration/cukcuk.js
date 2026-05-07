@@ -614,6 +614,27 @@ function _addSyncedRefId(dateStr, refId) {
 }
 
 /**
+ * Bulk-add multiple RefIDs at once (single localStorage write).
+ * Much faster than calling _addSyncedRefId N times.
+ */
+function _addSyncedRefIdsBulk(dateStr, refIds) {
+  if (!refIds || refIds.length === 0) return;
+  try {
+    var saved = localStorage.getItem(SYNCED_REFS_PREFIX + dateStr);
+    var arr = saved ? JSON.parse(saved) : [];
+    var existing = {};
+    for (var i = 0; i < arr.length; i++) existing[arr[i]] = true;
+    for (var j = 0; j < refIds.length; j++) {
+      if (!existing[refIds[j]]) {
+        arr.push(refIds[j]);
+        existing[refIds[j]] = true;
+      }
+    }
+    localStorage.setItem(SYNCED_REFS_PREFIX + dateStr, JSON.stringify(arr));
+  } catch(e) { /* ignore */ }
+}
+
+/**
  * Get sync metadata (last known total, last sync time).
  */
 function _getSyncMeta() {
@@ -814,117 +835,114 @@ export async function syncTransactions() {
     }
 
     // ═══ STEP 6: Process ONLY new invoices → save to Invoice Store ═══
+    // ★ PARALLEL BATCH PROCESSING — fetch 5 detail requests at once
     showToast('📥 ' + newInvoices.length + ' hóa đơn mới từ CUKCUK...', 'info');
     
     var count = 0;
     var totalAmount = 0;
     var paymentStats = { cash: 0, card: 0, transfer: 0 };
     var sheetData = [];
+    var invoiceRecords = [];  // Collect for bulk upsert
+    var allSyncedRefIds = []; // Collect for bulk write
+    var BATCH_SIZE = 5;       // Parallel concurrency limit
 
+    // Pre-filter: skip zero-amount and already-stored invoices
+    var toProcess = [];
     for (var k = 0; k < newInvoices.length; k++) {
       var inv = newInvoices[k];
       var refId = String(inv.RefId || inv.RefID || ('idx-' + k));
-      var refNo = inv.RefNo || '';
-      var tableName = inv.TableName || '';
-      var employeeName = inv.EmployeeName || '';
-      var refDate = inv.RefDate || '';
       var amount = inv.Amount || 0;
       
-      if (amount <= 0) {
-        // Still mark as synced so we don't re-check next time
-        _addSyncedRefId(todayStr, refId);
-        continue;
-      }
-
-      // Skip if already in Invoice Store (global dedup)
-      if (invoiceStore.hasInvoice(refId)) {
-        _addSyncedRefId(todayStr, refId);
-        continue;
-      }
-
-      // Fetch detail to get payment breakdown
-      var detail = await _fetchInvoiceDetail(refId);
-      var payments = (detail && detail.SAInvoicePayments) ? detail.SAInvoicePayments : null;
+      allSyncedRefIds.push(refId); // Always mark as seen
       
-      var invoicePayments = [];
-      var invCash = 0, invCard = 0, invTransfer = 0;
-
-      if (payments && payments.length > 0) {
-        for (var p = 0; p < payments.length; p++) {
-          var pmt = payments[p];
-          var pmtAmount = pmt.Amount || 0;
-          if (pmtAmount <= 0) continue;
-          
-          var mapped = _mapPayment(pmt);
-          invoicePayments.push({
-            method: mapped.method,
-            amount: pmtAmount,
-            label: mapped.label
-          });
-
-          if (mapped.method === 'cash') invCash += pmtAmount;
-          else if (mapped.method === 'card') invCard += pmtAmount;
-          else if (mapped.method === 'transfer') invTransfer += pmtAmount;
-        }
-      } else {
-        // No detail → assume all cash
-        invCash = amount;
-        invoicePayments.push({ method: 'cash', amount: amount, label: 'Tiền mặt' });
-      }
-
-      // ★ Save to Invoice Store (SINGLE record per bill)
-      // Use sum of payments as amount when payment details are available
-      // This ensures amount === sum(payments) for consistency
-      var effectiveAmount = (invoicePayments.length > 0) ? (invCash + invCard + invTransfer) : amount;
-      var invoiceRecord = {
-        refId: refId,
-        refNo: refNo,
-        refDate: refDate,
-        date: todayStr,
-        tableName: tableName,
-        employeeName: employeeName,
-        amount: effectiveAmount,
-        payments: invoicePayments,
-        syncedAt: new Date().toISOString(),
-        pushedToSheets: false
-      };
+      if (amount <= 0) continue;
+      if (invoiceStore.hasInvoice(refId)) continue;
       
-      invoiceStore.upsertInvoice(invoiceRecord);
+      toProcess.push({ inv: inv, refId: refId });
+    }
+
+    console.log('[CUKCUK] Processing ' + toProcess.length + ' invoices in parallel batches of ' + BATCH_SIZE);
+
+    // Process in parallel batches
+    for (var batchStart = 0; batchStart < toProcess.length; batchStart += BATCH_SIZE) {
+      var batch = toProcess.slice(batchStart, batchStart + BATCH_SIZE);
       
-      // Track stats
-      paymentStats.cash += invCash;
-      paymentStats.card += invCard;
-      paymentStats.transfer += invTransfer;
-      totalAmount += amount;
-      count++;
-
-      // ★ Mark RefId as synced (for API-level dedup)
-      _addSyncedRefId(todayStr, refId);
-
-      // Collect for Google Sheets
-      sheetData.push({
-        refId: refId,
-        refNo: refNo,
-        refDate: refDate,
-        tableName: tableName,
-        employeeName: employeeName,
-        amount: amount,
-        cashAmount: invCash,
-        cardAmount: invCard,
-        transferAmount: invTransfer,
-        paymentInfo: invoicePayments.map(function(pp) { return pp.label + ': ' + pp.amount.toLocaleString('vi-VN'); }).join(' + ')
+      // Fire all detail requests in this batch concurrently
+      var detailPromises = batch.map(function(item) {
+        return _fetchInvoiceDetail(item.refId).then(function(detail) {
+          return { item: item, detail: detail };
+        });
       });
-
-      // Progress every 10 invoices
-      if (k > 0 && k % 10 === 0) {
-        showToast('📥 Xử lý ' + k + '/' + newInvoices.length + ' hóa đơn mới...', 'info');
-      }
       
-      // Small delay to avoid API rate limiting
-      if (k < newInvoices.length - 1) {
-        await new Promise(function(r) { setTimeout(r, 50); });
+      var results = await Promise.all(detailPromises);
+      
+      // Process results
+      for (var ri = 0; ri < results.length; ri++) {
+        var r = results[ri];
+        var inv = r.item.inv;
+        var refId = r.item.refId;
+        var detail = r.detail;
+        var refNo = inv.RefNo || '';
+        var tableName = inv.TableName || '';
+        var employeeName = inv.EmployeeName || '';
+        var refDate = inv.RefDate || '';
+        var amount = inv.Amount || 0;
+        var payments = (detail && detail.SAInvoicePayments) ? detail.SAInvoicePayments : null;
+        
+        var invoicePayments = [];
+        var invCash = 0, invCard = 0, invTransfer = 0;
+
+        if (payments && payments.length > 0) {
+          for (var p = 0; p < payments.length; p++) {
+            var pmt = payments[p];
+            var pmtAmount = pmt.Amount || 0;
+            if (pmtAmount <= 0) continue;
+            
+            var mapped = _mapPayment(pmt);
+            invoicePayments.push({ method: mapped.method, amount: pmtAmount, label: mapped.label });
+
+            if (mapped.method === 'cash') invCash += pmtAmount;
+            else if (mapped.method === 'card') invCard += pmtAmount;
+            else if (mapped.method === 'transfer') invTransfer += pmtAmount;
+          }
+        } else {
+          invCash = amount;
+          invoicePayments.push({ method: 'cash', amount: amount, label: 'Tiền mặt' });
+        }
+
+        var effectiveAmount = (invoicePayments.length > 0) ? (invCash + invCard + invTransfer) : amount;
+        invoiceRecords.push({
+          refId: refId, refNo: refNo, refDate: refDate, date: todayStr,
+          tableName: tableName, employeeName: employeeName,
+          amount: effectiveAmount, payments: invoicePayments,
+          syncedAt: new Date().toISOString(), pushedToSheets: false
+        });
+        
+        paymentStats.cash += invCash;
+        paymentStats.card += invCard;
+        paymentStats.transfer += invTransfer;
+        totalAmount += amount;
+        count++;
+
+        sheetData.push({
+          refId: refId, refNo: refNo, refDate: refDate,
+          tableName: tableName, employeeName: employeeName, amount: amount,
+          cashAmount: invCash, cardAmount: invCard, transferAmount: invTransfer,
+          paymentInfo: invoicePayments.map(function(pp) { return pp.label + ': ' + pp.amount.toLocaleString('vi-VN'); }).join(' + ')
+        });
+      }
+
+      // Progress toast per batch
+      if (batchStart + BATCH_SIZE < toProcess.length) {
+        showToast('📥 ' + Math.min(batchStart + BATCH_SIZE, toProcess.length) + '/' + toProcess.length + ' hóa đơn...', 'info');
       }
     }
+
+    // ★ BULK WRITES — single localStorage + invoiceStore write
+    if (invoiceRecords.length > 0) {
+      invoiceStore.bulkUpsert(invoiceRecords);
+    }
+    _addSyncedRefIdsBulk(todayStr, allSyncedRefIds);
 
     // 7. Update sync meta (Invoice Store is now the source of truth for revenue)
     _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
