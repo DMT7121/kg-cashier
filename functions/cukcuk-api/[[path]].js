@@ -1,81 +1,69 @@
 // Cloudflare Pages Function — CUKCUK API CORS Proxy
-// Route: /cukcuk-api/* → https://graphapi.cukcuk.vn/*
-// Handles: Login (POST), Invoice list (POST), Invoice detail (GET)
+// This handles ALL methods: GET, POST, PUT, DELETE, OPTIONS
 
-export async function onRequest(context) {
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, CompanyCode',
+  'Access-Control-Max-Age': '86400',
+};
+
+async function handleProxy(context) {
   const { request, params } = context;
-  
+
   // Handle CORS preflight
   if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, CompanyCode',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  // Build target URL
-  const path = params.path ? params.path.join('/') : '';
+  const pathSegments = params.path || [];
+  const path = pathSegments.join('/');
   const targetUrl = 'https://graphapi.cukcuk.vn/' + path;
 
   try {
-    // Build headers for upstream request — only forward what CUKCUK needs
-    const upstreamHeaders = {
-      'Content-Type': request.headers.get('Content-Type') || 'application/json',
-    };
+    const upstreamHeaders = new Headers();
+    upstreamHeaders.set('Content-Type', request.headers.get('Content-Type') || 'application/json');
 
-    // Forward Authorization header (Bearer token)
     const auth = request.headers.get('Authorization');
-    if (auth) {
-      upstreamHeaders['Authorization'] = auth;
-    }
+    if (auth) upstreamHeaders.set('Authorization', auth);
 
-    // Forward CompanyCode header
     const companyCode = request.headers.get('CompanyCode');
-    if (companyCode) {
-      upstreamHeaders['CompanyCode'] = companyCode;
-    }
+    if (companyCode) upstreamHeaders.set('CompanyCode', companyCode);
 
-    // Read request body for POST/PUT
     let body = null;
-    if (request.method === 'POST' || request.method === 'PUT') {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
       body = await request.text();
     }
 
-    // Make upstream request to CUKCUK API
-    const upstreamResponse = await fetch(targetUrl, {
+    const resp = await fetch(targetUrl, {
       method: request.method,
       headers: upstreamHeaders,
       body: body,
     });
 
-    // Read response
-    const responseBody = await upstreamResponse.text();
+    const respBody = await resp.text();
 
-    // Return with CORS headers
-    return new Response(responseBody, {
-      status: upstreamResponse.status,
+    return new Response(respBody, {
+      status: resp.status,
       headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, CompanyCode',
+        ...CORS_HEADERS,
+        'Content-Type': resp.headers.get('Content-Type') || 'application/json',
       },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ 
-      Success: false, 
-      ErrorMessage: 'Proxy error: ' + error.message 
+    return new Response(JSON.stringify({
+      Success: false,
+      ErrorMessage: 'Proxy error: ' + error.message
     }), {
       status: 502,
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Access-Control-Allow-Origin': '*' 
-      },
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
   }
 }
+
+// Export ALL method handlers explicitly
+export const onRequestGet = handleProxy;
+export const onRequestPost = handleProxy;
+export const onRequestPut = handleProxy;
+export const onRequestDelete = handleProxy;
+export const onRequestOptions = handleProxy;
