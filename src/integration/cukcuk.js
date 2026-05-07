@@ -768,6 +768,7 @@ export async function syncSingleInvoice(refId) {
       employeeName: (existing && existing.employeeName) || (detail.EmployeeName || ''),
       amount: effectiveAmount,
       payments: invoicePayments,
+      confirmed: true,
       syncedAt: new Date().toISOString(),
       pushedToSheets: false  // Mark for re-push
     };
@@ -873,7 +874,25 @@ export async function syncTransactions() {
       }
     }
 
-    // ═══ STEP 3: Smart diff — detect NEW, CHANGED, or MISSING payment invoices ═══
+    // ═══ STEP 2b: Quick skip — if count unchanged AND all TODAY invoices confirmed ═══
+    if (apiTotal > 0 && apiTotal <= syncedCount) {
+      // Count matches — only do a lightweight check for unconfirmed invoices
+      var hasUnconfirmed = false;
+      for (var qi = 0; qi < allApiInvoices.length; qi++) {
+        var qInv = allApiInvoices[qi];
+        var qRefId = String(qInv.RefId || qInv.RefID || ('idx-' + qi));
+        var qExisting = invoiceStore.getInvoice(qRefId);
+        if (!qExisting || !qExisting.confirmed || qExisting.amount !== (qInv.Amount || 0)) {
+          hasUnconfirmed = true; break;
+        }
+      }
+      if (!hasUnconfirmed) {
+        // All invoices confirmed and amounts match — truly nothing to do
+        return { success: true, synced: 0, total: apiTotal, skipped: syncedCount, amount: 0, date: todayStr, smart: true };
+      }
+    }
+
+    // ═══ STEP 3: Smart diff — detect NEW, CHANGED, or UNCONFIRMED invoices ═══
     var toProcess = [];
     var allSyncedRefIds = [];
 
@@ -888,19 +907,16 @@ export async function syncTransactions() {
       var existing = invoiceStore.getInvoice(refId);
       
       if (!existing) {
-        // NEW invoice — need detail
+        // NEW invoice
         toProcess.push({ inv: inv, refId: refId, reason: 'new' });
       } else if (existing.amount !== apiAmount) {
-        // Amount CHANGED (e.g. discount applied, tax recalculated)
+        // Amount CHANGED
         toProcess.push({ inv: inv, refId: refId, reason: 'amount_changed' });
-      } else if (!existing.payments || existing.payments.length === 0) {
-        // Payment data MISSING (synced before payment was made)
-        toProcess.push({ inv: inv, refId: refId, reason: 'no_payment' });
-      } else if (existing.payments.length === 1 && existing.payments[0].method === 'cash' && existing.payments[0].amount === existing.amount) {
-        // Suspicious: single cash payment matching full amount = likely default fallback
-        // Re-check to see if actual payment method is now available
-        toProcess.push({ inv: inv, refId: refId, reason: 'recheck_payment' });
+      } else if (!existing.confirmed) {
+        // Not yet confirmed via detail API — need to verify payment
+        toProcess.push({ inv: inv, refId: refId, reason: 'unconfirmed' });
       }
+      // confirmed invoices with matching amount → skip (already verified)
     }
 
     console.log('[CUKCUK] Scanned ' + allApiInvoices.length + ' invoices, ' + toProcess.length + ' need detail fetch');
@@ -999,6 +1015,7 @@ export async function syncTransactions() {
           refId: refId, refNo: refNo, refDate: refDate, date: todayStr,
           tableName: tableName, employeeName: employeeName,
           amount: effectiveAmount, payments: invoicePayments,
+          confirmed: true, // ★ Detail API verified — won't re-check next cycle
           syncedAt: new Date().toISOString(), pushedToSheets: false
         });
         
