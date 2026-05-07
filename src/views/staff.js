@@ -1,4 +1,4 @@
-/* ── Staff Management View (Feature 6) — Realtime ── */
+/* ── Staff Management View (Feature 6) — Optimistic UI ── */
 import { showToast, showModal, hideModal, showConfirm } from '../utils.js';
 import { getStaffFromCloud, saveStaffToCloud, deleteStaffFromCloud } from '../api.js';
 import { setCachedStaff } from '../store.js';
@@ -6,7 +6,9 @@ import { setCachedStaff } from '../store.js';
 let staffList = [];
 let isStaffAuthed = false;
 let _refreshTimer = null;
+let _isBusy = false; // Prevent double-clicks
 
+// ── RENDER ────────────────────────────────────
 export function render() {
   if (!isStaffAuthed) {
     return `
@@ -48,6 +50,7 @@ export function render() {
   `;
 }
 
+// ── LOAD STAFF FROM CLOUD ─────────────────────
 async function loadStaff(silent) {
   if (!silent) {
     var statusEl = document.getElementById('staffSyncStatus');
@@ -58,7 +61,6 @@ async function loadStaff(silent) {
 
   if (result.success) {
     staffList = result.staff || [];
-    // Always save staff to local cache so shift view can use them immediately
     setCachedStaff(staffList);
     _renderStaffGrid();
 
@@ -75,6 +77,7 @@ async function loadStaff(silent) {
   }
 }
 
+// ── RENDER STAFF GRID ─────────────────────────
 function _renderStaffGrid() {
   const grid = document.getElementById('staffGrid');
   if (!grid) return;
@@ -86,103 +89,326 @@ function _renderStaffGrid() {
       <p>Thêm nhân viên để quản lý ca và phân quyền</p>
     </div>`;
   } else {
-    grid.innerHTML = staffList.map(s => `
-      <div class="staff-card">
-        <div class="staff-avatar" style="background: ${s.role === 'admin' ? 'var(--primary-glow)' : s.role === 'manager' ? 'var(--info-bg)' : 'var(--success-bg)'};">
-          <span class="material-symbols-rounded" style="color: ${s.role === 'admin' ? 'var(--primary)' : s.role === 'manager' ? 'var(--info)' : 'var(--success)'};">${s.role === 'admin' ? 'admin_panel_settings' : s.role === 'manager' ? 'supervisor_account' : 'person'}</span>
+    grid.innerHTML = staffList.map(function(s) {
+      var roleColor = s.role === 'admin' ? 'var(--primary)' : s.role === 'manager' ? 'var(--info)' : 'var(--success)';
+      var roleBg = s.role === 'admin' ? 'var(--primary-glow)' : s.role === 'manager' ? 'var(--info-bg)' : 'var(--success-bg)';
+      var roleIcon = s.role === 'admin' ? 'admin_panel_settings' : s.role === 'manager' ? 'supervisor_account' : 'person';
+      var roleLabel = s.role === 'admin' ? 'Admin' : s.role === 'manager' ? 'Quản lý' : 'Thu ngân';
+      var roleTag = s.role === 'admin' ? 'tag-transfer' : s.role === 'manager' ? 'tag-card' : 'tag-cash';
+
+      return `
+      <div class="staff-card" id="staff-card-${s.id}" style="transition:all .3s ease;">
+        <div class="staff-avatar" style="background:${roleBg};">
+          <span class="material-symbols-rounded" style="color:${roleColor};">${roleIcon}</span>
         </div>
         <div class="staff-info">
           <h4>${s.name}</h4>
-          <span class="tag ${s.role === 'admin' ? 'tag-transfer' : s.role === 'manager' ? 'tag-card' : 'tag-cash'}">${s.role === 'admin' ? 'Admin' : s.role === 'manager' ? 'Quản lý' : 'Thu ngân'}</span>
+          <span class="tag ${roleTag}">${roleLabel}</span>
           <span class="tag ${s.status === 'active' ? 'tag-income' : 'tag-expense'}">${s.status === 'active' ? 'Hoạt động' : 'Khóa'}</span>
         </div>
         <div class="staff-actions">
           <button class="btn-icon" data-edit-staff="${s.id}" title="Sửa"><span class="material-symbols-rounded">edit</span></button>
-          <button class="btn-icon" data-delete-staff="${s.id}" title="Xóa" style="color:var(--danger);"><span class="material-symbols-rounded">delete</span></button>
+          <button class="btn-icon" data-delete-staff="${s.id}" data-staff-name="${s.name}" title="Xóa" style="color:var(--danger);"><span class="material-symbols-rounded">delete</span></button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   _bindStaffEvents();
 }
 
+// ── BIND EVENTS ───────────────────────────────
 function _bindStaffEvents() {
   const grid = document.getElementById('staffGrid');
   if (!grid) return;
 
-  // Bind edit events
-  grid.querySelectorAll('[data-edit-staff]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const staff = staffList.find(s => s.id === btn.dataset.editStaff);
-      if (staff) showStaffModal(staff);
+  // Edit
+  grid.querySelectorAll('[data-edit-staff]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (_isBusy) return;
+      const staff = staffList.find(function(s) { return s.id === btn.dataset.editStaff; });
+      if (staff) _showStaffModal(staff);
     });
   });
 
-  // Bind delete events
-  grid.querySelectorAll('[data-delete-staff]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      var ok = await showConfirm('Xóa nhân viên này?', { title: 'Xóa nhân viên', confirmText: 'Xóa', type: 'danger' });
-      if (!ok) return;
-      const result = await deleteStaffFromCloud(btn.dataset.deleteStaff);
-      showToast(result.message, result.success ? 'success' : 'error');
-      if (result.success) loadStaff(); // Reload also updates cache
+  // Delete — Optimistic UI
+  grid.querySelectorAll('[data-delete-staff]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (_isBusy) return;
+      _handleDeleteStaff(btn.dataset.deleteStaff, btn.dataset.staffName);
     });
   });
 }
 
-function showStaffModal(existing) {
-  if (!existing) existing = null;
+// ── DELETE STAFF — Optimistic ─────────────────
+async function _handleDeleteStaff(staffId, staffName) {
+  var ok = await showConfirm(
+    'Xóa nhân viên "' + (staffName || '') + '" khỏi hệ thống?',
+    { title: 'Xóa nhân viên', confirmText: 'Xóa', type: 'danger' }
+  );
+  if (!ok) return;
+
+  _isBusy = true;
+
+  // ★ OPTIMISTIC: Remove from local list + UI immediately
+  var removedStaff = null;
+  var removedIndex = -1;
+  for (var i = 0; i < staffList.length; i++) {
+    if (staffList[i].id === staffId) {
+      removedStaff = staffList[i];
+      removedIndex = i;
+      break;
+    }
+  }
+
+  // Animate card out
+  var card = document.getElementById('staff-card-' + staffId);
+  if (card) {
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.9)';
+    card.style.maxHeight = card.offsetHeight + 'px';
+    setTimeout(function() {
+      if (card) { card.style.maxHeight = '0'; card.style.padding = '0'; card.style.margin = '0'; card.style.overflow = 'hidden'; }
+    }, 200);
+  }
+
+  // Remove from local array
+  if (removedIndex >= 0) {
+    staffList.splice(removedIndex, 1);
+    setCachedStaff(staffList);
+  }
+
+  // Update status bar count
+  _updateSyncStatus('✅ ' + staffList.length + ' nhân viên — Đang đồng bộ...');
+
+  showToast('✅ Đã xóa ' + (staffName || 'nhân viên'), 'success');
+
+  // ★ SYNC: Push to cloud in background
+  var result = await deleteStaffFromCloud(staffId);
+
+  if (result.success) {
+    _updateSyncStatus('✅ ' + staffList.length + ' nhân viên — Đã đồng bộ Sheets');
+  } else {
+    // ★ ROLLBACK: Cloud failed → restore staff
+    if (removedStaff && removedIndex >= 0) {
+      staffList.splice(removedIndex, 0, removedStaff);
+      setCachedStaff(staffList);
+    }
+    _renderStaffGrid();
+    showToast('❌ Lỗi xóa trên Cloud: ' + (result.message || 'Kiểm tra kết nối'), 'error');
+    _updateSyncStatus('⚠️ Lỗi đồng bộ — Dữ liệu đã khôi phục');
+  }
+
+  _isBusy = false;
+
+  // Re-render after animation completes (clean up DOM)
+  setTimeout(function() { _renderStaffGrid(); }, 400);
+}
+
+// ── ADD/EDIT MODAL ────────────────────────────
+function _showStaffModal(existing) {
+  var isEdit = !!existing;
+  var title = isEdit ? 'Sửa nhân viên' : 'Thêm nhân viên mới';
+  var icon = isEdit ? 'edit' : 'person_add';
+
   showModal(`
     <div class="modal-title">
-      <span class="material-symbols-rounded">person_add</span>
-      ${existing ? 'Sửa nhân viên' : 'Thêm nhân viên mới'}
+      <span class="material-symbols-rounded">${icon}</span>
+      ${title}
     </div>
     <div class="form-group">
-      <label class="form-label">Họ tên</label>
-      <input type="text" id="staffName" class="form-input" value="${existing ? existing.name : ''}" placeholder="Nhập họ tên...">
+      <label class="form-label">Họ tên *</label>
+      <input type="text" id="staffName" class="form-input" value="${isEdit ? existing.name : ''}" placeholder="Nhập họ tên..." autocomplete="off">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Mã PIN (4+ số)</label>
-        <input type="password" id="staffPin" class="form-input" placeholder="••••" maxlength="6" inputmode="numeric">
+        <label class="form-label">Mã PIN (4-6 số) ${isEdit ? '<span class="text-muted" style="font-weight:400;font-size:11px;">— để trống nếu không đổi</span>' : '*'}</label>
+        <input type="password" id="staffPin" class="form-input" placeholder="${isEdit ? '(giữ nguyên)' : '••••'}" maxlength="6" inputmode="numeric" autocomplete="off">
       </div>
       <div class="form-group">
         <label class="form-label">Vai trò</label>
         <select id="staffRole" class="form-input">
-          <option value="cashier" ${existing && existing.role === 'cashier' ? 'selected' : ''}>Thu ngân</option>
-          <option value="manager" ${existing && existing.role === 'manager' ? 'selected' : ''}>Quản lý</option>
-          <option value="admin" ${existing && existing.role === 'admin' ? 'selected' : ''}>Admin</option>
+          <option value="cashier" ${isEdit && existing.role === 'cashier' ? 'selected' : ''}>Thu ngân</option>
+          <option value="manager" ${isEdit && existing.role === 'manager' ? 'selected' : ''}>Quản lý</option>
+          <option value="admin" ${isEdit && existing.role === 'admin' ? 'selected' : ''}>Admin</option>
         </select>
       </div>
     </div>
+    ${isEdit ? `
+    <div class="form-group" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08);margin-top:4px;">
+      <label class="form-label" style="margin-bottom:0;flex:1;">Trạng thái hoạt động</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="staffActive" ${existing.status === 'active' ? 'checked' : ''}>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>` : ''}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
       <button class="btn btn-primary" id="btnSaveStaff">
-        <span class="material-symbols-rounded">save</span> Lưu
+        <span class="material-symbols-rounded">save</span> ${isEdit ? 'Cập nhật' : 'Thêm mới'}
       </button>
     </div>
   `);
 
-  setTimeout(() => {
-    document.getElementById('btnSaveStaff')?.addEventListener('click', async () => {
-      const name = document.getElementById('staffName').value.trim();
-      const pin = document.getElementById('staffPin').value.trim();
-      const role = document.getElementById('staffRole').value;
+  // Focus name input
+  setTimeout(function() {
+    var nameInput = document.getElementById('staffName');
+    if (nameInput) nameInput.focus();
 
-      if (!name) { showToast('Nhập họ tên', 'warning'); return; }
-      if (!pin || pin.length < 4) { showToast('PIN cần ít nhất 4 số', 'warning'); return; }
+    // Save handler
+    var saveBtn = document.getElementById('btnSaveStaff');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function() {
+        _handleSaveStaff(existing);
+      });
+    }
 
-      const result = await saveStaffToCloud({ id: existing ? existing.id : undefined, name: name, pin: pin, role: role, status: 'active' });
-      hideModal();
-      showToast(result.message, result.success ? 'success' : 'error');
-      if (result.success) loadStaff(); // Reload also updates cache + config
+    // Enter key submits
+    var inputs = document.querySelectorAll('#staffName, #staffPin');
+    inputs.forEach(function(input) {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          _handleSaveStaff(existing);
+        }
+      });
     });
-  }, 100);
+  }, 50);
 }
 
+// ── SAVE STAFF — Optimistic ───────────────────
+async function _handleSaveStaff(existing) {
+  if (_isBusy) return;
+
+  var nameInput = document.getElementById('staffName');
+  var pinInput = document.getElementById('staffPin');
+  var roleInput = document.getElementById('staffRole');
+  var activeInput = document.getElementById('staffActive');
+
+  var name = nameInput ? nameInput.value.trim() : '';
+  var pin = pinInput ? pinInput.value.trim() : '';
+  var role = roleInput ? roleInput.value : 'cashier';
+  var status = activeInput ? (activeInput.checked ? 'active' : 'inactive') : 'active';
+  var isEdit = !!existing;
+
+  // ── Validation ──
+  if (!name) { showToast('Vui lòng nhập họ tên', 'warning'); nameInput && nameInput.focus(); return; }
+
+  if (!isEdit) {
+    // New staff: PIN required
+    if (!pin) { showToast('Vui lòng nhập mã PIN', 'warning'); pinInput && pinInput.focus(); return; }
+    if (pin.length < 4) { showToast('PIN cần ít nhất 4 ký tự', 'warning'); pinInput && pinInput.focus(); return; }
+  } else {
+    // Edit: PIN optional (only validate if entered)
+    if (pin && pin.length < 4) { showToast('PIN cần ít nhất 4 ký tự', 'warning'); pinInput && pinInput.focus(); return; }
+  }
+
+  // Check duplicate name
+  var isDuplicate = staffList.some(function(s) {
+    return s.name.toLowerCase() === name.toLowerCase() && (!isEdit || s.id !== existing.id);
+  });
+  if (isDuplicate) { showToast('Tên nhân viên đã tồn tại', 'warning'); nameInput && nameInput.focus(); return; }
+
+  _isBusy = true;
+
+  // Show loading on button
+  var saveBtn = document.getElementById('btnSaveStaff');
+  var saveBtnOriginal = saveBtn ? saveBtn.innerHTML : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="material-symbols-rounded di-spin">sync</span> Đang lưu...';
+  }
+
+  // Build staff data
+  var staffData = {
+    name: name,
+    role: role,
+    status: status
+  };
+  if (isEdit) staffData.id = existing.id;
+  if (pin) staffData.pin = pin;
+
+  // ★ OPTIMISTIC: Update local list immediately
+  if (isEdit) {
+    for (var i = 0; i < staffList.length; i++) {
+      if (staffList[i].id === existing.id) {
+        staffList[i].name = name;
+        staffList[i].role = role;
+        staffList[i].status = status;
+        break;
+      }
+    }
+  } else {
+    // Generate temporary ID for new staff
+    var tempId = 'temp_' + Date.now();
+    staffData.id = tempId;
+    staffList.push({
+      id: tempId,
+      name: name,
+      role: role,
+      status: 'active',
+      pin: pin
+    });
+  }
+
+  setCachedStaff(staffList);
+  hideModal();
+  showToast(isEdit ? '✅ Đã cập nhật ' + name : '✅ Đã thêm ' + name, 'success');
+  _renderStaffGrid();
+  _updateSyncStatus('✅ ' + staffList.length + ' nhân viên — Đang đồng bộ Sheets...');
+
+  // ★ SYNC: Push to cloud
+  var result = await saveStaffToCloud(staffData);
+
+  if (result.success) {
+    // Replace temp ID with real ID from server
+    if (!isEdit && result.id) {
+      for (var j = 0; j < staffList.length; j++) {
+        if (staffList[j].id === tempId) {
+          staffList[j].id = result.id;
+          break;
+        }
+      }
+      setCachedStaff(staffList);
+      _renderStaffGrid(); // Re-render with real IDs
+    }
+    _updateSyncStatus('✅ ' + staffList.length + ' nhân viên — Đã đồng bộ Sheets');
+    showToast('☁️ Đã đồng bộ lên Spreadsheet', 'success');
+  } else {
+    // ★ ROLLBACK on failure
+    if (isEdit) {
+      // Restore original values
+      for (var k = 0; k < staffList.length; k++) {
+        if (staffList[k].id === existing.id) {
+          staffList[k].name = existing.name;
+          staffList[k].role = existing.role;
+          staffList[k].status = existing.status;
+          break;
+        }
+      }
+    } else {
+      // Remove the optimistically-added item
+      staffList = staffList.filter(function(s) { return s.id !== tempId; });
+    }
+    setCachedStaff(staffList);
+    _renderStaffGrid();
+    showToast('❌ Lỗi đồng bộ: ' + (result.message || 'Kiểm tra kết nối'), 'error');
+    _updateSyncStatus('⚠️ Lỗi đồng bộ Cloud — Thử lại sau');
+  }
+
+  _isBusy = false;
+}
+
+// ── HELPERS ───────────────────────────────────
+function _updateSyncStatus(text) {
+  var el = document.getElementById('staffSyncStatus');
+  if (el) el.textContent = text;
+  var timeEl = document.getElementById('staffSyncTime');
+  if (timeEl) timeEl.textContent = new Date().toLocaleTimeString('vi-VN');
+}
+
+// ── INIT ──────────────────────────────────────
 export function init() {
-  // Clear any previous refresh timer
   if (_refreshTimer) {
     clearInterval(_refreshTimer);
     _refreshTimer = null;
@@ -191,11 +417,11 @@ export function init() {
   if (!isStaffAuthed) {
     const input = document.getElementById('adminPassInput');
     const btn = document.getElementById('btnAdminAuth');
-    
-    const tryAuth = () => {
+
+    const tryAuth = function() {
       if (input.value === '712121') {
         isStaffAuthed = true;
-        window.refreshView?.();
+        window.refreshView && window.refreshView();
       } else {
         showToast('Mật khẩu không chính xác!', 'error');
         input.value = '';
@@ -203,29 +429,34 @@ export function init() {
       }
     };
 
-    btn?.addEventListener('click', tryAuth);
-    input?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') tryAuth();
-    });
-    input?.focus();
+    if (btn) btn.addEventListener('click', tryAuth);
+    if (input) {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') tryAuth();
+      });
+      input.focus();
+    }
     return;
   }
 
   // Initial load
   loadStaff();
 
-  // Realtime auto-refresh every 10 seconds
+  // Realtime auto-refresh every 10 seconds (silent)
   _refreshTimer = setInterval(function() {
-    loadStaff(true); // silent refresh
+    if (!_isBusy) loadStaff(true);
   }, 10000);
 
-  // Manual refresh button
-  document.getElementById('btnRefreshStaff')?.addEventListener('click', () => {
+  // Manual refresh
+  document.getElementById('btnRefreshStaff')?.addEventListener('click', function() {
     showToast('🔄 Đang tải lại...', 'info');
     loadStaff();
   });
 
-  document.getElementById('btnAddStaff')?.addEventListener('click', () => showStaffModal());
+  // Add staff
+  document.getElementById('btnAddStaff')?.addEventListener('click', function() {
+    _showStaffModal(null);
+  });
 }
 
 export function destroy() {
