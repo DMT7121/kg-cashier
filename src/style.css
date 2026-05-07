@@ -1137,16 +1137,22 @@ tr:hover td { background: rgba(255,255,255,.02); }
 }
 
 /* ── Print Styles ──────────────────────────── */
+@page { size: A4 landscape; margin: 10mm; }
+
 @media print {
-  body { background: #fff !important; }
+  body { background: #fff !important; color: #000 !important; }
   .sidebar, .topbar, .section-header, .no-print,
   .rpt-tabs, #rptDatePicker, .btn, .btn-group,
   button, input, select { display: none !important; }
   .main-content { margin: 0 !important; padding: 0 !important; }
-  .a4-sheet { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+  .view-container { padding: 0 !important; }
+  .a4-sheet { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; }
+  .a4-inner { padding: 0 !important; }
   .a4-two-col { grid-template-columns: 1.4fr 1fr !important; }
   .a4-signatures { grid-template-columns: 1fr 1fr 1fr !important; }
+  .stats-grid { grid-template-columns: repeat(4, 1fr) !important; }
   .stats-grid, .card { break-inside: avoid; }
+  .rpt-handover-section { border-top: none !important; margin-top: 0 !important; padding-top: 0 !important; }
 }
 
 /* .printing-a4: ONLY print the A4 handover sheet */
