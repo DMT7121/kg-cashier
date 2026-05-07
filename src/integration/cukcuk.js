@@ -758,9 +758,12 @@ export async function syncSingleInvoice(refId) {
         else if (mapped.method === 'card') invCard += pmtAmount;
         else if (mapped.method === 'transfer') invTransfer += pmtAmount;
       }
-    } else {
-      invCash = detailAmount;
-      invoicePayments.push({ method: 'cash', amount: detailAmount, label: 'Tiền mặt' });
+    }
+
+    // No payment = chưa thanh toán / chưa đóng bàn
+    if (invoicePayments.length === 0) {
+      showToast('⏳ Hóa đơn chưa được thanh toán trên CUKCUK', 'warning');
+      return { success: false, message: 'Chưa thanh toán' };
     }
 
     var effectiveAmount = (invCash + invCard + invTransfer) || detailAmount;
@@ -975,10 +978,12 @@ export async function syncTransactions() {
             else if (mapped.method === 'card') invCard += pmtAmount;
             else if (mapped.method === 'transfer') invTransfer += pmtAmount;
           }
-        } else {
-          // No payment detail — use tax-inclusive amount, default to cash
-          invCash = detailAmount;
-          invoicePayments.push({ method: 'cash', amount: detailAmount, label: 'Tiền mặt' });
+        }
+
+        // ★ No payment data = bill chưa thanh toán (chưa đóng bàn) → SKIP
+        if (invoicePayments.length === 0) {
+          console.log('[CUKCUK] Skip unpaid bill:', refId, refNo, '(' + detailAmount.toLocaleString() + 'đ)');
+          continue;
         }
 
         // ★ effectiveAmount = sum of payments (tax-inclusive)
