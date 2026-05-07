@@ -270,10 +270,11 @@ function _isInBounds(inv, bounds) {
   return false;
 }
 
-/** Lọc hóa đơn theo kỳ — chính xác theo timestamp */
+/** Lọc hóa đơn theo kỳ — chính xác theo timestamp, loại trừ bill chưa thanh toán */
 export function getInvoicesForPeriod(period, refDate) {
   var bounds = getPeriodBounds(period, refDate);
   return getAllInvoices().filter(function(inv) {
+    if (inv.unpaid) return false; // ★ Loại bill chưa thanh toán
     return _isInBounds(inv, bounds);
   });
 }
@@ -385,10 +386,10 @@ export function getTodayRevenue() {
   return result;
 }
 
-/** Get invoices for a specific date (YYYY-MM-DD) — utility */
+/** Get invoices for a specific date (YYYY-MM-DD) — utility, excludes unpaid */
 export function getInvoicesByDate(dateStr) {
   return getAllInvoices().filter(function(inv) {
-    return inv.date === dateStr;
+    return inv.date === dateStr && !inv.unpaid;
   });
 }
 

@@ -779,6 +779,7 @@ export async function syncSingleInvoice(refId) {
       employeeName: (existing && existing.employeeName) || (detail.EmployeeName || ''),
       amount: effectiveAmount,
       payments: invoicePayments,
+      unpaid: false,
       confirmed: true,
       syncedAt: new Date().toISOString(),
       pushedToSheets: false  // Mark for re-push
@@ -980,9 +981,17 @@ export async function syncTransactions() {
           }
         }
 
-        // ★ No payment data = bill chưa thanh toán (chưa đóng bàn) → SKIP
+        // ★ No payment data = bill chưa thanh toán (chưa đóng bàn)
         if (invoicePayments.length === 0) {
-          console.log('[CUKCUK] Skip unpaid bill:', refId, refNo, '(' + detailAmount.toLocaleString() + 'đ)');
+          console.log('[CUKCUK] Unpaid bill:', refId, refNo, '(' + detailAmount.toLocaleString() + 'đ)');
+          // Save as unpaid — won't re-fetch, won't count as revenue
+          invoiceRecords.push({
+            refId: refId, refNo: refNo, refDate: refDate, date: todayStr,
+            tableName: tableName, employeeName: employeeName,
+            amount: detailAmount, payments: [],
+            unpaid: true, confirmed: true,
+            syncedAt: new Date().toISOString(), pushedToSheets: false
+          });
           continue;
         }
 
@@ -994,7 +1003,7 @@ export async function syncTransactions() {
           refId: refId, refNo: refNo, refDate: refDate, date: todayStr,
           tableName: tableName, employeeName: employeeName,
           amount: effectiveAmount, payments: invoicePayments,
-          confirmed: true, // ★ Detail API verified — won't re-check next cycle
+          unpaid: false, confirmed: true,
           syncedAt: new Date().toISOString(), pushedToSheets: false
         });
         
