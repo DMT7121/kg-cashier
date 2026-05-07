@@ -1136,10 +1136,24 @@ tr:hover td { background: rgba(255,255,255,.02); }
   .a4-notes { background: #fafafa !important; border-color: #ddd !important; color: #333 !important; }
 }
 
+/* ── Print Styles ──────────────────────────── */
+@media print {
+  body { background: #fff !important; }
+  .sidebar, .topbar, .section-header, .no-print,
+  .rpt-tabs, #rptDatePicker, .btn, .btn-group,
+  button, input, select { display: none !important; }
+  .main-content { margin: 0 !important; padding: 0 !important; }
+  .a4-sheet { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+  .stats-grid, .card { break-inside: avoid; }
+}
+
 /* Also apply when body has .printing-a4 class */
 body.printing-a4 .sidebar,
 body.printing-a4 .topbar,
 body.printing-a4 .no-print,
+body.printing-a4 .rpt-tabs,
+body.printing-a4 #rptDatePicker,
+body.printing-a4 .btn-group,
 body.printing-a4 .section-header { display: none !important; }
 
 /* ── Analytics Chart Bars ─────────────────── */
