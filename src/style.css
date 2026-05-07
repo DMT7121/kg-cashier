@@ -1464,6 +1464,8 @@ body.printing-a4 .view-container { padding: 0 !important; }
 }
 .di-spin { animation: di-spin 1s linear infinite; }
 
+.btn-sync-inv:hover { color: var(--primary) !important; background: var(--bg-secondary) !important; }
+
 .di-stats-row {
   display: flex;
   gap: 8px;

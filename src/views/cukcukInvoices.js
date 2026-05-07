@@ -231,6 +231,7 @@ function _renderInvoiceTable(invoices) {
       <th class="text-right">💳 Thẻ</th>
       <th class="text-right">🏦 CK</th>
       <th class="text-right">Tổng</th>
+      <th style="width:40px;"></th>
     </tr></thead>
     <tbody>
       ${sorted.map(function(inv) {
@@ -251,6 +252,9 @@ function _renderInvoiceTable(invoices) {
           timeStr = d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         } catch(e) { timeStr = inv.date || ''; }
 
+        // Detect suspicious default-cash (likely unpaid/undetected)
+        var isSuspect = payments.length === 1 && payments[0].method === 'cash' && payments[0].amount === (inv.amount || 0);
+
         return '<tr>' +
           '<td style="font-weight:600;font-size:12px;">' + (inv.refNo || '—') + '</td>' +
           '<td>' + (inv.tableName || '—') + '</td>' +
@@ -260,6 +264,7 @@ function _renderInvoiceTable(invoices) {
           '<td class="text-right" style="color:var(--info);font-size:12px;">' + (card > 0 ? formatCurrency(card) : '') + '</td>' +
           '<td class="text-right" style="color:var(--primary);font-size:12px;">' + (transfer > 0 ? formatCurrency(transfer) : '') + '</td>' +
           '<td class="text-right amount-in">' + formatCurrency(rowTotal) + '</td>' +
+          '<td class="text-center"><button class="btn-sync-inv" data-refid="' + inv.refId + '" title="Cập nhật hóa đơn này" style="background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;color:' + (isSuspect ? 'var(--warning)' : 'var(--text-secondary)') + ';transition:color .2s;"><span class="material-symbols-rounded" style="font-size:18px;">sync</span></button></td>' +
         '</tr>';
       }).join('')}
     </tbody>
@@ -293,6 +298,33 @@ export function init() {
   document.getElementById('invoiceSearch')?.addEventListener('input', function(e) {
     var q = e.target.value.toLowerCase();
     _filterInvoices(q);
+  });
+
+  // Per-invoice sync — event delegation on table wrapper
+  var tableWrap = document.getElementById('invoiceTableWrap');
+  if (tableWrap) tableWrap.addEventListener('click', async function(e) {
+    var btn = e.target.closest('.btn-sync-inv');
+    if (!btn) return;
+    var refId = btn.dataset.refid;
+    if (!refId) return;
+
+    // Visual feedback
+    var icon = btn.querySelector('.material-symbols-rounded');
+    if (icon) icon.classList.add('di-spin');
+    btn.disabled = true;
+
+    try {
+      var cukcuk = await import('../integration/cukcuk.js');
+      var result = await cukcuk.syncSingleInvoice(refId);
+      if (result && result.success) {
+        _refreshData();
+      }
+    } catch(err) {
+      showToast('❌ ' + err.message, 'error');
+    }
+
+    btn.disabled = false;
+    if (icon) icon.classList.remove('di-spin');
   });
 
   // Sync button

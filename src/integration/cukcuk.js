@@ -1,5 +1,5 @@
 import { getCurrentShift, getSettings, getState, getShiftHistory, getShiftSummary } from '../store.js';
-import { showToast } from '../utils.js';
+import { showToast, formatCurrency } from '../utils.js';
 import { syncCukcukRevenueToCloud } from '../api.js';
 import * as invoiceStore from './invoiceStore.js';
 
@@ -714,6 +714,77 @@ export async function resyncAllTransactions() {
   
   // Now sync fresh
   return await syncTransactions();
+}
+
+// ── Sync a single invoice by RefId ──
+export async function syncSingleInvoice(refId) {
+  try {
+    var cached = _getCachedToken();
+    if (!cached) {
+      var loginResult = await loginAndGetToken();
+      if (!loginResult.success) {
+        showToast('❌ ' + loginResult.message, 'error');
+        return { success: false, message: loginResult.message };
+      }
+    }
+
+    var detail = await _fetchInvoiceDetail(refId);
+    if (!detail) {
+      showToast('⚠️ Không lấy được chi tiết hóa đơn', 'warning');
+      return { success: false, message: 'Detail not found' };
+    }
+
+    var payments = detail.SAInvoicePayments || [];
+    var detailAmount = detail.Amount || 0;
+    var invoicePayments = [];
+    var invCash = 0, invCard = 0, invTransfer = 0;
+
+    if (payments.length > 0) {
+      for (var p = 0; p < payments.length; p++) {
+        var pmt = payments[p];
+        var pmtAmount = pmt.Amount || 0;
+        if (pmtAmount <= 0) continue;
+        var mapped = _mapPayment(pmt);
+        invoicePayments.push({ method: mapped.method, amount: pmtAmount, label: mapped.label });
+        if (mapped.method === 'cash') invCash += pmtAmount;
+        else if (mapped.method === 'card') invCard += pmtAmount;
+        else if (mapped.method === 'transfer') invTransfer += pmtAmount;
+      }
+    } else {
+      invCash = detailAmount;
+      invoicePayments.push({ method: 'cash', amount: detailAmount, label: 'Tiền mặt' });
+    }
+
+    var effectiveAmount = (invCash + invCard + invTransfer) || detailAmount;
+
+    // Get existing record to preserve metadata
+    var existing = invoiceStore.getInvoice(refId);
+    var record = {
+      refId: refId,
+      refNo: (existing && existing.refNo) || (detail.RefNo || ''),
+      refDate: (existing && existing.refDate) || (detail.RefDate || ''),
+      date: (existing && existing.date) || _getWorkingDayStr(),
+      tableName: (existing && existing.tableName) || (detail.TableName || ''),
+      employeeName: (existing && existing.employeeName) || (detail.EmployeeName || ''),
+      amount: effectiveAmount,
+      payments: invoicePayments,
+      syncedAt: new Date().toISOString(),
+      pushedToSheets: false  // Mark for re-push
+    };
+
+    invoiceStore.upsertInvoice(record);
+
+    var changed = !existing || existing.amount !== effectiveAmount;
+    var paymentLabel = invoicePayments.map(function(pp) { return pp.label; }).join(', ');
+    showToast('✅ ' + (record.refNo || refId) + ': ' + formatCurrency(effectiveAmount) + ' (' + paymentLabel + ')', 'success');
+    console.log('[CUKCUK] Single sync ' + refId + ': ' + effectiveAmount + ' → ' + paymentLabel + (changed ? ' (UPDATED)' : ' (no change)'));
+
+    return { success: true, changed: changed, amount: effectiveAmount, payments: invoicePayments };
+  } catch(e) {
+    console.error('[CUKCUK] Single sync error:', e);
+    showToast('❌ Lỗi: ' + e.message, 'error');
+    return { success: false, message: e.message };
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
