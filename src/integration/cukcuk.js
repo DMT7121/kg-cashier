@@ -18,10 +18,11 @@ import * as invoiceStore from './invoiceStore.js';
  */
 
 // ── API Base URL ──
-// Uses /cukcuk-api proxy path:
-// - Dev (localhost): Vite proxy → graphapi.cukcuk.vn
-// - Production (Cloudflare Pages): Pages Function → graphapi.cukcuk.vn
-var CUKCUK_API_BASE = '/cukcuk-api';
+// - Dev (localhost): Vite proxy → /cukcuk-api → graphapi.cukcuk.vn
+// - Production: Cloudflare Worker proxy → graphapi.cukcuk.vn
+var CUKCUK_API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? '/cukcuk-api'
+  : 'https://cukcuk-proxy.dmt-kgwork.workers.dev';
 
 // ── Token Cache ──
 var _cachedToken = null;
