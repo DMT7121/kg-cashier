@@ -117,36 +117,37 @@ function _renderDatePicker() {
 }
 
 function _bindDatePickerEvents() {
-  var el;
-  // Day
-  el = document.getElementById('rptDateInput');
-  if (el) el.addEventListener('change', function() { _refDate = new Date(el.value + 'T12:00:00'); _renderTabContent(); });
-  el = document.getElementById('rptToday');
-  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+  // Day — use getElementById inside closures to avoid shared variable bug
+  var dayInput = document.getElementById('rptDateInput');
+  if (dayInput) dayInput.addEventListener('change', function() {
+    _refDate = new Date(dayInput.value + 'T12:00:00'); _renderTabContent();
+  });
+  var todayBtn = document.getElementById('rptToday');
+  if (todayBtn) todayBtn.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
   // Week
-  el = document.getElementById('rptWeekInput');
-  if (el) el.addEventListener('change', function() {
-    var parts = el.value.split('-W');
+  var weekInput = document.getElementById('rptWeekInput');
+  if (weekInput) weekInput.addEventListener('change', function() {
+    var parts = weekInput.value.split('-W');
     if (parts.length === 2) { _refDate = _weekToDate(parseInt(parts[0]), parseInt(parts[1])); _renderTabContent(); }
   });
-  el = document.getElementById('rptPrevWeek');
-  if (el) el.addEventListener('click', function() { _shiftWeek(-1); });
-  el = document.getElementById('rptNextWeek');
-  if (el) el.addEventListener('click', function() { _shiftWeek(1); });
-  el = document.getElementById('rptThisWeek');
-  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+  var prevWeek = document.getElementById('rptPrevWeek');
+  if (prevWeek) prevWeek.addEventListener('click', function() { _shiftWeek(-1); });
+  var nextWeek = document.getElementById('rptNextWeek');
+  if (nextWeek) nextWeek.addEventListener('click', function() { _shiftWeek(1); });
+  var thisWeek = document.getElementById('rptThisWeek');
+  if (thisWeek) thisWeek.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
   // Month
-  el = document.getElementById('rptMonthInput');
-  if (el) el.addEventListener('change', function() { _refDate = new Date(el.value + '-15T12:00:00'); _renderTabContent(); });
-  el = document.getElementById('rptThisMonth');
-  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+  var monthInput = document.getElementById('rptMonthInput');
+  if (monthInput) monthInput.addEventListener('change', function() { _refDate = new Date(monthInput.value + '-15T12:00:00'); _renderTabContent(); });
+  var thisMonth = document.getElementById('rptThisMonth');
+  if (thisMonth) thisMonth.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
   // Quarter
-  el = document.getElementById('rptQuarterInput');
-  var yearEl = document.getElementById('rptQuarterYear');
-  if (el) el.addEventListener('change', function() { _applyQuarter(); });
-  if (yearEl) yearEl.addEventListener('change', function() { _applyQuarter(); });
-  el = document.getElementById('rptThisQuarter');
-  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+  var qInput = document.getElementById('rptQuarterInput');
+  var qYear = document.getElementById('rptQuarterYear');
+  if (qInput) qInput.addEventListener('change', function() { _applyQuarter(); });
+  if (qYear) qYear.addEventListener('change', function() { _applyQuarter(); });
+  var thisQ = document.getElementById('rptThisQuarter');
+  if (thisQ) thisQ.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
 }
 
 function _applyQuarter() {

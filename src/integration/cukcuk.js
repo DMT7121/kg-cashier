@@ -955,6 +955,7 @@ export async function syncTransactions() {
         if (res && res.success) {
           console.log('[CUKCUK→Sheets] ✅ ' + res.message);
           invoiceStore.markPushedToSheets(pushedRefIds);
+          showToast('☁️ Đã đẩy ' + sheetData.length + ' hóa đơn lên Sheets', 'success');
         } else {
           console.warn('[CUKCUK→Sheets] ⚠️ ' + (res && res.message || 'Failed'));
         }
@@ -962,6 +963,35 @@ export async function syncTransactions() {
         console.warn('[CUKCUK→Sheets] Error:', err.message);
       });
     }
+
+    // 8b. Retry any previously unpushed invoices (fire-and-forget)
+    try {
+      var unpushed = invoiceStore.getUnpushedInvoices();
+      // Exclude invoices we just pushed above
+      var alreadyPushing = {};
+      for (var ui = 0; ui < sheetData.length; ui++) alreadyPushing[sheetData[ui].refId] = true;
+      var retryList = unpushed.filter(function(inv) { return !alreadyPushing[inv.refId]; });
+
+      if (retryList.length > 0) {
+        console.log('[CUKCUK] Retrying ' + retryList.length + ' previously unpushed invoices...');
+        var retryData = retryList.map(function(inv) {
+          var cash = 0, card = 0, transfer = 0;
+          (inv.payments || []).forEach(function(p) {
+            if (p.method === 'cash') cash += p.amount || 0;
+            else if (p.method === 'card') card += p.amount || 0;
+            else if (p.method === 'transfer') transfer += p.amount || 0;
+          });
+          return { refId: inv.refId, refNo: inv.refNo || '', refDate: inv.refDate || '', tableName: inv.tableName || '', employeeName: inv.employeeName || '', amount: inv.amount || 0, cashAmount: cash, cardAmount: card, transferAmount: transfer };
+        });
+        var retryRefIds = retryData.map(function(d) { return d.refId; });
+        syncCukcukRevenueToCloud(retryData, shift.id).then(function(res) {
+          if (res && res.success) {
+            invoiceStore.markPushedToSheets(retryRefIds);
+            console.log('[CUKCUK→Sheets] ✅ Retry OK: ' + retryRefIds.length + ' invoices');
+          }
+        }).catch(function() {});
+      }
+    } catch(retryErr) { /* ignore retry failures */ }
 
     // 9. Report results
     var statsMsg = '';
