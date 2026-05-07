@@ -776,26 +776,9 @@ export async function syncTransactions() {
     
     var apiTotal = data.Total || firstPageInvoices.length;
 
-    // ═══ STEP 2: Quick check — if API total == synced count → nothing new ═══
-    if (apiTotal > 0 && apiTotal <= syncedCount) {
-      console.log('[CUKCUK] ✓ No new invoices. API total:', apiTotal, ', synced:', syncedCount);
-      // Silent — no toast for background sync when nothing changed
-      _recalcDailyRevenue(todayStr, shift);
-      return { success: true, synced: 0, total: apiTotal, skipped: syncedCount, amount: 0, date: todayStr, smart: true };
-    }
+    // ═══ STEP 2: Collect ALL invoices from all pages ═══
+    var allApiInvoices = firstPageInvoices.slice();
 
-    // ═══ STEP 3: Filter page 1 for new invoices only ═══
-    var newInvoices = [];
-    
-    for (var i = 0; i < firstPageInvoices.length; i++) {
-      var inv = firstPageInvoices[i];
-      var refId = String(inv.RefId || inv.RefID || ('idx-' + i));
-      if (!syncedRefs[refId]) {
-        newInvoices.push(inv);
-      }
-    }
-
-    // ═══ STEP 4: If page 1 had 100 items and we need more, fetch remaining pages ═══
     if (firstPageInvoices.length >= 100 && apiTotal > firstPageInvoices.length) {
       var page = 2;
       var maxPages = 20;
@@ -810,55 +793,65 @@ export async function syncTransactions() {
           else if (pageData.Data.Items) pageInvoices = pageData.Data.Items;
         }
         
-        // Only add invoices NOT in our synced index
         for (var pi = 0; pi < pageInvoices.length; pi++) {
-          var pInv = pageInvoices[pi];
-          var pRefId = String(pInv.RefId || pInv.RefID || ('p' + page + '-' + pi));
-          if (!syncedRefs[pRefId]) {
-            newInvoices.push(pInv);
-          }
+          allApiInvoices.push(pageInvoices[pi]);
         }
         
-        console.log('[CUKCUK] Page ' + page + ': ' + pageInvoices.length + ' total, ' + newInvoices.length + ' new');
         if (pageInvoices.length < 100) break;
         page++;
       }
     }
 
-    console.log('[CUKCUK] Smart filter: ' + newInvoices.length + ' new out of ' + apiTotal + ' total (skipped ' + syncedCount + ')');
+    // ═══ STEP 3: Smart diff — detect NEW, CHANGED, or MISSING payment invoices ═══
+    var toProcess = [];
+    var allSyncedRefIds = [];
 
-    // ═══ STEP 5: Nothing new after filtering ═══
-    if (newInvoices.length === 0) {
-      // No new data — daily cache is already up to date, skip
-      _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
-      return { success: true, synced: 0, total: apiTotal, skipped: syncedCount, amount: 0, date: todayStr, smart: true };
+    for (var k = 0; k < allApiInvoices.length; k++) {
+      var inv = allApiInvoices[k];
+      var refId = String(inv.RefId || inv.RefID || ('idx-' + k));
+      var apiAmount = inv.Amount || 0;
+      
+      allSyncedRefIds.push(refId);
+      if (apiAmount <= 0) continue;
+
+      var existing = invoiceStore.getInvoice(refId);
+      
+      if (!existing) {
+        // NEW invoice — need detail
+        toProcess.push({ inv: inv, refId: refId, reason: 'new' });
+      } else if (existing.amount !== apiAmount) {
+        // Amount CHANGED (e.g. discount applied, tax recalculated)
+        toProcess.push({ inv: inv, refId: refId, reason: 'amount_changed' });
+      } else if (!existing.payments || existing.payments.length === 0) {
+        // Payment data MISSING (synced before payment was made)
+        toProcess.push({ inv: inv, refId: refId, reason: 'no_payment' });
+      } else if (existing.payments.length === 1 && existing.payments[0].method === 'cash' && existing.payments[0].amount === existing.amount) {
+        // Suspicious: single cash payment matching full amount = likely default fallback
+        // Re-check to see if actual payment method is now available
+        toProcess.push({ inv: inv, refId: refId, reason: 'recheck_payment' });
+      }
     }
 
-    // ═══ STEP 6: Process ONLY new invoices → save to Invoice Store ═══
-    // ★ PARALLEL BATCH PROCESSING — fetch 5 detail requests at once
-    showToast('📥 ' + newInvoices.length + ' hóa đơn mới từ CUKCUK...', 'info');
+    console.log('[CUKCUK] Scanned ' + allApiInvoices.length + ' invoices, ' + toProcess.length + ' need detail fetch');
+
+    // ═══ STEP 4: Nothing to update ═══
+    if (toProcess.length === 0) {
+      _addSyncedRefIdsBulk(todayStr, allSyncedRefIds);
+      _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
+      return { success: true, synced: 0, total: apiTotal, skipped: allApiInvoices.length, amount: 0, date: todayStr, smart: true };
+    }
+
+    // ═══ STEP 5: Fetch details for invoices that need update ═══
+    if (toProcess.length > 3) {
+      showToast('📥 ' + toProcess.length + ' hóa đơn cần cập nhật từ CUKCUK...', 'info');
+    }
     
     var count = 0;
     var totalAmount = 0;
     var paymentStats = { cash: 0, card: 0, transfer: 0 };
     var sheetData = [];
-    var invoiceRecords = [];  // Collect for bulk upsert
-    var allSyncedRefIds = []; // Collect for bulk write
-    var BATCH_SIZE = 5;       // Parallel concurrency limit
-
-    // Pre-filter: skip zero-amount invoices, allow updates for existing ones
-    var toProcess = [];
-    for (var k = 0; k < newInvoices.length; k++) {
-      var inv = newInvoices[k];
-      var refId = String(inv.RefId || inv.RefID || ('idx-' + k));
-      var amount = inv.Amount || 0;
-      
-      allSyncedRefIds.push(refId); // Always mark as seen
-      
-      if (amount <= 0) continue;
-      
-      toProcess.push({ inv: inv, refId: refId });
-    }
+    var invoiceRecords = [];
+    var BATCH_SIZE = 5;
 
     console.log('[CUKCUK] Processing ' + toProcess.length + ' invoices in parallel batches of ' + BATCH_SIZE);
 
@@ -915,11 +908,20 @@ export async function syncTransactions() {
         // ★ effectiveAmount = sum of payments (tax-inclusive)
         var effectiveAmount = (invCash + invCard + invTransfer) || detailAmount;
         
-        // ★ Check if existing record needs update (payment/amount changed)
+        // ★ Compare with existing — skip if amount AND payment breakdown are identical
         var existingInv = invoiceStore.getInvoice(refId);
-        if (existingInv && existingInv.amount === effectiveAmount) {
-          // No change — skip
-          continue;
+        if (existingInv) {
+          var sameAmount = existingInv.amount === effectiveAmount;
+          var samePayments = existingInv.payments && existingInv.payments.length === invoicePayments.length;
+          if (samePayments) {
+            for (var cp = 0; cp < invoicePayments.length; cp++) {
+              if (!existingInv.payments[cp] || existingInv.payments[cp].method !== invoicePayments[cp].method || existingInv.payments[cp].amount !== invoicePayments[cp].amount) {
+                samePayments = false; break;
+              }
+            }
+          }
+          if (sameAmount && samePayments) continue; // Truly no change
+          console.log('[CUKCUK] Updating invoice ' + refId + ' (' + r.item.reason + '): ' + (sameAmount ? 'payment changed' : 'amount ' + existingInv.amount + ' → ' + effectiveAmount));
         }
         
         invoiceRecords.push({
