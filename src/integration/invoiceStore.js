@@ -164,8 +164,8 @@ function _workingDayDate(dt) {
  * 
  * @returns {{ start: Date, end: Date, label: string }}
  */
-export function getPeriodBounds(period) {
-  var now = new Date();
+export function getPeriodBounds(period, refDate) {
+  var now = refDate ? new Date(refDate) : new Date();
   var start, end, label;
 
   // Xác định ngày làm việc hiện tại
@@ -259,8 +259,8 @@ function _isInBounds(inv, bounds) {
 }
 
 /** Lọc hóa đơn theo kỳ — chính xác theo timestamp */
-export function getInvoicesForPeriod(period) {
-  var bounds = getPeriodBounds(period);
+export function getInvoicesForPeriod(period, refDate) {
+  var bounds = getPeriodBounds(period, refDate);
   return getAllInvoices().filter(function(inv) {
     return _isInBounds(inv, bounds);
   });
@@ -269,9 +269,9 @@ export function getInvoicesForPeriod(period) {
 // ── Revenue Summaries ──
 
 /** Tổng hợp doanh thu theo kỳ */
-export function getRevenueSummary(period) {
-  var invoices = getInvoicesForPeriod(period);
-  var bounds = getPeriodBounds(period);
+export function getRevenueSummary(period, refDate) {
+  var invoices = getInvoicesForPeriod(period, refDate);
+  var bounds = getPeriodBounds(period, refDate);
   var result = {
     period: period,
     periodLabel: bounds.label,
@@ -317,8 +317,8 @@ export function getRevenueSummary(period) {
 }
 
 /** Phân tích doanh thu theo ngày làm việc, sắp xếp giảm dần */
-export function getDailyBreakdown(period) {
-  var invoices = getInvoicesForPeriod(period);
+export function getDailyBreakdown(period, refDate) {
+  var invoices = getInvoicesForPeriod(period, refDate);
   var days = {};
 
   for (var i = 0; i < invoices.length; i++) {

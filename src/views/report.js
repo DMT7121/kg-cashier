@@ -5,6 +5,7 @@ import { getCurrentShift, getSettings, getShiftHistory, getShiftSummary } from '
 import { formatCurrency, formatDate, formatTime, denominations, showToast } from '../utils.js';
 
 var _activeTab = 'day'; // day | week | month | quarter
+var _refDate = null;    // null = today/now, or Date object for custom period
 
 // ── RENDER ──
 export function render() {
@@ -40,6 +41,9 @@ export function render() {
       </button>
     </div>
 
+    <!-- DATE PICKER -->
+    <div id="rptDatePicker" style="margin-bottom:16px;"></div>
+
     <!-- TAB CONTENT -->
     <div id="rptContent">
       <div class="skeleton skeleton-card" style="min-height:200px;margin:16px 0;"></div>
@@ -52,8 +56,10 @@ export function init() {
   document.querySelectorAll('[data-rpt-tab]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       _activeTab = btn.dataset.rptTab;
+      _refDate = null; // Reset to current period on tab switch
       document.querySelectorAll('.rpt-tab').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
+      _renderDatePicker();
       _renderTabContent();
     });
   });
@@ -62,7 +68,112 @@ export function init() {
   document.getElementById('btnSyncSheets')?.addEventListener('click', _handleSyncSheets);
 
   // Initial render
+  _renderDatePicker();
   _renderTabContent();
+}
+
+// ── Date Picker per tab ──
+function _renderDatePicker() {
+  var container = document.getElementById('rptDatePicker');
+  if (!container) return;
+
+  var today = new Date();
+  var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  var refStr = _refDate ? _refDate.getFullYear() + '-' + String(_refDate.getMonth()+1).padStart(2,'0') + '-' + String(_refDate.getDate()).padStart(2,'0') : todayStr;
+
+  var html = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">';
+
+  if (_activeTab === 'day') {
+    html += '<span class="material-symbols-rounded" style="font-size:18px;color:var(--primary);">calendar_today</span>';
+    html += '<input type="date" id="rptDateInput" class="form-input" style="width:auto;padding:6px 12px;font-size:13px;" value="' + refStr + '">';
+    html += '<button class="btn btn-outline btn-sm" id="rptToday">Hôm nay</button>';
+  } else if (_activeTab === 'week') {
+    html += '<span class="material-symbols-rounded" style="font-size:18px;color:var(--primary);">date_range</span>';
+    html += '<input type="week" id="rptWeekInput" class="form-input" style="width:auto;padding:6px 12px;font-size:13px;">';
+    html += '<button class="btn btn-outline btn-sm" id="rptPrevWeek" title="Tuần trước"><span class="material-symbols-rounded" style="font-size:16px;">chevron_left</span></button>';
+    html += '<button class="btn btn-outline btn-sm" id="rptNextWeek" title="Tuần sau"><span class="material-symbols-rounded" style="font-size:16px;">chevron_right</span></button>';
+    html += '<button class="btn btn-outline btn-sm" id="rptThisWeek">Tuần này</button>';
+  } else if (_activeTab === 'month') {
+    html += '<span class="material-symbols-rounded" style="font-size:18px;color:var(--primary);">calendar_month</span>';
+    html += '<input type="month" id="rptMonthInput" class="form-input" style="width:auto;padding:6px 12px;font-size:13px;" value="' + refStr.substring(0,7) + '">';
+    html += '<button class="btn btn-outline btn-sm" id="rptThisMonth">Tháng này</button>';
+  } else if (_activeTab === 'quarter') {
+    var qMonth = _refDate ? _refDate.getMonth() : today.getMonth();
+    var qYear = _refDate ? _refDate.getFullYear() : today.getFullYear();
+    var currentQ = Math.floor(qMonth / 3) + 1;
+    html += '<span class="material-symbols-rounded" style="font-size:18px;color:var(--primary);">event_note</span>';
+    html += '<select id="rptQuarterInput" class="form-input" style="width:auto;padding:6px 12px;font-size:13px;">';
+    for (var q = 1; q <= 4; q++) {
+      html += '<option value="' + q + '" ' + (q === currentQ ? 'selected' : '') + '>Quý ' + q + '</option>';
+    }
+    html += '</select>';
+    html += '<input type="number" id="rptQuarterYear" class="form-input" style="width:80px;padding:6px 12px;font-size:13px;" value="' + qYear + '" min="2020" max="2030">';
+    html += '<button class="btn btn-outline btn-sm" id="rptThisQuarter">Quý này</button>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  _bindDatePickerEvents();
+}
+
+function _bindDatePickerEvents() {
+  var el;
+  // Day
+  el = document.getElementById('rptDateInput');
+  if (el) el.addEventListener('change', function() { _refDate = new Date(el.value + 'T12:00:00'); _renderTabContent(); });
+  el = document.getElementById('rptToday');
+  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+  // Week
+  el = document.getElementById('rptWeekInput');
+  if (el) el.addEventListener('change', function() {
+    var parts = el.value.split('-W');
+    if (parts.length === 2) { _refDate = _weekToDate(parseInt(parts[0]), parseInt(parts[1])); _renderTabContent(); }
+  });
+  el = document.getElementById('rptPrevWeek');
+  if (el) el.addEventListener('click', function() { _shiftWeek(-1); });
+  el = document.getElementById('rptNextWeek');
+  if (el) el.addEventListener('click', function() { _shiftWeek(1); });
+  el = document.getElementById('rptThisWeek');
+  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+  // Month
+  el = document.getElementById('rptMonthInput');
+  if (el) el.addEventListener('change', function() { _refDate = new Date(el.value + '-15T12:00:00'); _renderTabContent(); });
+  el = document.getElementById('rptThisMonth');
+  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+  // Quarter
+  el = document.getElementById('rptQuarterInput');
+  var yearEl = document.getElementById('rptQuarterYear');
+  if (el) el.addEventListener('change', function() { _applyQuarter(); });
+  if (yearEl) yearEl.addEventListener('change', function() { _applyQuarter(); });
+  el = document.getElementById('rptThisQuarter');
+  if (el) el.addEventListener('click', function() { _refDate = null; _renderDatePicker(); _renderTabContent(); });
+}
+
+function _applyQuarter() {
+  var qEl = document.getElementById('rptQuarterInput');
+  var yEl = document.getElementById('rptQuarterYear');
+  if (qEl && yEl) {
+    var q = parseInt(qEl.value);
+    var y = parseInt(yEl.value);
+    _refDate = new Date(y, (q - 1) * 3, 15, 12, 0, 0);
+    _renderTabContent();
+  }
+}
+
+function _shiftWeek(delta) {
+  var ref = _refDate || new Date();
+  ref = new Date(ref);
+  ref.setDate(ref.getDate() + delta * 7);
+  _refDate = ref;
+  _renderDatePicker();
+  _renderTabContent();
+}
+
+function _weekToDate(year, week) {
+  var jan1 = new Date(year, 0, 1);
+  var days = (week - 1) * 7;
+  jan1.setDate(jan1.getDate() + days);
+  return jan1;
 }
 
 // ── Render tab content ──
@@ -74,16 +185,16 @@ function _renderTabContent() {
   container.innerHTML = '<div class="skeleton skeleton-card" style="min-height:200px;"></div>';
 
   import('../integration/invoiceStore.js').then(function(store) {
-    var rev = store.getRevenueSummary(_activeTab);
-    var daily = store.getDailyBreakdown(_activeTab);
+    var rev = store.getRevenueSummary(_activeTab, _refDate);
+    var daily = store.getDailyBreakdown(_activeTab, _refDate);
     var unpushed = store.getUnpushedInvoices().length;
 
     var html = _buildRevenueReport(rev, daily, unpushed);
 
-    // Tab "Hôm nay" → thêm Phiếu bàn giao ca bên dưới
+    // Tab "Ngày" → thêm Phiếu bàn giao ca (cho ngày được chọn)
     if (_activeTab === 'day') {
       html += '<div style="margin-top:24px;border-top:2px solid var(--border);padding-top:20px;"></div>';
-      html += _buildHandoverHTML();
+      html += _buildHandoverHTML(rev);
     }
 
     container.innerHTML = html;
@@ -97,7 +208,7 @@ function _renderTabContent() {
 function _buildRevenueReport(rev, daily, unpushedCount) {
   var fc = formatCurrency;
 
-  var periodLabels = { day: 'Báo cáo hôm nay', week: 'Báo cáo tuần', month: 'Báo cáo tháng', quarter: 'Báo cáo quý' };
+  var periodLabels = { day: 'Báo cáo ngày', week: 'Báo cáo tuần', month: 'Báo cáo tháng', quarter: 'Báo cáo quý' };
   var title = periodLabels[_activeTab] || 'Báo cáo';
 
   return `
@@ -191,11 +302,32 @@ function _buildRevenueReport(rev, daily, unpushedCount) {
 }
 
 // ── Build handover HTML (returns string) ──
-function _buildHandoverHTML() {
+function _buildHandoverHTML(revSummary) {
+  // Use revSummary from invoiceStore (already filtered by selected date)
+  var cukcukRev = {
+    total: revSummary ? revSummary.totalRevenue : 0,
+    cash: revSummary ? revSummary.totalCash : 0,
+    card: revSummary ? revSummary.totalCard : 0,
+    transfer: revSummary ? revSummary.totalTransfer : 0,
+    bills: revSummary ? revSummary.totalBills : 0
+  };
+
+  // Try to find shift for the selected date
+  var selectedDateStr = _refDate ? _refDate.getFullYear() + '-' + String(_refDate.getMonth()+1).padStart(2,'0') + '-' + String(_refDate.getDate()).padStart(2,'0') : null;
   var shift = getCurrentShift();
   var history = getShiftHistory();
-  var lastClosed = history.length > 0 ? history[0] : null;
-  var target = shift || lastClosed;
+  var target = null;
+
+  if (!selectedDateStr || (shift && shift.date === selectedDateStr)) {
+    // Today or current shift matches
+    target = shift || (history.length > 0 ? history[0] : null);
+  } else {
+    // Find shift for selected date in history
+    for (var hi = 0; hi < history.length; hi++) {
+      if (history[hi].date === selectedDateStr) { target = history[hi]; break; }
+    }
+    if (!target) target = shift; // fallback
+  }
 
   if (!target) {
     return '<div class="empty-state" style="padding:30px;"><span class="material-symbols-rounded empty-icon">summarize</span><h2>Chưa có dữ liệu ca</h2><p>Mở ca hoặc đóng ca để tạo phiếu bàn giao</p></div>';
@@ -206,37 +338,6 @@ function _buildHandoverHTML() {
   var otherTxs = target.otherTransactions || [];
   var manualIncomeTxs = txs.filter(function(t) { return t.type === 'income' && (!t.note || t.note.indexOf('[CUKCUK]') === -1); });
   var expenseTxs = txs.filter(function(t) { return t.type === 'expense'; });
-
-  // Load CUKCUK revenue from localStorage
-  var cukcukRev = { total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
-  try {
-    var storeData = localStorage.getItem('cukcuk_invoice_store');
-    if (storeData) {
-      var parsed = JSON.parse(storeData);
-      if (parsed && parsed.invoices) {
-        for (var key in parsed.invoices) {
-          if (parsed.invoices.hasOwnProperty(key)) {
-            var inv = parsed.invoices[key];
-            if (inv.date === target.date) {
-              cukcukRev.bills++;
-              var payments = inv.payments || [];
-              var invTotal = 0;
-              for (var pi = 0; pi < payments.length; pi++) {
-                var pAmt = payments[pi].amount || 0;
-                invTotal += pAmt;
-                switch (payments[pi].method) {
-                  case 'cash': cukcukRev.cash += pAmt; break;
-                  case 'card': cukcukRev.card += pAmt; break;
-                  case 'transfer': cukcukRev.transfer += pAmt; break;
-                }
-              }
-              cukcukRev.total += invTotal > 0 ? invTotal : (inv.amount || 0);
-            }
-          }
-        }
-      }
-    }
-  } catch(e) {}
 
   var totalManualIncome = manualIncomeTxs.reduce(function(s, t) { return s + t.amount; }, 0);
   var totalExpenseAmt = expenseTxs.reduce(function(s, t) { return s + t.amount; }, 0);
