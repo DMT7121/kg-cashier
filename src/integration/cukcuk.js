@@ -1007,8 +1007,15 @@ export async function syncTransactions() {
               }
             }
           }
-          if (sameAmount && samePayments) continue; // Truly no change
-          console.log('[CUKCUK] Updating invoice ' + refId + ' (' + r.item.reason + '): ' + (sameAmount ? 'payment changed' : 'amount ' + existingInv.amount + ' → ' + effectiveAmount));
+          if (sameAmount && samePayments) {
+            // Data unchanged — but mark as confirmed so we don't re-check next cycle
+            if (!existingInv.confirmed) {
+              existingInv.confirmed = true;
+              invoiceStore.upsertInvoice(existingInv);
+            }
+            continue;
+          }
+          console.log('[CUKCUK] Updating ' + refId + ' (' + r.item.reason + ')');
         }
         
         invoiceRecords.push({
