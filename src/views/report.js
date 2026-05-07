@@ -1,137 +1,272 @@
 /* ═══════════════════════════════════════════════
-   PHIẾU BÀN GIAO CA — Smart A4 Print Sheet
-   Tự động co giãn nội dung vừa đúng 1 trang A4
+   BÁO CÁO DOANH THU — Tabs: Hôm nay / Tuần / Tháng / Quý + Phiếu bàn giao
    ═══════════════════════════════════════════════ */
-import { getCurrentShift, getSettings, getShiftHistory } from '../store.js';
+import { getCurrentShift, getSettings, getShiftHistory, getShiftSummary } from '../store.js';
 import { formatCurrency, formatDate, formatTime, denominations, showToast } from '../utils.js';
 
+var _activeTab = 'day'; // day | week | month | quarter
+
+// ── RENDER ──
 export function render() {
-  const shift = getCurrentShift();
-  // Cho phép xem report của ca mở hoặc ca cuối cùng trong lịch sử
-  const history = getShiftHistory();
-  const lastClosed = history.length > 0 ? history[0] : null;
-  const target = shift || lastClosed;
+  var settings = getSettings();
+  var storeName = settings.storeName || "KING's GRILL";
+
+  return `
+    <div class="section-header">
+      <div>
+        <h3>📊 Báo cáo doanh thu — ${storeName}</h3>
+        <p>Dữ liệu từ hệ thống CUKCUK POS</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" id="btnSyncSheets" title="Đẩy dữ liệu lên Google Sheets">
+          <span class="material-symbols-rounded">cloud_upload</span> Đẩy lên Sheets
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="rpt-tabs">
+      <button class="rpt-tab ${_activeTab === 'day' ? 'active' : ''}" data-rpt-tab="day">
+        <span class="material-symbols-rounded" style="font-size:16px;">today</span> Hôm nay
+      </button>
+      <button class="rpt-tab ${_activeTab === 'week' ? 'active' : ''}" data-rpt-tab="week">
+        <span class="material-symbols-rounded" style="font-size:16px;">date_range</span> Tuần
+      </button>
+      <button class="rpt-tab ${_activeTab === 'month' ? 'active' : ''}" data-rpt-tab="month">
+        <span class="material-symbols-rounded" style="font-size:16px;">calendar_month</span> Tháng
+      </button>
+      <button class="rpt-tab ${_activeTab === 'quarter' ? 'active' : ''}" data-rpt-tab="quarter">
+        <span class="material-symbols-rounded" style="font-size:16px;">event_note</span> Quý
+      </button>
+    </div>
+
+    <!-- TAB CONTENT -->
+    <div id="rptContent">
+      <div class="skeleton skeleton-card" style="min-height:200px;margin:16px 0;"></div>
+    </div>
+  `;
+}
+
+export function init() {
+  // Tab click
+  document.querySelectorAll('[data-rpt-tab]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _activeTab = btn.dataset.rptTab;
+      document.querySelectorAll('.rpt-tab').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      _renderTabContent();
+    });
+  });
+
+  // Sync to sheets
+  document.getElementById('btnSyncSheets')?.addEventListener('click', _handleSyncSheets);
+
+  // Initial render
+  _renderTabContent();
+}
+
+// ── Render tab content ──
+function _renderTabContent() {
+  var container = document.getElementById('rptContent');
+  if (!container) return;
+
+  // Show skeleton
+  container.innerHTML = '<div class="skeleton skeleton-card" style="min-height:200px;"></div>';
+
+  import('../integration/invoiceStore.js').then(function(store) {
+    var rev = store.getRevenueSummary(_activeTab);
+    var daily = store.getDailyBreakdown(_activeTab);
+    var unpushed = store.getUnpushedInvoices().length;
+
+    var html = _buildRevenueReport(rev, daily, unpushed);
+
+    // Tab "Hôm nay" → thêm Phiếu bàn giao ca bên dưới
+    if (_activeTab === 'day') {
+      html += '<div style="margin-top:24px;border-top:2px solid var(--border);padding-top:20px;"></div>';
+      html += _buildHandoverHTML();
+    }
+
+    container.innerHTML = html;
+    _bindPrintButtons();
+  }).catch(function() {
+    container.innerHTML = '<div class="empty-state"><p>Không tải được dữ liệu</p></div>';
+  });
+}
+
+// ── Build revenue report HTML ──
+function _buildRevenueReport(rev, daily, unpushedCount) {
+  var fc = formatCurrency;
+
+  var periodLabels = { day: 'Báo cáo hôm nay', week: 'Báo cáo tuần', month: 'Báo cáo tháng', quarter: 'Báo cáo quý' };
+  var title = periodLabels[_activeTab] || 'Báo cáo';
+
+  return `
+    <!-- HEADER + PRINT -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);">${title}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">📅 ${rev.periodLabel} ${rev.firstDate && rev.lastDate ? '(' + _fmtDateVN(rev.firstDate) + ' → ' + _fmtDateVN(rev.lastDate) + ')' : ''}
+          ${unpushedCount > 0 ? '<span style="margin-left:8px;color:var(--warning);">⚠ ' + unpushedCount + ' chưa đẩy lên Sheets</span>' : ''}
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" id="btnPrintReport">
+        <span class="material-symbols-rounded">print</span> In báo cáo
+      </button>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="stats-grid" style="margin-bottom:16px;">
+      <div class="stat-card stat-success">
+        <div class="stat-icon"><span class="material-symbols-rounded">payments</span></div>
+        <div class="stat-info">
+          <span class="stat-label">Tổng doanh thu</span>
+          <span class="stat-value">${fc(rev.totalRevenue)}</span>
+          <span class="stat-sub text-muted" style="font-size:10px;">${rev.totalBills} bill · TB/bill: ${fc(rev.avgPerBill)}</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left-color:#22c55e;">
+        <div class="stat-icon" style="background:rgba(34,197,94,.1);color:#22c55e;"><span class="material-symbols-rounded">money</span></div>
+        <div class="stat-info">
+          <span class="stat-label">💵 Tiền mặt</span>
+          <span class="stat-value">${fc(rev.totalCash)}</span>
+          <span class="stat-sub text-muted" style="font-size:10px;">${rev.totalRevenue > 0 ? Math.round(rev.totalCash / rev.totalRevenue * 100) : 0}%</span>
+        </div>
+      </div>
+      <div class="stat-card stat-info">
+        <div class="stat-icon"><span class="material-symbols-rounded">credit_card</span></div>
+        <div class="stat-info">
+          <span class="stat-label">💳 Quẹt thẻ</span>
+          <span class="stat-value">${fc(rev.totalCard)}</span>
+          <span class="stat-sub text-muted" style="font-size:10px;">${rev.totalRevenue > 0 ? Math.round(rev.totalCard / rev.totalRevenue * 100) : 0}%</span>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left-color:#a855f7;">
+        <div class="stat-icon" style="background:rgba(168,85,247,.1);color:#a855f7;"><span class="material-symbols-rounded">swap_horiz</span></div>
+        <div class="stat-info">
+          <span class="stat-label">🏦 Chuyển khoản</span>
+          <span class="stat-value">${fc(rev.totalTransfer)}</span>
+          <span class="stat-sub text-muted" style="font-size:10px;">${rev.totalRevenue > 0 ? Math.round(rev.totalTransfer / rev.totalRevenue * 100) : 0}%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AVG DAILY -->
+    ${rev.daysWithData > 1 ? '<div style="text-align:center;padding:10px;background:var(--bg-secondary);border-radius:10px;margin-bottom:16px;font-size:13px;"><span class="text-muted">TB/ngày:</span> <strong style="color:var(--primary);font-size:16px;">' + fc(rev.avgDaily) + '</strong> <span class="text-muted">(' + rev.daysWithData + ' ngày có dữ liệu)</span></div>' : ''}
+
+    <!-- DAILY BREAKDOWN TABLE -->
+    <div class="card">
+      <div class="card-header"><h3>📅 Chi tiết theo ngày</h3></div>
+      <div class="card-body" style="padding:0;">
+        <div style="overflow-x:auto;">
+          <table class="rpt-table">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th class="r">Bill</th>
+                <th class="r">💵 TM</th>
+                <th class="r">💳 Thẻ</th>
+                <th class="r">🏦 CK</th>
+                <th class="r">Tổng</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${daily.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">Chưa có dữ liệu CUKCUK cho kỳ này</td></tr>' :
+                daily.map(function(d) {
+                  return '<tr>' +
+                    '<td><strong>' + _fmtDateVN(d.date) + '</strong></td>' +
+                    '<td class="r">' + d.bills + '</td>' +
+                    '<td class="r">' + fc(d.cash) + '</td>' +
+                    '<td class="r">' + fc(d.card) + '</td>' +
+                    '<td class="r">' + fc(d.transfer) + '</td>' +
+                    '<td class="r"><strong style="color:var(--success);">' + fc(d.total) + '</strong></td>' +
+                  '</tr>';
+                }).join('')}
+            </tbody>
+            ${daily.length > 0 ? '<tfoot><tr style="border-top:2px solid var(--border);background:rgba(232,168,56,.05);"><td><strong>TỔNG</strong></td><td class="r"><strong>' + rev.totalBills + '</strong></td><td class="r"><strong>' + fc(rev.totalCash) + '</strong></td><td class="r"><strong>' + fc(rev.totalCard) + '</strong></td><td class="r"><strong>' + fc(rev.totalTransfer) + '</strong></td><td class="r"><strong style="color:var(--primary);font-size:15px;">' + fc(rev.totalRevenue) + '</strong></td></tr></tfoot>' : ''}
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Build handover HTML (returns string) ──
+function _buildHandoverHTML() {
+  var shift = getCurrentShift();
+  var history = getShiftHistory();
+  var lastClosed = history.length > 0 ? history[0] : null;
+  var target = shift || lastClosed;
 
   if (!target) {
-    return `<div class="empty-state">
-      <span class="material-symbols-rounded empty-icon">summarize</span>
-      <h2>Chưa có dữ liệu ca</h2>
-      <p>Mở ca hoặc đóng ca để tạo phiếu bàn giao</p>
-      <button class="btn btn-primary" onclick="window.navigateTo('shift')">Mở ca</button>
-    </div>`;
+    return '<div class="empty-state" style="padding:30px;"><span class="material-symbols-rounded empty-icon">summarize</span><h2>Chưa có dữ liệu ca</h2><p>Mở ca hoặc đóng ca để tạo phiếu bàn giao</p></div>';
   }
 
-  const settings = getSettings();
-  const txs = target.transactions || [];
-  const otherTxs = target.otherTransactions || [];
-  // Manual transactions only (CUKCUK data comes from Invoice Store now)
-  const manualIncomeTxs = txs.filter(t => t.type === 'income' && (!t.note || t.note.indexOf('[CUKCUK]') === -1));
-  const expenseTxs = txs.filter(t => t.type === 'expense');
+  var settings = getSettings();
+  var txs = target.transactions || [];
+  var otherTxs = target.otherTransactions || [];
+  var manualIncomeTxs = txs.filter(function(t) { return t.type === 'income' && (!t.note || t.note.indexOf('[CUKCUK]') === -1); });
+  var expenseTxs = txs.filter(function(t) { return t.type === 'expense'; });
 
-  // Load CUKCUK revenue from Invoice Store for this shift's date
-  var cukcukRevenue = { total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
+  // Load CUKCUK revenue from localStorage
+  var cukcukRev = { total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
   try {
-    var invStoreModule = null;
-    // Sync load from cache if available
     var storeData = localStorage.getItem('cukcuk_invoice_store');
     if (storeData) {
       var parsed = JSON.parse(storeData);
-      var shiftDate = target.date || '';
       if (parsed && parsed.invoices) {
         for (var key in parsed.invoices) {
           if (parsed.invoices.hasOwnProperty(key)) {
             var inv = parsed.invoices[key];
-            if (inv.date === shiftDate) {
-              cukcukRevenue.total += inv.amount || 0;
-              cukcukRevenue.bills++;
+            if (inv.date === target.date) {
+              cukcukRev.bills++;
               var payments = inv.payments || [];
+              var invTotal = 0;
               for (var pi = 0; pi < payments.length; pi++) {
+                var pAmt = payments[pi].amount || 0;
+                invTotal += pAmt;
                 switch (payments[pi].method) {
-                  case 'cash': cukcukRevenue.cash += payments[pi].amount || 0; break;
-                  case 'card': cukcukRevenue.card += payments[pi].amount || 0; break;
-                  case 'transfer': cukcukRevenue.transfer += payments[pi].amount || 0; break;
+                  case 'cash': cukcukRev.cash += pAmt; break;
+                  case 'card': cukcukRev.card += pAmt; break;
+                  case 'transfer': cukcukRev.transfer += pAmt; break;
                 }
               }
+              cukcukRev.total += invTotal > 0 ? invTotal : (inv.amount || 0);
             }
           }
         }
       }
     }
-  } catch(e) { /* ignore */ }
+  } catch(e) {}
 
-  // Group manual income by category
-  const manualByCategory = {};
-  manualIncomeTxs.forEach(tx => {
-    if (!manualByCategory[tx.category]) manualByCategory[tx.category] = { cash: 0, card: 0, transfer: 0, count: 0 };
-    manualByCategory[tx.category][tx.paymentMethod || 'cash'] += tx.amount;
-    manualByCategory[tx.category].count++;
-  });
-
-  // Combined income = CUKCUK + manual for total calculation
-  const totalManualIncome = manualIncomeTxs.reduce((s, t) => s + t.amount, 0);
-  const combinedIncome = cukcukRevenue.total + totalManualIncome;
-
-  // Build summary object (sm) — combining CUKCUK + manual data
-  const totalExpenseAmt = expenseTxs.reduce((s, t) => s + t.amount, 0);
-  const manualCash = manualIncomeTxs.filter(t => (t.paymentMethod || 'cash') === 'cash').reduce((s, t) => s + t.amount, 0);
-  const manualCard = manualIncomeTxs.filter(t => t.paymentMethod === 'card').reduce((s, t) => s + t.amount, 0);
-  const manualTransfer = manualIncomeTxs.filter(t => t.paymentMethod === 'transfer').reduce((s, t) => s + t.amount, 0);
-  const otherIncomeAmt = otherTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const otherExpenseAmt = otherTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const cashCountTotal = denominations.reduce((s, d) => s + (d.value * (cc[d.value] || 0)), 0);
-  const expectedCash = (target.startingCash || 0) + manualCash + cukcukRevenue.cash - totalExpenseAmt + otherIncomeAmt - otherExpenseAmt;
-  const sm = {
-    manualBills: manualIncomeTxs.length,
-    manualIncome: totalManualIncome,
-    cukcukBills: cukcukRevenue.bills,
-    cukcukRevenue: cukcukRevenue.total,
-    totalIncome: combinedIncome,
-    totalExpense: totalExpenseAmt,
-    cashIncome: manualCash + cukcukRevenue.cash,
-    cardIncome: manualCard + cukcukRevenue.card,
-    transferIncome: manualTransfer + cukcukRevenue.transfer,
-    billCount: cukcukRevenue.bills + manualIncomeTxs.length,
-    otherIncome: otherIncomeAmt,
-    otherExpense: otherExpenseAmt,
-    expectedCash: expectedCash,
-    cashCountTotal: cashCountTotal,
-    discrepancy: cashCountTotal - expectedCash
-  };
-  // Group expense by category
-  const expenseByCategory = {};
-  expenseTxs.forEach(tx => {
-    if (!expenseByCategory[tx.category]) expenseByCategory[tx.category] = 0;
-    expenseByCategory[tx.category] += tx.amount;
-  });
-
-  // Cash count rows (only non-zero)
-  const cc = target.cashCount || {};
-  const cashRows = denominations.filter(d => (cc[d.value] || 0) > 0);
-
-  const isOpen = target.status === 'open';
-  const now = new Date();
+  var totalManualIncome = manualIncomeTxs.reduce(function(s, t) { return s + t.amount; }, 0);
+  var totalExpenseAmt = expenseTxs.reduce(function(s, t) { return s + t.amount; }, 0);
+  var manualCash = manualIncomeTxs.filter(function(t) { return (t.paymentMethod || 'cash') === 'cash'; }).reduce(function(s, t) { return s + t.amount; }, 0);
+  var otherIncomeAmt = otherTxs.filter(function(t) { return t.type === 'income'; }).reduce(function(s, t) { return s + t.amount; }, 0);
+  var otherExpenseAmt = otherTxs.filter(function(t) { return t.type === 'expense'; }).reduce(function(s, t) { return s + t.amount; }, 0);
+  var cc = target.cashCount || {};
+  var cashCountTotal = denominations.reduce(function(s, d) { return s + (d.value * (cc[d.value] || 0)); }, 0);
+  var expectedCash = (target.startingCash || 0) + manualCash + cukcukRev.cash - totalExpenseAmt + otherIncomeAmt - otherExpenseAmt;
+  var combinedIncome = cukcukRev.total + totalManualIncome;
+  var billCount = cukcukRev.bills + manualIncomeTxs.length;
+  var discrepancy = cashCountTotal - expectedCash;
+  var fc = formatCurrency;
+  var now = new Date();
 
   return `
-    <div class="section-header no-print">
-      <div>
-        <h3>🖨️ Phiếu bàn giao ca</h3>
-        <p>${isOpen ? 'Ca đang mở — Dữ liệu cập nhật realtime' : 'Ca đã đóng — Sẵn sàng in'}</p>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-size:16px;font-weight:700;color:var(--text);">📋 Phiếu bàn giao ca</div>
       <div class="btn-group">
-        <button class="btn btn-outline btn-sm" id="btnPreviewA4" title="Xem trước A4">
+        <button class="btn btn-outline btn-sm" id="btnPreviewA4">
           <span class="material-symbols-rounded">preview</span> Xem A4
         </button>
-        <button class="btn btn-primary btn-sm" id="btnPrintReport">
+        <button class="btn btn-primary btn-sm" id="btnPrintHandover">
           <span class="material-symbols-rounded">print</span> In phiếu
         </button>
       </div>
     </div>
 
-    <!-- ===== PHIẾU A4 ===== -->
     <div class="a4-sheet" id="a4Sheet">
       <div class="a4-inner">
-
-        <!-- HEADER -->
         <div class="a4-header">
           <div class="a4-header-left">
             <div class="a4-brand">👑 ${settings.storeName || "KING's GRILL"}</div>
@@ -142,223 +277,135 @@ export function render() {
             <div class="a4-doc-sub">Ngày: ${formatDate(target.date)} — Ca ${target.shiftNumber}</div>
           </div>
         </div>
-
         <div class="a4-divider"></div>
-
-        <!-- THÔNG TIN CA -->
         <div class="a4-info-grid">
-          <div class="a4-info-row">
-            <span class="a4-info-label">Thu ngân:</span>
-            <span class="a4-info-value">${target.cashierName}</span>
-          </div>
-          <div class="a4-info-row">
-            <span class="a4-info-label">Bắt đầu:</span>
-            <span class="a4-info-value">${formatTime(target.startTime)}</span>
-          </div>
-          <div class="a4-info-row">
-            <span class="a4-info-label">Kết thúc:</span>
-            <span class="a4-info-value">${target.endTime ? formatTime(target.endTime) : '(đang mở)'}</span>
-          </div>
-          <div class="a4-info-row">
-            <span class="a4-info-label">Tiền đầu ca:</span>
-            <span class="a4-info-value a4-bold">${formatCurrency(target.startingCash)}</span>
-          </div>
+          <div class="a4-info-row"><span class="a4-info-label">Thu ngân:</span><span class="a4-info-value">${target.cashierName}</span></div>
+          <div class="a4-info-row"><span class="a4-info-label">Bắt đầu:</span><span class="a4-info-value">${formatTime(target.startTime)}</span></div>
+          <div class="a4-info-row"><span class="a4-info-label">Kết thúc:</span><span class="a4-info-value">${target.endTime ? formatTime(target.endTime) : '(đang mở)'}</span></div>
+          <div class="a4-info-row"><span class="a4-info-label">Tiền đầu ca:</span><span class="a4-info-value a4-bold">${fc(target.startingCash)}</span></div>
         </div>
 
-        <!-- BẢNG 2 CỘT: DOANH THU + CHI PHÍ -->
         <div class="a4-two-col">
-          <!-- CỘT TRÁI: DOANH THU -->
           <div class="a4-col">
-            ${cukcukRevenue.bills > 0 ? `
-            <div class="a4-section-title a4-income-title">▌DOANH THU BÁN HÀNG (CUKCUK POS)</div>
-            <table class="a4-table">
-              <thead>
-                <tr><th>Danh mục</th><th>SL</th><th class="r">TM</th><th class="r">Thẻ</th><th class="r">CK</th><th class="r">Tổng</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="a4-cat-name">Doanh thu bán hàng</td>
-                  <td>${cukcukRevenue.bills}</td>
-                  <td class="r">${cukcukRevenue.cash > 0 ? formatCurrency(cukcukRevenue.cash) : '—'}</td>
-                  <td class="r">${cukcukRevenue.card > 0 ? formatCurrency(cukcukRevenue.card) : '—'}</td>
-                  <td class="r">${cukcukRevenue.transfer > 0 ? formatCurrency(cukcukRevenue.transfer) : '—'}</td>
-                  <td class="r a4-bold">${formatCurrency(cukcukRevenue.total)}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr class="a4-total-row">
-                  <td colspan="2"><strong>CUKCUK (${cukcukRevenue.bills} bill)</strong></td>
-                  <td class="r" colspan="3"></td>
-                  <td class="r"><strong>${formatCurrency(cukcukRevenue.total)}</strong></td>
-                </tr>
-              </tfoot>
-            </table>
-            ` : ''}
-
-            ${sm.manualBills > 0 ? `
-            <div class="a4-section-title" style="margin-top:6px;color:#3b82f6;">▌THU NHẬP THỦ CÔNG</div>
-            <table class="a4-table">
-              <thead>
-                <tr><th>Danh mục</th><th>SL</th><th class="r">Mặt</th><th class="r">Thẻ</th><th class="r">CK</th><th class="r">Tổng</th></tr>
-              </thead>
-              <tbody>
-                ${Object.entries(manualByCategory).map(([cat, v]) => {
-                  const total = v.cash + v.card + v.transfer;
-                  return '<tr>' +
-                    '<td class="a4-cat-name">' + cat + '</td>' +
-                    '<td>' + v.count + '</td>' +
-                    '<td class="r">' + (v.cash > 0 ? formatCurrency(v.cash) : '—') + '</td>' +
-                    '<td class="r">' + (v.card > 0 ? formatCurrency(v.card) : '—') + '</td>' +
-                    '<td class="r">' + (v.transfer > 0 ? formatCurrency(v.transfer) : '—') + '</td>' +
-                    '<td class="r a4-bold">' + formatCurrency(total) + '</td>' +
-                  '</tr>';
-                }).join('')}
-              </tbody>
-              <tfoot>
-                <tr class="a4-total-row">
-                  <td colspan="2"><strong>Thủ công (${sm.manualBills})</strong></td>
-                  <td class="r" colspan="3"></td>
-                  <td class="r"><strong>${formatCurrency(sm.manualIncome)}</strong></td>
-                </tr>
-              </tfoot>
-            </table>
-            ` : ''}
-
-            ${sm.billCount === 0 ? '<div class="a4-empty-box">Không có doanh thu</div>' : ''}
-
-            <table class="a4-table" style="margin-top:4px;">
-              <tfoot>
-                <tr class="a4-highlight-row">
-                  <td><strong>TỔNG DOANH THU (${sm.billCount} bill)</strong></td>
-                  <td class="r"><strong>${formatCurrency(sm.totalIncome)}</strong></td>
-                </tr>
-              </tfoot>
-            </table>
+            ${cukcukRev.bills > 0 ? '<div class="a4-section-title a4-income-title">▌DOANH THU CUKCUK (' + cukcukRev.bills + ' bill)</div><table class="a4-table"><tbody><tr><td>Tiền mặt</td><td class="r">' + fc(cukcukRev.cash) + '</td></tr><tr><td>Quẹt thẻ</td><td class="r">' + fc(cukcukRev.card) + '</td></tr><tr><td>Chuyển khoản</td><td class="r">' + fc(cukcukRev.transfer) + '</td></tr></tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng CUKCUK</strong></td><td class="r"><strong>' + fc(cukcukRev.total) + '</strong></td></tr></tfoot></table>' : ''}
+            ${billCount === 0 ? '<div class="a4-empty-box">Không có doanh thu</div>' : ''}
+            <table class="a4-table" style="margin-top:4px;"><tfoot><tr class="a4-highlight-row"><td><strong>TỔNG DOANH THU (${billCount} bill)</strong></td><td class="r"><strong>${fc(combinedIncome)}</strong></td></tr></tfoot></table>
           </div>
-
-          <!-- CỘT PHẢI: CHI PHÍ + THU CHI KHÁC -->
-          <div class="a4-col">
-            <div class="a4-section-title a4-expense-title">▌CHI PHÍ</div>
-            <table class="a4-table">
-              <thead><tr><th>Danh mục</th><th class="r">Số tiền</th></tr></thead>
-              <tbody>
-                ${Object.entries(expenseByCategory).map(([cat, amt]) =>
-                  `<tr><td>${cat}</td><td class="r">${formatCurrency(amt)}</td></tr>`
-                ).join('') || '<tr><td colspan="2" class="a4-empty">Không có</td></tr>'}
-              </tbody>
-              <tfoot>
-                <tr class="a4-total-row"><td><strong>TỔNG CHI</strong></td><td class="r"><strong>${formatCurrency(sm.totalExpense)}</strong></td></tr>
-              </tfoot>
-            </table>
-
-            ${otherTxs.length > 0 ? `
-              <div class="a4-section-title" style="margin-top:6px;">▌THU CHI KHÁC</div>
-              <table class="a4-table">
-                <tbody>
-                  ${otherTxs.map(tx => `<tr><td>${tx.type === 'income' ? '＋' : '－'} ${tx.category}</td><td class="r">${tx.type === 'income' ? '+' : '−'}${formatCurrency(tx.amount)}</td></tr>`).join('')}
-                </tbody>
-                <tfoot>
-                  <tr class="a4-total-row"><td>Thu khác / Chi khác</td><td class="r">+${formatCurrency(sm.otherIncome)} / −${formatCurrency(sm.otherExpense)}</td></tr>
-                </tfoot>
-              </table>
-            ` : ''}
-          </div>
-        </div>
-
-        <!-- BẢNG 2 CỘT: KIỂM KÊ + TỔNG KẾT -->
-        <div class="a4-two-col">
-          <!-- KIỂM KÊ TIỀN MẶT -->
-          <div class="a4-col">
-            <div class="a4-section-title">▌KIỂM KÊ TIỀN MẶT</div>
-            ${cashRows.length > 0 ? `
-              <table class="a4-table a4-denom-table">
-                <thead><tr><th>Mệnh giá</th><th class="r">SL</th><th class="r">Thành tiền</th></tr></thead>
-                <tbody>
-                  ${cashRows.map(d => {
-                    const qty = target.cashCount[d.value];
-                    return `<tr><td>${d.label}đ</td><td class="r">${qty}</td><td class="r">${formatCurrency(d.value * qty)}</td></tr>`;
-                  }).join('')}
-                </tbody>
-                <tfoot>
-                  <tr class="a4-total-row"><td colspan="2"><strong>TỔNG KIỂM KÊ</strong></td><td class="r"><strong>${formatCurrency(sm.cashCountTotal)}</strong></td></tr>
-                </tfoot>
-              </table>
-            ` : '<div class="a4-empty-box">Chưa kiểm kê</div>'}
-          </div>
-
-          <!-- TỔNG KẾT -->
           <div class="a4-col">
             <div class="a4-section-title a4-summary-title">▌TỔNG KẾT</div>
-            <table class="a4-table a4-summary-table">
-              <tbody>
-                ${sm.cukcukBills > 0 ? '<tr><td>DT bán hàng CUKCUK (' + sm.cukcukBills + ' bill)</td><td class="r a4-income">' + formatCurrency(sm.cukcukRevenue) + '</td></tr>' : ''}
-                ${sm.manualBills > 0 ? '<tr><td>Thu thủ công (' + sm.manualBills + ' khoản)</td><td class="r a4-income">' + formatCurrency(sm.manualIncome) + '</td></tr>' : ''}
-                <tr class="a4-indent"><td>├ Tiền mặt</td><td class="r">${formatCurrency(sm.cashIncome)}</td></tr>
-                <tr class="a4-indent"><td>├ Quẹt thẻ</td><td class="r">${formatCurrency(sm.cardIncome)}</td></tr>
-                <tr class="a4-indent"><td>└ Chuyển khoản</td><td class="r">${formatCurrency(sm.transferIncome)}</td></tr>
-                <tr style="border-top:1px solid rgba(255,255,255,0.1);"><td><strong>Tổng THU (${sm.billCount} bill)</strong></td><td class="r a4-income"><strong>${formatCurrency(sm.totalIncome)}</strong></td></tr>
-                <tr><td>Chi phí trong ca</td><td class="r a4-expense">−${formatCurrency(sm.totalExpense)}</td></tr>
-                ${sm.otherIncome > 0 ? '<tr><td>Thu khác</td><td class="r a4-income">+' + formatCurrency(sm.otherIncome) + '</td></tr>' : ''}
-                ${sm.otherExpense > 0 ? '<tr><td>Chi khác</td><td class="r a4-expense">−' + formatCurrency(sm.otherExpense) + '</td></tr>' : ''}
-                <tr><td>Tiền đầu ca</td><td class="r">${formatCurrency(target.startingCash)}</td></tr>
-              </tbody>
-              <tfoot>
-                <tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>${formatCurrency(sm.expectedCash)}</strong></td></tr>
-                <tr><td>TM kiểm kê thực tế</td><td class="r">${formatCurrency(sm.cashCountTotal)}</td></tr>
-                <tr class="a4-disc-row ${Math.abs(sm.discrepancy) > 0 ? 'a4-disc-warn' : 'a4-disc-ok'}">
-                  <td><strong>CHÊNH LỆCH</strong></td>
-                  <td class="r"><strong>${sm.discrepancy === 0 ? '✓ 0 đ' : (sm.discrepancy > 0 ? '+' : '') + formatCurrency(sm.discrepancy)}</strong></td>
-                </tr>
-              </tfoot>
-            </table>
-
-            ${target.cashToKeep || target.cashToDeposit ? `
-              <table class="a4-table" style="margin-top:4px;">
-                <tr><td>Tiền giữ lại</td><td class="r a4-bold">${formatCurrency(target.cashToKeep || 0)}</td></tr>
-                <tr><td>Tiền nộp</td><td class="r a4-bold">${formatCurrency(target.cashToDeposit || 0)}</td></tr>
-              </table>` : ''}
+            <table class="a4-table a4-summary-table"><tbody>
+              ${cukcukRev.bills > 0 ? '<tr><td>DT CUKCUK (' + cukcukRev.bills + ' bill)</td><td class="r a4-income">' + fc(cukcukRev.total) + '</td></tr>' : ''}
+              <tr><td>Chi phí trong ca</td><td class="r a4-expense">−${fc(totalExpenseAmt)}</td></tr>
+              <tr><td>Tiền đầu ca</td><td class="r">${fc(target.startingCash)}</td></tr>
+            </tbody><tfoot>
+              <tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>${fc(expectedCash)}</strong></td></tr>
+              <tr><td>TM kiểm kê thực tế</td><td class="r">${fc(cashCountTotal)}</td></tr>
+              <tr class="a4-disc-row ${Math.abs(discrepancy) > 0 ? 'a4-disc-warn' : 'a4-disc-ok'}"><td><strong>CHÊNH LỆCH</strong></td><td class="r"><strong>${discrepancy === 0 ? '✓ 0 đ' : (discrepancy > 0 ? '+' : '') + fc(discrepancy)}</strong></td></tr>
+            </tfoot></table>
           </div>
         </div>
 
-        ${target.notes ? `<div class="a4-notes"><strong>Ghi chú:</strong> ${target.notes}</div>` : ''}
-
-        <!-- CHỮ KÝ -->
         <div class="a4-signatures">
-          <div class="a4-sig">
-            <div class="a4-sig-title">Người giao ca</div>
-            <div class="a4-sig-line"></div>
-            <div class="a4-sig-name">${target.cashierName}</div>
-          </div>
-          <div class="a4-sig">
-            <div class="a4-sig-title">Người nhận ca</div>
-            <div class="a4-sig-line"></div>
-            <div class="a4-sig-name">&nbsp;</div>
-          </div>
-          <div class="a4-sig">
-            <div class="a4-sig-title">Quản lý xác nhận</div>
-            <div class="a4-sig-line"></div>
-            <div class="a4-sig-name">&nbsp;</div>
-          </div>
+          <div class="a4-sig"><div class="a4-sig-title">Người giao ca</div><div class="a4-sig-line"></div><div class="a4-sig-name">${target.cashierName}</div></div>
+          <div class="a4-sig"><div class="a4-sig-title">Người nhận ca</div><div class="a4-sig-line"></div><div class="a4-sig-name">&nbsp;</div></div>
+          <div class="a4-sig"><div class="a4-sig-title">Quản lý xác nhận</div><div class="a4-sig-line"></div><div class="a4-sig-name">&nbsp;</div></div>
         </div>
-
-        <div class="a4-footer">
-          In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Phiếu bàn giao tự động
-        </div>
-
+        <div class="a4-footer">In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Phiếu bàn giao tự động</div>
       </div>
     </div>
   `;
 }
 
-export function init() {
-  document.getElementById('btnPrintReport')?.addEventListener('click', () => {
+// ── Bind print/preview buttons ──
+function _bindPrintButtons() {
+  // Revenue report print
+  document.getElementById('btnPrintReport')?.addEventListener('click', function() {
+    window.print();
+  });
+  // Handover A4 print
+  document.getElementById('btnPrintHandover')?.addEventListener('click', function() {
     document.body.classList.add('printing-a4');
     window.print();
-    setTimeout(() => document.body.classList.remove('printing-a4'), 1000);
+    setTimeout(function() { document.body.classList.remove('printing-a4'); }, 1000);
   });
-
-  document.getElementById('btnPreviewA4')?.addEventListener('click', () => {
-    const sheet = document.getElementById('a4Sheet');
+  // A4 preview
+  document.getElementById('btnPreviewA4')?.addEventListener('click', function() {
+    var sheet = document.getElementById('a4Sheet');
     if (sheet) sheet.classList.toggle('a4-preview-mode');
   });
+}
+
+// ── Sync to Google Sheets ──
+async function _handleSyncSheets() {
+  var btn = document.getElementById('btnSyncSheets');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded di-spin">sync</span> Đang đẩy...'; }
+
+  try {
+    var store = await import('../integration/invoiceStore.js');
+    var unpushed = store.getUnpushedInvoices();
+
+    if (unpushed.length === 0) {
+      showToast('✅ Tất cả dữ liệu đã được đẩy lên Sheets', 'success');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">cloud_upload</span> Đẩy lên Sheets'; }
+      return;
+    }
+
+    // Prepare data for GAS
+    var sheetData = unpushed.map(function(inv) {
+      var cash = 0, card = 0, transfer = 0;
+      (inv.payments || []).forEach(function(p) {
+        switch (p.method) { case 'cash': cash += p.amount || 0; break; case 'card': card += p.amount || 0; break; case 'transfer': transfer += p.amount || 0; break; }
+      });
+      return {
+        refId: inv.refId, refNo: inv.refNo || '', refDate: inv.refDate || '',
+        date: inv.date || '', tableName: inv.tableName || '',
+        employeeName: inv.employeeName || '', amount: inv.amount || 0,
+        cashAmount: cash, cardAmount: card, transferAmount: transfer
+      };
+    });
+
+    // Send in batches of 50
+    var batchSize = 50;
+    var totalAdded = 0, totalSkipped = 0;
+    var allRefIds = [];
+
+    for (var i = 0; i < sheetData.length; i += batchSize) {
+      var batch = sheetData.slice(i, i + batchSize);
+      var batchRefIds = batch.map(function(d) { return d.refId; });
+
+      var { syncCukcukRevenueToCloud } = await import('../api.js');
+      var result = await syncCukcukRevenueToCloud(batch, 'manual-sync');
+
+      if (result && result.success) {
+        allRefIds = allRefIds.concat(batchRefIds);
+        totalAdded += result.inserted || batch.length;
+        totalSkipped += result.updated || 0;
+      }
+
+      if (i + batchSize < sheetData.length) {
+        showToast('📤 Đẩy ' + (i + batchSize) + '/' + sheetData.length + '...', 'info');
+      }
+    }
+
+    // Mark as pushed
+    if (allRefIds.length > 0) {
+      store.markPushedToSheets(allRefIds);
+    }
+
+    showToast('✅ Đã đẩy ' + totalAdded + ' hóa đơn lên Sheets' + (totalSkipped > 0 ? ' (cập nhật ' + totalSkipped + ' trùng)' : ''), 'success');
+    _renderTabContent(); // Refresh to update unpushed count
+
+  } catch (e) {
+    showToast('❌ Lỗi đẩy Sheets: ' + e.message, 'error');
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">cloud_upload</span> Đẩy lên Sheets'; }
+}
+
+// ── Helpers ──
+function _fmtDateVN(dateStr) {
+  if (!dateStr) return '';
+  var parts = dateStr.split('-');
+  if (parts.length === 3) return parts[2] + '/' + parts[1];
+  return dateStr;
 }

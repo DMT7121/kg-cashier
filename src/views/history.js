@@ -1,7 +1,7 @@
 /* ── History View (Enhanced w/ Search & Cloud) ── */
-import { getShiftHistory, deleteShiftFromHistory, getShiftSummary } from '../store.js';
+import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, saveShiftToHistory } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
-import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, denominations } from '../utils.js';
+import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
 
 let allHistory = [];
 let cloudHistory = [];
@@ -129,8 +129,9 @@ function _bindHistoryEvents() {
     btn.addEventListener('click', () => _showShiftDetail(btn.dataset.viewShift))
   );
   document.querySelectorAll('[data-delete-shift]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      if (confirm('Xóa ca này khỏi lịch sử?')) {
+    btn.addEventListener('click', async () => {
+      var ok = await showConfirm('Xóa ca này khỏi lịch sử?', { title: 'Xóa ca', confirmText: 'Xóa', type: 'danger' });
+      if (ok) {
         deleteShiftFromHistory(btn.dataset.deleteShift);
         showToast('Đã xóa', 'info');
         allHistory = getShiftHistory();
@@ -150,9 +151,12 @@ export function init() {
     const result = await getShiftsFromCloud();
     if (result.success && result.shifts) {
       cloudHistory = result.shifts;
-      // Merge unique
+      // Merge unique — persist new cloud shifts to local store
       const localIds = new Set(allHistory.map(s => s.id));
       const newFromCloud = result.shifts.filter(s => !localIds.has(s.id));
+      newFromCloud.forEach(s => {
+        try { saveShiftToHistory(s); } catch(e) { /* ignore if not available */ }
+      });
       allHistory = [...allHistory, ...newFromCloud];
       _filterHistory();
       showToast(`Đã đồng bộ ${result.shifts.length} ca từ Cloud`, 'success');
@@ -166,12 +170,14 @@ export function init() {
     let csv = 'Ngày,Ca,Thu ngân,Doanh thu,Chi phí,Bills,Chênh lệch,Ghi chú\n';
     allHistory.forEach(sh => {
       const sm = getShiftSummary(sh);
-      csv += `${sh.date},${sh.shiftNumber},"${sh.cashierName}",${sm.totalIncome},${sm.totalExpense},${sm.billCount},${sm.discrepancy},"${sh.notes || ''}"\n`;
+      csv += `"${sh.date}","${sh.shiftNumber}","${(sh.cashierName || '').replace(/"/g, '""')}",${sm.totalIncome},${sm.totalExpense},${sm.billCount},${sm.discrepancy},"${(sh.notes || '').replace(/"/g, '""')}"\n`;
     });
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
+    a.href = blobUrl;
     a.download = `shift-history-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    URL.revokeObjectURL(blobUrl);
   });
 }

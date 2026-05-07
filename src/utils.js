@@ -77,12 +77,45 @@ export function showToast(message, type = 'info', duration = 3500) {
   toast.innerHTML = `<span class="material-symbols-rounded">${icons[type] || 'info'}</span><span>${message}</span>`;
   toastContainer.appendChild(toast);
 
+  // Limit max visible toasts to prevent overflow
+  while (toastContainer.children.length > 5) {
+    toastContainer.firstChild.remove();
+  }
+
   requestAnimationFrame(() => toast.classList.add('show'));
 
   setTimeout(() => {
     toast.classList.remove('show');
-    toast.addEventListener('transitionend', () => toast.remove());
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
   }, duration);
+}
+
+// ── Custom Confirm Modal ─────────────────────
+export function showConfirm(message, opts) {
+  var title = (opts && opts.title) || 'Xác nhận';
+  var confirmText = (opts && opts.confirmText) || 'Đồng ý';
+  var cancelText = (opts && opts.cancelText) || 'Hủy';
+  var type = (opts && opts.type) || 'warning';
+  var icons = { warning: 'warning', danger: 'delete_forever', info: 'help' };
+  var colors = { warning: 'var(--primary)', danger: 'var(--danger)', info: 'var(--info)' };
+
+  return new Promise(function(resolve) {
+    var html = '<div style="text-align:center;padding:10px 0;">' +
+      '<span class="material-symbols-rounded" style="font-size:48px;color:' + (colors[type] || colors.warning) + ';margin-bottom:12px;display:block;">' + (icons[type] || 'help') + '</span>' +
+      '<h3 style="font-size:16px;font-weight:700;margin-bottom:8px;">' + title + '</h3>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:24px;">' + message + '</p>' +
+      '<div style="display:flex;gap:10px;justify-content:center;">' +
+      '<button class="btn btn-outline" id="confirmCancel">' + cancelText + '</button>' +
+      '<button class="btn ' + (type === 'danger' ? 'btn-danger' : 'btn-primary') + '" id="confirmOk">' + confirmText + '</button>' +
+      '</div></div>';
+    showModal(html);
+    setTimeout(function() {
+      var okBtn = document.getElementById('confirmOk');
+      var cancelBtn = document.getElementById('confirmCancel');
+      if (okBtn) okBtn.addEventListener('click', function() { hideModal(); resolve(true); });
+      if (cancelBtn) cancelBtn.addEventListener('click', function() { hideModal(); resolve(false); });
+    }, 50);
+  });
 }
 
 // ── Modal ────────────────────────────────────

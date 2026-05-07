@@ -1,6 +1,6 @@
 /* ── Settings View (Feature 8+9+Categories+CUKCUK) ── */
 import { getSettings, updateSettings, getCategories, addCategory, removeCategory } from '../store.js';
-import { showToast } from '../utils.js';
+import { showToast, showConfirm } from '../utils.js';
 import { saveSettingsToCloud, pingAPI, isOnline, getQueueSize } from '../api.js';
 
 export function render() {
@@ -215,11 +215,12 @@ function _refreshCatLists() {
 
 function _bindCatRemoveEvents() {
   document.querySelectorAll('[data-remove-cat]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.preventDefault();
       const catName = btn.dataset.removeCat;
       const catType = btn.dataset.catType;
-      if (confirm(`Xóa danh mục "${catName}"?`)) {
+      var ok = await showConfirm(`Xóa danh mục "${catName}"?`, { title: 'Xóa danh mục', confirmText: 'Xóa', type: 'danger' });
+      if (ok) {
         removeCategory(catType, catName);
         showToast(`Đã xóa danh mục: ${catName}`, 'info');
         _refreshCatLists();
@@ -374,8 +375,13 @@ export function init() {
     }
   });
 
-  document.getElementById('btnClearLocal')?.addEventListener('click', () => {
-    if (confirm('Xóa TOÀN BỘ dữ liệu cục bộ? Hành động này không thể hoàn tác.')) {
+  document.getElementById('btnClearLocal')?.addEventListener('click', async () => {
+    var ok = await showConfirm('Xóa TOÀN BỘ dữ liệu cục bộ? Hành động này không thể hoàn tác.', {
+      title: 'Xóa dữ liệu',
+      confirmText: 'Xóa tất cả',
+      type: 'danger'
+    });
+    if (ok) {
       localStorage.removeItem('kg-cashier-data');
       showToast('Đã xóa dữ liệu cục bộ', 'success');
       setTimeout(() => location.reload(), 1000);

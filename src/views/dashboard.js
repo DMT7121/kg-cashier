@@ -1,6 +1,6 @@
 /* ── Dashboard View ─────────────────────────── */
 import { getCurrentShift, getShiftSummary, getShiftHistory, getSettings, getNotifications, getUnreadCount, markAllRead } from '../store.js';
-import { formatCurrency, formatDate, formatTime, formatDuration } from '../utils.js';
+import { formatCurrency, formatDate, formatTime, formatDuration, showConfirm } from '../utils.js';
 
 let _revenuePeriod = 'month'; // default view
 
@@ -65,13 +65,16 @@ function renderShiftDashboard(shift) {
                 inRange = inv.date === (shift.date || '');
               }
               if (inRange) {
-                cukRev.total += inv.amount || 0;
                 cukRev.bills++;
+                var invPaymentTotal = 0;
                 (inv.payments || []).forEach(function(p) {
-                  if (p.method === 'cash') cukRev.cash += p.amount || 0;
-                  else if (p.method === 'card') cukRev.card += p.amount || 0;
-                  else if (p.method === 'transfer') cukRev.transfer += p.amount || 0;
+                  if (p.method === 'cash') { cukRev.cash += p.amount || 0; invPaymentTotal += p.amount || 0; }
+                  else if (p.method === 'card') { cukRev.card += p.amount || 0; invPaymentTotal += p.amount || 0; }
+                  else if (p.method === 'transfer') { cukRev.transfer += p.amount || 0; invPaymentTotal += p.amount || 0; }
                 });
+                // Use sum of payments as total (ensures consistency)
+                // Fallback to inv.amount only if no payments exist
+                cukRev.total += invPaymentTotal > 0 ? invPaymentTotal : (inv.amount || 0);
               }
             }
           }
@@ -244,6 +247,16 @@ function _renderRevenuePeriod() {
   var container = document.getElementById('revenuePeriodContent');
   if (!container) return;
   
+  // Show skeleton loading while data loads
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="skeleton skeleton-card" style="min-height:70px;"></div>
+      <div class="skeleton skeleton-card" style="min-height:70px;"></div>
+      <div class="skeleton skeleton-card" style="min-height:70px;"></div>
+    </div>
+    <div class="skeleton skeleton-text" style="width:70%;margin:auto;"></div>
+  `;
+  
   import('../integration/invoiceStore.js').then(function(store) {
     var rev = store.getRevenueSummary(_revenuePeriod);
     var periodLabel = rev.periodLabel || _revenuePeriod;
@@ -348,7 +361,12 @@ export function init() {
 
   // CUKCUK RE-SYNC button (clear old + refetch all)
   document.getElementById('btnDashResyncCukcuk')?.addEventListener('click', async () => {
-    if (!confirm('Xóa toàn bộ dữ liệu CUKCUK cũ trong ca và đồng bộ lại từ đầu?\n\nThao tác này sẽ:\n• Xóa tất cả bill CUKCUK đã sync\n• Lấy lại từ đầu với đầy đủ chi tiết thanh toán\n\nTiếp tục?')) return;
+    var ok = await showConfirm('Xóa tất cả bill CUKCUK đã sync và lấy lại từ đầu với đầy đủ chi tiết thanh toán?', {
+      title: 'Đồng bộ lại CUKCUK',
+      confirmText: 'Sync lại',
+      type: 'warning'
+    });
+    if (!ok) return;
     
     const btn = document.getElementById('btnDashResyncCukcuk');
     const status = document.getElementById('cukcukSyncStatus');

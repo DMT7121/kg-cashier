@@ -60,9 +60,16 @@ var views = {
 };
 
 var currentView = 'dashboard';
+var _globalIntervals = [];
 
 // ── Navigation ───────────────────────────────
 function navigateTo(viewName) {
+  // Destroy previous view if it has a cleanup function
+  var prevView = views[currentView];
+  if (prevView && prevView.module.destroy) {
+    try { prevView.module.destroy(); } catch(e) { /* ignore */ }
+  }
+
   // Sync with cloud to ensure state is fresh (fire-and-forget, no re-navigation)
   syncCurrentShiftWithCloud().then(function(changed) {
     if (changed) {
@@ -209,6 +216,14 @@ function initApp() {
   }
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') hideModal();
+    // Keyboard shortcuts for cashier efficiency
+    if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+      switch (e.key.toLowerCase()) {
+        case 'n': e.preventDefault(); navigateTo('transactions'); break;
+        case 's': e.preventDefault(); syncCurrentShiftWithCloud(); break;
+        case 'p': e.preventDefault(); navigateTo('report'); break;
+      }
+    }
   });
 
   // Globals
@@ -259,14 +274,14 @@ function initApp() {
   }
 
   // Background polling for cloud sync (Feature: Multi-device real-time sync)
-  setInterval(function() {
+  _globalIntervals.push(setInterval(function() {
     syncCurrentShiftWithCloud().then(function(changed) {
       if (changed) {
         console.log('[Main] Auto-sync: Data refreshed from cloud');
         renderCurrentView();
       }
     });
-  }, 5000); // Check every 5 seconds for real-time updates
+  }, 5000)); // Check every 5 seconds for real-time updates
 
   // CUKCUK auto-sync: always active when shift is open and CUKCUK is configured
   // Loads invoices for TODAY's date only, auto-detects payment methods
@@ -304,7 +319,19 @@ function initApp() {
   setTimeout(function() { _triggerCukcukSync(true); }, 3000);
 
   // Then every 2 minutes for continuous live updates
-  setInterval(function() { _triggerCukcukSync(false); }, 120000);
+  _globalIntervals.push(setInterval(function() { _triggerCukcukSync(false); }, 120000));
+
+  // Cleanup intervals on page unload
+  window.addEventListener('beforeunload', function() {
+    for (var gi = 0; gi < _globalIntervals.length; gi++) {
+      clearInterval(_globalIntervals[gi]);
+    }
+    // Destroy current view
+    var cv = views[currentView];
+    if (cv && cv.module.destroy) {
+      try { cv.module.destroy(); } catch(e) { /* ignore */ }
+    }
+  });
 
   console.log('[KG-CASHIER] Ready!');
 }

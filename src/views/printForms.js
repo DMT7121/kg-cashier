@@ -541,10 +541,18 @@ function _openVisualEditor(templateKey, initialHtml) {
     }
     // Monitor every 500ms
     var _a4Timer = setInterval(_checkA4Fit, 500);
-    // Stop when modal closes
+    // Stop when modal closes — observe overlay class change instead of overriding hideModal
     frame.addEventListener('load', function() { setTimeout(_checkA4Fit, 200); });
-    var origHide = window.hideModal;
-    window.hideModal = function() { clearInterval(_a4Timer); if (origHide) origHide(); };
+    var _modalOverlay = document.getElementById('modalOverlay');
+    if (_modalOverlay) {
+      var _a4Observer = new MutationObserver(function(muts) {
+        if (!_modalOverlay.classList.contains('active')) {
+          clearInterval(_a4Timer);
+          _a4Observer.disconnect();
+        }
+      });
+      _a4Observer.observe(_modalOverlay, { attributes: true, attributeFilter: ['class'] });
+    }
 
     // ── Font Size ──
     document.getElementById('editorFontSize').onchange = (e) => {
@@ -802,8 +810,10 @@ export function init() {
     _openVisualEditor('inv_hangrau', _buildInventoryHTML('hangrau'));
   });
 
-  document.getElementById('btnResetTemplates')?.addEventListener('click', () => {
-    if (confirm('Bạn có chắc muốn xóa tất cả tùy chỉnh mẫu in và quay về mặc định?')) {
+  document.getElementById('btnResetTemplates')?.addEventListener('click', async () => {
+    const { showConfirm } = await import('../utils.js');
+    var ok = await showConfirm('Xóa tất cả tùy chỉnh mẫu in và quay về mặc định?', { title: 'Reset mẫu in', confirmText: 'Reset', type: 'warning' });
+    if (ok) {
       resetPrintForms();
       window.refreshView?.();
     }

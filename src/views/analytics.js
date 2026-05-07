@@ -1,14 +1,9 @@
 /* ── Analytics View (Feature 4) — Enhanced with CUKCUK Revenue Tracking ── */
 import { getShiftHistory, getShiftSummary, getDailyReport, getWeeklyReport, getMonthlyReport, getSettings } from '../store.js';
-import { formatCurrency, formatDate } from '../utils.js';
+import { formatCurrency, formatDate, showToast } from '../utils.js';
 
-// Try to load CUKCUK revenue helpers
+// CUKCUK revenue helpers (loaded in init())
 var _cukcukRevenue = null;
-try {
-  import('../integration/cukcuk.js').then(function(mod) {
-    _cukcukRevenue = mod;
-  }).catch(function() {});
-} catch(e) { /* ignore */ }
 
 function _getCukcukDailySummary(period) {
   if (_cukcukRevenue && _cukcukRevenue.getRevenueSummary) {
@@ -94,6 +89,23 @@ export function render() {
             <div class="text-muted" style="font-size:10px;margin-bottom:4px;">🏦 Chuyển khoản</div>
             <div style="font-size:18px;font-weight:700;color:var(--primary);">${formatCurrency(lastSync.transfer)}</div>
           </div>
+        </div>
+      </div>
+    </div>
+    ` : hasCukcuk && !lastSync ? `
+    <div class="card" style="margin-bottom:16px;border:1px solid rgba(16,185,129,0.15);">
+      <div class="card-header" style="border-bottom-color:rgba(16,185,129,0.1);">
+        <h3 style="color:#10b981;display:flex;align-items:center;gap:8px;margin:0;">
+          <span class="material-symbols-rounded">today</span> Doanh thu CUKCUK hôm nay
+        </h3>
+        <span class="text-muted" style="font-size:10px;">Đang tải...</span>
+      </div>
+      <div class="card-body" style="padding:16px 20px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+          <div class="skeleton skeleton-card" style="min-height:80px;border-radius:10px;"></div>
+          <div class="skeleton skeleton-card" style="min-height:80px;border-radius:10px;"></div>
+          <div class="skeleton skeleton-card" style="min-height:80px;border-radius:10px;"></div>
+          <div class="skeleton skeleton-card" style="min-height:80px;border-radius:10px;"></div>
         </div>
       </div>
     </div>
@@ -262,6 +274,14 @@ export function render() {
 }
 
 export function init() {
+  // Load CUKCUK module if not loaded yet, then re-render
+  if (!_cukcukRevenue) {
+    import('../integration/cukcuk.js').then(function(mod) {
+      _cukcukRevenue = mod;
+      window.refreshView?.();
+    }).catch(function() {});
+  }
+
   // Sync button
   document.getElementById('btnSyncAnalytics')?.addEventListener('click', async () => {
     const btn = document.getElementById('btnSyncAnalytics');
@@ -287,11 +307,11 @@ export function init() {
   // Export CSV
   document.getElementById('btnExportCSV')?.addEventListener('click', () => {
     const monthly = getMonthlyReport().filter(d => d.totalIncome > 0 || d.totalExpense > 0);
-    if (monthly.length === 0) { alert('Không có dữ liệu để xuất'); return; }
+    if (monthly.length === 0) { showToast('Không có dữ liệu để xuất', 'warning'); return; }
 
     let csv = 'Ngày,Số ca,Số bill,Doanh thu,Chi phí,Lợi nhuận,Tiền mặt,Thẻ,Chuyển khoản\n';
     monthly.forEach(d => {
-      csv += `${d.date},${d.shifts},${d.billCount},${d.totalIncome},${d.totalExpense},${d.net},${d.cashTotal},${d.cardTotal},${d.transferTotal}\n`;
+      csv += `"${d.date}",${d.shifts},${d.billCount},${d.totalIncome},${d.totalExpense},${d.net},${d.cashTotal},${d.cardTotal},${d.transferTotal}\n`;
     });
 
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });

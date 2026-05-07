@@ -222,6 +222,23 @@ export function getPeriodBounds(period) {
 function _pad2(n) { return n < 10 ? '0' + n : String(n); }
 
 /**
+ * Get effective total for an invoice.
+ * Prefers sum of payments over stored amount to ensure consistency.
+ * This handles existing data where inv.amount may differ from sum(payments).
+ */
+function _effectiveTotal(inv) {
+  var payments = inv.payments;
+  if (payments && payments.length > 0) {
+    var sum = 0;
+    for (var i = 0; i < payments.length; i++) {
+      sum += payments[i].amount || 0;
+    }
+    return sum;
+  }
+  return inv.amount || 0;
+}
+
+/**
  * Kiểm tra hóa đơn có nằm trong khoảng thời gian không
  */
 function _isInBounds(inv, bounds) {
@@ -274,7 +291,7 @@ export function getRevenueSummary(period) {
 
   for (var i = 0; i < invoices.length; i++) {
     var inv = invoices[i];
-    result.totalRevenue += inv.amount || 0;
+    result.totalRevenue += _effectiveTotal(inv);
     
     // Nhóm theo ngày làm việc
     var wDay = inv.refDate ? _workingDayDate(inv.refDate) : (inv.date || '');
@@ -312,7 +329,7 @@ export function getDailyBreakdown(period) {
     if (!days[wDay]) {
       days[wDay] = { date: wDay, total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
     }
-    days[wDay].total += inv.amount || 0;
+    days[wDay].total += _effectiveTotal(inv);
     days[wDay].bills++;
 
     var payments = inv.payments || [];
@@ -340,7 +357,7 @@ export function getTodayRevenue() {
 
   for (var i = 0; i < invoices.length; i++) {
     var inv = invoices[i];
-    result.total += inv.amount || 0;
+    result.total += _effectiveTotal(inv);
     if (inv.syncedAt > result.lastSync) result.lastSync = inv.syncedAt;
 
     var payments = inv.payments || [];
@@ -493,3 +510,40 @@ export function removeCukcukFromTransactions(transactions) {
     return !(tx.note && tx.note.indexOf('[CUKCUK]') !== -1);
   });
 }
+
+/**
+ * Auto-cleanup invoices older than 90 days to prevent localStorage bloat.
+ */
+export function cleanupOldInvoices(maxDays) {
+  if (!maxDays) maxDays = 90;
+  var store = _load();
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - maxDays);
+  var cutoffStr = _dateStr(cutoff);
+  var removed = 0;
+  for (var refId in store.invoices) {
+    if (store.invoices.hasOwnProperty(refId)) {
+      var inv = store.invoices[refId];
+      if (inv.date && inv.date < cutoffStr) {
+        delete store.invoices[refId];
+        removed++;
+      }
+    }
+  }
+  if (removed > 0) {
+    _save(store);
+    console.log('[InvoiceStore] Auto-cleanup: removed ' + removed + ' invoices older than ' + maxDays + ' days');
+  }
+  return removed;
+}
+
+// Auto-cleanup on module load (once per session)
+(function() {
+  try {
+    var lastCleanup = sessionStorage.getItem('invoice_cleanup_done');
+    if (!lastCleanup) {
+      cleanupOldInvoices(90);
+      sessionStorage.setItem('invoice_cleanup_done', '1');
+    }
+  } catch(e) { /* ignore */ }
+})();

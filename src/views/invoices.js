@@ -1,6 +1,6 @@
 /* ── Invoices View (Enhanced w/ Drive Upload) ── */
 import { getCurrentShift, addInvoice, removeInvoice } from '../store.js';
-import { showToast, showModal, hideModal, formatTime } from '../utils.js';
+import { showToast, showModal, hideModal, showConfirm, formatTime } from '../utils.js';
 import { uploadFileToCloud, deleteFileFromCloud } from '../api.js';
 
 export function render() {
@@ -157,7 +157,8 @@ export function init() {
   // Delete
   document.querySelectorAll('[data-delete-inv]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Xóa chứng từ này?')) return;
+      var ok = await showConfirm('Xóa chứng từ này?', { title: 'Xóa chứng từ', confirmText: 'Xóa', type: 'danger' });
+      if (!ok) return;
       const driveId = btn.dataset.driveId;
       if (driveId) await deleteFileFromCloud(driveId).catch(() => {});
       removeInvoice(btn.dataset.deleteInv);

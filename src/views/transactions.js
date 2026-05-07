@@ -1,6 +1,6 @@
 /* ── Transactions View (Enhanced w/ Search) ── */
 import { getCurrentShift, addTransaction, removeTransaction, addOtherTransaction, removeOtherTransaction, getCategories, addCategory } from '../store.js';
-import { formatCurrency, formatTime, showToast, showModal, hideModal } from '../utils.js';
+import { formatCurrency, formatTime, showToast, showModal, hideModal, showConfirm } from '../utils.js';
 
 export function render() {
   const shift = getCurrentShift();
@@ -250,14 +250,16 @@ export function init() {
   document.getElementById('btnAddOther')?.addEventListener('click', _showOtherTxModal);
 
   document.querySelectorAll('[data-remove-tx]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      if (confirm('Xóa giao dịch này?')) { removeTransaction(btn.dataset.removeTx); showToast('Đã xóa', 'info'); window.refreshView?.(); }
+    btn.addEventListener('click', async () => {
+      var ok = await showConfirm('Xóa giao dịch này?', { title: 'Xóa giao dịch', confirmText: 'Xóa', type: 'danger' });
+      if (ok) { removeTransaction(btn.dataset.removeTx); showToast('Đã xóa', 'info'); window.refreshView?.(); }
     })
   );
 
   document.querySelectorAll('[data-remove-other]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      if (confirm('Xóa?')) { removeOtherTransaction(btn.dataset.removeOther); showToast('Đã xóa', 'info'); window.refreshView?.(); }
+    btn.addEventListener('click', async () => {
+      var ok = await showConfirm('Xóa giao dịch này?', { title: 'Xóa', confirmText: 'Xóa', type: 'danger' });
+      if (ok) { removeOtherTransaction(btn.dataset.removeOther); showToast('Đã xóa', 'info'); window.refreshView?.(); }
     })
   );
 

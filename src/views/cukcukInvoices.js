@@ -4,7 +4,7 @@
    Hiển thị hóa đơn đã nạp từ CUKCUK, phân theo ngày/tuần/tháng/quý/năm.
    Tách biệt với giao dịch thủ công (shift.transactions).
    ══════════════════════════════════════════════════════════════ */
-import { formatCurrency, formatDate, showToast } from '../utils.js';
+import { formatCurrency, formatDate, showToast, showConfirm } from '../utils.js';
 import { getSettings, getCurrentShift } from '../store.js';
 
 var _currentPeriod = 'day';
@@ -243,6 +243,8 @@ function _renderInvoiceTable(invoices) {
             case 'transfer': transfer += payments[i].amount; break;
           }
         }
+        // Use sum of payments as total (ensures consistency)
+        var rowTotal = (cash + card + transfer) > 0 ? (cash + card + transfer) : (inv.amount || 0);
         var timeStr = '';
         try {
           var d = new Date(inv.refDate);
@@ -257,7 +259,7 @@ function _renderInvoiceTable(invoices) {
           '<td class="text-right" style="color:var(--success);font-size:12px;">' + (cash > 0 ? formatCurrency(cash) : '') + '</td>' +
           '<td class="text-right" style="color:var(--info);font-size:12px;">' + (card > 0 ? formatCurrency(card) : '') + '</td>' +
           '<td class="text-right" style="color:var(--primary);font-size:12px;">' + (transfer > 0 ? formatCurrency(transfer) : '') + '</td>' +
-          '<td class="text-right amount-in">' + formatCurrency(inv.amount) + '</td>' +
+          '<td class="text-right amount-in">' + formatCurrency(rowTotal) + '</td>' +
         '</tr>';
       }).join('')}
     </tbody>
@@ -317,7 +319,8 @@ export function init() {
 
   // Resync button
   document.getElementById('btnResyncCukcuk')?.addEventListener('click', async function() {
-    if (!confirm('Xóa toàn bộ hóa đơn hôm nay và tải lại từ CUKCUK?')) return;
+    var ok = await showConfirm('Xóa toàn bộ hóa đơn hôm nay và tải lại từ CUKCUK?', { title: 'Đồng bộ lại', confirmText: 'Sync lại', type: 'warning' });
+    if (!ok) return;
     try {
       var cukcuk = await import('../integration/cukcuk.js');
       await cukcuk.resyncAllTransactions();

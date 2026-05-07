@@ -1,5 +1,5 @@
 import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff } from '../store.js';
-import { showToast, showModal, hideModal, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
+import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
 import { getStaffFromCloud, getConfigFromCloud } from '../api.js';
 
 let _staffList = [];
@@ -279,8 +279,13 @@ export function init() {
     });
 
     // Force reset (emergency)
-    document.getElementById('btnForceReset')?.addEventListener('click', () => {
-      if (confirm('⚠️ HỦY CA HIỆN TẠI?\n\nCa sẽ bị xóa hoàn toàn, KHÔNG lưu vào lịch sử.\nHành động này không thể hoàn tác!')) {
+    document.getElementById('btnForceReset')?.addEventListener('click', async () => {
+      var ok = await showConfirm('Ca sẽ bị xóa hoàn toàn, KHÔNG lưu vào lịch sử.\nHành động này không thể hoàn tác!', {
+        title: '⚠️ HỦY CA HIỆN TẠI?',
+        confirmText: 'Hủy ca',
+        type: 'danger'
+      });
+      if (ok) {
         const s = getState();
         s.currentShift = null;
         try {

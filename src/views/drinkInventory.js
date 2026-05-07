@@ -3,7 +3,7 @@
    DrinkStock Pro integrated into KG-Cashier
    ════════════════════════════════════════════════ */
 import { getCurrentShift, addAudit } from '../store.js';
-import { showToast, formatCurrency, showModal, hideModal } from '../utils.js';
+import { showToast, formatCurrency, showModal, hideModal, showConfirm } from '../utils.js';
 
 // ── Storage Keys ──────────────────────────────
 const DRINK_STORE_KEY = 'kg-drink-inventory';
@@ -11,27 +11,89 @@ const DRINK_PRODUCTS_KEY = 'kg-drink-products';
 
 // ── Default Products ──────────────────────────
 const DEFAULT_PRODUCTS = [
-  { id: 'dp1',  name: 'Trà Sữa Trân Châu',    category: 'Trà sữa',    unit: 'ly',   emoji: '🧋', active: true, sort: 1 },
-  { id: 'dp2',  name: 'Hồng Trà Kem Cheese',   category: 'Trà sữa',    unit: 'ly',   emoji: '🍵', active: true, sort: 2 },
-  { id: 'dp3',  name: 'Matcha Latte',           category: 'Đặc biệt',   unit: 'ly',   emoji: '🍵', active: true, sort: 3 },
-  { id: 'dp4',  name: 'Cà Phê Sữa Đá',        category: 'Cà phê',      unit: 'ly',   emoji: '☕', active: true, sort: 4 },
-  { id: 'dp5',  name: 'Cà Phê Đen',            category: 'Cà phê',      unit: 'ly',   emoji: '☕', active: true, sort: 5 },
-  { id: 'dp6',  name: 'Sinh Tố Xoài',          category: 'Sinh tố',     unit: 'ly',   emoji: '🥭', active: true, sort: 6 },
-  { id: 'dp7',  name: 'Sinh Tố Bơ',            category: 'Sinh tố',     unit: 'ly',   emoji: '🥑', active: true, sort: 7 },
-  { id: 'dp8',  name: 'Nước Chanh Muối',        category: 'Nước ép',     unit: 'ly',   emoji: '🍋', active: true, sort: 8 },
-  { id: 'dp9',  name: 'Nước Ép Dưa Hấu',       category: 'Nước ép',     unit: 'ly',   emoji: '🍉', active: true, sort: 9 },
-  { id: 'dp10', name: 'Bia Tiger',              category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 10 },
-  { id: 'dp11', name: 'Bia Heineken',           category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 11 },
-  { id: 'dp12', name: 'Bia 333',                category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 12 },
-  { id: 'dp13', name: 'Coca Cola',              category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 13 },
-  { id: 'dp14', name: 'Pepsi',                  category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 14 },
-  { id: 'dp15', name: 'Nước Khoáng Lavie',      category: 'Nước suối',   unit: 'chai', emoji: '💧', active: true, sort: 15 },
-  { id: 'dp16', name: 'Red Bull',               category: 'Nước tăng lực', unit: 'lon', emoji: '⚡', active: true, sort: 16 },
-  { id: 'dp17', name: 'Sữa Tươi Không Đường',  category: 'Sữa',         unit: 'hộp', emoji: '🥛', active: true, sort: 17 },
-  { id: 'dp18', name: 'Trà Đào',               category: 'Trà',         unit: 'ly',   emoji: '🍑', active: true, sort: 18 },
-  { id: 'dp19', name: 'Trà Vải',               category: 'Trà',         unit: 'ly',   emoji: '🫐', active: true, sort: 19 },
-  { id: 'dp20', name: 'Nước Dừa',              category: 'Tự nhiên',    unit: 'trái', emoji: '🥥', active: true, sort: 20 },
+  // ═══ BIA ═══
+  // CUKCUK name: "Corona"
+  { id: 'dp1',  name: 'Corona',                 category: 'Bia',         unit: 'chai', emoji: '🍺', active: true, sort: 1,  volume: '250ml', caseSize: 24, caseSizeUnit: 'chai', cukcukAliases: ['corona'] },
+  // CUKCUK name: (không có trên CUKCUK — chỉ kiểm kho)
+  { id: 'dp2',  name: 'Heineken Silver Alu',     category: 'Bia',         unit: 'chai', emoji: '🍺', active: true, sort: 2,  volume: '330ml', caseSize: 12, caseSizeUnit: 'chai', cukcukAliases: ['heineken silver alu'] },
+  // CUKCUK name: "Heineken 330ml"
+  { id: 'dp3',  name: 'Heineken 330ml',          category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 3,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken 330ml'] },
+  // CUKCUK name: "Heineken Silver 330ml"
+  { id: 'dp4',  name: 'Heineken Silver 330ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 4,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 330ml'] },
+  // CUKCUK name: "Heineken Silver 250ml"
+  { id: 'dp5',  name: 'Heineken Silver 250ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 5,  volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 250ml'] },
+  // CUKCUK name: "Tiger Nâu 330ml"
+  { id: 'dp6',  name: 'Tiger Nâu 330ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 6,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger nâu 330ml', 'tiger nâu'] },
+  // CUKCUK name: "Tiger Bạc 330ml"
+  { id: 'dp7',  name: 'Tiger Bạc 330ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 7,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger bạc 330ml'] },
+  // CUKCUK name: "Tiger Bạc 250ml"
+  { id: 'dp8',  name: 'Tiger Bạc 250ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 8,  volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger bạc 250ml'] },
+  // ═══ RƯỢU ═══
+  // CUKCUK name: "Soju"
+  { id: 'dp9',  name: 'Soju',                    category: 'Rượu',        unit: 'chai', emoji: '🍶', active: true, sort: 9,  volume: '360ml', caseSize: 20, caseSizeUnit: 'chai', cukcukAliases: ['soju'] },
+  // ═══ NƯỚC NGỌT ═══
+  // CUKCUK name: "Coca Cola"
+  { id: 'dp10', name: 'Coca Cola',               category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 10, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['coca cola'] },
+  // CUKCUK name: "Pepsi"
+  { id: 'dp11', name: 'Pepsi',                   category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 11, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['pepsi'] },
+  // CUKCUK name: "Sting"
+  { id: 'dp12', name: 'Sting',                   category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 12, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['sting'] },
+  // CUKCUK name: "7up"
+  { id: 'dp13', name: '7up',                     category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 13, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['7up'] },
+  // ═══ NƯỚC TĂNG LỰC ═══
+  // CUKCUK name: (không có trên CUKCUK — chỉ kiểm kho)
+  { id: 'dp14', name: 'Red Bull',                category: 'Nước tăng lực', unit: 'lon', emoji: '⚡', active: true, sort: 14, volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['red bull', 'redbull'] },
+  // ═══ NƯỚC SUỐI ═══
+  // CUKCUK name: "Nước suối"
+  { id: 'dp15', name: 'Nước suối',               category: 'Nước suối',   unit: 'chai', emoji: '💧', active: true, sort: 15, volume: '400ml', caseSize: 20, caseSizeUnit: 'chai', cukcukAliases: ['nước suối'] },
 ];
+// ── Safe Math Expression Evaluator ────────────
+// Recursive-descent parser: only supports +, -, *, /, (), numbers
+// No eval/Function — zero injection risk
+function _safeEval(expr) {
+  var sanitized = expr.replace(/[^0-9+\-*/().  ]/g, '').replace(/\s+/g, '');
+  if (!sanitized) throw new Error('Empty');
+  var pos = 0;
+  function parseExpr() {
+    var left = parseTerm();
+    while (pos < sanitized.length && (sanitized[pos] === '+' || sanitized[pos] === '-')) {
+      var op = sanitized[pos++];
+      var right = parseTerm();
+      left = op === '+' ? left + right : left - right;
+    }
+    return left;
+  }
+  function parseTerm() {
+    var left = parseFactor();
+    while (pos < sanitized.length && (sanitized[pos] === '*' || sanitized[pos] === '/')) {
+      var op = sanitized[pos++];
+      var right = parseFactor();
+      left = op === '*' ? left * right : left / right;
+    }
+    return left;
+  }
+  function parseFactor() {
+    if (sanitized[pos] === '(') {
+      pos++; // skip '('
+      var val = parseExpr();
+      if (sanitized[pos] === ')') pos++; // skip ')'
+      return val;
+    }
+    // Handle unary minus
+    var sign = 1;
+    if (sanitized[pos] === '-') { sign = -1; pos++; }
+    else if (sanitized[pos] === '+') { pos++; }
+    var numStr = '';
+    while (pos < sanitized.length && (/[0-9.]/).test(sanitized[pos])) {
+      numStr += sanitized[pos++];
+    }
+    if (!numStr) throw new Error('Expected number');
+    return sign * parseFloat(numStr);
+  }
+  var result = parseExpr();
+  if (pos < sanitized.length) throw new Error('Unexpected char');
+  return result;
+}
 
 // ── Formula Parser ────────────────────────────
 function parseFormula(input) {
@@ -46,11 +108,8 @@ function parseFormula(input) {
   // Has operators → is a formula
   if (/[+\-*/()]/.test(trimmed)) {
     try {
-      // Sanitize: only allow digits, operators, spaces, dots, parens
-      var sanitized = trimmed.replace(/[^0-9+\-*/().  ]/g, '');
-      if (!sanitized) return { value: 0, formula: trimmed, isFormula: false, error: 'Không hợp lệ' };
-      // Safe eval via Function constructor
-      var result = new Function('return (' + sanitized + ')')();
+      // Safe math-only evaluator (no eval/Function)
+      var result = _safeEval(trimmed);
       if (typeof result !== 'number' || isNaN(result) || !isFinite(result)) {
         return { value: 0, formula: trimmed, isFormula: false, error: 'Kết quả không hợp lệ' };
       }
@@ -89,8 +148,19 @@ function uid() {
 }
 
 // ── Data Store ────────────────────────────────
+var DRINK_PRODUCTS_VERSION = 'kg-drink-products-v3'; // bump version when DEFAULT_PRODUCTS changes
+
 function getProducts() {
   try {
+    // Check if product version matches - if not, reset to new defaults
+    var currentVersion = localStorage.getItem('kg-drink-products-version');
+    if (currentVersion !== 'v3') {
+      // Upgrade: replace with CUKCUK-synced product list
+      console.log('[DrinkStock] Upgrading product list to v3 (CUKCUK sync)');
+      localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+      localStorage.setItem('kg-drink-products-version', 'v3');
+      return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
+    }
     var saved = localStorage.getItem(DRINK_PRODUCTS_KEY);
     if (saved) {
       var parsed = JSON.parse(saved);
@@ -99,6 +169,7 @@ function getProducts() {
   } catch (e) { /* ignore */ }
   // First-time: save defaults
   localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+  localStorage.setItem('kg-drink-products-version', 'v3');
   return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
 }
 
@@ -137,20 +208,40 @@ function saveCurrentSession(date, shiftName, session) {
 
 function createSession(date, shiftName) {
   var products = getProducts().filter(function(p) { return p.active; });
+
+  // Auto carry-forward: find the most recent previous session to use closing stock as opening
+  var prevClosingMap = {};
+  try {
+    var data = getInventoryData();
+    var sessions = data.sessions || {};
+    var allKeys = Object.keys(sessions).sort().reverse(); // newest first
+    var currentKey = getSessionKey(date, shiftName);
+    for (var ki = 0; ki < allKeys.length; ki++) {
+      if (allKeys[ki] !== currentKey && sessions[allKeys[ki]] && sessions[allKeys[ki]].rows) {
+        // Found the previous session
+        sessions[allKeys[ki]].rows.forEach(function(r) {
+          if (r.closingStock > 0) prevClosingMap[r.productId] = r.closingStock;
+        });
+        break;
+      }
+    }
+  } catch(e) { /* ignore */ }
+
   var rows = products.map(function(p) {
+    var carryForward = prevClosingMap[p.id] || 0;
     return {
       id: uid(),
       productId: p.id,
-      openingStock: 0,
-      openingFormula: '',
+      openingStock: carryForward,
+      openingFormula: carryForward > 0 ? '' : '',
       newImport: 0,
       newImportFormula: '',
       closingStock: 0,
       closingFormula: '',
-      actualSold: 0,
+      actualSold: carryForward, // opening + 0 import - 0 closing
       cukcukSold: 0,
-      difference: 0,
-      differenceType: 'MATCH',
+      difference: carryForward,
+      differenceType: carryForward > 0 ? 'SURPLUS' : 'MATCH',
       notes: ''
     };
   });
@@ -162,6 +253,11 @@ function createSession(date, shiftName) {
     createdAt: new Date().toISOString(),
     rows: rows
   };
+  
+  if (Object.keys(prevClosingMap).length > 0) {
+    showToast('\u2705 T\u1ef1 \u0111\u1ed9ng mang t\u1ed3n cu\u1ed1i ca tr\u01b0\u1edbc l\u00e0m t\u1ed3n \u0111\u1ea7u ca m\u1edbi', 'success');
+  }
+  
   saveCurrentSession(date, shiftName, session);
   return session;
 }
@@ -192,6 +288,32 @@ export function render() {
   // Build product lookup
   var pMap = {};
   products.forEach(function(p) { pMap[p.id] = p; });
+
+  // ── Sync session rows with current product list ──
+  // 1. Remove ghost rows (product no longer exists)
+  var validRows = rows.filter(function(r) { return !!pMap[r.productId]; });
+  // 2. Add rows for new products not yet in session
+  var existingProductIds = {};
+  validRows.forEach(function(r) { existingProductIds[r.productId] = true; });
+  var activeProducts = products.filter(function(p) { return p.active; });
+  activeProducts.forEach(function(p) {
+    if (!existingProductIds[p.id]) {
+      validRows.push({
+        id: uid(), productId: p.id,
+        openingStock: 0, openingFormula: '',
+        newImport: 0, newImportFormula: '',
+        closingStock: 0, closingFormula: '',
+        actualSold: 0, cukcukSold: 0,
+        difference: 0, differenceType: 'MATCH', notes: ''
+      });
+    }
+  });
+  // Save cleaned session if changed
+  if (validRows.length !== rows.length) {
+    session.rows = validRows;
+    saveCurrentSession(_currentDate, _currentShiftName, session);
+  }
+  rows = validRows;
 
   // Filter & sort rows
   var displayRows = rows.filter(function(r) {
@@ -275,22 +397,22 @@ export function render() {
           <div class="di-stat di-stat-total">
             <span class="material-symbols-rounded" style="font-size:14px;">inventory_2</span>
             <span>Tổng SP</span>
-            <strong>${stats.total}</strong>
+            <strong id="diStatTotal">${stats.total}</strong>
           </div>
           <div class="di-stat di-stat-match">
             <span class="material-symbols-rounded" style="font-size:14px;">check_circle</span>
             <span>Khớp</span>
-            <strong>${stats.match}</strong>
+            <strong id="diStatMatch">${stats.match}</strong>
           </div>
           <div class="di-stat di-stat-surplus">
             <span class="material-symbols-rounded" style="font-size:14px;">trending_up</span>
             <span>Dư</span>
-            <strong>${stats.surplus}</strong>
+            <strong id="diStatSurplus">${stats.surplus}</strong>
           </div>
           <div class="di-stat di-stat-shortage">
             <span class="material-symbols-rounded" style="font-size:14px;">trending_down</span>
             <span>Thiếu</span>
-            <strong>${stats.shortage}</strong>
+            <strong id="diStatShortage">${stats.shortage}</strong>
           </div>
         </div>
       </div>
@@ -371,7 +493,7 @@ export function render() {
                       <span class="di-product-emoji">${p.emoji || '🥤'}</span>
                       <div class="di-product-info">
                         <span class="di-product-name">${p.name}</span>
-                        <span class="di-product-meta">${p.category} · ${p.unit}</span>
+                        <span class="di-product-meta">${p.category} · ${p.unit}${p.volume ? ' · ' + p.volume : ''}${p.caseSize ? ' <span style="color:var(--primary);font-size:9px;">[' + p.caseSize + '/' + (p.caseSizeUnit || 'thùng') + ']</span>' : ''}</span>
                       </div>
                     </div>
                   </td>
@@ -411,11 +533,11 @@ export function render() {
                   </td>
                   <!-- Bán thực kiểm -->
                   <td class="di-td-actual di-td-computed">
-                    <span class="di-computed-value di-value-orange">${formatNum(row.actualSold)}</span>
+                    <span class="di-computed-value di-value-orange di-computed-actual">${formatNum(row.actualSold)}</span>
                   </td>
                   <!-- Bán CUKCUK -->
                   <td class="di-td-cukcuk di-td-computed">
-                    <span class="di-computed-value di-value-teal">${formatNum(row.cukcukSold)}</span>
+                    <span class="di-computed-value di-value-teal di-computed-cukcuk">${formatNum(row.cukcukSold)}</span>
                   </td>
                   <!-- Chênh lệch -->
                   <td class="di-td-diff">
@@ -648,8 +770,9 @@ export function init() {
   // Clear
   var btnClear = document.getElementById('btnDiClearAll');
   if (btnClear) {
-    btnClear.addEventListener('click', function() {
-      if (!confirm('Xóa toàn bộ dữ liệu kiểm kho ca này?\nHành động không thể hoàn tác.')) return;
+    btnClear.addEventListener('click', async function() {
+      var ok = await showConfirm('Xóa toàn bộ dữ liệu kiểm kho ca này?\nHành động không thể hoàn tác.', { title: 'Xóa dữ liệu ca', confirmText: 'Xóa', type: 'danger' });
+      if (!ok) return;
       var data = getInventoryData();
       var key = getSessionKey(_currentDate, _currentShiftName);
       delete data.sessions[key];
@@ -723,9 +846,52 @@ function _handleFormulaBlur(input) {
 }
 
 function _updateRowUI(row) {
-  // We refresh the entire view for simplicity
-  // Preserve expanded state
-  window.refreshView();
+  // Targeted DOM update instead of full refreshView()
+  var tr = document.querySelector('tr[data-row-id="' + row.id + '"]');
+  if (!tr) {
+    // Fallback: full refresh if row not found
+    window.refreshView();
+    return;
+  }
+  
+  // Update computed cells
+  var actualEl = tr.querySelector('.di-computed-actual');
+  if (actualEl) actualEl.textContent = formatNum(row.actualSold);
+  
+  var cukcukEl = tr.querySelector('.di-computed-cukcuk');
+  if (cukcukEl) cukcukEl.textContent = formatNum(row.cukcukSold);
+  
+  // Update diff badge
+  var diffBtn = tr.querySelector('.di-diff-badge');
+  if (diffBtn) {
+    var diffText = row.differenceType === 'MATCH' ? '\u2714 Kh\u1edbp' :
+                   (row.difference > 0 ? '+' : '') + formatNum(row.difference);
+    var diffClass = 'di-diff-badge di-diff-' + row.differenceType.toLowerCase();
+    diffBtn.className = diffClass;
+    var icon = row.differenceType === 'MATCH' ? 'check_circle' :
+               row.differenceType === 'SURPLUS' ? 'trending_up' : 'trending_down';
+    diffBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px;">' + icon + '</span> ' + diffText;
+  }
+  
+  // Update header stats
+  _updateHeaderStats();
+}
+
+function _updateHeaderStats() {
+  var session = getCurrentSession(_currentDate, _currentShiftName);
+  if (!session) return;
+  var rows = session.rows || [];
+  var match = 0, surplus = 0, shortage = 0;
+  rows.forEach(function(r) {
+    if (r.differenceType === 'MATCH') match++;
+    else if (r.differenceType === 'SURPLUS') surplus++;
+    else shortage++;
+  });
+  var el;
+  el = document.getElementById('diStatTotal'); if (el) el.textContent = rows.length;
+  el = document.getElementById('diStatMatch'); if (el) el.textContent = match;
+  el = document.getElementById('diStatSurplus'); if (el) el.textContent = surplus;
+  el = document.getElementById('diStatShortage'); if (el) el.textContent = shortage;
 }
 
 // ── CUKCUK Sync ───────────────────────────────
@@ -801,19 +967,42 @@ async function _handleSyncCukcuk() {
       var product = pMap[row.productId];
       if (!product) return;
 
-      // Try to match by product name (case-insensitive, partial match)
+      // Smart matching: use cukcukAliases first, then fallback to name matching
       var pName = product.name.toLowerCase();
+      var aliases = (product.cukcukAliases || []).map(function(a) { return a.toLowerCase(); });
+      // Add the product name itself as an alias
+      aliases.push(pName);
+
+      var bestMatch = null;
+      var bestQty = 0;
+
       for (var salesName in salesByName) {
-        if (salesName.toLowerCase().indexOf(pName) !== -1 || pName.indexOf(salesName.toLowerCase()) !== -1) {
-          row.cukcukSold = salesByName[salesName];
-          matched++;
-          // Recalculate
-          row.actualSold = calcActualSold(row.openingStock, row.newImport, row.closingStock);
-          var diff = calcDifference(row.actualSold, row.cukcukSold);
-          row.difference = diff.difference;
-          row.differenceType = diff.type;
-          break;
+        var sLower = salesName.toLowerCase();
+        var isMatch = false;
+
+        // Check each alias
+        for (var ai = 0; ai < aliases.length; ai++) {
+          var alias = aliases[ai];
+          // Exact match (best)
+          if (sLower === alias) { isMatch = true; break; }
+          // Alias contained in sales name, or vice versa
+          if (sLower.indexOf(alias) !== -1 || alias.indexOf(sLower) !== -1) { isMatch = true; break; }
         }
+
+        if (isMatch) {
+          bestQty += salesByName[salesName];
+          bestMatch = salesName;
+        }
+      }
+
+      if (bestMatch !== null) {
+        row.cukcukSold = bestQty;
+        matched++;
+        // Recalculate
+        row.actualSold = calcActualSold(row.openingStock, row.newImport, row.closingStock);
+        var diff = calcDifference(row.actualSold, row.cukcukSold);
+        row.difference = diff.difference;
+        row.differenceType = diff.type;
       }
     });
 
@@ -870,9 +1059,9 @@ function _showProductManagerModal() {
             <div class="form-group">
               <label class="form-label">Đơn vị</label>
               <select class="form-input" id="diNewUnit">
-                <option value="ly">Ly</option>
                 <option value="lon">Lon</option>
                 <option value="chai">Chai</option>
+                <option value="ly">Ly</option>
                 <option value="hộp">Hộp</option>
                 <option value="trái">Trái</option>
                 <option value="kg">Kg</option>
@@ -881,8 +1070,23 @@ function _showProductManagerModal() {
             </div>
             <div class="form-group">
               <label class="form-label">Emoji</label>
-              <input type="text" class="form-input" id="diNewEmoji" value="🥤" style="text-align:center;font-size:18px;width:60px;">
+              <input type="text" class="form-input" id="diNewEmoji" value="🍺" style="text-align:center;font-size:18px;width:60px;">
             </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Dung tích</label>
+              <input type="text" class="form-input" id="diNewVolume" placeholder="VD: 330ml">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Quy cách thùng</label>
+              <input type="number" class="form-input" id="diNewCaseSize" placeholder="VD: 24" min="1">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tên trên CUKCUK (aliases, phân cách bằng dấu phẩy)</label>
+            <input type="text" class="form-input" id="diNewAliases" placeholder="VD: heineken, bia heineken, heineken 330">
+            <p class="form-hint">Giúp tự động khớp với tên sản phẩm trên app CUKCUK khi đồng bộ</p>
           </div>
           <button class="btn btn-primary btn-sm" id="btnDiAddProduct">
             <span class="material-symbols-rounded">add</span> Thêm sản phẩm
@@ -906,11 +1110,12 @@ function _showProductManagerModal() {
               <div style="margin-bottom:12px;">
                 <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${cat}</div>
                 ${items.map(function(p) {
+                  var specInfo = (p.volume || '') + (p.caseSize ? ' [' + p.caseSize + '/' + (p.caseSizeUnit || 'thùng') + ']' : '');
                   return `
                     <div class="di-pm-item" data-product-id="${p.id}">
                       <span class="di-pm-emoji">${p.emoji || '🥤'}</span>
                       <span class="di-pm-name">${p.name}</span>
-                      <span class="di-pm-unit">${p.unit}</span>
+                      <span class="di-pm-unit">${p.unit}${specInfo ? ' · <span style="color:var(--text-muted);font-size:10px;">' + specInfo + '</span>' : ''}</span>
                       <label class="toggle-switch di-pm-toggle">
                         <input type="checkbox" ${p.active ? 'checked' : ''} data-toggle-product="${p.id}">
                         <span class="toggle-slider"></span>
@@ -946,6 +1151,10 @@ function _showProductManagerModal() {
           var emoji = (document.getElementById('diNewEmoji').value || '🥤').trim();
           if (!name) { showToast('Nhập tên sản phẩm', 'warning'); return; }
           if (!category) { showToast('Nhập phân loại', 'warning'); return; }
+          var volume = (document.getElementById('diNewVolume').value || '').trim();
+          var caseSize = parseInt(document.getElementById('diNewCaseSize').value) || 0;
+          var aliasesStr = (document.getElementById('diNewAliases').value || '').trim();
+          var aliases = aliasesStr ? aliasesStr.split(',').map(function(a) { return a.trim().toLowerCase(); }).filter(function(a) { return a; }) : [];
           var prods = getProducts();
           var newProd = {
             id: 'dp_' + Date.now().toString(36),
@@ -954,7 +1163,11 @@ function _showProductManagerModal() {
             unit: unit,
             emoji: emoji,
             active: true,
-            sort: prods.length + 1
+            sort: prods.length + 1,
+            volume: volume || undefined,
+            caseSize: caseSize || undefined,
+            caseSizeUnit: unit,
+            cukcukAliases: aliases.length > 0 ? aliases : [name.toLowerCase()]
           };
           prods.push(newProd);
           saveProducts(prods);
@@ -996,9 +1209,10 @@ function _showProductManagerModal() {
 
       // Delete product
       document.querySelectorAll('[data-delete-product]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', async function() {
           var prodId = btn.dataset.deleteProduct;
-          if (!confirm('Xóa sản phẩm này?')) return;
+          var ok = await showConfirm('Xóa sản phẩm này?', { title: 'Xóa sản phẩm', confirmText: 'Xóa', type: 'danger' });
+          if (!ok) return;
           var prods = getProducts().filter(function(p) { return p.id !== prodId; });
           saveProducts(prods);
           showToast('Đã xóa', 'info');
@@ -1010,8 +1224,9 @@ function _showProductManagerModal() {
       // Reset defaults
       var btnReset = document.getElementById('btnDiResetProducts');
       if (btnReset) {
-        btnReset.addEventListener('click', function() {
-          if (!confirm('Khôi phục danh sách sản phẩm về mặc định?')) return;
+        btnReset.addEventListener('click', async function() {
+          var ok = await showConfirm('Khôi phục danh sách sản phẩm về mặc định?', { title: 'Reset', confirmText: 'Khôi phục', type: 'warning' });
+          if (!ok) return;
           localStorage.removeItem(DRINK_PRODUCTS_KEY);
           showToast('Đã khôi phục mặc định', 'info');
           hideModal();

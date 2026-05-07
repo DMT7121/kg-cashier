@@ -548,6 +548,18 @@ export function getShiftSummary(shift) {
 // ── History ──────────────────────────────────
 export function getShiftHistory() { return getState().shifts || []; }
 
+export function saveShiftToHistory(shift) {
+  if (!shift || !shift.id) return;
+  var s = getState();
+  if (!s.shifts) s.shifts = [];
+  // Avoid duplicates
+  for (var i = 0; i < s.shifts.length; i++) {
+    if (s.shifts[i].id === shift.id) return;
+  }
+  s.shifts.push(shift);
+  save();
+}
+
 export function deleteShiftFromHistory(id) {
   var s = getState();
   s.shifts = s.shifts.filter(function(sh) { return sh.id !== id; });

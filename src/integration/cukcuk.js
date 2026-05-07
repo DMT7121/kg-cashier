@@ -873,6 +873,9 @@ export async function syncTransactions() {
       }
 
       // ★ Save to Invoice Store (SINGLE record per bill)
+      // Use sum of payments as amount when payment details are available
+      // This ensures amount === sum(payments) for consistency
+      var effectiveAmount = (invoicePayments.length > 0) ? (invCash + invCard + invTransfer) : amount;
       var invoiceRecord = {
         refId: refId,
         refNo: refNo,
@@ -880,7 +883,7 @@ export async function syncTransactions() {
         date: todayStr,
         tableName: tableName,
         employeeName: employeeName,
-        amount: amount,
+        amount: effectiveAmount,
         payments: invoicePayments,
         syncedAt: new Date().toISOString(),
         pushedToSheets: false

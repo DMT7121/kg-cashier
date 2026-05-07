@@ -1,5 +1,5 @@
 /* ── Staff Management View (Feature 6) — Realtime ── */
-import { showToast, showModal, hideModal } from '../utils.js';
+import { showToast, showModal, hideModal, showConfirm } from '../utils.js';
 import { getStaffFromCloud, saveStaffToCloud, deleteStaffFromCloud } from '../api.js';
 import { setCachedStaff } from '../store.js';
 
@@ -13,7 +13,7 @@ export function render() {
       <div class="empty-state" style="padding:100px 20px;">
         <span class="material-symbols-rounded" style="font-size:64px;color:var(--primary);margin-bottom:20px;">lock</span>
         <h2>Yêu cầu quyền Admin</h2>
-        <p>Vui lòng nhập mật khẩu quản trị để truy cập trang này (712121)</p>
+        <p>Vui lòng nhập mật khẩu quản trị để truy cập trang này</p>
         <div style="max-width:300px;margin:24px auto;">
           <input type="password" id="adminPassInput" class="form-input" style="text-align:center;font-size:24px;letter-spacing:4px;" placeholder="••••••" autofocus autocomplete="off">
           <button class="btn btn-primary" id="btnAdminAuth" style="width:100%;margin-top:16px;">Xác nhận</button>
@@ -122,7 +122,8 @@ function _bindStaffEvents() {
   // Bind delete events
   grid.querySelectorAll('[data-delete-staff]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Xóa nhân viên này?')) return;
+      var ok = await showConfirm('Xóa nhân viên này?', { title: 'Xóa nhân viên', confirmText: 'Xóa', type: 'danger' });
+      if (!ok) return;
       const result = await deleteStaffFromCloud(btn.dataset.deleteStaff);
       showToast(result.message, result.success ? 'success' : 'error');
       if (result.success) loadStaff(); // Reload also updates cache
@@ -225,4 +226,11 @@ export function init() {
   });
 
   document.getElementById('btnAddStaff')?.addEventListener('click', () => showStaffModal());
+}
+
+export function destroy() {
+  if (_refreshTimer) {
+    clearInterval(_refreshTimer);
+    _refreshTimer = null;
+  }
 }
