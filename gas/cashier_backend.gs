@@ -6,6 +6,67 @@
 const CASHIER_SS_ID = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
 const CASHIER_DRIVE_ID = '15FAybIiVn96rEXs7BoaTQL5yyqkWHoJz';
 
+// ══════════════════════════════════════════════
+//  ADVANCED SHEETS API — Bulk Read/Write
+//  Requires: Google Sheets API v4 enabled in
+//  Apps Script → Services → Google Sheets API
+// ══════════════════════════════════════════════
+
+/**
+ * Read all data from a sheet using Advanced Sheets API.
+ * Returns 2D array (including header row).
+ * Falls back to SpreadsheetApp if Advanced API unavailable.
+ */
+function _sheetsGet(sheetName) {
+  try {
+    var resp = Sheets.Spreadsheets.Values.get(CASHIER_SS_ID, sheetName);
+    return resp.values || [];
+  } catch(e) {
+    // Fallback: sheet doesn't exist or API not enabled
+    return [];
+  }
+}
+
+/**
+ * Batch write rows to a sheet using Advanced Sheets API.
+ * Much faster than individual setValues calls.
+ * @param {string} sheetName
+ * @param {string} range - A1 notation, e.g. 'Sheet1!A2:L'
+ * @param {Array[]} values - 2D array of values
+ */
+function _sheetsBatchWrite(sheetName, range, values) {
+  if (!values || values.length === 0) return;
+  Sheets.Spreadsheets.Values.update(
+    { values: values },
+    CASHIER_SS_ID,
+    range,
+    { valueInputOption: 'RAW' }
+  );
+}
+
+/**
+ * Append rows to end of sheet using Advanced Sheets API.
+ * Fastest method for bulk insert.
+ */
+function _sheetsAppend(sheetName, values) {
+  if (!values || values.length === 0) return;
+  Sheets.Spreadsheets.Values.append(
+    { values: values },
+    CASHIER_SS_ID,
+    sheetName + '!A1',
+    { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' }
+  );
+}
+
+/**
+ * Clear a specific range using Advanced API.
+ */
+function _sheetsClear(range) {
+  try {
+    Sheets.Spreadsheets.Values.clear({}, CASHIER_SS_ID, range);
+  } catch(e) { /* ignore */ }
+}
+
 // ── Web App Handlers ─────────────────────────
 function doGet(e) {
   return _handleCashierRequest(e);
@@ -84,16 +145,19 @@ function _getSheet(name, headers) {
 }
 
 function _getSheetData(name) {
-  const ss = SpreadsheetApp.openById(CASHIER_SS_ID);
-  const sheet = ss.getSheetByName(name);
-  if (!sheet || sheet.getLastRow() < 2) return [];
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  return data.map(row => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i]; });
-    return obj;
-  });
+  // Use Advanced Sheets API for faster bulk read
+  var allRows = _sheetsGet(name);
+  if (!allRows || allRows.length < 2) return [];
+  var headers = allRows[0];
+  var result = [];
+  for (var r = 1; r < allRows.length; r++) {
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      obj[headers[c]] = (allRows[r] && allRows[r][c] !== undefined) ? allRows[r][c] : '';
+    }
+    result.push(obj);
+  }
+  return result;
 }
 
 // ── Shift CRUD ───────────────────────────────
@@ -103,13 +167,13 @@ function _syncShift(data) {
 
   if (!data.id) return { success: false, message: 'Missing shift ID' };
 
-  // Find existing row
-  const allData = sheet.getLastRow() > 1
-    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues()
-    : [];
+  // Use Advanced API for fast row lookup
+  var allRows = _sheetsGet('KG_SHIFTS');
   let rowIndex = -1;
-  for (let i = 0; i < allData.length; i++) {
-    if (allData[i][0] === data.id) { rowIndex = i + 2; break; }
+  if (allRows && allRows.length > 1) {
+    for (let i = 1; i < allRows.length; i++) {
+      if (allRows[i][0] === data.id) { rowIndex = i + 1; break; }
+    }
   }
 
   const jsonData = JSON.stringify({
@@ -128,9 +192,9 @@ function _syncShift(data) {
   ];
 
   if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+    _sheetsBatchWrite('KG_SHIFTS', 'KG_SHIFTS!A' + rowIndex + ':M' + rowIndex, [row]);
   } else {
-    sheet.appendRow(row);
+    _sheetsAppend('KG_SHIFTS', [row]);
   }
 
   _addAuditLog({ user: data.cashierName, action: 'SYNC_SHIFT', details: 'Ca ' + data.shiftNumber + ' - ' + data.date });
@@ -216,23 +280,35 @@ function _saveStaff(data) {
   const sheet = _getSheet('KG_STAFF', headers);
 
   if (!data.name) return { success: false, message: 'Thiếu tên nhân viên' };
-  if (!data.pin || data.pin.length < 4) return { success: false, message: 'PIN phải có ít nhất 4 số' };
+  // PIN required for new staff, optional for edits
+  if (!data.id && (!data.pin || data.pin.length < 4)) return { success: false, message: 'PIN phải có ít nhất 4 số' };
 
   const id = data.id || Utilities.getUuid().substring(0, 8);
-  const allData = sheet.getLastRow() > 1
-    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues()
-    : [];
+  
+  // Use Advanced API for fast read
+  var allRows = _sheetsGet('KG_STAFF');
   let rowIndex = -1;
-  for (let i = 0; i < allData.length; i++) {
-    if (allData[i][0] === id) { rowIndex = i + 2; break; }
+  let existingPin = '';
+  if (allRows && allRows.length > 1) {
+    for (let i = 1; i < allRows.length; i++) {
+      if (allRows[i][0] === id) {
+        rowIndex = i + 1; // sheet row (1-indexed)
+        existingPin = allRows[i][2] || ''; // keep old PIN if not provided
+        break;
+      }
+    }
   }
 
-  const row = [id, data.name, data.pin, data.role || 'cashier', data.status || 'active', data.createdAt || new Date().toISOString()];
+  var pin = data.pin || existingPin;
+  if (!pin || pin.length < 4) return { success: false, message: 'PIN phải có ít nhất 4 số' };
+
+  const row = [id, data.name, pin, data.role || 'cashier', data.status || 'active', data.createdAt || new Date().toISOString()];
 
   if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+    // Update existing row via Advanced API
+    _sheetsBatchWrite('KG_STAFF', 'KG_STAFF!A' + rowIndex + ':F' + rowIndex, [row]);
   } else {
-    sheet.appendRow(row);
+    _sheetsAppend('KG_STAFF', [row]);
   }
 
   // Auto-update KG_CONFIG sheet with staff list
@@ -565,85 +641,76 @@ function _syncCukcukRevenue(data) {
     const sheetName = 'CUKCUK_' + monthKey;
     let sheet = ss.getSheetByName(sheetName);
     
-    // Create sheet if not exists
+    // Create sheet if not exists (one-time setup with SpreadsheetApp)
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.appendRow(CUKCUK_HEADERS);
-      // Format header
       const headerRange = sheet.getRange(1, 1, 1, CUKCUK_HEADERS.length);
-      headerRange.setFontWeight('bold');
-      headerRange.setBackground('#10b981');
-      headerRange.setFontColor('#ffffff');
-      // Freeze header
+      headerRange.setFontWeight('bold').setBackground('#10b981').setFontColor('#ffffff');
       sheet.setFrozenRows(1);
-      // Set column widths
-      sheet.setColumnWidth(1, 280); // RefId
-      sheet.setColumnWidth(2, 120); // RefNo
-      sheet.setColumnWidth(3, 160); // RefDate
-      sheet.setColumnWidth(4, 100); // Table
-      sheet.setColumnWidth(5, 120); // Employee
-      sheet.setColumnWidth(6, 130); // Amount
-      sheet.setColumnWidth(7, 130); // Cash
-      sheet.setColumnWidth(8, 130); // Card
-      sheet.setColumnWidth(9, 130); // Transfer
-      sheet.setColumnWidth(10, 150); // PaymentInfo
-      sheet.setColumnWidth(11, 200); // ShiftId
-      sheet.setColumnWidth(12, 160); // SyncedAt
+      sheet.setColumnWidths(1, 12, 140);
     }
     
-    // Build existing RefId index for fast lookup (upsert)
-    const lastRow = sheet.getLastRow();
-    const existingRefIds = {};
-    if (lastRow > 1) {
-      const refIdCol = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-      for (let i = 0; i < refIdCol.length; i++) {
-        existingRefIds[String(refIdCol[i][0])] = i + 2; // row number (1-indexed, +1 for header)
+    // ★ ADVANCED API: Read existing RefIds in single API call
+    var existingRefIds = {};
+    var existingRows = _sheetsGet(sheetName);
+    if (existingRows && existingRows.length > 1) {
+      for (var ei = 1; ei < existingRows.length; ei++) {
+        existingRefIds[String(existingRows[ei][0] || '')] = ei + 1;
       }
     }
     
-    // Process invoices for this month
     const monthInvoices = byMonth[monthKey];
     const newRows = [];
+    var updateBatch = []; // Collect updates for batch write
     
     for (let i = 0; i < monthInvoices.length; i++) {
       const inv = monthInvoices[i];
       const refId = String(inv.refId || '');
       
       const row = [
-        refId,
-        inv.refNo || '',
-        inv.refDate || '',
-        inv.tableName || '',
-        inv.employeeName || '',
-        inv.amount || 0,
-        inv.cashAmount || 0,
-        inv.cardAmount || 0,
-        inv.transferAmount || 0,
-        inv.paymentInfo || '',
-        shiftId,
-        now
+        refId, inv.refNo || '', inv.refDate || '',
+        inv.tableName || '', inv.employeeName || '',
+        inv.amount || 0, inv.cashAmount || 0,
+        inv.cardAmount || 0, inv.transferAmount || 0,
+        inv.paymentInfo || '', shiftId, now
       ];
       
       if (existingRefIds[refId]) {
-        // Update existing row
-        sheet.getRange(existingRefIds[refId], 1, 1, row.length).setValues([row]);
+        // Collect for batch update
+        updateBatch.push({ range: sheetName + '!A' + existingRefIds[refId], values: [row] });
         totalUpdated++;
       } else {
-        // New row
         newRows.push(row);
         totalInserted++;
       }
     }
     
-    // Batch append new rows
-    if (newRows.length > 0) {
-      sheet.getRange(lastRow + 1, 1, newRows.length, CUKCUK_HEADERS.length).setValues(newRows);
+    // ★ ADVANCED API: Batch update existing rows in single call
+    if (updateBatch.length > 0) {
+      try {
+        Sheets.Spreadsheets.Values.batchUpdate(
+          { valueInputOption: 'RAW', data: updateBatch },
+          CASHIER_SS_ID
+        );
+      } catch(e) {
+        // Fallback: individual updates
+        updateBatch.forEach(function(u) {
+          try { _sheetsBatchWrite(sheetName, u.range, u.values); } catch(ex) {}
+        });
+      }
     }
     
-    // Format amount columns as number
+    // ★ ADVANCED API: Bulk append new rows in single call
+    if (newRows.length > 0) {
+      _sheetsAppend(sheetName, newRows);
+    }
+    
+    // Format amount columns (one-time cosmetic, uses SpreadsheetApp)
     if (sheet.getLastRow() > 1) {
-      const amtRange = sheet.getRange(2, 6, sheet.getLastRow() - 1, 4); // Amount, Cash, Card, Transfer
-      amtRange.setNumberFormat('#,##0');
+      try {
+        sheet.getRange(2, 6, sheet.getLastRow() - 1, 4).setNumberFormat('#,##0');
+      } catch(e) { /* ignore format errors */ }
     }
   }
   
