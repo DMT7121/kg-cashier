@@ -404,9 +404,47 @@ function _buildHandoverHTML(revSummary) {
               <tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>${fc(expectedCash)}</strong></td></tr>
               <tr><td>TM kiểm kê thực tế</td><td class="r">${fc(cashCountTotal)}</td></tr>
               <tr class="a4-disc-row ${Math.abs(discrepancy) > 0 ? 'a4-disc-warn' : 'a4-disc-ok'}"><td><strong>CHÊNH LỆCH</strong></td><td class="r"><strong>${discrepancy === 0 ? '✓ 0 đ' : (discrepancy > 0 ? '+' : '') + fc(discrepancy)}</strong></td></tr>
-              ${(target.cashToKeep || 0) > 0 ? '<tr><td>Tiền giữ lại</td><td class="r">' + fc(target.cashToKeep) + '</td></tr>' : ''}
-              ${(target.cashToDeposit || 0) > 0 ? '<tr><td>Tiền bàn giao</td><td class="r">' + fc(target.cashToDeposit) + '</td></tr>' : ''}
             </tfoot></table>
+
+            ${(function() {
+              var pc = target.pinnedCash || {};
+              var hasPins = Object.keys(pc).length > 0;
+              if (!hasPins && !(target.cashToKeep > 0)) return '';
+
+              var keepRows = '';
+              var handoverRows = '';
+              var keepTotal = 0;
+              var handoverTotal = 0;
+
+              for (var di = 0; di < denominations.length; di++) {
+                var dv = denominations[di].value;
+                var dl = denominations[di].label;
+                var countQty = cc[dv] || 0;
+                var pinQty = pc[dv] || 0;
+                var handQty = Math.max(0, countQty - pinQty);
+                if (pinQty > 0) {
+                  keepRows += '<tr><td>' + pinQty + ' x ' + dl + '</td><td class="r">' + fc(dv * pinQty) + '</td></tr>';
+                  keepTotal += dv * pinQty;
+                }
+                if (handQty > 0) {
+                  handoverRows += '<tr><td>' + handQty + ' x ' + dl + '</td><td class="r">' + fc(dv * handQty) + '</td></tr>';
+                  handoverTotal += dv * handQty;
+                }
+              }
+
+              var html = '';
+              if (keepRows) {
+                html += '<div class="a4-section-title" style="color:#e8a838;margin-top:10px;">▌TIỀN GIỮ LẠI (KÉT)</div>';
+                html += '<table class="a4-table"><tbody>' + keepRows + '</tbody>';
+                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng giữ lại</strong></td><td class="r"><strong>' + fc(keepTotal) + '</strong></td></tr></tfoot></table>';
+              }
+              if (handoverRows) {
+                html += '<div class="a4-section-title" style="color:#22c55e;margin-top:10px;">▌TIỀN BÀN GIAO</div>';
+                html += '<table class="a4-table"><tbody>' + handoverRows + '</tbody>';
+                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng bàn giao</strong></td><td class="r"><strong>' + fc(handoverTotal) + '</strong></td></tr></tfoot></table>';
+              }
+              return html;
+            })()}
           </div>
         </div>
 

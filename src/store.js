@@ -442,15 +442,27 @@ export function removeOtherTransaction(id) {
 }
 
 // ── Cash count ───────────────────────────────
-export function updateCashCount(counts) {
+export function updateCashCount(counts, pinnedCash) {
   var s = getState();
   if (!s.currentShift) throw new Error('Chưa mở ca');
   var newCounts = {};
   for (var key in counts) { newCounts[key] = counts[key]; }
   s.currentShift.cashCount = newCounts;
+  // Save pinned cash (ghim két) if provided
+  if (pinnedCash) {
+    var newPins = {};
+    for (var pk in pinnedCash) { if (pinnedCash[pk] > 0) newPins[pk] = pinnedCash[pk]; }
+    s.currentShift.pinnedCash = newPins;
+    // Auto-calculate cashToKeep (sum of pinned) and cashToDeposit (total - pinned)
+    var totalCount = 0, totalPinned = 0;
+    for (var d in newCounts) { totalCount += Number(d) * Number(newCounts[d]); }
+    for (var p in newPins) { totalPinned += Number(p) * Number(newPins[p]); }
+    s.currentShift.cashToKeep = totalPinned;
+    s.currentShift.cashToDeposit = Math.max(0, totalCount - totalPinned);
+  }
   save();
   var total = 0;
-  for (var d in counts) { total += Number(d) * Number(counts[d]); }
+  for (var d2 in counts) { total += Number(d2) * Number(counts[d2]); }
   addAudit('UPDATE_CASH_COUNT', 'Tổng: ' + total.toLocaleString('vi-VN') + 'đ');
   _syncCurrentShift();
 }

@@ -4,7 +4,12 @@ import { formatCurrency, denominations, showToast } from '../utils.js';
 
 var PIN_KEY = 'kg_cashier_pinned_cash';
 
+/** Load pins: prioritize shift data, fallback to localStorage */
 function _loadPins() {
+  var shift = getCurrentShift();
+  if (shift && shift.pinnedCash && Object.keys(shift.pinnedCash).length > 0) {
+    return shift.pinnedCash;
+  }
   try {
     var saved = localStorage.getItem(PIN_KEY);
     if (saved) return JSON.parse(saved);
@@ -12,10 +17,20 @@ function _loadPins() {
   return {};
 }
 
-function _savePins(pins) {
+function _savePinsLocal(pins) {
   try {
     localStorage.setItem(PIN_KEY, JSON.stringify(pins));
   } catch(e) { /* ignore */ }
+}
+
+function _collectPins() {
+  var pins = {};
+  document.querySelectorAll('[data-pin-denom]').forEach(function(input) {
+    var denom = Number(input.dataset.pinDenom);
+    var val = parseInt(input.value) || 0;
+    if (val > 0) pins[denom] = val;
+  });
+  return pins;
 }
 
 export function render() {
@@ -25,6 +40,7 @@ export function render() {
   const counts = shift.cashCount || {};
   const pins = _loadPins();
   const total = Object.entries(counts).reduce((s, [d, q]) => s + Number(d) * Number(q), 0);
+  const totalPinned = Object.entries(pins).reduce((s, [d, q]) => s + Number(d) * Number(q), 0);
 
   return `
     <div class="section-header">
@@ -47,8 +63,8 @@ export function render() {
             <div style="display:flex;flex-direction:column;align-items:center;min-width:70px;">
               <span class="denom-badge" style="background:${d.color};">${d.label}</span>
               <div class="denom-pin-row">
-                <span class="pin-icon" title="Ghim két: ${pinQty} tờ" data-pin-toggle="${d.value}">📌</span>
-                <input type="number" class="pin-input" data-pin-denom="${d.value}" value="${pinQty}" min="0" title="Số tờ ghim két">
+                <span class="pin-icon" title="Nhấn để áp dụng số ghim két vào số lượng" data-pin-toggle="${d.value}">📌</span>
+                <input type="number" data-pin-denom="${d.value}" value="${pinQty}" min="0" title="Số tờ ghim két (giữ lại)">
               </div>
             </div>
             <div class="denom-controls">
@@ -70,6 +86,17 @@ export function render() {
       <span id="cashTotal" class="cash-total-value">${formatCurrency(total)}</span>
     </div>
 
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <div style="flex:1;padding:10px 14px;background:rgba(232,168,56,.08);border:1px solid rgba(232,168,56,.2);border-radius:var(--radius-sm);font-size:13px;">
+        <span style="color:var(--text-muted);">📌 Tiền giữ lại (két):</span>
+        <strong id="cashPinnedTotal" style="float:right;color:var(--primary);">${formatCurrency(totalPinned)}</strong>
+      </div>
+      <div style="flex:1;padding:10px 14px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:var(--radius-sm);font-size:13px;">
+        <span style="color:var(--text-muted);">🤝 Tiền bàn giao:</span>
+        <strong id="cashHandoverTotal" style="float:right;color:var(--success);">${formatCurrency(Math.max(0, total - totalPinned))}</strong>
+      </div>
+    </div>
+
     <button class="btn btn-primary" style="width:100%;margin-top:16px;" id="btnSaveCashCount">
       <span class="material-symbols-rounded">save</span> Lưu kiểm kê
     </button>
@@ -87,8 +114,19 @@ function _recalculate() {
     const card = input.closest('.denomination-card');
     if (card) card.querySelector('.denom-subtotal').textContent = formatCurrency(denom * qty);
   });
+
+  // Recalc pinned total
+  var pins = _collectPins();
+  var totalPinned = 0;
+  for (var p in pins) { totalPinned += Number(p) * Number(pins[p]); }
+
   const el = document.getElementById('cashTotal');
   if (el) el.textContent = formatCurrency(total);
+  const pinnedEl = document.getElementById('cashPinnedTotal');
+  if (pinnedEl) pinnedEl.textContent = formatCurrency(totalPinned);
+  const handoverEl = document.getElementById('cashHandoverTotal');
+  if (handoverEl) handoverEl.textContent = formatCurrency(Math.max(0, total - totalPinned));
+
   return counts;
 }
 
@@ -111,6 +149,11 @@ export function init() {
     input.addEventListener('input', _recalculate);
   });
 
+  // Pin input change — update totals live
+  document.querySelectorAll('[data-pin-denom]').forEach(input => {
+    input.addEventListener('input', _recalculate);
+  });
+
   // Pin icon click — apply pinned value to count input
   document.querySelectorAll('[data-pin-toggle]').forEach(icon => {
     icon.addEventListener('click', () => {
@@ -126,22 +169,6 @@ export function init() {
     });
   });
 
-  // Pin input change — save to localStorage
-  document.querySelectorAll('[data-pin-denom]').forEach(input => {
-    input.addEventListener('change', () => {
-      var pins = _loadPins();
-      var denom = Number(input.dataset.pinDenom);
-      var val = parseInt(input.value) || 0;
-      if (val > 0) {
-        pins[denom] = val;
-      } else {
-        delete pins[denom];
-      }
-      _savePins(pins);
-      showToast('📌 Ghim két ' + denominations.find(d => d.value === denom)?.label + ': ' + val + ' tờ', 'info');
-    });
-  });
-
   // Reset
   document.getElementById('btnResetCount')?.addEventListener('click', () => {
     document.querySelectorAll('[data-denom-input]').forEach(input => { input.value = 0; });
@@ -152,18 +179,12 @@ export function init() {
   // Save
   document.getElementById('btnSaveCashCount')?.addEventListener('click', () => {
     const counts = _recalculate();
-    // Also save any changed pins
-    var pins = _loadPins();
-    document.querySelectorAll('[data-pin-denom]').forEach(input => {
-      var denom = Number(input.dataset.pinDenom);
-      var val = parseInt(input.value) || 0;
-      if (val > 0) pins[denom] = val;
-      else delete pins[denom];
-    });
-    _savePins(pins);
+    const pins = _collectPins();
+    // Save pins to localStorage for next shift persistence
+    _savePinsLocal(pins);
     try {
-      updateCashCount(counts);
-      showToast('Đã lưu kiểm kê tiền mặt', 'success');
+      updateCashCount(counts, pins);
+      showToast('✅ Đã lưu kiểm kê tiền mặt', 'success');
     } catch (e) { showToast(e.message, 'error'); }
   });
 }

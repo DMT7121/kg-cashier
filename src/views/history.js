@@ -97,9 +97,30 @@ function _showShiftDetail(shiftId) {
         <tr><td>TM kỳ vọng</td><td>${formatCurrency(sm.expectedCash)}</td></tr>
         <tr><td>TM kiểm kê</td><td>${formatCurrency(sm.cashCountTotal)}</td></tr>
         <tr><td><strong>Chênh lệch</strong></td><td style="color:${sm.discrepancy === 0 ? 'var(--success)' : 'var(--danger)'}"><strong>${formatCurrency(sm.discrepancy)}</strong></td></tr>
-        ${(sh.cashToKeep || 0) > 0 ? '<tr><td>Tiền giữ lại</td><td>' + formatCurrency(sh.cashToKeep) + '</td></tr>' : ''}
-        ${(sh.cashToDeposit || 0) > 0 ? '<tr><td>Tiền bàn giao</td><td>' + formatCurrency(sh.cashToDeposit) + '</td></tr>' : ''}
       </table>
+
+      ${(function() {
+        var pc = sh.pinnedCash || {};
+        var cc2 = sh.cashCount || {};
+        var hasPins = Object.keys(pc).length > 0;
+        if (!hasPins) return '';
+        var keepHtml = '';
+        var handHtml = '';
+        var keepTotal = 0, handTotal = 0;
+        for (var i = 0; i < denominations.length; i++) {
+          var dv = denominations[i].value;
+          var dl = denominations[i].label;
+          var cq = cc2[dv] || 0;
+          var pq = pc[dv] || 0;
+          var hq = Math.max(0, cq - pq);
+          if (pq > 0) { keepHtml += '<tr><td>' + pq + ' x ' + dl + '</td><td>' + formatCurrency(dv * pq) + '</td></tr>'; keepTotal += dv * pq; }
+          if (hq > 0) { handHtml += '<tr><td>' + hq + ' x ' + dl + '</td><td>' + formatCurrency(dv * hq) + '</td></tr>'; handTotal += dv * hq; }
+        }
+        var out = '';
+        if (keepHtml) out += '<h4 style="margin:12px 0 4px;color:var(--primary);">📌 Tiền giữ lại (két)</h4><table class="report-table">' + keepHtml + '<tr><td><strong>Tổng</strong></td><td><strong>' + formatCurrency(keepTotal) + '</strong></td></tr></table>';
+        if (handHtml) out += '<h4 style="margin:12px 0 4px;color:var(--success);">🤝 Tiền bàn giao</h4><table class="report-table">' + handHtml + '<tr><td><strong>Tổng</strong></td><td><strong>' + formatCurrency(handTotal) + '</strong></td></tr></table>';
+        return out;
+      })()}
 
       ${(sh.transactions || []).length > 0 ? `
         <h4 style="margin:12px 0 8px;">Giao dịch (${sh.transactions.length})</h4>
