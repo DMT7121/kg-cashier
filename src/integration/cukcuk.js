@@ -22,7 +22,7 @@ import * as invoiceStore from './invoiceStore.js';
 // - Production: Cloudflare Worker proxy → graphapi.cukcuk.vn
 var CUKCUK_API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? '/cukcuk-api'
-  : 'https://cukcuk-proxy.dmt-kgwork.workers.dev';
+  : 'https://kg-cukcuk-api.dmt-kgwork.workers.dev';
 
 // ── Token Cache ──
 var _cachedToken = null;
@@ -260,8 +260,11 @@ export async function loginAndGetToken() {
     });
 
     if (!response.ok) {
+      if (response.status === 429) {
+        console.warn('[CUKCUK] Rate limited (429)');
+        return { success: false, message: '⏳ API đang bị giới hạn tốc độ. Thử lại sau 1 phút.' };
+      }
       if (response.status === 405) {
-        // 405 from CUKCUK API means invalid request format  
         var body405 = '';
         try { body405 = await response.text(); } catch(e) {}
         console.warn('[CUKCUK] Login 405:', body405);
