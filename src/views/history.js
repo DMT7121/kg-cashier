@@ -97,6 +97,8 @@ function _showShiftDetail(shiftId) {
         <tr><td>TM kỳ vọng</td><td>${formatCurrency(sm.expectedCash)}</td></tr>
         <tr><td>TM kiểm kê</td><td>${formatCurrency(sm.cashCountTotal)}</td></tr>
         <tr><td><strong>Chênh lệch</strong></td><td style="color:${sm.discrepancy === 0 ? 'var(--success)' : 'var(--danger)'}"><strong>${formatCurrency(sm.discrepancy)}</strong></td></tr>
+        ${(sh.cashToKeep || 0) > 0 ? '<tr><td>Tiền giữ lại</td><td>' + formatCurrency(sh.cashToKeep) + '</td></tr>' : ''}
+        ${(sh.cashToDeposit || 0) > 0 ? '<tr><td>Tiền bàn giao</td><td>' + formatCurrency(sh.cashToDeposit) + '</td></tr>' : ''}
       </table>
 
       ${(sh.transactions || []).length > 0 ? `

@@ -787,15 +787,15 @@ tr:hover td { background: rgba(255,255,255,.02); }
 .denom-btn { color: var(--text-muted); }
 .denom-btn:hover { color: var(--primary); }
 .denom-input {
-  width: 48px;
+  width: 64px;
   text-align: center;
-  padding: 6px;
+  padding: 8px 4px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
   outline: none;
 }
@@ -819,6 +819,30 @@ tr:hover td { background: rgba(255,255,255,.02); }
   font-weight: 700;
 }
 .cash-total-value { font-size: 22px; color: var(--primary); font-variant-numeric: tabular-nums; }
+
+.denom-pin-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.denom-pin-row input {
+  width: 48px;
+  text-align: center;
+  padding: 2px 4px;
+  background: rgba(232,168,56,.08);
+  border: 1px dashed rgba(232,168,56,.3);
+  border-radius: 4px;
+  color: var(--primary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+.denom-pin-row input:focus { border-color: var(--primary); }
+.denom-pin-row .pin-icon { cursor: pointer; font-size: 14px; }
 
 /* ── Invoice / Upload ─────────────────────── */
 .upload-zone {

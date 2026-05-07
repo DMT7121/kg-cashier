@@ -404,6 +404,8 @@ function _buildHandoverHTML(revSummary) {
               <tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>${fc(expectedCash)}</strong></td></tr>
               <tr><td>TM kiểm kê thực tế</td><td class="r">${fc(cashCountTotal)}</td></tr>
               <tr class="a4-disc-row ${Math.abs(discrepancy) > 0 ? 'a4-disc-warn' : 'a4-disc-ok'}"><td><strong>CHÊNH LỆCH</strong></td><td class="r"><strong>${discrepancy === 0 ? '✓ 0 đ' : (discrepancy > 0 ? '+' : '') + fc(discrepancy)}</strong></td></tr>
+              ${(target.cashToKeep || 0) > 0 ? '<tr><td>Tiền giữ lại</td><td class="r">' + fc(target.cashToKeep) + '</td></tr>' : ''}
+              ${(target.cashToDeposit || 0) > 0 ? '<tr><td>Tiền bàn giao</td><td class="r">' + fc(target.cashToDeposit) + '</td></tr>' : ''}
             </tfoot></table>
           </div>
         </div>
