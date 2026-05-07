@@ -260,7 +260,11 @@ export async function loginAndGetToken() {
 
     if (!response.ok) {
       if (response.status === 405) {
-        return { success: false, message: 'CORS bị chặn. Cần mở webapp qua localhost (Vite dev server).' };
+        // 405 from CUKCUK API means invalid request format  
+        var body405 = '';
+        try { body405 = await response.text(); } catch(e) {}
+        console.warn('[CUKCUK] Login 405:', body405);
+        return { success: false, message: '❌ CUKCUK API từ chối (405). Kiểm tra App ID và Domain trong Cài đặt.' };
       }
       throw new Error('HTTP ' + response.status);
     }
