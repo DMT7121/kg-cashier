@@ -642,6 +642,82 @@ export function deleteShiftFromHistory(id) {
   addAudit('DELETE_SHIFT_HISTORY', 'ID: ' + id);
 }
 
+/**
+ * Sync shift history with cloud — merge cloud shifts into local history.
+ * Uses union merge: local shifts + cloud shifts not already in local.
+ * Sorted by date descending (most recent first).
+ */
+var _historySyncInFlight = false;
+export async function syncShiftHistory() {
+  if (_historySyncInFlight) return false;
+  _historySyncInFlight = true;
+  try {
+    var getShiftsFromCloud = null;
+    try {
+      var api = await import('./api.js');
+      getShiftsFromCloud = api.getShiftsFromCloud;
+    } catch(e) { _historySyncInFlight = false; return false; }
+
+    var res = await getShiftsFromCloud();
+    if (!res || !res.success || !res.shifts || !Array.isArray(res.shifts)) {
+      _historySyncInFlight = false;
+      return false;
+    }
+
+    var cloudShifts = res.shifts;
+    var s = getState();
+    if (!s.shifts) s.shifts = [];
+
+    // Build index of local shift IDs
+    var localIds = {};
+    for (var i = 0; i < s.shifts.length; i++) {
+      localIds[s.shifts[i].id] = i;
+    }
+
+    // Merge: add cloud shifts missing from local
+    var added = 0;
+    for (var j = 0; j < cloudShifts.length; j++) {
+      var cs = cloudShifts[j];
+      if (!cs || !cs.id) continue;
+      if (localIds[cs.id] === undefined) {
+        // Cloud shift not in local → add
+        cs.invoices = cs.invoices || [];
+        s.shifts.push(cs);
+        added++;
+      } else {
+        // Shift exists locally — update if cloud version has more data
+        var localShift = s.shifts[localIds[cs.id]];
+        var localTxCount = (localShift.transactions || []).length;
+        var cloudTxCount = (cs.transactions || []).length;
+        if (cloudTxCount > localTxCount) {
+          // Cloud has more transactions → use cloud version, keep local invoices
+          cs.invoices = localShift.invoices || [];
+          s.shifts[localIds[cs.id]] = cs;
+          added++;
+        }
+      }
+    }
+
+    if (added > 0) {
+      // Sort by date descending, then by startTime descending
+      s.shifts.sort(function(a, b) {
+        var da = (a.date || '') + (a.startTime || '');
+        var db = (b.date || '') + (b.startTime || '');
+        return da > db ? -1 : (da < db ? 1 : 0);
+      });
+      save();
+      console.log('[Store] History synced: +' + added + ' shifts from cloud, total: ' + s.shifts.length);
+    }
+
+    _historySyncInFlight = false;
+    return added > 0;
+  } catch(e) {
+    console.warn('[Store] History sync error:', e);
+    _historySyncInFlight = false;
+    return false;
+  }
+}
+
 export function getCategories() { return getState().categories; }
 
 export function addCategory(type, name) {
@@ -739,6 +815,18 @@ export async function syncCurrentShiftWithCloud() {
       
       // Case 1: Cloud has no open shift but local does → shift was closed on another device
       if (!cloudShift && s.currentShift) {
+        // Save to local history before clearing (in case closeShift wasn't synced)
+        if (s.currentShift.status === 'open') {
+          s.currentShift.status = 'closed';
+          s.currentShift.endTime = s.currentShift.endTime || new Date().toISOString();
+          s.currentShift.notes = (s.currentShift.notes || '') + ' [Đóng từ thiết bị khác]';
+          if (!s.shifts) s.shifts = [];
+          var dup1 = false;
+          for (var h1 = 0; h1 < s.shifts.length; h1++) {
+            if (s.shifts[h1].id === s.currentShift.id) { dup1 = true; break; }
+          }
+          if (!dup1) s.shifts.unshift(JSON.parse(JSON.stringify(s.currentShift)));
+        }
         s.currentShift = null;
         save();
         return true;
@@ -759,11 +847,15 @@ export async function syncCurrentShiftWithCloud() {
         }
       }
       
-      // Case 3: Cloud has an open shift but local does NOT
-      // → Do NOT auto-apply! This prevents the "phantom shift" bug where a stale
-      //   cloud shift keeps reappearing. The user must explicitly open a shift.
-      //   (Previously this would silently set s.currentShift = cloudShift, causing
-      //    the "Admin đang mở ca" notification when nobody actually opened a shift)
+      // Case 3: Cloud has an open shift but local does NOT → apply cloud shift
+      // This enables cross-device sync: open on localhost → see on production
+      if (cloudShift && !s.currentShift) {
+        console.log('[Store] Cloud shift applied locally:', cloudShift.id, '- Ca', cloudShift.shiftNumber);
+        s.currentShift = cloudShift;
+        s.currentShift.invoices = s.currentShift.invoices || [];
+        save();
+        return true;
+      }
     }
   } catch (e) {
     console.warn('[Store] Cloud sync pull error:', e);

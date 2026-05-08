@@ -3,7 +3,7 @@
    COMPATIBLE: No optional chaining, global error handling
    ============================================ */
 import './style.css';
-import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud, isShiftDirty, clearShiftDirty } from './store.js';
+import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud, isShiftDirty, clearShiftDirty, syncShiftHistory } from './store.js';
 import { hideModal } from './utils.js';
 
 // ── Global Error Handler — Show on screen ────
@@ -272,6 +272,23 @@ function initApp() {
   } catch(e) {
     console.warn('[Migration] Error:', e);
   }
+
+  // ── Cross-device sync on startup ──
+  // 1) Pull current shift from cloud (enables: open on localhost → see on production)
+  // 2) Merge shift history from cloud into local
+  syncCurrentShiftWithCloud().then(function(changed) {
+    if (changed) {
+      console.log('[Main] Startup: Applied cloud shift state');
+      renderCurrentView();
+    }
+  });
+  syncShiftHistory().then(function(changed) {
+    if (changed) {
+      console.log('[Main] Startup: Merged cloud shift history');
+      // Only refresh if currently viewing history
+      if (window.location.hash === '#history') renderCurrentView();
+    }
+  });
 
   // Background polling for cloud sync
   // Only pull from cloud when local data is clean (not dirty).
