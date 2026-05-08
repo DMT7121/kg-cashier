@@ -816,7 +816,7 @@ export async function syncTransactions(force) {
     // Use invoiceStore as source of truth for already-synced count
     var storedCount = invoiceStore.getCountByDate(todayStr);
     
-    console.log('[CUKCUK] Smart sync for', todayStr, '| Already in store:', storedCount);
+    console.log('[CUKCUK] Smart sync for', todayStr, '| Range:', fromDate, '→', toDate, '| Stored:', storedCount, '| Force:', !!force);
 
     // ═══ COOLDOWN: Skip API call if we recently synced and found no new data ═══
     if (!force) {
@@ -847,6 +847,15 @@ export async function syncTransactions(force) {
     }
     
     var apiTotal = data.Total || firstPageInvoices.length;
+    console.log('[CUKCUK] API returned: Total=' + apiTotal + ', Page1=' + firstPageInvoices.length + ', data.Total=' + data.Total);
+    if (force && firstPageInvoices.length > 0) {
+      console.log('[CUKCUK] First invoice sample:', JSON.stringify({
+        RefId: firstPageInvoices[0].RefId || firstPageInvoices[0].RefID,
+        RefNo: firstPageInvoices[0].RefNo,
+        Amount: firstPageInvoices[0].Amount,
+        RefDate: firstPageInvoices[0].RefDate
+      }));
+    }
 
     // ═══ STEP 2: Collect ALL invoices from all pages ═══
     var allApiInvoices = firstPageInvoices.slice();
@@ -914,6 +923,16 @@ export async function syncTransactions(force) {
     }
 
     console.log('[CUKCUK] Scanned ' + allApiInvoices.length + ' invoices, ' + toProcess.length + ' need detail fetch');
+    if (force) {
+      // Log each invoice scan decision for debugging
+      for (var dk = 0; dk < allApiInvoices.length; dk++) {
+        var dinv = allApiInvoices[dk];
+        var dRefId = String(dinv.RefId || dinv.RefID || ('idx-' + dk));
+        var dExisting = invoiceStore.getInvoice(dRefId);
+        var dStatus = dExisting ? (dExisting.unpaid ? 'UNPAID→refetch' : 'EXISTS→skip') : 'NEW→fetch';
+        console.log('[CUKCUK] [' + dk + '] ' + dRefId + ' ' + (dinv.RefNo || '') + ' Amt=' + (dinv.Amount || 0) + ' → ' + dStatus);
+      }
+    }
 
     // ═══ STEP 4: Nothing to update ═══
     if (toProcess.length === 0) {
@@ -921,6 +940,9 @@ export async function syncTransactions(force) {
       _lastSyncApiTime = Date.now();
       _lastSyncHadNewData = false;
       _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
+      if (force) {
+        showToast('ℹ️ Không có hóa đơn mới (API: ' + apiTotal + ', Local: ' + storedCount + ')', 'info');
+      }
       return { success: true, synced: 0, total: apiTotal, skipped: allApiInvoices.length, amount: 0, date: todayStr, smart: true };
     }
 
