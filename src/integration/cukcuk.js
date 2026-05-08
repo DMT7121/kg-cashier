@@ -876,50 +876,40 @@ export async function syncTransactions(force) {
       return newOnThisPage;
     }
 
-    if (force && apiTotal > totalStored && apiTotal > 100) {
-      // ═══ FORCE MODE: Scan from LAST page backwards (newest invoices are at the end) ═══
-      var lastPage = Math.ceil(apiTotal / 100);
-      console.log('[CUKCUK] Force mode: apiTotal(' + apiTotal + ') > stored(' + totalStored + '), scanning from page ' + lastPage + ' backwards');
+    if (force) {
+      // ═══ FORCE MODE: Scan ALL pages — no skipping, no early termination ═══
+      // This guarantees finding every invoice the API returns
+      var totalPages = Math.ceil(apiTotal / 100) || 1;
+      console.log('[CUKCUK] FORCE: Scanning ALL ' + totalPages + ' pages (no date filter, no skip)');
+      
+      _scanPage(firstPageInvoices);
+      console.log('[CUKCUK] Page 1: ' + firstPageInvoices.length + ' inv, found ' + toProcess.length + ' new so far');
 
-      for (var pg = lastPage; pg >= 1; pg--) {
+      for (var pg = 2; pg <= totalPages; pg++) {
         var pgData = await _fetchInvoices(useFrom, useTo, pg);
         if (pgData._authFailed || !pgData.Success) break;
         var pgInvoices = _extractPageData(pgData);
-        if (pgInvoices.length === 0) continue;
-
-        var newOnPg = _scanPage(pgInvoices);
-        console.log('[CUKCUK] Page ' + pg + ': ' + pgInvoices.length + ' inv, ' + newOnPg + ' new');
-
-        // Stop when we hit a full page with zero new invoices (all already known)
-        if (newOnPg === 0 && pgInvoices.length >= 100) {
-          console.log('[CUKCUK] Page ' + pg + ' fully known — stopping backwards scan');
-          break;
+        if (pgInvoices.length === 0) break;
+        _scanPage(pgInvoices);
+        if (pg % 5 === 0 || pg === totalPages) {
+          console.log('[CUKCUK] Page ' + pg + '/' + totalPages + ': found ' + toProcess.length + ' new total');
         }
       }
     } else {
-      // ═══ NORMAL MODE: Scan from page 1 forward ═══
+      // ═══ AUTO MODE: Optimized scan from page 1, stop early ═══
       var newOnPage1 = _scanPage(firstPageInvoices);
-      console.log('[CUKCUK] Page 1: ' + firstPageInvoices.length + ' invoices, ' + newOnPage1 + ' new/unpaid');
 
       if (firstPageInvoices.length >= 100 && (newOnPage1 > 0 || apiTotal > totalStored)) {
         var page = 2;
         var maxPages = 20;
-        var consecutiveEmptyPages = 0;
+        var emptyPages = 0;
         while (page <= maxPages) {
           var pageData = await _fetchInvoices(useFrom, useTo, page);
           if (pageData._authFailed || !pageData.Success) break;
           var pageInvoices = _extractPageData(pageData);
           if (pageInvoices.length === 0) break;
-
-          var newOnThisPage = _scanPage(pageInvoices);
-          console.log('[CUKCUK] Page ' + page + ': ' + pageInvoices.length + ' inv, ' + newOnThisPage + ' new');
-
-          if (newOnThisPage === 0) {
-            consecutiveEmptyPages++;
-            if (consecutiveEmptyPages >= 2) break;
-          } else {
-            consecutiveEmptyPages = 0;
-          }
+          var n = _scanPage(pageInvoices);
+          if (n === 0) { emptyPages++; if (emptyPages >= 2) break; } else { emptyPages = 0; }
           if (pageInvoices.length < 100) break;
           page++;
         }
