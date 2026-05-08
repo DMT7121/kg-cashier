@@ -7,6 +7,15 @@ import { formatCurrency, formatDate, formatTime, denominations, showToast } from
 var _activeTab = 'day'; // day | week | month | quarter
 var _refDate = null;    // null = today/now, or Date object for custom period
 
+// Global hook: allow other views (e.g. history) to set the report date before navigation.
+// Registered at module level so it's available before init() runs.
+window._setReportDate = function(dateStr) {
+  if (dateStr) {
+    _activeTab = 'day';
+    _refDate = new Date(dateStr + 'T12:00:00');
+  }
+};
+
 // ── RENDER ──
 export function render() {
   var settings = getSettings();

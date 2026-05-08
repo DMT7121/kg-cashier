@@ -521,7 +521,7 @@ export function getShiftSummary(shift) {
   var otherTxs = shift.otherTransactions || [];
 
   var totalIncome = 0, totalExpense = 0, cashIncome = 0, cardIncome = 0, transferIncome = 0, cashExpense = 0, otherIncome = 0, otherExpense = 0, billCount = 0;
-  // CUKCUK breakdown
+  // CUKCUK breakdown (from shift.transactions — legacy tagged entries)
   var cukcukRevenue = 0, cukcukBills = 0;
   var manualIncome = 0, manualBills = 0;
 
@@ -551,6 +551,41 @@ export function getShiftSummary(shift) {
   for (var j = 0; j < otherTxs.length; j++) {
     if (otherTxs[j].type === 'income') otherIncome += otherTxs[j].amount;
     else otherExpense += otherTxs[j].amount;
+  }
+
+  // ── Also read CUKCUK invoices from Invoice Store (cukcuk_invoice_store) ──
+  // CUKCUK data is now stored separately from shift.transactions.
+  // Match invoices to shift by date (working day).
+  if (shift.date) {
+    try {
+      var storeData = localStorage.getItem('cukcuk_invoice_store');
+      if (storeData) {
+        var parsed = JSON.parse(storeData);
+        if (parsed && parsed.invoices) {
+          for (var k in parsed.invoices) {
+            if (!parsed.invoices.hasOwnProperty(k)) continue;
+            var inv = parsed.invoices[k];
+            if (inv.unpaid) continue;
+            if (inv.date !== shift.date) continue;
+            
+            cukcukBills++;
+            billCount++;
+            var invTotal = 0;
+            var payments = inv.payments || [];
+            for (var p = 0; p < payments.length; p++) {
+              var amt = payments[p].amount || 0;
+              invTotal += amt;
+              if (payments[p].method === 'cash') { cashIncome += amt; }
+              else if (payments[p].method === 'card') { cardIncome += amt; }
+              else if (payments[p].method === 'transfer') { transferIncome += amt; }
+            }
+            var effectiveAmt = invTotal > 0 ? invTotal : (inv.amount || 0);
+            cukcukRevenue += effectiveAmt;
+            totalIncome += effectiveAmt;
+          }
+        }
+      }
+    } catch(e) { /* ignore — invoice store unavailable */ }
   }
 
   var cashCountTotal = 0;

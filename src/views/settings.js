@@ -339,7 +339,7 @@ export function init() {
     
     try {
       const { syncTransactions } = await import('../integration/cukcuk.js');
-      const result = await syncTransactions();
+      const result = await syncTransactions(true);
       if (result && result.success) {
         var msg = '✅ Đồng bộ hoàn tất!\n';
         msg += '📊 Tổng hóa đơn: ' + result.total + '\n';

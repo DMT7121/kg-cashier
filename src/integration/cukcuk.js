@@ -30,6 +30,12 @@ var _cachedCompanyCode = null;
 var _cachedTokenTime = 0;
 var TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours (official CUKCUK TTL)
 
+// ── Sync Cooldown ──
+// Minimum time between API calls when auto-sync finds no new data
+var SYNC_COOLDOWN = 2 * 60 * 1000; // 2 minutes
+var _lastSyncApiTime = 0;
+var _lastSyncHadNewData = false;
+
 // ── Daily Revenue Cache ──
 var DAILY_REVENUE_KEY = 'cukcuk_daily_revenue';
 var CACHE_VERSION_KEY = 'cukcuk_cache_version';
@@ -692,37 +698,8 @@ function _cleanupOldSyncIndexes() {
   } catch(e) { /* ignore */ }
 }
 
-// ── Force Re-Sync: Clear old CUKCUK data and re-fetch with payment details ──
-export async function resyncAllTransactions() {
-  var shift = getCurrentShift();
-  if (!shift) {
-    showToast('Bạn cần mở ca trước', 'warning');
-    return { success: false };
-  }
-  
-  var todayStr = shift.date || _getWorkingDayStr();
-  
-  // Remove today's invoices from Invoice Store
-  var allInvoices = invoiceStore.getAllInvoices();
-  var removedCount = 0;
-  for (var i = 0; i < allInvoices.length; i++) {
-    if (allInvoices[i].date === todayStr) removedCount++;
-  }
-  // Clear and re-add non-today invoices
-  var keepInvoices = allInvoices.filter(function(inv) { return inv.date !== todayStr; });
-  invoiceStore.clearAll();
-  invoiceStore.bulkUpsert(keepInvoices);
-  
-  // Clear the synced RefID index so everything re-downloads
-  _clearSyncedRefIds(todayStr);
-  _setSyncMeta({ lastTotal: 0, lastSyncTime: '', lastDate: todayStr });
-  
-  console.log('[CUKCUK] Removed ' + removedCount + ' invoices for ' + todayStr + '. Re-syncing...');
-  showToast('🔄 Đã xóa ' + removedCount + ' hóa đơn. Đang đồng bộ lại...', 'info');
-  
-  // Now sync fresh
-  return await syncTransactions();
-}
+// resyncAllTransactions() removed — syncTransactions(force=true) now handles
+// unpaid bill refresh without deleting any data.
 
 // ── Sync a single invoice by RefId ──
 export async function syncSingleInvoice(refId) {
@@ -809,7 +786,7 @@ export async function syncSingleInvoice(refId) {
 //   3. Chỉ tải chi tiết thanh toán cho hóa đơn CHƯA có
 //   4. Dùng localStorage Set cho tra cứu O(1)
 // ══════════════════════════════════════════════════════════════
-export async function syncTransactions() {
+export async function syncTransactions(force) {
   var shift = getCurrentShift();
   if (!shift) {
     return { success: false, message: 'Chưa mở ca' };
@@ -836,6 +813,15 @@ export async function syncTransactions() {
     var storedCount = invoiceStore.getCountByDate(todayStr);
     
     console.log('[CUKCUK] Smart sync for', todayStr, '| Already in store:', storedCount);
+
+    // ═══ COOLDOWN: Skip API call if we recently synced and found no new data ═══
+    if (!force) {
+      var timeSinceLastSync = Date.now() - _lastSyncApiTime;
+      if (timeSinceLastSync < SYNC_COOLDOWN && !_lastSyncHadNewData) {
+        console.log('[CUKCUK] Cooldown skip: last sync ' + Math.round(timeSinceLastSync / 1000) + 's ago, no new data last time');
+        return { success: true, synced: 0, total: storedCount, skipped: storedCount, amount: 0, date: todayStr, smart: true, cooldown: true };
+      }
+    }
 
     // ═══ STEP 1: Fetch page 1 to get total count ═══
     var data = await _fetchInvoices(fromDate, toDate, 1);
@@ -887,11 +873,15 @@ export async function syncTransactions() {
     // ═══ STEP 2b: Quick skip — if total count unchanged ═══
     if (apiTotal > 0 && apiTotal <= storedCount) {
       // No new invoices — nothing to do
+      _lastSyncApiTime = Date.now();
+      _lastSyncHadNewData = false;
       console.log('[CUKCUK] Quick skip: API total (' + apiTotal + ') <= stored (' + storedCount + ')');
       return { success: true, synced: 0, total: apiTotal, skipped: storedCount, amount: 0, date: todayStr, smart: true };
     }
 
-    // ═══ STEP 3: Only process NEW invoices (not already in store) ═══
+    // ═══ STEP 3: Process NEW + UNPAID invoices ═══
+    // - New: bill chưa có trong invoiceStore → fetch detail
+    // - Unpaid refresh (force only): bill unpaid có thể đã thanh toán → re-fetch
     var toProcess = [];
     var allSyncedRefIds = [];
 
@@ -906,10 +896,12 @@ export async function syncTransactions() {
       var existing = invoiceStore.getInvoice(refId);
       
       if (!existing) {
-        // Only fetch detail for genuinely NEW invoices
+        // Genuinely NEW invoice
         toProcess.push({ inv: inv, refId: refId, reason: 'new' });
+      } else if (force && existing.unpaid) {
+        // Force mode: re-check unpaid bills (customer may have paid since last sync)
+        toProcess.push({ inv: inv, refId: refId, reason: 'unpaid-refresh' });
       }
-      // Existing invoices → skip entirely. Use per-invoice sync button (🔄) to refresh.
     }
 
     console.log('[CUKCUK] Scanned ' + allApiInvoices.length + ' invoices, ' + toProcess.length + ' need detail fetch');
@@ -917,6 +909,8 @@ export async function syncTransactions() {
     // ═══ STEP 4: Nothing to update ═══
     if (toProcess.length === 0) {
       _addSyncedRefIdsBulk(todayStr, allSyncedRefIds);
+      _lastSyncApiTime = Date.now();
+      _lastSyncHadNewData = false;
       _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
       return { success: true, synced: 0, total: apiTotal, skipped: allApiInvoices.length, amount: 0, date: todayStr, smart: true };
     }
@@ -1035,6 +1029,8 @@ export async function syncTransactions() {
 
     // 7. Update sync meta (Invoice Store is now the source of truth for revenue)
     _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
+    _lastSyncApiTime = Date.now();
+    _lastSyncHadNewData = count > 0;
 
     // 8. Push to Google Sheets (fire-and-forget) + mark as pushed
     if (sheetData.length > 0) {
@@ -1093,7 +1089,7 @@ export async function syncTransactions() {
       if (window.refreshView) window.refreshView();
     }
 
-    return { success: true, synced: count, total: apiTotal, skipped: syncedCount, amount: totalAmount, payments: paymentStats, date: todayStr, smart: true };
+    return { success: true, synced: count, total: apiTotal, skipped: storedCount, amount: totalAmount, payments: paymentStats, date: todayStr, smart: true };
 
   } catch (e) {
     console.error('[CUKCUK Sync Error]', e);

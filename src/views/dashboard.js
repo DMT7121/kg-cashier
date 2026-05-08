@@ -88,9 +88,6 @@ function renderShiftDashboard(shift) {
         </h3>
         <div style="display:flex;align-items:center;gap:8px;">
           <span id="cukcukSyncStatus" class="text-muted" style="font-size:11px;"></span>
-          <button class="btn btn-sm" id="btnDashResyncCukcuk" style="white-space:nowrap;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);" title="Xóa toàn bộ dữ liệu CUKCUK cũ và đồng bộ lại từ đầu">
-            <span class="material-symbols-rounded">refresh</span> Sync lại
-          </button>
           <button class="btn btn-success btn-sm" id="btnDashSyncCukcuk" style="white-space:nowrap;">
             <span class="material-symbols-rounded">sync</span> Đồng bộ
           </button>
@@ -110,7 +107,7 @@ function renderShiftDashboard(shift) {
           </div>
         </div>
         <p class="text-muted" style="font-size:10px;margin:10px 0 0;text-align:center;opacity:0.6;">
-          Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau · Tự động đồng bộ mỗi 2 phút
+          Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau · Tự động đồng bộ mỗi 5 phút
         </p>
       </div>
     </div>`;
@@ -342,7 +339,7 @@ export function init() {
     if (status) status.textContent = '⏳';
     try {
       const { syncTransactions } = await import('../integration/cukcuk.js');
-      const result = await syncTransactions();
+      const result = await syncTransactions(true);
       if (result && result.success) {
         if (status) status.textContent = '✅ ' + result.synced + ' mới / ' + result.total + ' tổng';
         if (result.synced > 0) window.refreshView?.();
@@ -356,49 +353,6 @@ export function init() {
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = '<span class="material-symbols-rounded">sync</span> Đồng bộ';
-    }
-  });
-
-  // CUKCUK RE-SYNC button (clear old + refetch all)
-  document.getElementById('btnDashResyncCukcuk')?.addEventListener('click', async () => {
-    var ok = await showConfirm('Xóa tất cả bill CUKCUK đã sync và lấy lại từ đầu với đầy đủ chi tiết thanh toán?', {
-      title: 'Đồng bộ lại CUKCUK',
-      confirmText: 'Sync lại',
-      type: 'warning'
-    });
-    if (!ok) return;
-    
-    const btn = document.getElementById('btnDashResyncCukcuk');
-    const status = document.getElementById('cukcukSyncStatus');
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<span class="material-symbols-rounded">hourglass_top</span> Đang xử lý...';
-    }
-    if (status) status.textContent = '🔄 Re-sync...';
-    try {
-      const { resyncAllTransactions } = await import('../integration/cukcuk.js');
-      const result = await resyncAllTransactions();
-      if (result && result.success) {
-        var msg = '✅ ' + result.synced + ' bill';
-        if (result.payments) {
-          var p = result.payments;
-          var parts = [];
-          if (p.cash > 0) parts.push('TM: ' + p.cash.toLocaleString('vi-VN'));
-          if (p.card > 0) parts.push('Thẻ: ' + p.card.toLocaleString('vi-VN'));
-          if (p.transfer > 0) parts.push('CK: ' + p.transfer.toLocaleString('vi-VN'));
-          if (parts.length > 0) msg += ' (' + parts.join(' | ') + ')';
-        }
-        if (status) status.textContent = msg;
-        window.refreshView?.();
-      } else {
-        if (status) status.textContent = '❌ ' + (result?.message || 'Lỗi').substring(0, 40);
-      }
-    } catch(e) {
-      if (status) status.textContent = '❌ ' + e.message;
-    }
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-symbols-rounded">refresh</span> Sync lại';
     }
   });
 }

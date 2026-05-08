@@ -291,7 +291,7 @@ export function init() {
     }
     try {
       const { syncTransactions } = await import('../integration/cukcuk.js');
-      const result = await syncTransactions();
+      const result = await syncTransactions(true);
       if (result && result.success) {
         window.refreshView?.();
       }

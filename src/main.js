@@ -281,36 +281,35 @@ function initApp() {
         renderCurrentView();
       }
     });
-  }, 5000)); // Check every 5 seconds for real-time updates
+  }, 15000)); // Check every 15 seconds for real-time updates
 
-  // CUKCUK auto-sync: always active when shift is open and CUKCUK is configured
+  // CUKCUK auto-sync: only fetch NEW bills to avoid rate limiting
   // Loads invoices for TODAY's date only, auto-detects payment methods
-  // Immediate sync on page load, then every 2 minutes for continuous updates
+  // Immediate sync on page load, then every 5 minutes
+  var _cukcukSyncInFlight = false;
   function _triggerCukcukSync(isInitial) {
     try {
+      if (_cukcukSyncInFlight) return; // Prevent overlapping syncs
       var shift = getCurrentShift();
       if (!shift) return;
       var settings = JSON.parse(localStorage.getItem('kg-cashier-data') || '{}');
       var cukcuk = settings.settings && settings.settings.cukcuk;
       if (!cukcuk || !cukcuk.key) return;
       
-      var today = new Date();
-      var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-      console.log('[Main] CUKCUK auto-sync' + (isInitial ? ' (initial)' : '') + ' for date: ' + todayStr);
-      
+      _cukcukSyncInFlight = true;
       import('./integration/cukcuk.js').then(function(mod) {
         mod.syncTransactions().then(function(result) {
+          _cukcukSyncInFlight = false;
           if (result && result.success) {
             if (result.synced > 0) {
-              console.log('[Main] CUKCUK auto-sync: Added ' + result.synced + ' invoices for ' + (result.date || todayStr));
+              console.log('[Main] CUKCUK auto-sync: Added ' + result.synced + ' invoices');
               renderCurrentView();
-            } else {
-              console.log('[Main] CUKCUK auto-sync: No new invoices for ' + (result.date || todayStr) + ' (total: ' + result.total + ')');
             }
           }
-        }).catch(function() {});
-      }).catch(function() {});
+        }).catch(function() { _cukcukSyncInFlight = false; });
+      }).catch(function() { _cukcukSyncInFlight = false; });
     } catch(e) {
+      _cukcukSyncInFlight = false;
       console.warn('[Main] CUKCUK auto-sync error:', e);
     }
   }
@@ -318,8 +317,8 @@ function initApp() {
   // Immediate sync on load (with 3s delay to let UI settle)
   setTimeout(function() { _triggerCukcukSync(true); }, 3000);
 
-  // Then every 30 seconds for near-realtime updates (smart sync skips instantly when no new data)
-  _globalIntervals.push(setInterval(function() { _triggerCukcukSync(false); }, 30000));
+  // Then every 5 minutes — smart sync skips API call entirely when no new data expected
+  _globalIntervals.push(setInterval(function() { _triggerCukcukSync(false); }, 300000));
 
   // Cleanup intervals on page unload
   window.addEventListener('beforeunload', function() {

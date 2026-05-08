@@ -70,9 +70,6 @@ export function render() {
         ${hasCukcuk && shift ? `
         <button class="btn btn-success btn-sm" id="btnSyncCukcukInv">
           <span class="material-symbols-rounded">sync</span> Đồng bộ ngay
-        </button>
-        <button class="btn btn-outline btn-sm" id="btnResyncCukcuk">
-          <span class="material-symbols-rounded">refresh</span> Sync lại
         </button>` : ''}
         <button class="btn btn-outline btn-sm" id="btnExportCukcukCSV">
           <span class="material-symbols-rounded">download</span> Xuất CSV
@@ -336,7 +333,7 @@ export function init() {
     }
     try {
       var cukcuk = await import('../integration/cukcuk.js');
-      var result = await cukcuk.syncTransactions();
+      var result = await cukcuk.syncTransactions(true);
       if (result && result.success) {
         window.refreshView && window.refreshView();
       }
@@ -349,18 +346,7 @@ export function init() {
     }
   });
 
-  // Resync button
-  document.getElementById('btnResyncCukcuk')?.addEventListener('click', async function() {
-    var ok = await showConfirm('Xóa toàn bộ hóa đơn hôm nay và tải lại từ CUKCUK?', { title: 'Đồng bộ lại', confirmText: 'Sync lại', type: 'warning' });
-    if (!ok) return;
-    try {
-      var cukcuk = await import('../integration/cukcuk.js');
-      await cukcuk.resyncAllTransactions();
-      window.refreshView && window.refreshView();
-    } catch(e) {
-      showToast('❌ Lỗi: ' + e.message, 'error');
-    }
-  });
+  // Resync button removed — "Đồng bộ ngay" with force=true handles everything
 
   // Export CSV
   document.getElementById('btnExportCukcukCSV')?.addEventListener('click', function() {
