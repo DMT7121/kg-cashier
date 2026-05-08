@@ -1053,6 +1053,11 @@ export async function syncTransactions(force) {
     _lastSyncApiTime = Date.now();
     _lastSyncHadNewData = count > 0;
 
+    // 7b. Push to cloud for cross-device sync (non-blocking)
+    if (count > 0) {
+      invoiceStore.pushInvoicesToCloud(todayStr).catch(function() {});
+    }
+
     // 8. Push to Google Sheets (with retry queue fallback)
     if (sheetData.length > 0) {
       console.log('[CUKCUK] Pushing ' + sheetData.length + ' NEW invoices to Google Sheets...');

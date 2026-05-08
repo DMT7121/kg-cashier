@@ -562,6 +562,80 @@ export function cleanupOldInvoices(maxDays) {
   return removed;
 }
 
+// ══════════════════════════════════════════════════════════════
+// CROSS-DEVICE SYNC — share invoices between localhost + production
+// Uses GAS config store as cloud relay
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Push today's invoices to cloud for cross-device sync.
+ * Only pushes a compact summary (not full invoice data) to stay within GAS limits.
+ */
+export async function pushInvoicesToCloud(dateStr) {
+  try {
+    var { saveConfigToCloud } = await import('../api.js');
+    var invoices = getInvoicesByDate(dateStr);
+    if (invoices.length === 0) return;
+
+    // Compact format: only fields needed to reconstruct on other device
+    var compact = invoices.map(function(inv) {
+      return {
+        refId: inv.refId, refNo: inv.refNo, refDate: inv.refDate, date: inv.date,
+        tableName: inv.tableName, employeeName: inv.employeeName,
+        amount: inv.amount, payments: inv.payments,
+        unpaid: inv.unpaid, syncedAt: inv.syncedAt
+      };
+    });
+
+    await saveConfigToCloud('cukcuk_invoices_' + dateStr, compact);
+    console.log('[InvoiceStore] ☁️ Pushed ' + compact.length + ' invoices to cloud for ' + dateStr);
+  } catch (e) {
+    console.warn('[InvoiceStore] Cloud push failed:', e.message);
+  }
+}
+
+/**
+ * Pull invoices from cloud and merge missing ones into local store.
+ * Returns count of newly added invoices.
+ */
+export async function pullInvoicesFromCloud(dateStr) {
+  try {
+    var { getConfigFromCloud } = await import('../api.js');
+    var result = await getConfigFromCloud();
+    if (!result || !result.success || !result.data) return 0;
+
+    var cloudInvoices = result.data['cukcuk_invoices_' + dateStr];
+    if (!Array.isArray(cloudInvoices) || cloudInvoices.length === 0) return 0;
+
+    // Merge: add only invoices not already in local store
+    var store = _load();
+    var added = 0;
+    for (var i = 0; i < cloudInvoices.length; i++) {
+      var inv = cloudInvoices[i];
+      var key = String(inv.refId);
+      if (!store.invoices[key]) {
+        store.invoices[key] = {
+          refId: inv.refId, refNo: inv.refNo || '', refDate: inv.refDate || '', date: inv.date || dateStr,
+          tableName: inv.tableName || '', employeeName: inv.employeeName || '',
+          amount: inv.amount || 0, payments: inv.payments || [],
+          unpaid: !!inv.unpaid, confirmed: true,
+          syncedAt: inv.syncedAt || new Date().toISOString(), pushedToSheets: false
+        };
+        added++;
+      }
+    }
+
+    if (added > 0) {
+      _save(store);
+      console.log('[InvoiceStore] ☁️ Pulled ' + added + ' new invoices from cloud (total cloud: ' + cloudInvoices.length + ')');
+    }
+    return added;
+  } catch (e) {
+    console.warn('[InvoiceStore] Cloud pull failed:', e.message);
+    return 0;
+  }
+}
+
 // Auto-cleanup on module load (once per session)
 (function() {
   try {

@@ -285,10 +285,25 @@ function initApp() {
   syncShiftHistory().then(function(changed) {
     if (changed) {
       console.log('[Main] Startup: Merged cloud shift history');
-      // Only refresh if currently viewing history
       if (window.location.hash === '#history') renderCurrentView();
     }
   });
+
+  // 3) Pull CUKCUK invoices from cloud (cross-device sync)
+  try {
+    var shift = getCurrentShift();
+    if (shift) {
+      var shiftDate = shift.date || new Date().toISOString().slice(0, 10);
+      import('./integration/invoiceStore.js').then(function(store) {
+        store.pullInvoicesFromCloud(shiftDate).then(function(added) {
+          if (added > 0) {
+            console.log('[Main] Startup: Pulled ' + added + ' invoices from cloud');
+            renderCurrentView();
+          }
+        });
+      });
+    }
+  } catch(e3) { console.warn('[Main] Invoice cloud pull error:', e3); }
 
   // Background polling for cloud sync
   // Only pull from cloud when local data is clean (not dirty).
