@@ -120,6 +120,18 @@ export function getCountByDate(dateStr) {
   return count;
 }
 
+/** Check if there are any unpaid invoices for a given date */
+export function hasUnpaidInvoices(dateStr) {
+  var store = _load();
+  for (var key in store.invoices) {
+    if (store.invoices.hasOwnProperty(key)) {
+      var inv = store.invoices[key];
+      if (inv.date === dateStr && inv.unpaid) return true;
+    }
+  }
+  return false;
+}
+
 // ── Working Day Boundaries ──
 // Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau
 // Tất cả bộ lọc dùng refDate timestamp (thời gian gốc từ CUKCUK)

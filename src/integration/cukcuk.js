@@ -875,17 +875,22 @@ export async function syncTransactions(force) {
     }
 
     // ═══ STEP 2b: Quick skip — if total count unchanged ═══
-    if (apiTotal > 0 && apiTotal <= storedCount) {
-      // No new invoices — nothing to do
-      _lastSyncApiTime = Date.now();
-      _lastSyncHadNewData = false;
-      console.log('[CUKCUK] Quick skip: API total (' + apiTotal + ') <= stored (' + storedCount + ')');
-      return { success: true, synced: 0, total: apiTotal, skipped: storedCount, amount: 0, date: todayStr, smart: true };
+    // IMPORTANT: Skip ONLY in auto-sync. Manual sync (force=true) always processes.
+    if (!force && apiTotal > 0 && apiTotal <= storedCount) {
+      // Count unchanged in auto-sync — check if we have unpaid bills that need refresh
+      var hasUnpaid = invoiceStore.hasUnpaidInvoices(todayStr);
+      if (!hasUnpaid) {
+        _lastSyncApiTime = Date.now();
+        _lastSyncHadNewData = false;
+        console.log('[CUKCUK] Quick skip: API total (' + apiTotal + ') <= stored (' + storedCount + '), no unpaid');
+        return { success: true, synced: 0, total: apiTotal, skipped: storedCount, amount: 0, date: todayStr, smart: true };
+      }
+      console.log('[CUKCUK] Count unchanged but has unpaid bills — processing anyway');
     }
 
     // ═══ STEP 3: Process NEW + UNPAID invoices ═══
     // - New: bill chưa có trong invoiceStore → fetch detail
-    // - Unpaid refresh (force only): bill unpaid có thể đã thanh toán → re-fetch
+    // - Unpaid refresh: bill unpaid có thể đã thanh toán → always re-fetch
     var toProcess = [];
     var allSyncedRefIds = [];
 
@@ -902,8 +907,8 @@ export async function syncTransactions(force) {
       if (!existing) {
         // Genuinely NEW invoice
         toProcess.push({ inv: inv, refId: refId, reason: 'new' });
-      } else if (force && existing.unpaid) {
-        // Force mode: re-check unpaid bills (customer may have paid since last sync)
+      } else if (existing.unpaid) {
+        // Unpaid bill — always re-check (customer may have paid since last sync)
         toProcess.push({ inv: inv, refId: refId, reason: 'unpaid-refresh' });
       }
     }
