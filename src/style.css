@@ -801,12 +801,22 @@ tr:hover td { background: rgba(255,255,255,.02); }
 .cc-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .cc-label { font-size: 10px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
 .cc-input-group { display: flex; align-items: center; gap: 2px; }
+.cc-input-group-wide { gap: 4px; }
 .cc-num-input {
   width: 52px; text-align: center; padding: 6px 2px;
   background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
   color: var(--text); font-family: var(--font); font-size: 16px; font-weight: 700; outline: none;
 }
+.cc-num-wide { width: 70px; font-size: 18px; padding: 8px 4px; }
 .cc-num-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(232,168,56,.15); }
+.denom-btn-lg {
+  width: 40px; height: 40px; min-width: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid var(--border);
+  cursor: pointer; transition: all .15s ease; user-select: none; -webkit-user-select: none;
+}
+.denom-btn-lg:hover { background: rgba(232,168,56,.15); border-color: var(--primary); }
+.denom-btn-lg:active { background: rgba(232,168,56,.25); transform: scale(0.95); }
 .cc-subtotals {
   display: flex; gap: 6px; width: 100%; padding-top: 4px;
   border-top: 1px dashed var(--border); margin-top: 4px; font-size: 11px; font-weight: 600;
@@ -2078,3 +2088,35 @@ body.printing-a4 .view-container { padding: 0 !important; }
   padding: 12px;
   font-weight: 700;
 }
+
+/* ── Analytics Bar Chart ─────────────────── */
+.analytics-bar-chart {
+  display: flex; gap: 6px; align-items: flex-end;
+  height: 220px; padding: 12px 0 0;
+}
+.ab-col {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 2px; min-width: 0;
+}
+.ab-col-today .ab-fill { background: linear-gradient(180deg, var(--primary) 0%, rgba(232,168,56,.6) 100%) !important; }
+.ab-col-today .ab-label { color: var(--primary); font-weight: 700; }
+.ab-value {
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+.ab-track {
+  width: 100%; flex: 1; min-height: 20px;
+  background: rgba(255,255,255,.04); border-radius: 6px 6px 0 0;
+  overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
+  transition: background .2s;
+}
+.ab-col:hover .ab-track { background: rgba(255,255,255,.08); }
+.ab-fill {
+  width: 100%; border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, rgba(16,185,129,.8) 0%, rgba(16,185,129,.3) 100%);
+  transition: height .5s ease;
+}
+.ab-label { font-size: 11px; font-weight: 500; color: var(--text-muted); margin-top: 4px; }
+.ab-date { font-size: 10px; color: var(--text-muted); opacity: .7; }
+.ab-bills { font-size: 9px; color: var(--text-muted); opacity: .5; }

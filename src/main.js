@@ -3,7 +3,7 @@
    COMPATIBLE: No optional chaining, global error handling
    ============================================ */
 import './style.css';
-import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud, isShiftDirty, clearShiftDirty, syncShiftHistory } from './store.js';
+import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud, isShiftDirty, clearShiftDirty, syncShiftHistory, pullCategoriesFromCloud } from './store.js';
 import { hideModal } from './utils.js';
 
 // ── Global Error Handler — Show on screen ────
@@ -289,7 +289,10 @@ function initApp() {
     }
   });
 
-  // 3) Pull CUKCUK invoices from cloud (cross-device sync)
+  // 3) Pull categories from cloud (cross-device sync)
+  pullCategoriesFromCloud().catch(function() {});
+
+  // 4) Pull CUKCUK invoices from cloud (cross-device sync)
   try {
     var shift = getCurrentShift();
     if (shift) {

@@ -415,6 +415,27 @@ export function removeTransaction(id) {
   _syncCurrentShift();
 }
 
+export function editTransaction(id, updates) {
+  var s = getState();
+  if (!s.currentShift) throw new Error('Chưa mở ca');
+  for (var i = 0; i < s.currentShift.transactions.length; i++) {
+    if (s.currentShift.transactions[i].id === id) {
+      var tx = s.currentShift.transactions[i];
+      var oldAmt = tx.amount;
+      if (updates.category !== undefined) tx.category = updates.category;
+      if (updates.amount !== undefined) tx.amount = Number(updates.amount);
+      if (updates.paymentMethod !== undefined) tx.paymentMethod = updates.paymentMethod;
+      if (updates.note !== undefined) tx.note = updates.note;
+      if (updates.type !== undefined) tx.type = updates.type;
+      save();
+      addAudit('EDIT_TX', tx.category + ': ' + oldAmt.toLocaleString('vi-VN') + ' → ' + tx.amount.toLocaleString('vi-VN') + 'đ');
+      _syncCurrentShift();
+      return tx;
+    }
+  }
+  throw new Error('Không tìm thấy giao dịch');
+}
+
 export function addOtherTransaction(opts) {
   var s = getState();
   if (!s.currentShift) throw new Error('Chưa mở ca');
@@ -741,6 +762,7 @@ export function addCategory(type, name) {
   }
   save();
   addAudit('ADD_CATEGORY', type + ': ' + trimmed);
+  _syncCategoriesToCloud();
   return true;
 }
 
@@ -750,7 +772,55 @@ export function removeCategory(type, name) {
   s.categories[type] = s.categories[type].filter(function(c) { return c !== name; });
   save();
   addAudit('REMOVE_CATEGORY', type + ': ' + name);
+  _syncCategoriesToCloud();
   return true;
+}
+
+/** Push categories to cloud for cross-device sync */
+function _syncCategoriesToCloud() {
+  try {
+    import('./api.js').then(function(api) {
+      var cats = getState().categories;
+      api.saveConfigToCloud('categories', JSON.stringify(cats)).catch(function() {});
+    });
+  } catch(e) { /* ignore */ }
+}
+
+/** Pull categories from cloud (called on startup) */
+export async function pullCategoriesFromCloud() {
+  try {
+    var api = await import('./api.js');
+    var res = await api.getConfigFromCloud();
+    if (res && res.success && res.config) {
+      var cloudCats = null;
+      // Config may be an object with 'categories' key
+      if (res.config.categories) {
+        cloudCats = typeof res.config.categories === 'string' ? JSON.parse(res.config.categories) : res.config.categories;
+      }
+      if (cloudCats && cloudCats.income && cloudCats.expense) {
+        var s = getState();
+        var localCats = s.categories || defaultCategories;
+        // Merge: union of local + cloud (keep all)
+        var merged = { income: [], expense: [] };
+        var seen = { income: {}, expense: {} };
+        ['income', 'expense'].forEach(function(type) {
+          var all = (localCats[type] || []).concat(cloudCats[type] || []);
+          for (var i = 0; i < all.length; i++) {
+            var c = all[i];
+            if (!seen[type][c.toLowerCase()]) {
+              seen[type][c.toLowerCase()] = true;
+              merged[type].push(c);
+            }
+          }
+        });
+        s.categories = merged;
+        save();
+        console.log('[Store] ☁️ Categories synced from cloud');
+      }
+    }
+  } catch(e) {
+    console.warn('[Store] Category cloud pull error:', e);
+  }
 }
 
 // ── Cloud Sync ───────────────────────────────

@@ -1,8 +1,9 @@
-/* ── Cash Count View — 3-column: Ghim + Giữ + Giao ────── */
-import { getCurrentShift, updateCashCount } from '../store.js';
+/* ── Cash Count View — Ghim + Giữ + Giao + Discrepancy + Long-press ── */
+import { getCurrentShift, getShiftSummary, updateCashCount, getShiftHistory } from '../store.js';
 import { formatCurrency, denominations, showToast } from '../utils.js';
 
 var PIN_KEY = 'kg_cashier_pinned_cash';
+var _longPressTimers = [];
 
 /** Load persistent pins from localStorage (carry forward across shifts) */
 function _loadPersistentPins() {
@@ -17,13 +18,25 @@ function _savePersistentPins(pins) {
   try { localStorage.setItem(PIN_KEY, JSON.stringify(pins)); } catch(e) { /* ignore */ }
 }
 
-/** Build a ± input group HTML */
+/** Get ghim from last closed shift for auto carry-forward */
+function _getLastShiftGhim() {
+  try {
+    var history = getShiftHistory();
+    if (history.length > 0) {
+      var last = history[0];
+      return last.pinnedCash || {};
+    }
+  } catch(e) { /* ignore */ }
+  return {};
+}
+
+/** Build a ± input group HTML — bigger buttons */
 function _inputGroup(prefix, denom, value, color) {
   var id = prefix + '_' + denom;
-  return '<div class="cc-input-group">' +
-    '<button class="btn-icon denom-btn" data-cc-btn="' + prefix + '" data-cc-denom="' + denom + '" data-cc-dir="-1"><span class="material-symbols-rounded">remove</span></button>' +
-    '<input type="number" class="cc-num-input" id="' + id + '" data-cc-type="' + prefix + '" data-cc-denom="' + denom + '" value="' + value + '" min="0" style="border-color:' + (color || 'var(--border)') + ';">' +
-    '<button class="btn-icon denom-btn" data-cc-btn="' + prefix + '" data-cc-denom="' + denom + '" data-cc-dir="1"><span class="material-symbols-rounded">add</span></button>' +
+  return '<div class="cc-input-group cc-input-group-wide">' +
+    '<button class="btn-icon denom-btn denom-btn-lg" data-cc-btn="' + prefix + '" data-cc-denom="' + denom + '" data-cc-dir="-1"><span class="material-symbols-rounded">remove</span></button>' +
+    '<input type="number" class="cc-num-input cc-num-wide" id="' + id + '" data-cc-type="' + prefix + '" data-cc-denom="' + denom + '" value="' + value + '" min="0" style="border-color:' + (color || 'var(--border)') + ';">' +
+    '<button class="btn-icon denom-btn denom-btn-lg" data-cc-btn="' + prefix + '" data-cc-denom="' + denom + '" data-cc-dir="1"><span class="material-symbols-rounded">add</span></button>' +
   '</div>';
 }
 
@@ -31,11 +44,16 @@ export function render() {
   var shift = getCurrentShift();
   if (!shift) return '<div class="empty-state"><span class="material-symbols-rounded empty-icon">calculate</span><h2>Chưa mở ca</h2><p>Mở ca để kiểm kê tiền mặt</p><button class="btn btn-primary" onclick="window.navigateTo(\'shift\')">Mở ca</button></div>';
 
-  // Load data: from shift (if saved) or defaults
-  var savedPins = shift.pinnedCash || _loadPersistentPins();
+  // Load data: from shift (if saved) or defaults; auto carry-forward ghim
+  var lastGhim = _getLastShiftGhim();
+  var persistedPins = _loadPersistentPins();
+  // Merge: shift > persisted > lastShift
+  var savedPins = shift.pinnedCash || {};
+  if (Object.keys(savedPins).length === 0) {
+    savedPins = Object.keys(persistedPins).length > 0 ? persistedPins : lastGhim;
+  }
   var savedKeep = shift.keepCash || {};
   var savedHandover = shift.handoverCash || {};
-  // Backward compat: if shift has cashCount but no handover, use cashCount as total
   var cc = shift.cashCount || {};
 
   // Calculate totals
@@ -45,7 +63,6 @@ export function render() {
     var pin = savedPins[dv] || 0;
     var keep = savedKeep[dv] || 0;
     var hand = savedHandover[dv] || 0;
-    // If no split data, infer from cashCount
     if (!shift.handoverCash && cc[dv] > 0) {
       hand = Math.max(0, (cc[dv] || 0) - pin - keep);
     }
@@ -53,6 +70,11 @@ export function render() {
     totalGiao += dv * hand;
   }
   totalAll = totalKet + totalGiao;
+
+  // Calculate expected cash for discrepancy
+  var summary = getShiftSummary(shift);
+  var expectedCash = summary ? summary.expectedCash : 0;
+  var discrepancy = totalAll - expectedCash;
 
   var rows = denominations.map(function(d) {
     var pin = savedPins[d.value] || 0;
@@ -79,11 +101,38 @@ export function render() {
     '</div>';
   }).join('');
 
+  var discColor = discrepancy === 0 ? 'var(--success)' : (Math.abs(discrepancy) <= 50000 ? 'var(--warning)' : 'var(--danger)');
+  var discIcon = discrepancy === 0 ? 'check_circle' : (discrepancy > 0 ? 'arrow_upward' : 'arrow_downward');
+
   return '<div class="section-header">' +
     '<div><h3>💰 Kiểm kê tiền mặt</h3><p>Ghim (két cố định) + Giữ (thêm) = Tiền két. Giao = bàn giao.</p></div>' +
     '<button class="btn btn-outline btn-sm" id="btnResetCount"><span class="material-symbols-rounded">restart_alt</span> Đặt lại</button>' +
   '</div>' +
   '<div class="cc-denom-list">' + rows + '</div>' +
+
+  // ═══ DISCREPANCY BAR (hiện TRƯỚC khi lưu) ═══
+  '<div class="card" style="margin-top:16px;border:1px solid ' + discColor + ';background:linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.02) 100%);">' +
+    '<div class="card-body" style="padding:12px 20px;">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;">' +
+        '<div>' +
+          '<div class="text-muted" style="font-size:11px;margin-bottom:4px;">💵 Tiền mặt kỳ vọng</div>' +
+          '<div style="font-size:20px;font-weight:700;color:var(--info);" id="discExpected">' + formatCurrency(expectedCash) + '</div>' +
+          '<div class="text-muted" style="font-size:10px;">= Đầu ca + TM thu − TM chi ± Khác</div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="text-muted" style="font-size:11px;margin-bottom:4px;">💰 Thực tế kiểm kê</div>' +
+          '<div style="font-size:20px;font-weight:700;color:var(--text);" id="discActual">' + formatCurrency(totalAll) + '</div>' +
+          '<div class="text-muted" style="font-size:10px;">Két + Giao</div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="text-muted" style="font-size:11px;margin-bottom:4px;"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;color:' + discColor + ';">' + discIcon + '</span> Chênh lệch</div>' +
+          '<div style="font-size:20px;font-weight:700;color:' + discColor + ';" id="discDiff">' + (discrepancy >= 0 ? '+' : '') + formatCurrency(discrepancy) + '</div>' +
+          '<div class="text-muted" style="font-size:10px;">' + (discrepancy === 0 ? '✅ Khớp hoàn toàn' : (Math.abs(discrepancy) <= 50000 ? '⚠️ Chênh nhẹ' : '❌ Chênh nhiều')) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>' +
+
   '<div class="cc-summary-bar">' +
     '<div class="cc-summary-item cc-ket-bg"><span>📌🔒 Tiền két (giữ lại)</span><strong id="sumKet">' + formatCurrency(totalKet) + '</strong></div>' +
     '<div class="cc-summary-item cc-giao-bg"><span>🤝 Tiền bàn giao</span><strong id="sumGiao">' + formatCurrency(totalGiao) + '</strong></div>' +
@@ -92,8 +141,9 @@ export function render() {
   '<button class="btn btn-primary" style="width:100%;margin-top:16px;" id="btnSaveCashCount"><span class="material-symbols-rounded">save</span> Lưu kiểm kê</button>';
 }
 
-/** Recalculate all subtotals and totals */
+/** Recalculate all subtotals, totals, and discrepancy */
 function _recalc() {
+  var shift = getCurrentShift();
   var totalKet = 0, totalGiao = 0;
 
   for (var i = 0; i < denominations.length; i++) {
@@ -108,7 +158,6 @@ function _recalc() {
     totalKet += ketAmt;
     totalGiao += giaoAmt;
 
-    // Update per-row subtotals
     var row = document.getElementById('pin_' + dv)?.closest('.cc-denom-row');
     if (row) {
       var subs = row.querySelector('.cc-subtotals');
@@ -120,10 +169,24 @@ function _recalc() {
     }
   }
 
+  var totalAll = totalKet + totalGiao;
   var el;
   el = document.getElementById('sumKet'); if (el) el.textContent = formatCurrency(totalKet);
   el = document.getElementById('sumGiao'); if (el) el.textContent = formatCurrency(totalGiao);
-  el = document.getElementById('sumAll'); if (el) el.textContent = formatCurrency(totalKet + totalGiao);
+  el = document.getElementById('sumAll'); if (el) el.textContent = formatCurrency(totalAll);
+
+  // Update discrepancy
+  var summary = shift ? getShiftSummary(shift) : null;
+  var expectedCash = summary ? summary.expectedCash : 0;
+  var disc = totalAll - expectedCash;
+  el = document.getElementById('discExpected'); if (el) el.textContent = formatCurrency(expectedCash);
+  el = document.getElementById('discActual'); if (el) el.textContent = formatCurrency(totalAll);
+  el = document.getElementById('discDiff');
+  if (el) {
+    var color = disc === 0 ? 'var(--success)' : (Math.abs(disc) <= 50000 ? 'var(--warning)' : 'var(--danger)');
+    el.textContent = (disc >= 0 ? '+' : '') + formatCurrency(disc);
+    el.style.color = color;
+  }
 }
 
 /** Collect all input values */
@@ -143,10 +206,19 @@ function _collectAll() {
   return { pins: pins, keeps: keeps, hands: hands, counts: counts };
 }
 
+/** Clear long-press timers */
+function _clearLongPress() {
+  for (var i = 0; i < _longPressTimers.length; i++) {
+    clearTimeout(_longPressTimers[i]);
+    clearInterval(_longPressTimers[i]);
+  }
+  _longPressTimers = [];
+}
+
 export function init() {
-  // ± buttons
+  // ± buttons with LONG-PRESS support
   document.querySelectorAll('[data-cc-btn]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    var handleClick = function() {
       var type = btn.dataset.ccBtn;
       var denom = btn.dataset.ccDenom;
       var dir = parseInt(btn.dataset.ccDir);
@@ -155,8 +227,35 @@ export function init() {
         input.value = Math.max(0, (parseInt(input.value) || 0) + dir);
         _recalc();
       }
+    };
+
+    btn.addEventListener('click', handleClick);
+
+    // Long-press: hold for 400ms → auto-increment every 120ms
+    btn.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      var t1 = setTimeout(function() {
+        var t2 = setInterval(handleClick, 120);
+        _longPressTimers.push(t2);
+      }, 400);
+      _longPressTimers.push(t1);
+    });
+    btn.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      handleClick();
+      var t1 = setTimeout(function() {
+        var t2 = setInterval(handleClick, 120);
+        _longPressTimers.push(t2);
+      }, 400);
+      _longPressTimers.push(t1);
     });
   });
+
+  // Stop long-press on mouseup/touchend (global)
+  var stopLongPress = function() { _clearLongPress(); };
+  document.addEventListener('mouseup', stopLongPress);
+  document.addEventListener('touchend', stopLongPress);
+  document.addEventListener('touchcancel', stopLongPress);
 
   // Direct input change
   document.querySelectorAll('.cc-num-input').forEach(function(input) {
@@ -164,9 +263,9 @@ export function init() {
   });
 
   // Reset
-  document.getElementById('btnResetCount')?.addEventListener('click', function() {
+  var btnReset = document.getElementById('btnResetCount');
+  if (btnReset) btnReset.addEventListener('click', function() {
     document.querySelectorAll('.cc-num-input').forEach(function(input) {
-      // Don't reset pins — they're persistent
       if (input.dataset.ccType !== 'pin') input.value = 0;
     });
     _recalc();
@@ -174,13 +273,17 @@ export function init() {
   });
 
   // Save
-  document.getElementById('btnSaveCashCount')?.addEventListener('click', function() {
+  var btnSave = document.getElementById('btnSaveCashCount');
+  if (btnSave) btnSave.addEventListener('click', function() {
     var data = _collectAll();
-    // Save pins to localStorage for next-shift persistence
     _savePersistentPins(data.pins);
     try {
       updateCashCount(data.counts, data.pins, data.keeps, data.hands);
       showToast('✅ Đã lưu kiểm kê tiền mặt', 'success');
     } catch (e) { showToast(e.message, 'error'); }
   });
+}
+
+export function destroy() {
+  _clearLongPress();
 }

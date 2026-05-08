@@ -1,6 +1,8 @@
-/* ── Transactions View (Enhanced w/ Search) ── */
-import { getCurrentShift, addTransaction, removeTransaction, addOtherTransaction, removeOtherTransaction, getCategories, addCategory } from '../store.js';
+/* ── Transactions View — Edit + CUKCUK distinction + Advanced Filter ── */
+import { getCurrentShift, addTransaction, removeTransaction, editTransaction, addOtherTransaction, removeOtherTransaction, getCategories, addCategory } from '../store.js';
 import { formatCurrency, formatTime, showToast, showModal, hideModal, showConfirm } from '../utils.js';
+
+var _filter = { type: 'all', payment: 'all', search: '' };
 
 export function render() {
   const shift = getCurrentShift();
@@ -8,7 +10,20 @@ export function render() {
 
   const txs = shift.transactions || [];
   const otherTxs = shift.otherTransactions || [];
-  const categories = getCategories();
+
+  // Apply filters
+  var filtered = txs.filter(function(tx) {
+    if (_filter.type !== 'all' && tx.type !== _filter.type) return false;
+    if (_filter.payment !== 'all' && tx.paymentMethod !== _filter.payment) return false;
+    if (_filter.search) {
+      var q = _filter.search.toLowerCase();
+      var text = (tx.category + ' ' + (tx.note || '') + ' ' + tx.amount).toLowerCase();
+      if (text.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+
+  var totalFiltered = filtered.reduce(function(s, tx) { return s + (tx.type === 'income' ? tx.amount : -tx.amount); }, 0);
 
   return `
     <div class="section-header">
@@ -22,32 +37,51 @@ export function render() {
       </div>
     </div>
 
-    <!-- Search -->
-    <div class="form-group" style="margin-bottom:16px;">
-      <input type="text" id="txSearch" class="form-input" placeholder="🔍 Tìm kiếm giao dịch...">
+    <!-- ═══ ADVANCED FILTER BAR ═══ -->
+    <div class="card" style="margin-bottom:16px;padding:12px 16px;">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <input type="text" id="txSearch" class="form-input" placeholder="🔍 Tìm kiếm..." value="${_filter.search}" style="flex:1;min-width:160px;max-width:250px;height:36px;">
+        <select id="txFilterType" class="form-input" style="width:auto;height:36px;">
+          <option value="all"${_filter.type === 'all' ? ' selected' : ''}>📋 Tất cả</option>
+          <option value="income"${_filter.type === 'income' ? ' selected' : ''}>↑ Thu</option>
+          <option value="expense"${_filter.type === 'expense' ? ' selected' : ''}>↓ Chi</option>
+        </select>
+        <select id="txFilterPayment" class="form-input" style="width:auto;height:36px;">
+          <option value="all"${_filter.payment === 'all' ? ' selected' : ''}>💳 Tất cả PTTT</option>
+          <option value="cash"${_filter.payment === 'cash' ? ' selected' : ''}>💵 Tiền mặt</option>
+          <option value="card"${_filter.payment === 'card' ? ' selected' : ''}>💳 Quẹt thẻ</option>
+          <option value="transfer"${_filter.payment === 'transfer' ? ' selected' : ''}>🔄 Chuyển khoản</option>
+        </select>
+        <span class="text-muted" style="font-size:12px;white-space:nowrap;">${filtered.length}/${txs.length} · <span style="color:${totalFiltered >= 0 ? 'var(--success)' : 'var(--danger)'};font-weight:700;">${totalFiltered >= 0 ? '+' : ''}${formatCurrency(totalFiltered)}</span></span>
+      </div>
     </div>
 
     <!-- Main Transaction Table -->
     <div class="card">
-      <div class="card-header"><h3>📋 Danh sách giao dịch (${txs.length})</h3></div>
-      ${txs.length === 0 ? '<div class="card-body"><p class="text-muted text-center" style="padding:24px;">Chưa có giao dịch nào</p></div>' : `
+      <div class="card-header"><h3>📋 Danh sách giao dịch (${filtered.length})</h3></div>
+      ${filtered.length === 0 ? '<div class="card-body"><p class="text-muted text-center" style="padding:24px;">Không có giao dịch phù hợp</p></div>' : `
         <div class="table-wrap" id="txTableWrap">
           <table>
             <thead><tr>
-              <th>Thời gian</th><th>Loại</th><th>Danh mục</th><th>Thanh toán</th><th>Ghi chú</th><th class="text-right">Số tiền</th><th></th>
+              <th>Thời gian</th><th>Nguồn</th><th>Loại</th><th>Danh mục</th><th>Thanh toán</th><th>Ghi chú</th><th class="text-right">Số tiền</th><th></th>
             </tr></thead>
             <tbody>
-              ${txs.slice().reverse().map(tx => `
-                <tr data-tx-row>
-                  <td style="font-variant-numeric:tabular-nums;">${formatTime(tx.timestamp)}</td>
-                  <td><span class="tag ${tx.type === 'income' ? 'tag-income' : 'tag-expense'}">${tx.type === 'income' ? 'Thu' : 'Chi'}</span></td>
-                  <td>${tx.category}</td>
-                  <td><span class="tag ${tx.paymentMethod === 'cash' ? 'tag-cash' : tx.paymentMethod === 'card' ? 'tag-card' : 'tag-transfer'}">${tx.paymentMethod === 'cash' ? '💵 Mặt' : tx.paymentMethod === 'card' ? '💳 Thẻ' : '🔄 CK'}</span></td>
-                  <td class="text-muted">${tx.note || '—'}</td>
-                  <td class="text-right ${tx.type === 'income' ? 'amount-in' : 'amount-out'}">${tx.type === 'income' ? '+' : '−'}${formatCurrency(tx.amount)}</td>
-                  <td><button class="btn-icon" data-remove-tx="${tx.id}" title="Xóa"><span class="material-symbols-rounded" style="color:var(--danger);">delete</span></button></td>
-                </tr>
-              `).join('')}
+              ${filtered.slice().reverse().map(function(tx) {
+                var isCukcuk = tx.note && tx.note.indexOf('[CUKCUK]') !== -1;
+                return '<tr data-tx-row>' +
+                  '<td style="font-variant-numeric:tabular-nums;">' + formatTime(tx.timestamp) + '</td>' +
+                  '<td>' + (isCukcuk ? '<span class="tag" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:10px;padding:2px 6px;">🔗 POS</span>' : '<span class="tag" style="background:rgba(168,85,247,0.15);color:#a855f7;font-size:10px;padding:2px 6px;">✍️ Thủ công</span>') + '</td>' +
+                  '<td><span class="tag ' + (tx.type === 'income' ? 'tag-income' : 'tag-expense') + '">' + (tx.type === 'income' ? 'Thu' : 'Chi') + '</span></td>' +
+                  '<td>' + tx.category + '</td>' +
+                  '<td><span class="tag ' + (tx.paymentMethod === 'cash' ? 'tag-cash' : tx.paymentMethod === 'card' ? 'tag-card' : 'tag-transfer') + '">' + (tx.paymentMethod === 'cash' ? '💵 Mặt' : tx.paymentMethod === 'card' ? '💳 Thẻ' : '🔄 CK') + '</span></td>' +
+                  '<td class="text-muted">' + (tx.note ? tx.note.replace('[CUKCUK]', '').trim().substring(0, 40) : '—') + '</td>' +
+                  '<td class="text-right ' + (tx.type === 'income' ? 'amount-in' : 'amount-out') + '">' + (tx.type === 'income' ? '+' : '−') + formatCurrency(tx.amount) + '</td>' +
+                  '<td style="white-space:nowrap;">' +
+                    (!isCukcuk ? '<button class="btn-icon" data-edit-tx="' + tx.id + '" title="Sửa"><span class="material-symbols-rounded" style="color:var(--primary);font-size:18px;">edit</span></button>' : '') +
+                    '<button class="btn-icon" data-remove-tx="' + tx.id + '" title="Xóa"><span class="material-symbols-rounded" style="color:var(--danger);font-size:18px;">delete</span></button>' +
+                  '</td>' +
+                '</tr>';
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -70,15 +104,14 @@ export function render() {
           <table>
             <thead><tr><th>Thời gian</th><th>Loại</th><th>Danh mục</th><th>Ghi chú</th><th class="text-right">Số tiền</th><th></th></tr></thead>
             <tbody>
-              ${otherTxs.slice().reverse().map(tx => `
-                <tr>
-                  <td>${formatTime(tx.timestamp)}</td>
-                  <td><span class="tag ${tx.type === 'income' ? 'tag-income' : 'tag-expense'}">${tx.type === 'income' ? 'Thu' : 'Chi'}</span></td>
-                  <td>${tx.category}</td>
-                  <td class="text-muted">${tx.note || '—'}</td>
-                  <td class="text-right ${tx.type === 'income' ? 'amount-in' : 'amount-out'}">${tx.type === 'income' ? '+' : '−'}${formatCurrency(tx.amount)}</td>
-                  <td><button class="btn-icon" data-remove-other="${tx.id}"><span class="material-symbols-rounded" style="color:var(--danger);">delete</span></button></td>
-                </tr>`).join('')}
+              ${otherTxs.slice().reverse().map(function(tx) { return '<tr>' +
+                '<td>' + formatTime(tx.timestamp) + '</td>' +
+                '<td><span class="tag ' + (tx.type === 'income' ? 'tag-income' : 'tag-expense') + '">' + (tx.type === 'income' ? 'Thu' : 'Chi') + '</span></td>' +
+                '<td>' + tx.category + '</td>' +
+                '<td class="text-muted">' + (tx.note || '—') + '</td>' +
+                '<td class="text-right ' + (tx.type === 'income' ? 'amount-in' : 'amount-out') + '">' + (tx.type === 'income' ? '+' : '−') + formatCurrency(tx.amount) + '</td>' +
+                '<td><button class="btn-icon" data-remove-other="' + tx.id + '"><span class="material-symbols-rounded" style="color:var(--danger);">delete</span></button></td>' +
+              '</tr>'; }).join('')}
             </tbody>
           </table>
         </div>`}
@@ -86,114 +119,117 @@ export function render() {
   `;
 }
 
-function _showTxModal(type) {
+function _showTxModal(type, editTx) {
+  var isEdit = !!editTx;
   const categories = getCategories();
   const cats = type === 'income' ? categories.income : categories.expense;
 
   showModal(`
     <div class="modal-title">
-      <span class="material-symbols-rounded" style="color:${type === 'income' ? 'var(--success)' : 'var(--danger)'};">${type === 'income' ? 'add_circle' : 'remove_circle'}</span>
-      ${type === 'income' ? 'Thêm khoản thu' : 'Thêm khoản chi'}
+      <span class="material-symbols-rounded" style="color:${type === 'income' ? 'var(--success)' : 'var(--danger)'};">${isEdit ? 'edit' : (type === 'income' ? 'add_circle' : 'remove_circle')}</span>
+      ${isEdit ? 'Sửa giao dịch' : (type === 'income' ? 'Thêm khoản thu' : 'Thêm khoản chi')}
     </div>
     <div class="form-group">
       <label class="form-label">Danh mục</label>
       <select id="txCategory" class="form-input">
-        ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
+        ${cats.map(function(c) { return '<option value="' + c + '"' + (isEdit && editTx.category === c ? ' selected' : '') + '>' + c + '</option>'; }).join('')}
         <option value="__new__" style="color:#e8a838;font-weight:600;">➕ Thêm danh mục mới...</option>
       </select>
       <div id="newCatWrap" style="display:none;margin-top:8px;">
         <div style="display:flex;gap:8px;">
           <input type="text" id="newCatName" class="form-input" placeholder="Nhập tên danh mục mới..." style="flex:1;">
-          <button class="btn btn-primary btn-sm" id="btnAddCat" type="button">
-            <span class="material-symbols-rounded">add</span>
-          </button>
+          <button class="btn btn-primary btn-sm" id="btnAddCat" type="button"><span class="material-symbols-rounded">add</span></button>
         </div>
-        <p class="form-hint">VD: Doanh thu bar, Mua đá, Phí giao hàng...</p>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Số tiền (VNĐ)</label>
-        <input type="number" id="txAmount" class="form-input" placeholder="0" inputmode="numeric">
+        <input type="number" id="txAmount" class="form-input" placeholder="0" inputmode="numeric" value="${isEdit ? editTx.amount : ''}">
       </div>
       <div class="form-group">
         <label class="form-label">Phương thức${type === 'income' ? '' : ' TT'}</label>
         <select id="txPayment" class="form-input">
-          <option value="cash">💵 Tiền mặt</option>
-          <option value="card">💳 Quẹt thẻ</option>
-          <option value="transfer">🔄 Chuyển khoản</option>
+          <option value="cash"${isEdit && editTx.paymentMethod === 'cash' ? ' selected' : ''}>💵 Tiền mặt</option>
+          <option value="card"${isEdit && editTx.paymentMethod === 'card' ? ' selected' : ''}>💳 Quẹt thẻ</option>
+          <option value="transfer"${isEdit && editTx.paymentMethod === 'transfer' ? ' selected' : ''}>🔄 Chuyển khoản</option>
         </select>
       </div>
     </div>
     <div class="form-group">
       <label class="form-label">Ghi chú</label>
-      <input type="text" id="txNote" class="form-input" placeholder="VD: Bàn 5, khách VIP...">
+      <input type="text" id="txNote" class="form-input" placeholder="VD: Bàn 5, khách VIP..." value="${isEdit ? (editTx.note || '') : ''}">
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
       <button class="btn ${type === 'income' ? 'btn-success' : 'btn-danger'}" id="btnSaveTx">
-        <span class="material-symbols-rounded">save</span> Lưu
+        <span class="material-symbols-rounded">${isEdit ? 'check' : 'save'}</span> ${isEdit ? 'Cập nhật' : 'Lưu'}
       </button>
     </div>
   `);
 
-  setTimeout(() => {
-    const catSelect = document.getElementById('txCategory');
-    const newCatWrap = document.getElementById('newCatWrap');
-    const newCatInput = document.getElementById('newCatName');
+  setTimeout(function() {
+    var catSelect = document.getElementById('txCategory');
+    var newCatWrap = document.getElementById('newCatWrap');
+    var newCatInput = document.getElementById('newCatName');
 
-    // Toggle custom category input
-    catSelect?.addEventListener('change', () => {
+    if (catSelect) catSelect.addEventListener('change', function() {
       if (catSelect.value === '__new__') {
         newCatWrap.style.display = 'block';
-        newCatInput?.focus();
+        if (newCatInput) newCatInput.focus();
       } else {
         newCatWrap.style.display = 'none';
       }
     });
 
-    // Add new category button
-    document.getElementById('btnAddCat')?.addEventListener('click', () => {
-      const name = newCatInput?.value?.trim();
+    var btnAddCat = document.getElementById('btnAddCat');
+    if (btnAddCat) btnAddCat.addEventListener('click', function() {
+      var name = newCatInput ? newCatInput.value.trim() : '';
       if (!name) { showToast('Nhập tên danh mục', 'warning'); return; }
-      const added = addCategory(type, name);
+      var added = addCategory(type, name);
       if (!added) { showToast('Danh mục đã tồn tại', 'warning'); return; }
-      // Add new option to select and select it
-      const newOpt = document.createElement('option');
-      newOpt.value = name;
-      newOpt.textContent = name;
-      // Insert before the "Thêm mới" option
-      const addOpt = catSelect.querySelector('option[value="__new__"]');
+      var newOpt = document.createElement('option');
+      newOpt.value = name; newOpt.textContent = name;
+      var addOpt = catSelect.querySelector('option[value="__new__"]');
       catSelect.insertBefore(newOpt, addOpt);
       catSelect.value = name;
       newCatWrap.style.display = 'none';
-      newCatInput.value = '';
-      showToast(`Đã thêm danh mục: ${name}`, 'success');
+      if (newCatInput) newCatInput.value = '';
+      showToast('Đã thêm danh mục: ' + name, 'success');
     });
 
-    // Enter key on new category input
-    newCatInput?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        document.getElementById('btnAddCat')?.click();
-      }
+    if (newCatInput) newCatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); if (btnAddCat) btnAddCat.click(); }
     });
 
-    document.getElementById('txAmount')?.focus();
-    document.getElementById('btnSaveTx')?.addEventListener('click', () => {
-      const catValue = catSelect.value;
-      if (catValue === '__new__') { showToast('Hãy thêm danh mục mới hoặc chọn danh mục có sẵn', 'warning'); return; }
-      const amount = Number(document.getElementById('txAmount').value);
+    var amtInput = document.getElementById('txAmount');
+    if (amtInput && !isEdit) amtInput.focus();
+
+    var btnSave = document.getElementById('btnSaveTx');
+    if (btnSave) btnSave.addEventListener('click', function() {
+      var catValue = catSelect ? catSelect.value : '';
+      if (catValue === '__new__') { showToast('Chọn hoặc thêm danh mục', 'warning'); return; }
+      var amount = Number(document.getElementById('txAmount').value);
       if (!amount || amount <= 0) { showToast('Nhập số tiền hợp lệ', 'warning'); return; }
       try {
-        addTransaction({
-          type, category: catValue,
-          amount, paymentMethod: document.getElementById('txPayment').value,
-          note: document.getElementById('txNote').value
-        });
-        hideModal();
-        showToast(`Đã thêm ${type === 'income' ? 'thu' : 'chi'}: ${amount.toLocaleString('vi-VN')}đ`, 'success');
-        window.refreshView?.();
+        if (isEdit) {
+          editTransaction(editTx.id, {
+            category: catValue, amount: amount,
+            paymentMethod: document.getElementById('txPayment').value,
+            note: document.getElementById('txNote').value
+          });
+          hideModal();
+          showToast('✅ Đã cập nhật giao dịch', 'success');
+        } else {
+          addTransaction({
+            type: type, category: catValue, amount: amount,
+            paymentMethod: document.getElementById('txPayment').value,
+            note: document.getElementById('txNote').value
+          });
+          hideModal();
+          showToast('Đã thêm ' + (type === 'income' ? 'thu' : 'chi') + ': ' + amount.toLocaleString('vi-VN') + 'đ', 'success');
+        }
+        window.refreshView && window.refreshView();
       } catch (e) { showToast(e.message, 'error'); }
     });
   }, 100);
@@ -226,48 +262,77 @@ function _showOtherTxModal() {
     </div>
   `);
 
-  setTimeout(() => {
-    document.getElementById('btnSaveOther')?.addEventListener('click', () => {
-      const amount = Number(document.getElementById('otherAmount').value);
+  setTimeout(function() {
+    var btnSave = document.getElementById('btnSaveOther');
+    if (btnSave) btnSave.addEventListener('click', function() {
+      var amount = Number(document.getElementById('otherAmount').value);
       if (!amount || amount <= 0) { showToast('Nhập số tiền', 'warning'); return; }
       try {
         addOtherTransaction({
           type: document.getElementById('otherType').value,
           category: document.getElementById('otherCategory').value,
-          amount, note: document.getElementById('otherNote').value
+          amount: amount, note: document.getElementById('otherNote').value
         });
         hideModal();
         showToast('Đã thêm khoản thu/chi khác', 'success');
-        window.refreshView?.();
+        window.refreshView && window.refreshView();
       } catch (e) { showToast(e.message, 'error'); }
     });
   }, 100);
 }
 
 export function init() {
-  document.getElementById('btnAddIncome')?.addEventListener('click', () => _showTxModal('income'));
-  document.getElementById('btnAddExpense')?.addEventListener('click', () => _showTxModal('expense'));
-  document.getElementById('btnAddOther')?.addEventListener('click', _showOtherTxModal);
+  var btnIncome = document.getElementById('btnAddIncome');
+  if (btnIncome) btnIncome.addEventListener('click', function() { _showTxModal('income'); });
+  var btnExpense = document.getElementById('btnAddExpense');
+  if (btnExpense) btnExpense.addEventListener('click', function() { _showTxModal('expense'); });
+  var btnOther = document.getElementById('btnAddOther');
+  if (btnOther) btnOther.addEventListener('click', _showOtherTxModal);
 
-  document.querySelectorAll('[data-remove-tx]').forEach(btn =>
-    btn.addEventListener('click', async () => {
-      var ok = await showConfirm('Xóa giao dịch này?', { title: 'Xóa giao dịch', confirmText: 'Xóa', type: 'danger' });
-      if (ok) { removeTransaction(btn.dataset.removeTx); showToast('Đã xóa', 'info'); window.refreshView?.(); }
-    })
-  );
-
-  document.querySelectorAll('[data-remove-other]').forEach(btn =>
-    btn.addEventListener('click', async () => {
-      var ok = await showConfirm('Xóa giao dịch này?', { title: 'Xóa', confirmText: 'Xóa', type: 'danger' });
-      if (ok) { removeOtherTransaction(btn.dataset.removeOther); showToast('Đã xóa', 'info'); window.refreshView?.(); }
-    })
-  );
-
-  // Search filter (Feature 7)
-  document.getElementById('txSearch')?.addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase();
-    document.querySelectorAll('[data-tx-row]').forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  // Edit transaction
+  document.querySelectorAll('[data-edit-tx]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var shift = getCurrentShift();
+      if (!shift) return;
+      var txId = btn.dataset.editTx;
+      var tx = null;
+      for (var i = 0; i < shift.transactions.length; i++) {
+        if (shift.transactions[i].id === txId) { tx = shift.transactions[i]; break; }
+      }
+      if (tx) _showTxModal(tx.type, tx);
     });
+  });
+
+  // Remove transaction
+  document.querySelectorAll('[data-remove-tx]').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var ok = await showConfirm('Xóa giao dịch này?', { title: 'Xóa giao dịch', confirmText: 'Xóa', type: 'danger' });
+      if (ok) { removeTransaction(btn.dataset.removeTx); showToast('Đã xóa', 'info'); window.refreshView && window.refreshView(); }
+    });
+  });
+
+  // Remove other
+  document.querySelectorAll('[data-remove-other]').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var ok = await showConfirm('Xóa giao dịch này?', { title: 'Xóa', confirmText: 'Xóa', type: 'danger' });
+      if (ok) { removeOtherTransaction(btn.dataset.removeOther); showToast('Đã xóa', 'info'); window.refreshView && window.refreshView(); }
+    });
+  });
+
+  // Filters — re-render on change
+  var searchInput = document.getElementById('txSearch');
+  if (searchInput) searchInput.addEventListener('input', function(e) {
+    _filter.search = e.target.value;
+    window.refreshView && window.refreshView();
+  });
+  var filterType = document.getElementById('txFilterType');
+  if (filterType) filterType.addEventListener('change', function(e) {
+    _filter.type = e.target.value;
+    window.refreshView && window.refreshView();
+  });
+  var filterPayment = document.getElementById('txFilterPayment');
+  if (filterPayment) filterPayment.addEventListener('change', function(e) {
+    _filter.payment = e.target.value;
+    window.refreshView && window.refreshView();
   });
 }
