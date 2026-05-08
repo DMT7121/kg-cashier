@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-08T13:06:00Z",
+  "title": "Design System: KG-Cashier",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "King's Gold",
+        "canonical": "oklch(76% 0.15 75)",
+        "tonalRamp": ["#3d2a0e", "#5c3f15", "#7b551c", "#9a6a23", "#b9802a", "#d89531", "#e8a838", "#f0c46a", "#f5d98d", "#faedb0"]
+      },
+      "bg-base": {
+        "role": "neutral",
+        "displayName": "Deep Warm Charcoal",
+        "canonical": "oklch(14% 0.005 270)",
+        "tonalRamp": ["#0a0c10", "#111318", "#181b23", "#1f222c", "#262a35", "#2d313e", "#343947", "#3b4050"]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Confirmation Green",
+        "canonical": "oklch(70% 0.18 150)",
+        "tonalRamp": ["#0a2e14", "#0f4a1e", "#156628", "#1a8232", "#1f9e3c", "#22c55e", "#4ade80", "#86efac"]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Alert Red",
+        "canonical": "oklch(58% 0.22 25)",
+        "tonalRamp": ["#3b0d0d", "#5c1414", "#7d1b1b", "#9e2222", "#bf2929", "#ef4444", "#f87171", "#fca5a5"]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Caution Amber",
+        "canonical": "oklch(78% 0.16 85)",
+        "tonalRamp": ["#3d2504", "#5c3806", "#7b4a08", "#9a5d0a", "#b96f0c", "#f59e0b", "#fbbf24", "#fde68a"]
+      },
+      "info": {
+        "role": "semantic",
+        "displayName": "Information Blue",
+        "canonical": "oklch(58% 0.18 260)",
+        "tonalRamp": ["#0d1e3b", "#142e5c", "#1b3e7d", "#224e9e", "#295ebf", "#3b82f6", "#60a5fa", "#93c5fd"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Section headings and page titles. Largest text on screen." },
+      "body": { "displayName": "Body", "purpose": "Descriptions, form hints, body text." },
+      "label": { "displayName": "Label", "purpose": "Stat labels, form labels, section navigation. Always uppercase with tracked spacing." }
+    },
+    "shadows": [
+      { "name": "ambient", "value": "0 2px 12px rgba(0,0,0,0.3)", "purpose": "Hover state feedback on buttons and interactive cards." },
+      { "name": "elevated", "value": "0 8px 32px rgba(0,0,0,0.45)", "purpose": "Modal and overlay separation from base layer." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "ease", "purpose": "Default for state transitions (hover, focus)." },
+      { "name": "duration-fast", "value": "0.15s", "purpose": "Background and border-color transitions." },
+      { "name": "duration-normal", "value": "0.2s", "purpose": "Modal entry, toast slide." },
+      { "name": "duration-slide", "value": "0.25s", "purpose": "Toast slideInRight, sidebar mobile toggle." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "480px" },
+      { "name": "tablet", "value": "768px" },
+      { "name": "desktop-sm", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Gold CTA for primary actions. Dark text on gold background.",
+      "html": "<button class=\"ds-btn-primary\"><span class=\"ds-btn-icon\">▶</span> Mở ca</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; background: #e8a838; color: #111; border: 1px solid #e8a838; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: box-shadow 0.15s; } .ds-btn-primary:hover { box-shadow: 0 2px 8px rgba(232,168,56,0.25); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(232,168,56,0.15); } .ds-btn-icon { font-size: 14px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action. Transparent with subtle border.",
+      "html": "<button class=\"ds-btn-outline\">Hủy</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; background: transparent; color: #e2e2e6; border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s, border-color 0.15s; } .ds-btn-outline:hover { border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.03); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.08); }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "stat-card",
+      "description": "Metric display: icon + label + value. No side-stripe accent.",
+      "html": "<div class=\"ds-stat-card\"><div class=\"ds-stat-icon\" style=\"background:rgba(232,168,56,0.10);color:#e8a838;\">📊</div><div class=\"ds-stat-info\"><span class=\"ds-stat-label\">DOANH THU</span><span class=\"ds-stat-value\">12,500,000</span></div></div>",
+      "css": ".ds-stat-card { display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; transition: background 0.2s, border-color 0.2s; } .ds-stat-card:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); } .ds-stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; } .ds-stat-info { display: flex; flex-direction: column; } .ds-stat-label { font-size: 11px; color: #71717a; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; } .ds-stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: #e2e2e6; margin-top: 2px; }"
+    },
+    {
+      "name": "Form Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Dark glass input with gold focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Nhập giao dịch...\" />",
+      "css": ".ds-input { width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; color: #e2e2e6; font-family: 'DM Sans', sans-serif; font-size: 13px; transition: border-color 0.2s, box-shadow 0.2s; outline: none; color-scheme: dark; } .ds-input::placeholder { color: #71717a; } .ds-input:focus { border-color: #e8a838; box-shadow: 0 0 0 3px rgba(232,168,56,0.15); }"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Sidebar nav link with gold active state.",
+      "html": "<a class=\"ds-nav-item ds-nav-active\"><span>📊</span><span>Tổng quan</span></a>",
+      "css": ".ds-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 20px; color: #71717a; font-weight: 500; font-size: 13px; cursor: pointer; transition: color 0.15s, background 0.15s; border-left: 3px solid transparent; text-decoration: none; } .ds-nav-item:hover { color: #e2e2e6; background: rgba(255,255,255,0.04); } .ds-nav-active { color: #e8a838; background: rgba(232,168,56,0.10); border-left-color: #e8a838; font-weight: 600; }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Pill-shaped status indicator.",
+      "html": "<span class=\"ds-tag ds-tag-income\">Thu nhập</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; } .ds-tag-income { background: rgba(34,197,94,0.10); color: #22c55e; } .ds-tag-expense { background: rgba(239,68,68,0.10); color: #ef4444; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Steady Counter",
+    "overview": "A cashier's workspace that feels solid and trustworthy, like a well-lit mahogany counter in a premium restaurant. Warm dark tones ground the interface. Gold accents mark where attention should go but never compete. Every screen answers one question fast: what do I need to do right now?",
+    "keyCharacteristics": [
+      "Warm dark: backgrounds tinted toward warm gray, never pure black",
+      "Restrained accent: gold used sparingly, for primary actions and active states only",
+      "Data-first: numbers and labels dominate, decoration is minimal",
+      "Vietnamese-native: DM Sans renders Vietnamese diacritics cleanly at all sizes",
+      "Scannable: clear type hierarchy lets cashiers glance, not study"
+    ],
+    "rules": [
+      { "name": "The Rarity Rule", "body": "King's Gold appears on no more than 15% of any screen. It marks interactive affordances and active states. When everything is gold, nothing is.", "section": "colors" },
+      { "name": "The No Decoration Rule", "body": "Semantic colors (green, red, amber, blue) indicate data status only. They are never used for backgrounds, gradients, or ornamentation.", "section": "colors" },
+      { "name": "The One Family Rule", "body": "DM Sans carries every role. Hierarchy comes from weight, size, and letter-spacing, never from a second typeface.", "section": "typography" },
+      { "name": "The Tabular Numbers Rule", "body": "Every financial figure uses font-variant-numeric: tabular-nums. Columns of money amounts must align vertically without exception.", "section": "typography" },
+      { "name": "The Flat-Rest Rule", "body": "No element has a shadow at rest. Shadows appear only as feedback (hover) or to separate layers (modals).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use King's Gold (#e8a838) exclusively for primary actions, active states, and the brand mark.",
+      "Do use tonal layering (#111318 → #181b23 → rgba surface) for depth. Three tones, no more.",
+      "Do use tabular-nums on every column of financial data.",
+      "Do use uppercase + letter-spacing (0.04em) for labels; negative letter-spacing (-0.02em) for headings.",
+      "Do keep Vietnamese diacritics readable at every size.",
+      "Do keep modals small and focused."
+    ],
+    "donts": [
+      "Don't use border-left or border-right greater than 1px as a colored accent stripe on cards.",
+      "Don't use backdrop-filter: blur() decoratively on sidebars or topbars.",
+      "Don't use purple gradients, neon glows, or cyan accents.",
+      "Don't use background-clip: text with gradient backgrounds.",
+      "Don't use bounce or elastic easing.",
+      "Don't add glow shadows to elements at rest.",
+      "Don't use Inter, Roboto, Geist, or Plus Jakarta Sans.",
+      "Don't animate width, height, padding, or margin.",
+      "Don't wrap every piece of content in a bordered card."
+    ]
+  }
+}
