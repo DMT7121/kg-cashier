@@ -242,17 +242,20 @@ export function render() {
       (cukcukMonth && cukcukMonth.daysWithData > 0 ? '<span class="tag tag-income" style="font-size:10px;">' + cukcukMonth.daysWithData + ' ngày có doanh thu</span>' : '') +
     '</div>' +
     (function() {
-      var cukcukDays = cukcukMonth ? cukcukMonth.days : [];
+      var cukcukDays = (cukcukMonth && cukcukMonth.days) ? cukcukMonth.days : [];
       var mergedMonthly = monthly.map(function(d) {
-        var cd = cukcukDays.find(function(c) { return c && c.date === d.date; });
+        var cd = null;
+        for (var ci = 0; ci < cukcukDays.length; ci++) {
+          if (cukcukDays[ci] && cukcukDays[ci].date === d.date) { cd = cukcukDays[ci]; break; }
+        }
         return {
           date: d.date, shifts: d.shifts,
           billCount: cd && cd.bills > d.billCount ? cd.bills : d.billCount,
           totalIncome: cd && cd.total > d.totalIncome ? cd.total : d.totalIncome,
           totalExpense: d.totalExpense,
-          cashTotal: cd ? cd.cash : d.cashTotal,
-          cardTotal: cd ? cd.card : d.cardTotal,
-          transferTotal: cd ? cd.transfer : d.transferTotal,
+          cashTotal: cd ? cd.cash : (d.cashTotal || 0),
+          cardTotal: cd ? cd.card : (d.cardTotal || 0),
+          transferTotal: cd ? cd.transfer : (d.transferTotal || 0),
           net: (cd && cd.total > d.totalIncome ? cd.total : d.totalIncome) - d.totalExpense,
           source: cd && cd.source === 'cukcuk' ? 'cukcuk' : 'local'
         };
