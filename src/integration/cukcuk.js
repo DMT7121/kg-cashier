@@ -2,6 +2,10 @@ import { getCurrentShift, getSettings, getState, getShiftHistory, getShiftSummar
 import { showToast, formatCurrency } from '../utils.js';
 import { syncCukcukRevenueToCloud } from '../api.js';
 import * as invoiceStore from './invoiceStore.js';
+import * as retryQueue from './retryQueue.js';
+
+// Initialize retry queue with Sheets push function
+retryQueue.init(syncCukcukRevenueToCloud);
 
 /**
  * CUKCUK API Helper - Official Integration
@@ -1032,51 +1036,29 @@ export async function syncTransactions(force) {
     _lastSyncApiTime = Date.now();
     _lastSyncHadNewData = count > 0;
 
-    // 8. Push to Google Sheets (fire-and-forget) + mark as pushed
+    // 8. Push to Google Sheets (with retry queue fallback)
     if (sheetData.length > 0) {
       console.log('[CUKCUK] Pushing ' + sheetData.length + ' NEW invoices to Google Sheets...');
       var pushedRefIds = sheetData.map(function(sd) { return sd.refId; });
-      syncCukcukRevenueToCloud(sheetData, shift.id).then(function(res) {
-        if (res && res.success) {
-          console.log('[CUKCUK→Sheets] ✅ ' + res.message);
+      try {
+        var sheetsRes = await syncCukcukRevenueToCloud(sheetData, shift.id);
+        if (sheetsRes && sheetsRes.success) {
+          console.log('[CUKCUK→Sheets] ✅ ' + sheetsRes.message);
           invoiceStore.markPushedToSheets(pushedRefIds);
           showToast('☁️ Đã đẩy ' + sheetData.length + ' hóa đơn lên Sheets', 'success');
         } else {
-          console.warn('[CUKCUK→Sheets] ⚠️ ' + (res && res.message || 'Failed'));
+          // Push failed → enqueue for retry
+          retryQueue.enqueue(sheetData, shift.id, pushedRefIds);
+          showToast('⚠️ Sheets tạm lỗi, sẽ tự động thử lại', 'warning');
         }
-      }).catch(function(err) {
-        console.warn('[CUKCUK→Sheets] Error:', err.message);
-      });
+      } catch(pushErr) {
+        retryQueue.enqueue(sheetData, shift.id, pushedRefIds);
+        console.warn('[CUKCUK→Sheets] Failed, queued for retry:', pushErr.message);
+      }
     }
 
-    // 8b. Retry any previously unpushed invoices (fire-and-forget)
-    try {
-      var unpushed = invoiceStore.getUnpushedInvoices();
-      // Exclude invoices we just pushed above
-      var alreadyPushing = {};
-      for (var ui = 0; ui < sheetData.length; ui++) alreadyPushing[sheetData[ui].refId] = true;
-      var retryList = unpushed.filter(function(inv) { return !alreadyPushing[inv.refId]; });
-
-      if (retryList.length > 0) {
-        console.log('[CUKCUK] Retrying ' + retryList.length + ' previously unpushed invoices...');
-        var retryData = retryList.map(function(inv) {
-          var cash = 0, card = 0, transfer = 0;
-          (inv.payments || []).forEach(function(p) {
-            if (p.method === 'cash') cash += p.amount || 0;
-            else if (p.method === 'card') card += p.amount || 0;
-            else if (p.method === 'transfer') transfer += p.amount || 0;
-          });
-          return { refId: inv.refId, refNo: inv.refNo || '', refDate: inv.refDate || '', tableName: inv.tableName || '', employeeName: inv.employeeName || '', amount: inv.amount || 0, cashAmount: cash, cardAmount: card, transferAmount: transfer };
-        });
-        var retryRefIds = retryData.map(function(d) { return d.refId; });
-        syncCukcukRevenueToCloud(retryData, shift.id).then(function(res) {
-          if (res && res.success) {
-            invoiceStore.markPushedToSheets(retryRefIds);
-            console.log('[CUKCUK→Sheets] ✅ Retry OK: ' + retryRefIds.length + ' invoices');
-          }
-        }).catch(function() {});
-      }
-    } catch(retryErr) { /* ignore retry failures */ }
+    // 8b. Process retry queue (replaces old unpushed retry logic)
+    retryQueue.processQueue();
 
     // 9. Report results
     var statsMsg = '';
@@ -1136,3 +1118,36 @@ export function getLastSyncInfo() {
 
 // ── Export Invoice Store for direct access ──
 export { invoiceStore };
+
+/**
+ * Get comprehensive sync status for UI status bar.
+ * Aggregates CUKCUK connection, sync state, cooldown, and Sheets queue.
+ */
+export function getSyncStatus() {
+  var conn = getConnectionStatus();
+  var meta = _getSyncMeta();
+  var now = Date.now();
+  var cooldownRemaining = 0;
+  if (!_lastSyncHadNewData && _lastSyncApiTime > 0) {
+    var elapsed = now - _lastSyncApiTime;
+    if (elapsed < SYNC_COOLDOWN) {
+      cooldownRemaining = Math.ceil((SYNC_COOLDOWN - elapsed) / 1000);
+    }
+  }
+  var queueStatus = retryQueue.getStatus();
+  var storedCount = 0;
+  try {
+    var todayStr = meta.lastDate || '';
+    if (todayStr) storedCount = invoiceStore.getCountByDate(todayStr);
+  } catch(e) { /* ignore */ }
+
+  return {
+    connected: conn.connected,
+    configured: conn.configured,
+    billCount: storedCount,
+    lastSyncTime: meta.lastSyncTime || '',
+    lastSyncDate: meta.lastDate || '',
+    cooldownSeconds: cooldownRemaining,
+    sheetsQueue: queueStatus
+  };
+}

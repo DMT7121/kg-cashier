@@ -679,11 +679,15 @@ export function removeCategory(type, name) {
 
 // ── Cloud Sync ───────────────────────────────
 var _syncTimer = null;
+var _shiftDirty = false;
+var _lastCloudPushTime = 0;
 
 function _syncCurrentShift() {
   var settings = getState().settings;
   if (!settings || !settings.autoSync) return;
   if (!_cloudSync) return;
+
+  _shiftDirty = true;
 
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(function() {
@@ -696,9 +700,29 @@ function _syncCurrentShift() {
           delete cleanShift.invoices[i].data;
         }
       }
-      try { _cloudSync(cleanShift).catch(function() {}); } catch (e) { /* ignore */ }
+      try {
+        _cloudSync(cleanShift).then(function() {
+          _shiftDirty = false;
+          _lastCloudPushTime = Date.now();
+        }).catch(function() {});
+      } catch (e) { /* ignore */ }
     }
   }, 1500); // 1.5s debounce for near real-time sync
+}
+
+/** Check if shift data has local changes not yet pushed to cloud */
+export function isShiftDirty() { return _shiftDirty; }
+
+/** Clear dirty flag (called after successful cloud pull) */
+export function clearShiftDirty() { _shiftDirty = false; }
+
+/** Get cloud sync metadata for UI status bar */
+export function getCloudSyncMeta() {
+  return {
+    dirty: _shiftDirty,
+    lastPushTime: _lastCloudPushTime,
+    hasPendingPush: !!_syncTimer
+  };
 }
 
 export async function syncCurrentShiftWithCloud() {

@@ -87,12 +87,13 @@ function renderShiftDashboard(shift) {
           <span class="material-symbols-rounded">point_of_sale</span> Doanh thu POS — ${new Date().toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric'})}
         </h3>
         <div style="display:flex;align-items:center;gap:8px;">
-          <span id="cukcukSyncStatus" class="text-muted" style="font-size:11px;"></span>
           <button class="btn btn-success btn-sm" id="btnDashSyncCukcuk" style="white-space:nowrap;">
             <span class="material-symbols-rounded">sync</span> Đồng bộ
           </button>
         </div>
       </div>
+      <!-- Sync Status Bar -->
+      <div id="syncStatusBar" class="sync-status-bar"></div>
       <div class="card-body" style="padding:16px 20px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
           <div style="text-align:center;padding:12px;background:rgba(16,185,129,0.08);border-radius:10px;">
@@ -106,9 +107,6 @@ function renderShiftDashboard(shift) {
             <div style="font-size:12px;color:var(--info);margin-top:4px;">${summary.manualBills} khoản</div>
           </div>
         </div>
-        <p class="text-muted" style="font-size:10px;margin:10px 0 0;text-align:center;opacity:0.6;">
-          Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau · Tự động đồng bộ mỗi 5 phút
-        </p>
       </div>
     </div>`;
     })() : ''}
@@ -328,31 +326,86 @@ export function init() {
   // Initial revenue render
   _renderRevenuePeriod();
 
+  // Populate sync status bar on load
+  _refreshSyncStatusBar();
+
   // CUKCUK sync button on dashboard
   document.getElementById('btnDashSyncCukcuk')?.addEventListener('click', async () => {
     const btn = document.getElementById('btnDashSyncCukcuk');
-    const status = document.getElementById('cukcukSyncStatus');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<span class="material-symbols-rounded">hourglass_top</span> Đang đồng bộ...';
+      btn.innerHTML = '<span class="material-symbols-rounded spin-icon">hourglass_top</span> Đang đồng bộ...';
     }
-    if (status) status.textContent = '⏳';
     try {
       const { syncTransactions } = await import('../integration/cukcuk.js');
       const result = await syncTransactions(true);
       if (result && result.success) {
-        if (status) status.textContent = '✅ ' + result.synced + ' mới / ' + result.total + ' tổng';
         if (result.synced > 0) window.refreshView?.();
-        _renderRevenuePeriod(); // Update period revenue too
-      } else {
-        if (status) status.textContent = '❌ ' + (result?.message || 'Lỗi').substring(0, 30);
+        _renderRevenuePeriod();
       }
     } catch(e) {
-      if (status) status.textContent = '❌ Lỗi';
+      // error handled by syncTransactions internally
     }
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = '<span class="material-symbols-rounded">sync</span> Đồng bộ';
     }
+    _refreshSyncStatusBar();
   });
+
+  // Retry failed Sheets push button
+  document.getElementById('btnRetrySheets')?.addEventListener('click', async () => {
+    try {
+      const { retryFailed } = await import('../integration/retryQueue.js');
+      retryFailed();
+      _refreshSyncStatusBar();
+    } catch(e) {}
+  });
+}
+
+// ── Sync Status Bar Helper ──
+async function _refreshSyncStatusBar() {
+  var bar = document.getElementById('syncStatusBar');
+  if (!bar) return;
+
+  try {
+    var { getSyncStatus } = await import('../integration/cukcuk.js');
+    var { getCloudSyncMeta } = await import('../store.js');
+    var sync = getSyncStatus();
+    var cloud = getCloudSyncMeta();
+
+    var timeAgo = '';
+    if (sync.lastSyncTime) {
+      var diff = Math.round((Date.now() - new Date(sync.lastSyncTime).getTime()) / 1000);
+      if (diff < 60) timeAgo = diff + 's trước';
+      else if (diff < 3600) timeAgo = Math.floor(diff / 60) + ' phút trước';
+      else timeAgo = Math.floor(diff / 3600) + 'h trước';
+    }
+
+    var cukcukDot = sync.connected ? '🟢' : (sync.configured ? '🟡' : '⚪');
+    var cloudDot = cloud.dirty ? '🟡' : '🟢';
+
+    var sheetsInfo = '';
+    if (sync.sheetsQueue.failed > 0) {
+      sheetsInfo = '<span style="color:var(--danger);font-weight:600;">' + sync.sheetsQueue.failed + ' lỗi</span> · <button class="btn-link" id="btnRetrySheets" style="font-size:11px;color:var(--primary);cursor:pointer;background:none;border:none;text-decoration:underline;padding:0;">Thử lại</button>';
+    } else if (sync.sheetsQueue.pending > 0) {
+      sheetsInfo = '<span style="color:var(--warning);">' + sync.sheetsQueue.pending + ' đang chờ</span>';
+    } else {
+      sheetsInfo = '<span style="color:var(--text-muted);">OK</span>';
+    }
+
+    var cooldownInfo = '';
+    if (sync.cooldownSeconds > 0) {
+      var mins = Math.floor(sync.cooldownSeconds / 60);
+      var secs = sync.cooldownSeconds % 60;
+      cooldownInfo = ' · <span style="color:var(--text-muted);font-style:italic;">Chờ ' + (mins > 0 ? mins + ':' : '') + String(secs).padStart(2, '0') + '</span>';
+    }
+
+    bar.innerHTML = '<div class="sync-status-row">' +
+      '<span>' + cukcukDot + ' CUKCUK: <strong>' + sync.billCount + '</strong> bill' + (timeAgo ? ' · ' + timeAgo : '') + cooldownInfo + '</span>' +
+      '<span>' + cloudDot + ' Cloud: ' + (cloud.dirty ? 'Đang đẩy...' : 'OK') + ' · ☁️ Sheets: ' + sheetsInfo + '</span>' +
+    '</div>';
+  } catch(e) {
+    bar.innerHTML = '';
+  }
 }

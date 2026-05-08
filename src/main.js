@@ -3,7 +3,7 @@
    COMPATIBLE: No optional chaining, global error handling
    ============================================ */
 import './style.css';
-import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud } from './store.js';
+import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud, isShiftDirty, clearShiftDirty } from './store.js';
 import { hideModal } from './utils.js';
 
 // ── Global Error Handler — Show on screen ────
@@ -273,15 +273,22 @@ function initApp() {
     console.warn('[Migration] Error:', e);
   }
 
-  // Background polling for cloud sync (Feature: Multi-device real-time sync)
+  // Background polling for cloud sync
+  // Only pull from cloud when local data is clean (not dirty).
+  // Dirty changes push immediately via store.js _syncCurrentShift debounce.
   _globalIntervals.push(setInterval(function() {
+    // Skip pull if we have local changes pending push
+    var isDirty = false;
+    try { isDirty = isShiftDirty(); } catch(e2) {}
+    if (isDirty) return;
     syncCurrentShiftWithCloud().then(function(changed) {
       if (changed) {
         console.log('[Main] Auto-sync: Data refreshed from cloud');
+        clearShiftDirty();
         renderCurrentView();
       }
     });
-  }, 15000)); // Check every 15 seconds for real-time updates
+  }, 60000));
 
   // CUKCUK auto-sync: only fetch NEW bills to avoid rate limiting
   // Loads invoices for TODAY's date only, auto-detects payment methods

@@ -656,6 +656,35 @@ tr:hover td { background: rgba(255,255,255,.02); }
   border-top: 1px solid var(--border);
 }
 
+/* ── Sync Status Bar ──────────────────────── */
+.sync-status-bar {
+  padding: 0 20px;
+}
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  margin: 0 0 4px;
+}
+.sync-status-row strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
 /* ── Toast ────────────────────────────────── */
 .toast {
   display: flex;
