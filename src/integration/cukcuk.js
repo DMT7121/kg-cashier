@@ -332,6 +332,15 @@ export async function testConnection() {
   return loginAndGetToken();
 }
 
+// ── Extract invoice array from API response Data field ──
+function _extractPageData(data) {
+  if (!data || !data.Data) return [];
+  if (Array.isArray(data.Data)) return data.Data;
+  if (data.Data.PageData) return data.Data.PageData;
+  if (data.Data.Items) return data.Data.Items;
+  return [];
+}
+
 // ── Fetch SAInvoices (uses centralized _cukcukApiCall with auto-retry) ──
 async function _fetchInvoices(startDate, endDate, pageIndex) {
   if (!pageIndex) pageIndex = 1;
@@ -816,134 +825,94 @@ export async function syncTransactions(force) {
     // Use invoiceStore as source of truth for already-synced count
     var storedCount = invoiceStore.getCountByDate(todayStr);
     
-    console.log('[CUKCUK] Smart sync for', todayStr, '| Range:', fromDate, '→', toDate, '| Stored:', storedCount, '| Force:', !!force);
+    console.log('[CUKCUK] v2 sync for', todayStr, '| Range:', fromDate, '→', toDate, '| Stored:', storedCount, '| Force:', !!force);
 
     // ═══ COOLDOWN: Skip API call if we recently synced and found no new data ═══
     if (!force) {
       var timeSinceLastSync = Date.now() - _lastSyncApiTime;
       if (timeSinceLastSync < SYNC_COOLDOWN && !_lastSyncHadNewData) {
-        console.log('[CUKCUK] Cooldown skip: last sync ' + Math.round(timeSinceLastSync / 1000) + 's ago, no new data last time');
         return { success: true, synced: 0, total: storedCount, skipped: storedCount, amount: 0, date: todayStr, smart: true, cooldown: true };
       }
     }
 
-    // ═══ STEP 1: Fetch page 1 to get total count ═══
+    // ═══ STEP 1: Fetch page 1 ═══
     var data = await _fetchInvoices(fromDate, toDate, 1);
-    
-    if (data._authFailed) {
-      return { success: false, message: data.message };
-    }
+    if (data._authFailed) return { success: false, message: data.message };
+    if (!data.Success) throw new Error(data.ErrorMessage || data.Message || 'Lỗi API');
 
-    if (!data.Success) {
-      var errDetail = data.ErrorMessage || data.Message || 'Lỗi API';
-      throw new Error(errDetail);
-    }
-
-    var firstPageInvoices = [];
-    if (data.Data) {
-      if (Array.isArray(data.Data)) firstPageInvoices = data.Data;
-      else if (data.Data.PageData) firstPageInvoices = data.Data.PageData;
-      else if (data.Data.Items) firstPageInvoices = data.Data.Items;
-    }
-    
+    var firstPageInvoices = _extractPageData(data);
     var apiTotal = data.Total || firstPageInvoices.length;
-    console.log('[CUKCUK] API returned: Total=' + apiTotal + ', Page1=' + firstPageInvoices.length + ', data.Total=' + data.Total);
-    if (force && firstPageInvoices.length > 0) {
-      console.log('[CUKCUK] First invoice sample:', JSON.stringify({
-        RefId: firstPageInvoices[0].RefId || firstPageInvoices[0].RefID,
-        RefNo: firstPageInvoices[0].RefNo,
-        Amount: firstPageInvoices[0].Amount,
-        RefDate: firstPageInvoices[0].RefDate
-      }));
+    console.log('[CUKCUK] API: Total=' + apiTotal + ', Page1=' + firstPageInvoices.length);
+
+    // ═══ STEP 2: Scan pages — stop when a full page has NO new invoices ═══
+    var toProcess = [];
+    var allSyncedRefIds = [];
+
+    function _scanPage(pageInvoices) {
+      var newOnThisPage = 0;
+      for (var k = 0; k < pageInvoices.length; k++) {
+        var inv = pageInvoices[k];
+        var refId = String(inv.RefId || inv.RefID || ('idx-' + k));
+        var apiAmount = inv.Amount || 0;
+        allSyncedRefIds.push(refId);
+        if (apiAmount <= 0) continue;
+        var existing = invoiceStore.getInvoice(refId);
+        if (!existing) {
+          toProcess.push({ inv: inv, refId: refId, reason: 'new' });
+          newOnThisPage++;
+          console.log('[CUKCUK] NEW: ' + refId + ' ' + (inv.RefNo || '') + ' ' + apiAmount.toLocaleString() + 'đ');
+        } else if (existing.unpaid) {
+          toProcess.push({ inv: inv, refId: refId, reason: 'unpaid-refresh' });
+          newOnThisPage++;
+          console.log('[CUKCUK] UNPAID→refresh: ' + refId + ' ' + (inv.RefNo || ''));
+        }
+      }
+      return newOnThisPage;
     }
 
-    // ═══ STEP 2: Collect ALL invoices from all pages ═══
-    var allApiInvoices = firstPageInvoices.slice();
+    // Scan page 1
+    var newOnPage1 = _scanPage(firstPageInvoices);
+    console.log('[CUKCUK] Page 1: ' + firstPageInvoices.length + ' invoices, ' + newOnPage1 + ' new/unpaid');
 
-    if (firstPageInvoices.length >= 100 && apiTotal > firstPageInvoices.length) {
+    // Only fetch more pages if: page 1 had new items OR apiTotal > stored (more invoices exist)
+    if (firstPageInvoices.length >= 100 && (newOnPage1 > 0 || apiTotal > storedCount)) {
       var page = 2;
       var maxPages = 20;
+      var consecutiveEmptyPages = 0;
       while (page <= maxPages) {
         var pageData = await _fetchInvoices(fromDate, toDate, page);
         if (pageData._authFailed || !pageData.Success) break;
-        
-        var pageInvoices = [];
-        if (pageData.Data) {
-          if (Array.isArray(pageData.Data)) pageInvoices = pageData.Data;
-          else if (pageData.Data.PageData) pageInvoices = pageData.Data.PageData;
-          else if (pageData.Data.Items) pageInvoices = pageData.Data.Items;
+        var pageInvoices = _extractPageData(pageData);
+        if (pageInvoices.length === 0) break;
+
+        var newOnThisPage = _scanPage(pageInvoices);
+        console.log('[CUKCUK] Page ' + page + ': ' + pageInvoices.length + ' inv, ' + newOnThisPage + ' new');
+
+        // Stop scanning if this full page had zero new invoices (all already known)
+        if (newOnThisPage === 0) {
+          consecutiveEmptyPages++;
+          if (consecutiveEmptyPages >= 2) {
+            console.log('[CUKCUK] 2 consecutive pages with 0 new — stopping scan');
+            break;
+          }
+        } else {
+          consecutiveEmptyPages = 0;
         }
-        
-        for (var pi = 0; pi < pageInvoices.length; pi++) {
-          allApiInvoices.push(pageInvoices[pi]);
-        }
-        
         if (pageInvoices.length < 100) break;
         page++;
       }
     }
 
-    // ═══ STEP 2b: Quick skip — if total count unchanged ═══
-    // IMPORTANT: Skip ONLY in auto-sync. Manual sync (force=true) always processes.
-    if (!force && apiTotal > 0 && apiTotal <= storedCount) {
-      // Count unchanged in auto-sync — check if we have unpaid bills that need refresh
-      var hasUnpaid = invoiceStore.hasUnpaidInvoices(todayStr);
-      if (!hasUnpaid) {
-        _lastSyncApiTime = Date.now();
-        _lastSyncHadNewData = false;
-        console.log('[CUKCUK] Quick skip: API total (' + apiTotal + ') <= stored (' + storedCount + '), no unpaid');
-        return { success: true, synced: 0, total: apiTotal, skipped: storedCount, amount: 0, date: todayStr, smart: true };
-      }
-      console.log('[CUKCUK] Count unchanged but has unpaid bills — processing anyway');
-    }
+    console.log('[CUKCUK] Total to process: ' + toProcess.length + ' (new + unpaid-refresh)');
 
-    // ═══ STEP 3: Process NEW + UNPAID invoices ═══
-    // - New: bill chưa có trong invoiceStore → fetch detail
-    // - Unpaid refresh: bill unpaid có thể đã thanh toán → always re-fetch
-    var toProcess = [];
-    var allSyncedRefIds = [];
-
-    for (var k = 0; k < allApiInvoices.length; k++) {
-      var inv = allApiInvoices[k];
-      var refId = String(inv.RefId || inv.RefID || ('idx-' + k));
-      var apiAmount = inv.Amount || 0;
-      
-      allSyncedRefIds.push(refId);
-      if (apiAmount <= 0) continue;
-
-      var existing = invoiceStore.getInvoice(refId);
-      
-      if (!existing) {
-        // Genuinely NEW invoice
-        toProcess.push({ inv: inv, refId: refId, reason: 'new' });
-      } else if (existing.unpaid) {
-        // Unpaid bill — always re-check (customer may have paid since last sync)
-        toProcess.push({ inv: inv, refId: refId, reason: 'unpaid-refresh' });
-      }
-    }
-
-    console.log('[CUKCUK] Scanned ' + allApiInvoices.length + ' invoices, ' + toProcess.length + ' need detail fetch');
-    if (force) {
-      // Log each invoice scan decision for debugging
-      for (var dk = 0; dk < allApiInvoices.length; dk++) {
-        var dinv = allApiInvoices[dk];
-        var dRefId = String(dinv.RefId || dinv.RefID || ('idx-' + dk));
-        var dExisting = invoiceStore.getInvoice(dRefId);
-        var dStatus = dExisting ? (dExisting.unpaid ? 'UNPAID→refetch' : 'EXISTS→skip') : 'NEW→fetch';
-        console.log('[CUKCUK] [' + dk + '] ' + dRefId + ' ' + (dinv.RefNo || '') + ' Amt=' + (dinv.Amount || 0) + ' → ' + dStatus);
-      }
-    }
-
-    // ═══ STEP 4: Nothing to update ═══
+    // ═══ STEP 3: Nothing to update ═══
     if (toProcess.length === 0) {
       _addSyncedRefIdsBulk(todayStr, allSyncedRefIds);
       _lastSyncApiTime = Date.now();
       _lastSyncHadNewData = false;
       _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
-      if (force) {
-        showToast('ℹ️ Không có hóa đơn mới (API: ' + apiTotal + ', Local: ' + storedCount + ')', 'info');
-      }
-      return { success: true, synced: 0, total: apiTotal, skipped: allApiInvoices.length, amount: 0, date: todayStr, smart: true };
+      if (force) showToast('ℹ️ Không có hóa đơn mới (API: ' + apiTotal + ', Local: ' + storedCount + ')', 'info');
+      return { success: true, synced: 0, total: apiTotal, skipped: allSyncedRefIds.length, amount: 0, date: todayStr, smart: true };
     }
 
     // ═══ STEP 5: Fetch details for invoices that need update ═══
