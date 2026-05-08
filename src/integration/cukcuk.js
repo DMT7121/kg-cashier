@@ -822,12 +822,14 @@ export async function syncTransactions(force) {
     // Clean up old indexes periodically
     _cleanupOldSyncIndexes();
     
-    // Use invoiceStore as source of truth for already-synced count
+    // invoiceStore = bộ nhớ ghi nhớ giao dịch đã đồng bộ (key: RefId)
+    // → getInvoice(refId) !== null → đã đồng bộ → BỎ QUA
+    // → getInvoice(refId) === null → MỚI → fetch detail + lưu
+    var totalStored = invoiceStore.getInvoiceCount();
     var storedCount = invoiceStore.getCountByDate(todayStr);
-    
-    console.log('[CUKCUK] v3 sync for', todayStr, '| Range:', fromDate, '→', toDate, '| Stored:', storedCount, '| Force:', !!force);
+    console.log('[CUKCUK] v4 sync | date:', todayStr, '| storedAll:', totalStored, '| storedToday:', storedCount, '| force:', !!force);
 
-    // ═══ COOLDOWN: Skip API call if we recently synced and found no new data ═══
+    // ═══ COOLDOWN (auto-sync only) ═══
     if (!force) {
       var timeSinceLastSync = Date.now() - _lastSyncApiTime;
       if (timeSinceLastSync < SYNC_COOLDOWN && !_lastSyncHadNewData) {
@@ -835,12 +837,9 @@ export async function syncTransactions(force) {
       }
     }
 
-    // ═══ STEP 1: Fetch page 1 ═══
-    // Force mode: NO date range → get ALL invoices (eliminates timezone/range bugs)
-    // Auto mode: use date range for efficiency
+    // ═══ STEP 1: Fetch page 1 to get apiTotal ═══
     var useFrom = force ? null : fromDate;
     var useTo = force ? null : toDate;
-    var totalStored = force ? invoiceStore.getInvoiceCount() : storedCount;
 
     var data = await _fetchInvoices(useFrom, useTo, 1);
     if (data._authFailed) return { success: false, message: data.message };
@@ -848,9 +847,10 @@ export async function syncTransactions(force) {
 
     var firstPageInvoices = _extractPageData(data);
     var apiTotal = data.Total || firstPageInvoices.length;
-    console.log('[CUKCUK] API: Total=' + apiTotal + ', Page1=' + firstPageInvoices.length + ', StoredTotal=' + totalStored);
+    var newOnApi = apiTotal - totalStored;
+    console.log('[CUKCUK] API total: ' + apiTotal + ' | Stored: ' + totalStored + ' | Diff: ' + newOnApi);
 
-    // ═══ STEP 2: Scan pages for NEW + UNPAID invoices ═══
+    // ═══ STEP 2: Smart scan — only pages with potential new invoices ═══
     var toProcess = [];
     var allSyncedRefIds = [];
 
@@ -866,57 +866,65 @@ export async function syncTransactions(force) {
         if (!existing) {
           toProcess.push({ inv: inv, refId: refId, reason: 'new' });
           newOnThisPage++;
-          console.log('[CUKCUK] NEW: ' + refId + ' ' + (inv.RefNo || '') + ' ' + apiAmount.toLocaleString() + 'đ');
+          console.log('[CUKCUK] ★ NEW: ' + (inv.RefNo || refId) + ' ' + apiAmount.toLocaleString() + 'đ');
         } else if (existing.unpaid) {
           toProcess.push({ inv: inv, refId: refId, reason: 'unpaid-refresh' });
           newOnThisPage++;
-          console.log('[CUKCUK] UNPAID→refresh: ' + refId + ' ' + (inv.RefNo || ''));
         }
       }
       return newOnThisPage;
     }
 
     if (force) {
-      // ═══ FORCE MODE: Scan ALL pages — no skipping, no early termination ═══
-      // This guarantees finding every invoice the API returns
+      // ═══ FORCE: Targeted scan — only pages that COULD have new invoices ═══
       var totalPages = Math.ceil(apiTotal / 100) || 1;
-      console.log('[CUKCUK] FORCE: Scanning ALL ' + totalPages + ' pages (no date filter, no skip)');
-      
-      _scanPage(firstPageInvoices);
-      console.log('[CUKCUK] Page 1: ' + firstPageInvoices.length + ' inv, found ' + toProcess.length + ' new so far');
 
-      for (var pg = 2; pg <= totalPages; pg++) {
-        var pgData = await _fetchInvoices(useFrom, useTo, pg);
-        if (pgData._authFailed || !pgData.Success) break;
-        var pgInvoices = _extractPageData(pgData);
-        if (pgInvoices.length === 0) break;
-        _scanPage(pgInvoices);
-        if (pg % 5 === 0 || pg === totalPages) {
-          console.log('[CUKCUK] Page ' + pg + '/' + totalPages + ': found ' + toProcess.length + ' new total');
+      if (newOnApi > 0) {
+        // New invoices detected! Scan from the page where they start
+        var startPage = Math.floor(totalStored / 100) + 1;
+        if (startPage < 1) startPage = 1;
+        console.log('[CUKCUK] SMART: ' + newOnApi + ' new detected, scanning pages ' + startPage + '-' + totalPages);
+        showToast('🔍 Tìm ' + newOnApi + ' hóa đơn mới...', 'info');
+
+        for (var pg = startPage; pg <= totalPages; pg++) {
+          var pgData = (pg === 1) ? data : await _fetchInvoices(useFrom, useTo, pg);
+          if (pg !== 1 && (pgData._authFailed || !pgData.Success)) break;
+          var pgInvoices = (pg === 1) ? firstPageInvoices : _extractPageData(pgData);
+          if (pgInvoices.length === 0) break;
+          _scanPage(pgInvoices);
+        }
+      } else {
+        // API says same count — do a quick check on page 1 + last page for edge cases
+        console.log('[CUKCUK] SMART: API total unchanged (' + apiTotal + '), checking page 1 + last page');
+        _scanPage(firstPageInvoices);
+        if (totalPages > 1) {
+          var lastData = await _fetchInvoices(useFrom, useTo, totalPages);
+          if (lastData.Success) {
+            var lastInvoices = _extractPageData(lastData);
+            _scanPage(lastInvoices);
+          }
         }
       }
     } else {
-      // ═══ AUTO MODE: Optimized scan from page 1, stop early ═══
+      // ═══ AUTO: Scan page 1 only, extend if new found ═══
       var newOnPage1 = _scanPage(firstPageInvoices);
-
-      if (firstPageInvoices.length >= 100 && (newOnPage1 > 0 || apiTotal > totalStored)) {
+      if (firstPageInvoices.length >= 100 && (newOnPage1 > 0 || newOnApi > 0)) {
         var page = 2;
-        var maxPages = 20;
-        var emptyPages = 0;
-        while (page <= maxPages) {
+        var emptyRun = 0;
+        while (page <= 20) {
           var pageData = await _fetchInvoices(useFrom, useTo, page);
           if (pageData._authFailed || !pageData.Success) break;
           var pageInvoices = _extractPageData(pageData);
           if (pageInvoices.length === 0) break;
           var n = _scanPage(pageInvoices);
-          if (n === 0) { emptyPages++; if (emptyPages >= 2) break; } else { emptyPages = 0; }
+          if (n === 0) { emptyRun++; if (emptyRun >= 2) break; } else { emptyRun = 0; }
           if (pageInvoices.length < 100) break;
           page++;
         }
       }
     }
 
-    console.log('[CUKCUK] Total to process: ' + toProcess.length + ' (new + unpaid-refresh)');
+    console.log('[CUKCUK] Scan complete: ' + toProcess.length + ' to process, ' + allSyncedRefIds.length + ' scanned');
 
     // ═══ STEP 3: Nothing to update ═══
     if (toProcess.length === 0) {
@@ -924,7 +932,7 @@ export async function syncTransactions(force) {
       _lastSyncApiTime = Date.now();
       _lastSyncHadNewData = false;
       _setSyncMeta({ lastTotal: apiTotal, lastSyncTime: new Date().toISOString(), lastDate: todayStr });
-      if (force) showToast('ℹ️ Không có hóa đơn mới (API: ' + apiTotal + ', Local: ' + storedCount + ')', 'info');
+      if (force) showToast('ℹ️ API: ' + apiTotal + ' hóa đơn — tất cả đã đồng bộ', 'info');
       return { success: true, synced: 0, total: apiTotal, skipped: allSyncedRefIds.length, amount: 0, date: todayStr, smart: true };
     }
 
