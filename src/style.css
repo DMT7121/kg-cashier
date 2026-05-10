@@ -1017,7 +1017,10 @@ tr:hover td { background: rgba(255,255,255,.02); }
   font-weight: 800;
   color: var(--primary);
   letter-spacing: .5px;
+  display: flex;
+  align-items: center;
 }
+.a4-brand img { filter: invert(72%) sepia(60%) saturate(500%) hue-rotate(5deg) brightness(100%) contrast(95%); }
 .a4-address { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 .a4-header-right { text-align: right; }
 .a4-doc-title {
@@ -1221,6 +1224,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 
   /* Black text on print */
   .a4-brand { color: #333 !important; }
+  .a4-brand img { filter: none !important; }
   .a4-doc-title { color: #111 !important; }
   .a4-section-title { color: #333 !important; border-bottom-color: #ccc !important; }
   .a4-income-title { color: #16a34a !important; }
