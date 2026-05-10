@@ -1,27 +1,46 @@
-/* ── Settings View (Feature 8+9+Categories+CUKCUK) ── */
+/* ── Settings View — Consolidated Hub ──
+   Tabs: Hệ thống | Nhân viên | Nhật ký | Biểu mẫu in
+   ── */
 import { getSettings, updateSettings, getCategories, addCategory, removeCategory } from '../store.js';
 import { showToast, showConfirm } from '../utils.js';
 import { saveSettingsToCloud, pingAPI, isOnline, getQueueSize } from '../api.js';
 
-export function render() {
+// Sub-modules (lazy-rendered via tabs)
+import * as staffModule from './staff.js';
+import * as auditModule from './auditLog.js';
+import * as printModule from './printForms.js';
+
+let _activeTab = 'system';
+
+const _tabs = [
+  { key: 'system',  icon: 'settings',     label: 'Hệ thống' },
+  { key: 'staff',   icon: 'group',        label: 'Nhân viên' },
+  { key: 'audit',   icon: 'history_edu',  label: 'Nhật ký' },
+  { key: 'print',   icon: 'print',        label: 'Biểu mẫu in' },
+];
+
+function _renderTabs() {
+  return `<div class="settings-tabs">
+    ${_tabs.map(t => `
+      <button class="settings-tab ${_activeTab === t.key ? 'active' : ''}" data-stab="${t.key}">
+        <span class="material-symbols-rounded">${t.icon}</span>
+        <span>${t.label}</span>
+      </button>
+    `).join('')}
+  </div>`;
+}
+
+// ── System tab content (original settings) ──
+function _renderSystemTab() {
   const s = getSettings();
   const online = isOnline();
   const queueSize = getQueueSize();
-
-  // CUKCUK status
   const hasCukcuk = s.cukcuk && s.cukcuk.domain && s.cukcuk.appId && s.cukcuk.key;
   const cukcukDomain = (s.cukcuk && s.cukcuk.domain) ? s.cukcuk.domain : '';
   const cukcukAppId = (s.cukcuk && s.cukcuk.appId) ? s.cukcuk.appId : '';
   const cukcukKey = (s.cukcuk && s.cukcuk.key) ? s.cukcuk.key : '';
 
   return `
-    <div class="section-header">
-      <div>
-        <h3>⚙️ Cài đặt hệ thống</h3>
-        <p>Tùy chỉnh ứng dụng thu ngân</p>
-      </div>
-    </div>
-
     <!-- Connection Status -->
     <div class="stat-card ${online ? 'stat-success' : 'stat-danger'}" style="margin-bottom:20px;">
       <div class="stat-icon"><span class="material-symbols-rounded">${online ? 'cloud_done' : 'cloud_off'}</span></div>
@@ -239,7 +258,63 @@ function _showCukcukResult(message, isSuccess) {
   el.textContent = message;
 }
 
-export function init() {
+// ── MAIN RENDER ──
+export function render() {
+  return `
+    <div class="section-header">
+      <div>
+        <h3>⚙️ Cài đặt hệ thống</h3>
+        <p>Quản lý cấu hình, nhân viên, nhật ký và biểu mẫu in</p>
+      </div>
+    </div>
+
+    ${_renderTabs()}
+
+    <div id="settingsTabContent">
+      ${_activeTab === 'system' ? _renderSystemTab() : ''}
+    </div>
+  `;
+}
+
+// ── SWITCH TAB ──
+function _switchTab(tabKey) {
+  // Destroy previous sub-module if needed
+  _destroySubModule();
+
+  _activeTab = tabKey;
+
+  // Update tab buttons
+  document.querySelectorAll('.settings-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.stab === tabKey);
+  });
+
+  // Render tab content
+  const container = document.getElementById('settingsTabContent');
+  if (!container) return;
+
+  if (tabKey === 'system') {
+    container.innerHTML = _renderSystemTab();
+    _initSystemTab();
+  } else if (tabKey === 'staff') {
+    container.innerHTML = staffModule.render();
+    staffModule.init();
+  } else if (tabKey === 'audit') {
+    container.innerHTML = auditModule.render();
+    auditModule.init();
+  } else if (tabKey === 'print') {
+    container.innerHTML = printModule.render();
+    printModule.init();
+  }
+}
+
+function _destroySubModule() {
+  if (_activeTab === 'staff' && staffModule.destroy) {
+    try { staffModule.destroy(); } catch(e) { /* ignore */ }
+  }
+}
+
+// ── INIT SYSTEM TAB (extracted for reuse) ──
+function _initSystemTab() {
   // Category management
   _bindCatRemoveEvents();
 
@@ -273,7 +348,7 @@ export function init() {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btnAddExpenseCat')?.click(); }
   });
 
-  // Save settings (extracted for reuse)
+  // Save settings
   const performSave = (silent) => {
     if (silent === undefined) silent = false;
     const newSettings = {
@@ -299,7 +374,7 @@ export function init() {
 
   // CUKCUK Actions
   document.getElementById('btnTestCukCuk')?.addEventListener('click', async () => {
-    performSave(true); // Silent save
+    performSave(true);
     const btn = document.getElementById('btnTestCukCuk');
     if (btn) {
       btn.disabled = true;
@@ -330,7 +405,7 @@ export function init() {
   });
 
   document.getElementById('btnSyncCukCuk')?.addEventListener('click', async () => {
-    performSave(true); // Silent save
+    performSave(true);
     const btn = document.getElementById('btnSyncCukCuk');
     if (btn) {
       btn.disabled = true;
@@ -387,4 +462,26 @@ export function init() {
       setTimeout(() => location.reload(), 1000);
     }
   });
+}
+
+// ── MAIN INIT ──
+export function init() {
+  // Bind tab clicks
+  document.querySelectorAll('.settings-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _switchTab(btn.dataset.stab);
+    });
+  });
+
+  // Init the active tab
+  if (_activeTab === 'system') {
+    _initSystemTab();
+  } else {
+    _switchTab(_activeTab);
+  }
+}
+
+// ── DESTROY ──
+export function destroy() {
+  _destroySubModule();
 }

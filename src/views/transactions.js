@@ -1,10 +1,29 @@
-/* ── Transactions View — Edit + CUKCUK distinction + Advanced Filter ── */
+/* ── Transactions View — Consolidated: Thu Chi + Chứng từ ──
+   Tabs: [Thu Chi] [Chứng từ]
+   ── */
 import { getCurrentShift, addTransaction, removeTransaction, editTransaction, addOtherTransaction, removeOtherTransaction, getCategories, addCategory } from '../store.js';
 import { formatCurrency, formatTime, showToast, showModal, hideModal, showConfirm } from '../utils.js';
 
-var _filter = { type: 'all', payment: 'all', search: '' };
+// Sub-module
+import * as invoicesModule from './invoices.js';
 
-export function render() {
+var _filter = { type: 'all', payment: 'all', search: '' };
+var _activeTab = 'transactions';
+
+function _renderTabBar() {
+  return `<div class="settings-tabs" style="margin-bottom:16px;">
+    <button class="settings-tab ${_activeTab === 'transactions' ? 'active' : ''}" data-txtab="transactions">
+      <span class="material-symbols-rounded">receipt_long</span>
+      <span>Thu Chi</span>
+    </button>
+    <button class="settings-tab ${_activeTab === 'invoices' ? 'active' : ''}" data-txtab="invoices">
+      <span class="material-symbols-rounded">description</span>
+      <span>Chứng từ</span>
+    </button>
+  </div>`;
+}
+
+function _renderTransactionsTab() {
   const shift = getCurrentShift();
   if (!shift) return '<div class="empty-state"><span class="material-symbols-rounded empty-icon">receipt_long</span><h2>Chưa mở ca</h2><p>Mở ca để bắt đầu ghi nhận giao dịch</p><button class="btn btn-primary" onclick="window.navigateTo(\'shift\')">Mở ca</button></div>';
 
@@ -119,6 +138,39 @@ export function render() {
   `;
 }
 
+// ── MAIN RENDER ──
+export function render() {
+  return `
+    ${_renderTabBar()}
+    <div id="txTabContent">
+      ${_activeTab === 'transactions' ? _renderTransactionsTab() : invoicesModule.render()}
+    </div>
+  `;
+}
+
+// ── SWITCH TAB ──
+function _switchTab(tabKey) {
+  _activeTab = tabKey;
+
+  // Update tab buttons
+  document.querySelectorAll('[data-txtab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.txtab === tabKey);
+  });
+
+  // Render tab content
+  const container = document.getElementById('txTabContent');
+  if (!container) return;
+
+  if (tabKey === 'transactions') {
+    container.innerHTML = _renderTransactionsTab();
+    _initTransactionsTab();
+  } else if (tabKey === 'invoices') {
+    container.innerHTML = invoicesModule.render();
+    invoicesModule.init();
+  }
+}
+
+// ── Transaction Modals (unchanged logic) ──
 function _showTxModal(type, editTx) {
   var isEdit = !!editTx;
   const categories = getCategories();
@@ -281,7 +333,8 @@ function _showOtherTxModal() {
   }, 100);
 }
 
-export function init() {
+// ── INIT TRANSACTIONS TAB ──
+function _initTransactionsTab() {
   var btnIncome = document.getElementById('btnAddIncome');
   if (btnIncome) btnIncome.addEventListener('click', function() { _showTxModal('income'); });
   var btnExpense = document.getElementById('btnAddExpense');
@@ -335,4 +388,21 @@ export function init() {
     _filter.payment = e.target.value;
     window.refreshView && window.refreshView();
   });
+}
+
+// ── MAIN INIT ──
+export function init() {
+  // Bind tab clicks
+  document.querySelectorAll('[data-txtab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _switchTab(btn.dataset.txtab);
+    });
+  });
+
+  // Init the active tab
+  if (_activeTab === 'transactions') {
+    _initTransactionsTab();
+  } else {
+    _switchTab(_activeTab);
+  }
 }

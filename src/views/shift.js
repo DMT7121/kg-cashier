@@ -3,54 +3,83 @@ import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDur
 import { getStaffFromCloud, getConfigFromCloud } from '../api.js';
 
 let _staffList = [];
+let _selectedStaff = null;
+let _timer = null;
 
-function _populateStaffSelect(staffList) {
-  _staffList = staffList;
-  var select = document.getElementById('staffSelect');
-  if (!select) return;
-  var activeStaff = staffList.filter(function(s) { return s.status === 'active'; });
-  if (activeStaff.length === 0) {
-    select.innerHTML = '<option value="">-- Chưa có nhân viên --</option>';
-  } else {
-    select.innerHTML = '<option value="">-- Chọn nhân viên --</option>' + 
-      activeStaff.map(function(s) { return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('');
-  }
+function _autoShiftNumber() {
+  var h = new Date().getHours();
+  if (h < 14) return '1';
+  if (h < 22) return '2';
+  return '3';
+}
+
+function _avatarBg(role) {
+  if (role === 'admin') return 'var(--primary-glow)';
+  if (role === 'manager') return 'var(--info-bg)';
+  return 'var(--success-bg)';
+}
+
+function _roleLabel(role) {
+  if (role === 'admin') return 'Admin';
+  if (role === 'manager') return 'Quản lý';
+  return 'Thu ngân';
+}
+
+function _roleIcon(role) {
+  if (role === 'admin') return 'admin_panel_settings';
+  if (role === 'manager') return 'supervisor_account';
+  return 'person';
+}
+
+function _roleClass(role) {
+  if (role === 'admin') return 'qo-role-admin';
+  if (role === 'manager') return 'qo-role-manager';
+  return 'qo-role-cashier';
+}
+
+function _buildStaffCards(list) {
+  var active = list.filter(function(s) { return s.status === 'active'; });
+  if (active.length === 0) return '<div class="empty-state" style="padding:30px;grid-column:1/-1;"><p>Chưa có nhân viên. Thêm tại mục <b>Nhân viên</b> hoặc dùng <b>Nhập tên thủ công</b>.</p></div>';
+  return active.map(function(s) {
+    return '<div class="qo-staff-card" data-staff-id="' + s.id + '">' +
+      '<div class="qo-check"><span class="material-symbols-rounded" style="font-size:14px;">check</span></div>' +
+      '<div class="qo-avatar" style="background:' + _avatarBg(s.role) + ';"><span class="material-symbols-rounded" style="color:inherit;">' + _roleIcon(s.role) + '</span></div>' +
+      '<div class="qo-name">' + s.name + '</div>' +
+      '<div class="qo-role ' + _roleClass(s.role) + '">' + _roleLabel(s.role) + '</div>' +
+    '</div>';
+  }).join('');
 }
 
 export function render() {
   const shift = getCurrentShift();
   const isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
 
-  // ── CASE 1: Shift is OPEN ──
-  if (shift) {
-    if (!isValidated) {
-      return `
-        <div class="empty-state" style="padding:80px 20px;">
-          <span class="material-symbols-rounded" style="font-size:64px;color:var(--warning);margin-bottom:20px;">lock_open</span>
-          <h2>Ca đang mở</h2>
-          <p>Nhân viên <b>${shift.cashierName}</b> đang mở Ca ${shift.shiftNumber}</p>
-          <p class="text-muted">Vui lòng nhập mật khẩu ca để tiếp tục hoặc để đóng ca</p>
-          
-          <div style="max-width:300px;margin:24px auto;">
-            <div class="form-group">
-              <label class="form-label">Mật khẩu ca (mặc định 0000)</label>
-              <input type="password" id="shiftUnlockPass" class="form-input" style="text-align:center;font-size:24px;letter-spacing:4px;" placeholder="••••" autofocus>
-            </div>
-            <button class="btn btn-primary" id="btnUnlockShift" style="width:100%;margin-top:8px;">Xác nhận</button>
+  // ── CASE 1: Shift OPEN but not validated ──
+  if (shift && !isValidated) {
+    return `
+      <div class="empty-state" style="padding:80px 20px;">
+        <span class="material-symbols-rounded" style="font-size:64px;color:var(--warning);margin-bottom:20px;">lock_open</span>
+        <h2>Ca đang mở</h2>
+        <p>Nhân viên <b>${shift.cashierName}</b> đang mở Ca ${shift.shiftNumber}</p>
+        <p class="text-muted">Vui lòng nhập mật khẩu ca để tiếp tục hoặc để đóng ca</p>
+        <div style="max-width:300px;margin:24px auto;">
+          <div class="form-group">
+            <label class="form-label">Mật khẩu ca (mặc định 0000)</label>
+            <input type="password" id="shiftUnlockPass" class="form-input" style="text-align:center;font-size:24px;letter-spacing:4px;" placeholder="••••" autofocus>
           </div>
+          <button class="btn btn-primary" id="btnUnlockShift" style="width:100%;margin-top:8px;">Xác nhận</button>
         </div>
-      `;
-    }
+      </div>
+    `;
+  }
 
+  // ── CASE 2: Shift OPEN and validated ──
+  if (shift) {
     const sm = getShiftSummary(shift);
     return `
       <div class="section-header">
-        <div>
-          <h3>🟢 Ca đang mở</h3>
-          <p>Ca ${shift.shiftNumber} — ${shift.cashierName}</p>
-        </div>
+        <div><h3>🟢 Ca đang mở</h3><p>Ca ${shift.shiftNumber} — ${shift.cashierName}</p></div>
       </div>
-
       <div class="card active-shift-card">
         <div class="card-body">
           <div class="shift-details-grid">
@@ -61,117 +90,94 @@ export function render() {
             <div><span class="text-muted">Thời gian</span><strong id="shiftTimer">${formatDuration(shift.startTime)}</strong></div>
             <div><span class="text-muted">Tiền đầu ca</span><strong>${formatCurrency(shift.startingCash)} <button class="btn btn-sm" id="btnEditStartingCash" title="Bổ sung tiền đầu ca" style="padding:2px 6px;font-size:11px;vertical-align:middle;background:transparent;border:1px dashed var(--border);color:var(--text-muted);cursor:pointer;">✏️</button></strong></div>
           </div>
-
           <div class="shift-quick-stats">
-            <div class="quick-stat">
-              <span class="material-symbols-rounded" style="color:var(--success);">trending_up</span>
-              <div><small>Doanh thu</small><strong class="amount-in">${formatCurrency(sm.totalIncome)}</strong></div>
-            </div>
-            <div class="quick-stat">
-              <span class="material-symbols-rounded" style="color:var(--danger);">trending_down</span>
-              <div><small>Chi phí</small><strong class="amount-out">${formatCurrency(sm.totalExpense)}</strong></div>
-            </div>
-            <div class="quick-stat">
-              <span class="material-symbols-rounded" style="color:var(--info);">receipt</span>
-              <div><small>Bills</small><strong>${sm.billCount}</strong></div>
-            </div>
+            <div class="quick-stat"><span class="material-symbols-rounded" style="color:var(--success);">trending_up</span><div><small>Doanh thu</small><strong class="amount-in">${formatCurrency(sm.totalIncome)}</strong></div></div>
+            <div class="quick-stat"><span class="material-symbols-rounded" style="color:var(--danger);">trending_down</span><div><small>Chi phí</small><strong class="amount-out">${formatCurrency(sm.totalExpense)}</strong></div></div>
+            <div class="quick-stat"><span class="material-symbols-rounded" style="color:var(--info);">receipt</span><div><small>Bills</small><strong>${sm.billCount}</strong></div></div>
           </div>
         </div>
       </div>
-
-      <button class="btn btn-danger" style="width:100%;margin-top:20px;" id="btnCloseShift">
-        <span class="material-symbols-rounded">stop_circle</span> Đóng ca
-      </button>
-
-      <button class="btn btn-outline" style="width:100%;margin-top:10px;" id="btnForceReset">
-        <span class="material-symbols-rounded">restart_alt</span> Hủy ca (không lưu lịch sử)
-      </button>
+      <button class="btn btn-danger" style="width:100%;margin-top:20px;" id="btnCloseShift"><span class="material-symbols-rounded">stop_circle</span> Đóng ca</button>
+      <button class="btn btn-outline" style="width:100%;margin-top:10px;" id="btnForceReset"><span class="material-symbols-rounded">restart_alt</span> Hủy ca (không lưu lịch sử)</button>
     `;
   }
 
-  // ── CASE 2: No shift open ──
+  // ── CASE 3: No shift — Quick Open ──
+  var cached = getCachedStaff() || [];
+  _staffList = cached;
+  var autoShift = _autoShiftNumber();
+
   return `
     <div class="section-header">
       <div>
-        <h3>🔓 Mở ca mới</h3>
-        <p>Chọn tài khoản và nhập PIN để bắt đầu làm việc</p>
+        <h3>⚡ Mở ca nhanh</h3>
+        <p>Chọn nhân viên để bắt đầu ca làm việc</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" id="btnRefreshStaffList" title="Tải lại danh sách"><span class="material-symbols-rounded" style="font-size:18px;">refresh</span> Tải lại</button>
+        <button class="btn btn-outline btn-sm" id="btnManualName"><span class="material-symbols-rounded" style="font-size:18px;">edit</span> Thủ công</button>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-body">
-        <div id="shiftFormError" style="display:none;padding:10px 14px;margin-bottom:14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;font-weight:600;"></div>
+    <div id="shiftFormError" style="display:none;padding:10px 14px;margin-bottom:14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;font-weight:600;"></div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">👤 Nhân viên <span style="color:var(--danger);">*</span></label>
-            <div style="display:flex;gap:8px;align-items:flex-start;">
-              <select id="staffSelect" class="form-input" required autofocus style="flex:1;">
-                <option value="">-- Chọn nhân viên --</option>
-              </select>
-              <button class="btn btn-outline btn-sm" id="btnRefreshStaffList" type="button" title="Tải lại danh sách nhân viên từ Cloud" style="white-space:nowrap;height:42px;">
-                <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
-              </button>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-              <p class="form-hint" id="staffLoadStatus" style="margin:0;flex:1;"></p>
-              <button class="btn btn-sm" id="btnManualName" type="button" style="font-size:11px;padding:2px 8px;background:transparent;color:var(--text-muted);border:1px dashed var(--border);">✏️ Nhập tên thủ công</button>
-            </div>
-            <div id="manualNameBox" style="display:none;margin-top:8px;">
-              <input type="text" id="manualStaffName" class="form-input" placeholder="Nhập tên nhân viên..." style="background:rgba(245,158,11,0.05);border-color:rgba(245,158,11,0.3);">
-              <p class="form-hint" style="color:var(--warning);margin-top:2px;">⚡ Mở ca nhanh — không cần PIN</p>
-            </div>
-          </div>
-          <div class="form-group">
+    <p id="staffLoadStatus" style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">${cached.length > 0 ? '✅ ' + cached.length + ' nhân viên (cache)' : '⏳ Đang tải...'}</p>
+
+    <div class="qo-staff-grid" id="staffGrid">
+      ${_buildStaffCards(cached)}
+    </div>
+
+    <!-- Manual name input (hidden by default) -->
+    <div id="manualNameBox" style="display:none;margin-bottom:16px;">
+      <div class="card" style="border-color:rgba(245,158,11,.2);">
+        <div class="card-body">
+          <label class="form-label">✏️ Nhập tên nhân viên</label>
+          <input type="text" id="manualStaffName" class="form-input" placeholder="Nhập tên nhân viên..." style="font-size:16px;">
+          <p class="form-hint" style="color:var(--warning);margin-top:4px;">⚡ Mở ca nhanh — không cần PIN</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIN + settings panel (shown after selecting staff) -->
+    <div id="pinPanel" style="display:none;"></div>
+
+    <!-- Quick settings always visible -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-body">
+        <div class="qo-settings-row">
+          <div class="form-group" style="margin-bottom:0;">
             <label class="form-label"># Số ca</label>
             <select id="shiftNumber" class="form-input">
-              <option value="1">Ca 1</option>
-              <option value="2">Ca 2</option>
-              <option value="3">Ca 3</option>
+              <option value="1" ${autoShift === '1' ? 'selected' : ''}>Ca 1</option>
+              <option value="2" ${autoShift === '2' ? 'selected' : ''}>Ca 2</option>
+              <option value="3" ${autoShift === '3' ? 'selected' : ''}>Ca 3</option>
             </select>
           </div>
-        </div>
-
-        <div class="form-row" id="pinRow">
-          <div class="form-group">
-            <label class="form-label">🔑 Mã PIN cá nhân <span style="color:var(--danger);">*</span></label>
-            <input type="password" id="staffPin" class="form-input" placeholder="••••" maxlength="6" inputmode="numeric">
-          </div>
-          <div class="form-group">
-            <label class="form-label">🔒 Đặt mật khẩu cho ca này</label>
-            <input type="password" id="shiftPassword" class="form-input" placeholder="Mặc định 0000" value="0000">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">📅 Ngày <span style="color:var(--danger);">*</span></label>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">📅 Ngày</label>
             <input type="date" id="shiftDate" class="form-input" value="${todayStr()}" required>
           </div>
-          <div class="form-group">
-            <label class="form-label">💰 Tiền đầu ca (VNĐ)</label>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">💰 Tiền đầu ca</label>
             <input type="number" id="startingCash" class="form-input" placeholder="0" value="0" min="0">
           </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">🔒 Mật khẩu ca</label>
+            <input type="password" id="shiftPassword" class="form-input" placeholder="0000" value="0000">
+          </div>
         </div>
-
-        <button class="btn btn-primary" style="width:100%;margin-top:16px;padding:14px 18px;font-size:15px;" id="btnOpenShift">
-          <span class="material-symbols-rounded">play_arrow</span> Mở ca
-        </button>
       </div>
     </div>
+
+    <button class="btn btn-primary" style="width:100%;padding:16px 20px;font-size:16px;font-weight:700;" id="btnOpenShift" disabled>
+      <span class="material-symbols-rounded">play_arrow</span> Chọn nhân viên để mở ca
+    </button>
   `;
 }
 
-let _timer = null;
-
 function _showFormError(msg) {
   const el = document.getElementById('shiftFormError');
-  if (el) {
-    el.textContent = '⚠️ ' + msg;
-    el.style.display = 'block';
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-  // Also show toast as backup
+  if (el) { el.textContent = '⚠️ ' + msg; el.style.display = 'block'; el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   try { showToast(msg, 'warning'); } catch (e) { /* ignore */ }
 }
 
@@ -180,16 +186,102 @@ function _clearFormError() {
   if (el) el.style.display = 'none';
 }
 
-function _highlightField(fieldId) {
-  const field = document.getElementById(fieldId);
-  if (field) {
-    field.style.borderColor = 'var(--danger)';
-    field.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
-    field.focus();
-    setTimeout(() => {
-      field.style.borderColor = '';
-      field.style.boxShadow = '';
-    }, 3000);
+function _selectStaff(staffId) {
+  _selectedStaff = null;
+  for (var i = 0; i < _staffList.length; i++) {
+    if (_staffList[i].id === staffId) { _selectedStaff = _staffList[i]; break; }
+  }
+  if (!_selectedStaff) return;
+
+  // Update card selection
+  var cards = document.querySelectorAll('.qo-staff-card');
+  for (var j = 0; j < cards.length; j++) {
+    if (cards[j].dataset.staffId === staffId) cards[j].classList.add('selected');
+    else cards[j].classList.remove('selected');
+  }
+
+  // Show PIN panel
+  var panel = document.getElementById('pinPanel');
+  if (panel) {
+    var hasPin = _selectedStaff.pin && _selectedStaff.pin !== '****' && _selectedStaff.pin !== '';
+    panel.style.display = 'block';
+    panel.innerHTML = '<div class="qo-pin-panel">' +
+      '<div class="qo-pin-header"><span class="material-symbols-rounded" style="color:var(--primary);">person</span> <span class="qo-sel-name">' + _selectedStaff.name + '</span></div>' +
+      (hasPin ? '<div class="form-group" style="margin-bottom:0;"><label class="form-label">🔑 Mã PIN cá nhân</label><input type="password" id="staffPin" class="form-input" placeholder="••••" maxlength="6" inputmode="numeric" autofocus style="font-size:20px;text-align:center;letter-spacing:4px;"></div>' : '<p style="font-size:12px;color:var(--success);"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">check_circle</span> Không yêu cầu PIN</p>') +
+    '</div>';
+
+    // Auto-focus PIN
+    setTimeout(function() {
+      var pinInput = document.getElementById('staffPin');
+      if (pinInput) {
+        pinInput.focus();
+        pinInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('btnOpenShift').click(); });
+      }
+    }, 50);
+  }
+
+  // Enable open button
+  var btn = document.getElementById('btnOpenShift');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Mở ca — ' + _selectedStaff.name;
+  }
+}
+
+function _loadStaffFromCloud(isManual) {
+  var statusEl = document.getElementById('staffLoadStatus');
+  if (isManual && statusEl) { statusEl.textContent = '⏳ Đang tải lại từ Cloud...'; statusEl.style.color = 'var(--info)'; }
+
+  getConfigFromCloud().then(function(configRes) {
+    if (configRes.success && configRes.config && configRes.config.staff) {
+      _staffList = configRes.config.staff;
+      setCachedStaff(_staffList);
+      _refreshGrid();
+      if (statusEl) { statusEl.textContent = '✅ ' + _staffList.length + ' nhân viên'; statusEl.style.color = 'var(--success)'; }
+      return;
+    }
+    return getStaffFromCloud().then(function(res) {
+      if (res.success && res.staff) {
+        _staffList = res.staff;
+        setCachedStaff(_staffList);
+        _refreshGrid();
+        if (statusEl) { statusEl.textContent = '✅ ' + _staffList.length + ' nhân viên'; statusEl.style.color = 'var(--success)'; }
+      } else if (isManual && statusEl) {
+        statusEl.textContent = '⚠️ Không tải được — dùng "Thủ công"';
+        statusEl.style.color = 'var(--warning)';
+      }
+    });
+  }).catch(function() {
+    getStaffFromCloud().then(function(res) {
+      if (res.success && res.staff) {
+        _staffList = res.staff;
+        setCachedStaff(_staffList);
+        _refreshGrid();
+        if (statusEl) { statusEl.textContent = '✅ ' + _staffList.length + ' nhân viên'; statusEl.style.color = 'var(--success)'; }
+      }
+    }).catch(function() {
+      if (statusEl && _staffList.length === 0) {
+        statusEl.textContent = '❌ Offline — dùng "Thủ công"';
+        statusEl.style.color = 'var(--danger)';
+      }
+    });
+  });
+}
+
+function _refreshGrid() {
+  var grid = document.getElementById('staffGrid');
+  if (grid) {
+    grid.innerHTML = _buildStaffCards(_staffList);
+    _bindCardClicks();
+  }
+}
+
+function _bindCardClicks() {
+  var cards = document.querySelectorAll('.qo-staff-card[data-staff-id]');
+  for (var i = 0; i < cards.length; i++) {
+    (function(card) {
+      card.addEventListener('click', function() { _selectStaff(card.dataset.staffId); });
+    })(cards[i]);
   }
 }
 
@@ -197,37 +289,32 @@ export function init() {
   const shift = getCurrentShift();
   const isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
 
-  if (shift) {
-    if (!isValidated) {
-      const input = document.getElementById('shiftUnlockPass');
-      const btn = document.getElementById('btnUnlockShift');
-      const tryUnlock = () => {
-        if (input.value === (shift.shiftPassword || '0000')) {
-          sessionStorage.setItem('shift_validated', shift.id);
-          showToast('Xác thực thành công!', 'success');
-          window.refreshView?.();
-        } else {
-          showToast('Mật khẩu ca không đúng!', 'error');
-          input.value = '';
-          input.focus();
-        }
-      };
-      btn?.addEventListener('click', tryUnlock);
-      input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
-      return;
-    }
+  if (shift && !isValidated) {
+    const input = document.getElementById('shiftUnlockPass');
+    const btn = document.getElementById('btnUnlockShift');
+    const tryUnlock = () => {
+      if (input.value === (shift.shiftPassword || '0000')) {
+        sessionStorage.setItem('shift_validated', shift.id);
+        showToast('Xác thực thành công!', 'success');
+        window.refreshView?.();
+      } else {
+        showToast('Mật khẩu ca không đúng!', 'error');
+        input.value = '';
+        input.focus();
+      }
+    };
+    btn?.addEventListener('click', tryUnlock);
+    input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+    return;
+  }
 
-    // Timer — clear any existing timer first to prevent accumulation
+  if (shift) {
+    // Timer
     if (_timer) clearInterval(_timer);
     _timer = setInterval(() => {
       const el = document.getElementById('shiftTimer');
-      if (el) {
-        el.textContent = formatDuration(shift.startTime);
-      } else {
-        // View no longer visible, stop timer
-        clearInterval(_timer);
-        _timer = null;
-      }
+      if (el) el.textContent = formatDuration(shift.startTime);
+      else { clearInterval(_timer); _timer = null; }
     }, 30000);
 
     // Close shift
@@ -235,28 +322,16 @@ export function init() {
       showModal(`
         <div class="modal-title"><span class="material-symbols-rounded" style="color:var(--danger);">stop_circle</span> Đóng ca</div>
         <p>Xác nhận đóng Ca ${shift.shiftNumber}?</p>
-        <div class="form-group">
-          <label class="form-label">Ghi chú (tùy chọn)</label>
-          <textarea id="closeNotes" class="form-input" rows="3" placeholder="Ghi chú bàn giao..."></textarea>
-        </div>
+        <div class="form-group"><label class="form-label">Ghi chú (tùy chọn)</label><textarea id="closeNotes" class="form-input" rows="3" placeholder="Ghi chú bàn giao..."></textarea></div>
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Tiền giữ lại</label>
-            <input type="number" id="cashToKeep" class="form-input" value="0">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Tiền nộp</label>
-            <input type="number" id="cashToDeposit" class="form-input" value="0">
-          </div>
+          <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="number" id="cashToKeep" class="form-input" value="0"></div>
+          <div class="form-group"><label class="form-label">Tiền nộp</label><input type="number" id="cashToDeposit" class="form-input" value="0"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
-          <button class="btn btn-danger" id="btnConfirmClose">
-            <span class="material-symbols-rounded">check</span> Đóng ca
-          </button>
+          <button class="btn btn-danger" id="btnConfirmClose"><span class="material-symbols-rounded">check</span> Đóng ca</button>
         </div>
       `);
-
       setTimeout(() => {
         document.getElementById('btnConfirmClose')?.addEventListener('click', () => {
           try {
@@ -270,28 +345,18 @@ export function init() {
             clearInterval(_timer);
             showToast('Đã đóng ca thành công!', 'success');
             window.refreshView?.();
-          } catch (e) {
-            showToast(e.message, 'error');
-            console.error('Close shift error:', e);
-          }
+          } catch (e) { showToast(e.message, 'error'); }
         });
       }, 100);
     });
 
-    // Force reset (emergency)
+    // Force reset
     document.getElementById('btnForceReset')?.addEventListener('click', async () => {
-      var ok = await showConfirm('Ca sẽ bị xóa hoàn toàn, KHÔNG lưu vào lịch sử.\nHành động này không thể hoàn tác!', {
-        title: '⚠️ HỦY CA HIỆN TẠI?',
-        confirmText: 'Hủy ca',
-        type: 'danger'
-      });
+      var ok = await showConfirm('Ca sẽ bị xóa hoàn toàn, KHÔNG lưu vào lịch sử.\nHành động này không thể hoàn tác!', { title: '⚠️ HỦY CA HIỆN TẠI?', confirmText: 'Hủy ca', type: 'danger' });
       if (ok) {
         const s = getState();
         s.currentShift = null;
-        try {
-          localStorage.setItem('kg-cashier-data', JSON.stringify(s));
-          sessionStorage.removeItem('shift_validated');
-        } catch (e) { /* ignore */ }
+        try { localStorage.setItem('kg-cashier-data', JSON.stringify(s)); sessionStorage.removeItem('shift_validated'); } catch (e) { /* ignore */ }
         showToast('Đã hủy ca', 'info');
         window.refreshView?.();
       }
@@ -302,21 +367,15 @@ export function init() {
       showModal(`
         <div class="modal-title"><span class="material-symbols-rounded" style="color:var(--warning);">account_balance_wallet</span> Bổ sung tiền đầu ca</div>
         <p style="margin-bottom:12px;color:var(--text-muted);">Hiện tại: <strong>${formatCurrency(shift.startingCash)}</strong></p>
-        <div class="form-group">
-          <label class="form-label">Số tiền mới (tổng tiền đầu ca)</label>
-          <input type="number" id="newStartingCash" class="form-input" value="${shift.startingCash}" min="0" style="font-size:18px;font-weight:700;text-align:right;">
-        </div>
+        <div class="form-group"><label class="form-label">Số tiền mới (tổng tiền đầu ca)</label><input type="number" id="newStartingCash" class="form-input" value="${shift.startingCash}" min="0" style="font-size:18px;font-weight:700;text-align:right;"></div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
-          <button class="btn btn-primary" id="btnConfirmStartingCash">
-            <span class="material-symbols-rounded">check</span> Cập nhật
-          </button>
+          <button class="btn btn-primary" id="btnConfirmStartingCash"><span class="material-symbols-rounded">check</span> Cập nhật</button>
         </div>
       `);
       setTimeout(() => {
         const input = document.getElementById('newStartingCash');
-        input?.focus();
-        input?.select();
+        input?.focus(); input?.select();
         document.getElementById('btnConfirmStartingCash')?.addEventListener('click', () => {
           try {
             const val = Number(input?.value) || 0;
@@ -324,186 +383,104 @@ export function init() {
             hideModal();
             showToast('✅ Tiền đầu ca: ' + formatCurrency(val), 'success');
             window.refreshView?.();
-          } catch (e) {
-            showToast(e.message, 'error');
-          }
+          } catch (e) { showToast(e.message, 'error'); }
         });
         input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('btnConfirmStartingCash')?.click(); });
       }, 100);
     });
 
-  } else {
-    // ── OPEN SHIFT ──
-    var statusEl = document.getElementById('staffLoadStatus');
-    var _isManualMode = false;
-
-    // Toggle manual name input
-    document.getElementById('btnManualName')?.addEventListener('click', function() {
-      _isManualMode = !_isManualMode;
-      var box = document.getElementById('manualNameBox');
-      var pinRow = document.getElementById('pinRow');
-      var select = document.getElementById('staffSelect');
-      if (_isManualMode) {
-        if (box) box.style.display = 'block';
-        if (pinRow) pinRow.style.display = 'none';
-        if (select) select.disabled = true;
-        this.textContent = '📋 Chọn từ danh sách';
-        document.getElementById('manualStaffName')?.focus();
-      } else {
-        if (box) box.style.display = 'none';
-        if (pinRow) pinRow.style.display = '';
-        if (select) select.disabled = false;
-        this.textContent = '✏️ Nhập tên thủ công';
-      }
-    });
-
-    // Reusable staff loading function
-    function _loadStaffFromCloud(isManual) {
-      if (isManual) {
-        if (statusEl) {
-          statusEl.textContent = '⏳ Đang tải lại từ Cloud...';
-          statusEl.style.color = 'var(--info)';
-        }
-      }
-      
-      // Try fast config API first, then fallback to full staff API
-      getConfigFromCloud().then(function(configRes) {
-        if (configRes.success && configRes.config && configRes.config.staff) {
-          var configStaff = configRes.config.staff;
-          setCachedStaff(configStaff);
-          _populateStaffSelect(configStaff);
-          if (statusEl) {
-            statusEl.textContent = '✅ ' + configStaff.length + ' nhân viên';
-            statusEl.style.color = 'var(--success)';
-          }
-          return;
-        }
-        // Fallback to full staff API
-        return getStaffFromCloud().then(function(res) {
-          if (res.success && res.staff) {
-            setCachedStaff(res.staff);
-            _populateStaffSelect(res.staff);
-            if (statusEl) {
-              statusEl.textContent = '✅ ' + res.staff.length + ' nhân viên';
-              statusEl.style.color = 'var(--success)';
-            }
-          } else if (isManual) {
-            if (statusEl) {
-              statusEl.textContent = '⚠️ Không tải được — dùng "Nhập tên thủ công"';
-              statusEl.style.color = 'var(--warning)';
-            }
-          }
-        });
-      }).catch(function() {
-        // Config failed, try direct staff API
-        getStaffFromCloud().then(function(res) {
-          if (res.success && res.staff) {
-            setCachedStaff(res.staff);
-            _populateStaffSelect(res.staff);
-            if (statusEl) {
-              statusEl.textContent = '✅ ' + res.staff.length + ' nhân viên';
-              statusEl.style.color = 'var(--success)';
-            }
-          }
-        }).catch(function() {
-          if (statusEl && (!getCachedStaff() || getCachedStaff().length === 0)) {
-            statusEl.textContent = '❌ Offline — dùng "Nhập tên thủ công"';
-            statusEl.style.color = 'var(--danger)';
-          }
-        });
-      });
-    }
-
-    // Step 1: Immediately show cached staff (instant, no network wait)
-    var cached = getCachedStaff();
-    if (cached && cached.length > 0) {
-      _populateStaffSelect(cached);
-      if (statusEl) {
-        statusEl.textContent = '✅ ' + cached.length + ' nhân viên';
-        statusEl.style.color = 'var(--success)';
-      }
-    } else {
-      if (statusEl) {
-        statusEl.textContent = '⏳ Đang tải...';
-        statusEl.style.color = 'var(--text-muted)';
-      }
-    }
-
-    // Step 2: Load fresh staff from cloud in background (silent update)
-    _loadStaffFromCloud(false);
-
-    // Manual refresh button
-    document.getElementById('btnRefreshStaffList')?.addEventListener('click', function() {
-      _loadStaffFromCloud(true);
-      showToast('🔄 Tải lại danh sách nhân viên...', 'info');
-    });
-
-    const btnOpen = document.getElementById('btnOpenShift');
-    if (!btnOpen) return;
-
-    btnOpen.addEventListener('click', function handleOpenShift(e) {
-      e.preventDefault();
-      _clearFormError();
-
-      var staffName = '';
-      var staffId = '';
-
-      if (_isManualMode) {
-        // Manual mode — use typed name
-        staffName = (document.getElementById('manualStaffName')?.value || '').trim();
-        if (!staffName) { _showFormError('Vui lòng nhập tên nhân viên'); return; }
-        staffId = 'manual-' + Date.now();
-      } else {
-        // Normal mode — use selected staff
-        staffId = document.getElementById('staffSelect').value;
-        if (!staffId) { _showFormError('Vui lòng chọn nhân viên'); return; }
-        
-        const staff = _staffList.find(function(s) { return s.id === staffId; });
-        if (!staff) {
-          _showFormError('Không tìm thấy nhân viên. Hãy thử tải lại trang.');
-          return;
-        }
-        
-        // PIN verification
-        var pin = document.getElementById('staffPin').value.trim();
-        var staffPin = String(staff.pin || '');
-        if (staffPin && staffPin !== '****' && staffPin !== pin) {
-          _showFormError('Mã PIN không chính xác!');
-          _highlightField('staffPin');
-          return;
-        }
-        staffName = staff.name;
-      }
-
-      const shiftPass = document.getElementById('shiftPassword').value || '0000';
-      const num = document.getElementById('shiftNumber').value;
-      const date = document.getElementById('shiftDate').value;
-      const cash = document.getElementById('startingCash').value;
-
-      if (!date) { _showFormError('Vui lòng chọn ngày'); return; }
-
-      try {
-        const result = openShift({
-          cashierName: staffName,
-          shiftNumber: num,
-          date: date,
-          startingCash: cash,
-          shiftPassword: shiftPass
-        });
-        
-        // Auto validate the session for the opener
-        sessionStorage.setItem('shift_validated', result.id);
-        if (!_isManualMode) {
-          const staff = _staffList.find(function(s) { return s.id === staffId; });
-          if (staff) setLoggedInUser(staff);
-        }
-
-        showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');
-        if (window.navigateTo) window.navigateTo('dashboard');
-        else window.refreshView?.();
-      } catch (err) {
-        _showFormError(err.message || 'Không thể mở ca.');
-      }
-    });
+    return;
   }
+
+  // ── OPEN SHIFT FLOW ──
+  _selectedStaff = null;
+  var _isManualMode = false;
+
+  // Bind card clicks
+  _bindCardClicks();
+
+  // Background cloud refresh
+  _loadStaffFromCloud(false);
+
+  // Manual refresh
+  document.getElementById('btnRefreshStaffList')?.addEventListener('click', function() {
+    _loadStaffFromCloud(true);
+    showToast('🔄 Tải lại danh sách nhân viên...', 'info');
+  });
+
+  // Toggle manual mode
+  document.getElementById('btnManualName')?.addEventListener('click', function() {
+    _isManualMode = !_isManualMode;
+    var box = document.getElementById('manualNameBox');
+    var grid = document.getElementById('staffGrid');
+    var panel = document.getElementById('pinPanel');
+    var btn = document.getElementById('btnOpenShift');
+
+    if (_isManualMode) {
+      if (box) box.style.display = 'block';
+      if (grid) grid.style.display = 'none';
+      if (panel) panel.style.display = 'none';
+      _selectedStaff = null;
+      // Deselect cards
+      var cards = document.querySelectorAll('.qo-staff-card');
+      for (var i = 0; i < cards.length; i++) cards[i].classList.remove('selected');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Mở ca (thủ công)'; }
+      this.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">group</span> Danh sách';
+      document.getElementById('manualStaffName')?.focus();
+    } else {
+      if (box) box.style.display = 'none';
+      if (grid) grid.style.display = '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Chọn nhân viên để mở ca'; }
+      this.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">edit</span> Thủ công';
+    }
+  });
+
+  // Open shift button
+  const btnOpen = document.getElementById('btnOpenShift');
+  if (!btnOpen) return;
+
+  btnOpen.addEventListener('click', function(e) {
+    e.preventDefault();
+    _clearFormError();
+
+    var staffName = '';
+    var staffId = '';
+
+    if (_isManualMode) {
+      staffName = (document.getElementById('manualStaffName')?.value || '').trim();
+      if (!staffName) { _showFormError('Vui lòng nhập tên nhân viên'); return; }
+      staffId = 'manual-' + Date.now();
+    } else {
+      if (!_selectedStaff) { _showFormError('Vui lòng chọn nhân viên'); return; }
+      // PIN verification
+      var pin = (document.getElementById('staffPin')?.value || '').trim();
+      var staffPin = String(_selectedStaff.pin || '');
+      if (staffPin && staffPin !== '****' && staffPin !== pin) {
+        _showFormError('Mã PIN không chính xác!');
+        var pinEl = document.getElementById('staffPin');
+        if (pinEl) { pinEl.style.borderColor = 'var(--danger)'; pinEl.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)'; pinEl.focus(); pinEl.value = ''; setTimeout(function() { pinEl.style.borderColor = ''; pinEl.style.boxShadow = ''; }, 3000); }
+        return;
+      }
+      staffName = _selectedStaff.name;
+      staffId = _selectedStaff.id;
+    }
+
+    const shiftPass = document.getElementById('shiftPassword').value || '0000';
+    const num = document.getElementById('shiftNumber').value;
+    const date = document.getElementById('shiftDate').value;
+    const cash = document.getElementById('startingCash').value;
+
+    if (!date) { _showFormError('Vui lòng chọn ngày'); return; }
+
+    try {
+      const result = openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass });
+      sessionStorage.setItem('shift_validated', result.id);
+      if (!_isManualMode && _selectedStaff) setLoggedInUser(_selectedStaff);
+      showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');
+      if (window.navigateTo) window.navigateTo('dashboard');
+      else window.refreshView?.();
+    } catch (err) {
+      _showFormError(err.message || 'Không thể mở ca.');
+    }
+  });
 }

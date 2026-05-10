@@ -30,15 +30,9 @@ import * as dashboardView from './views/dashboard.js';
 import * as shiftView from './views/shift.js';
 import * as transactionsView from './views/transactions.js';
 import * as cashCountView from './views/cashCount.js';
-import * as invoicesView from './views/invoices.js';
-import * as reportView from './views/report.js';
+import * as revenueView from './views/revenue.js';
 import * as historyView from './views/history.js';
-import * as analyticsView from './views/analytics.js';
-import * as staffView from './views/staff.js';
-import * as auditLogView from './views/auditLog.js';
 import * as settingsView from './views/settings.js';
-import * as printFormsView from './views/printForms.js';
-import * as cukcukInvoicesView from './views/cukcukInvoices.js';
 import * as drinkInventoryView from './views/drinkInventory.js';
 
 // ── View Registry ────────────────────────────
@@ -47,15 +41,9 @@ var views = {
   'shift':        { module: shiftView,        title: 'Quản lý ca' },
   'transactions': { module: transactionsView, title: 'Giao dịch' },
   'cash-count':   { module: cashCountView,    title: 'Kiểm kê tiền' },
-  'invoices':     { module: invoicesView,     title: 'Hóa đơn / Chứng từ' },
-  'cukcuk':       { module: cukcukInvoicesView, title: 'Hóa đơn CUKCUK' },
-  'report':       { module: reportView,       title: 'Báo cáo bàn giao' },
-  'analytics':    { module: analyticsView,    title: 'Phân tích' },
+  'revenue':      { module: revenueView,      title: 'Doanh thu & Phân tích' },
   'history':      { module: historyView,      title: 'Lịch sử ca' },
-  'staff':        { module: staffView,        title: 'Nhân viên' },
-  'audit':        { module: auditLogView,     title: 'Nhật ký' },
   'settings':     { module: settingsView,     title: 'Cài đặt' },
-  'print-forms':  { module: printFormsView,   title: 'Biểu mẫu in' },
   'drink-inventory': { module: drinkInventoryView, title: 'Kiểm kho đồ uống' },
 };
 
@@ -68,6 +56,17 @@ function navigateTo(viewName) {
   var prevView = views[currentView];
   if (prevView && prevView.module.destroy) {
     try { prevView.module.destroy(); } catch(e) { /* ignore */ }
+  }
+
+  // ── Redirect legacy hashes to consolidated views ──
+  if (viewName === 'staff' || viewName === 'audit' || viewName === 'print-forms') {
+    viewName = 'settings';
+  }
+  if (viewName === 'invoices') {
+    viewName = 'transactions';
+  }
+  if (viewName === 'report' || viewName === 'analytics' || viewName === 'cukcuk') {
+    viewName = 'revenue';
   }
 
   // Sync with cloud to ensure state is fresh (fire-and-forget, no re-navigation)

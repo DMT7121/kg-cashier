@@ -37,6 +37,7 @@ export function render() {
 
 function renderTable(logs) {
   const wrap = document.getElementById('auditTableWrap');
+  if (!wrap) return;
   const count = document.getElementById('auditCount');
   if (count) count.textContent = `${logs.length} mục`;
 
