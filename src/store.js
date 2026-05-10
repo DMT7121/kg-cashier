@@ -1,5 +1,5 @@
-/* ============================================
-   KG-CASHIER — Data Store (localStorage + Cloud Sync)
+﻿/* ============================================
+   KG-CASHIER â€” Data Store (localStorage + Cloud Sync)
    COMPATIBLE: No optional chaining, no bare catch
    ============================================ */
 
@@ -29,8 +29,8 @@ var SESSION_KEY = 'kg-cashier-session';
 var STAFF_CACHE_KEY = 'kg-cashier-staff';
 
 var defaultCategories = {
-  income: ['Doanh thu bán hàng', 'Doanh thu dịch vụ', 'Thu hồi nợ', 'Thu khác'],
-  expense: ['Mua nguyên liệu', 'Vận chuyển', 'Sửa chữa', 'Tiền tip/bo', 'Trả nợ', 'Chi khác']
+  income: ['Doanh thu bÃ¡n hÃ ng', 'Doanh thu dá»‹ch vá»¥', 'Thu há»“i ná»£', 'Thu khÃ¡c'],
+  expense: ['Mua nguyÃªn liá»‡u', 'Váº­n chuyá»ƒn', 'Sá»­a chá»¯a', 'Tiá»n tip/bo', 'Tráº£ ná»£', 'Chi khÃ¡c']
 };
 
 var state = null;
@@ -41,76 +41,76 @@ var listeners = [];
 function getInitialPrintForms() {
   return {
     checklist: [
-      { section: 'CHECKLIST PHỤC VỤ — ĐẦU CA', items: [
-        { cat: 'VỆ SINH & SETUP', title: 'I. Vệ sinh & setup khu trực', list: [
-          'Vệ sinh sàn & Khu vực chung: Quét và lau sạch tổng thể khu trực, cổng ra vào.',
-          'Bàn ghế: Lau sạch bàn ghế, setup tiêu chuẩn (Chén/Đũa/Ly...).',
-          'Chuẩn bị xô đá: Đảm bảo sạch và đủ đá.',
-          'Kiểm tra Menu: Sắp xếp ngay ngắn, lau sạch bìa.'
+      { section: 'CHECKLIST PHá»¤C Vá»¤ â€” Äáº¦U CA', items: [
+        { cat: 'Vá»† SINH & SETUP', title: 'I. Vá»‡ sinh & setup khu trá»±c', list: [
+          'Vá»‡ sinh sÃ n & Khu vá»±c chung: QuÃ©t vÃ  lau sáº¡ch tá»•ng thá»ƒ khu trá»±c, cá»•ng ra vÃ o.',
+          'BÃ n gháº¿: Lau sáº¡ch bÃ n gháº¿, setup tiÃªu chuáº©n (ChÃ©n/ÄÅ©a/Ly...).',
+          'Chuáº©n bá»‹ xÃ´ Ä‘Ã¡: Äáº£m báº£o sáº¡ch vÃ  Ä‘á»§ Ä‘Ã¡.',
+          'Kiá»ƒm tra Menu: Sáº¯p xáº¿p ngay ngáº¯n, lau sáº¡ch bÃ¬a.'
         ]},
-        { cat: 'CA 15H', title: 'II. SETUP & VỆ SINH (CA 15H)', list: [
-          'Bổ sung vật tư tiêu hao: Tăm, Xiên tre, Ống hút, Bao tay, Diêm, Khăn giấy, Hộp mang về...',
-          'Sắp xếp: Gọn gàng tủ đồ, bố trí các Trạm đồ dùng dự phòng.'
+        { cat: 'CA 15H', title: 'II. SETUP & Vá»† SINH (CA 15H)', list: [
+          'Bá»• sung váº­t tÆ° tiÃªu hao: TÄƒm, XiÃªn tre, á»ng hÃºt, Bao tay, DiÃªm, KhÄƒn giáº¥y, Há»™p mang vá»...',
+          'Sáº¯p xáº¿p: Gá»n gÃ ng tá»§ Ä‘á»“, bá»‘ trÃ­ cÃ¡c Tráº¡m Ä‘á»“ dÃ¹ng dá»± phÃ²ng.'
         ]},
-        { cat: 'BÀN ĐẶT', title: 'III. Bàn đặt trước', list: [
-          'Setup bàn đặt: Đúng số lượng, màu sắc, nhu cầu tiệc.',
-          'Đánh dấu: Cắm khăn giấy hoặc đặt bảng "Bàn đặt trước".'
+        { cat: 'BÃ€N Äáº¶T', title: 'III. BÃ n Ä‘áº·t trÆ°á»›c', list: [
+          'Setup bÃ n Ä‘áº·t: ÄÃºng sá»‘ lÆ°á»£ng, mÃ u sáº¯c, nhu cáº§u tiá»‡c.',
+          'ÄÃ¡nh dáº¥u: Cáº¯m khÄƒn giáº¥y hoáº·c Ä‘áº·t báº£ng "BÃ n Ä‘áº·t trÆ°á»›c".'
         ]},
-        { cat: 'BÀN GIAO', title: 'IV. Bàn giao đầu ca', list: [
-          'Nắm bắt thông tin: Khách đặt, món hết, lưu ý đặc biệt từ ca trước.'
+        { cat: 'BÃ€N GIAO', title: 'IV. BÃ n giao Ä‘áº§u ca', list: [
+          'Náº¯m báº¯t thÃ´ng tin: KhÃ¡ch Ä‘áº·t, mÃ³n háº¿t, lÆ°u Ã½ Ä‘áº·c biá»‡t tá»« ca trÆ°á»›c.'
         ]},
-        { cat: 'TRONG CA', title: 'V. Kiểm tra chéo & Bổ sung (Công việc trong ca)', list: [
-          'Kiểm tra vệ sinh liên tục, bổ sung đá/dụng cụ.',
-          'Hỗ trợ các bàn đông khách.',
-          'Kiểm tra tồn kho vật tư tiêu hao.'
+        { cat: 'TRONG CA', title: 'V. Kiá»ƒm tra chÃ©o & Bá»• sung (CÃ´ng viá»‡c trong ca)', list: [
+          'Kiá»ƒm tra vá»‡ sinh liÃªn tá»¥c, bá»• sung Ä‘Ã¡/dá»¥ng cá»¥.',
+          'Há»— trá»£ cÃ¡c bÃ n Ä‘Ã´ng khÃ¡ch.',
+          'Kiá»ƒm tra tá»“n kho váº­t tÆ° tiÃªu hao.'
         ]}
       ]},
-      { section: 'CHECKLIST PHỤC VỤ — CUỐI CA', items: [
-        { cat: 'XUỐNG CA', title: 'VI. Checklist Cuối ca & Xuống ca', list: [
-          'Thu dọn bàn, vệ sinh gầm bàn.',
-          'Tắt các thiết bị điện (Máy lạnh, Đèn sảnh...).',
-          'Dọn dẹp tổng thể và khóa cửa an toàn.',
-          'Bàn giao lại thông tin cho quản lý/ca sau.'
+      { section: 'CHECKLIST PHá»¤C Vá»¤ â€” CUá»I CA', items: [
+        { cat: 'XUá»NG CA', title: 'VI. Checklist Cuá»‘i ca & Xuá»‘ng ca', list: [
+          'Thu dá»n bÃ n, vá»‡ sinh gáº§m bÃ n.',
+          'Táº¯t cÃ¡c thiáº¿t bá»‹ Ä‘iá»‡n (MÃ¡y láº¡nh, ÄÃ¨n sáº£nh...).',
+          'Dá»n dáº¹p tá»•ng thá»ƒ vÃ  khÃ³a cá»­a an toÃ n.',
+          'BÃ n giao láº¡i thÃ´ng tin cho quáº£n lÃ½/ca sau.'
         ]}
       ]}
     ],
     inventory: {
       ncc: {
-        title: 'KIỂM KÊ HÀNG HÓA — NHÀ CUNG CẤP (THỊT / HẢI SẢN)',
-        subtitle: 'CÔNG TY HOÀNG TRỌNG / MM MARKET / THÚY / CẢNH',
+        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” NHÃ€ CUNG Cáº¤P (THá»ŠT / Háº¢I Sáº¢N)',
+        subtitle: 'CÃ”NG TY HOÃ€NG TRá»ŒNG / MM MARKET / THÃšY / Cáº¢NH',
         items: [
-          {supplier:'C.THÚY\nMM MARKET', items:['Gà (con)','Sụn gà (kg)','Trứng muối','Thịt bò (kg)','Giò heo (kg)','Xương ống (kg)']},
-          {supplier:'HOÀNG TRỌNG\n0947459191', items:['Chân gà (kg)','Thanh cua (kg)','Bào ngư (kg)','Ba rọi bò (kg)','Ba rọi heo (kg)','Nạc dăm (kg)','Xương ống (kg)','Sườn heo (kg)','Cánh gà (kg)','Ếch (kg)','Mực trứng (kg)']},
-          {supplier:'HUYỀN MỰC\nPHƯỚC THÀNH', items:['Mực Indo (kg)','Tôm Sú size 30 (kg)','Tôm càng size 10 (kg)','Ốc hương (kg)','Mực ống (kg)']}
+          {supplier:'C.THÃšY\nMM MARKET', items:['GÃ  (con)','Sá»¥n gÃ  (kg)','Trá»©ng muá»‘i','Thá»‹t bÃ² (kg)','GiÃ² heo (kg)','XÆ°Æ¡ng á»‘ng (kg)']},
+          {supplier:'HOÃ€NG TRá»ŒNG\n0947459191', items:['ChÃ¢n gÃ  (kg)','Thanh cua (kg)','BÃ o ngÆ° (kg)','Ba rá»i bÃ² (kg)','Ba rá»i heo (kg)','Náº¡c dÄƒm (kg)','XÆ°Æ¡ng á»‘ng (kg)','SÆ°á»n heo (kg)','CÃ¡nh gÃ  (kg)','áº¾ch (kg)','Má»±c trá»©ng (kg)']},
+          {supplier:'HUYá»€N Má»°C\nPHÆ¯á»šC THÃ€NH', items:['Má»±c Indo (kg)','TÃ´m SÃº size 30 (kg)','TÃ´m cÃ ng size 10 (kg)','á»c hÆ°Æ¡ng (kg)','Má»±c á»‘ng (kg)']}
         ],
-        rightItems: ['Khô mực','Bê','Cá chim','Bạch tuộc','Mực 1 nắng','Cá hokke','Khoai tây','Sò điệp Nhật','Nghêu','Nọng heo','Bơ bánh mì','Cá diêu hồng','Trứng non','Thú Linh','Ba rọi có da','Phổi bò','Tủy bò','Pate','Khoai tây cọng','Lạp xưởng xông khói','Sò huyết','Ba rọi xông khói','Trâu gác bếp','Bắp bò','Bao tử','Da heo','Mỡ heo','Phô mai sợi']
+        rightItems: ['KhÃ´ má»±c','BÃª','CÃ¡ chim','Báº¡ch tuá»™c','Má»±c 1 náº¯ng','CÃ¡ hokke','Khoai tÃ¢y','SÃ² Ä‘iá»‡p Nháº­t','NghÃªu','Ná»ng heo','BÆ¡ bÃ¡nh mÃ¬','CÃ¡ diÃªu há»“ng','Trá»©ng non','ThÃº Linh','Ba rá»i cÃ³ da','Phá»•i bÃ²','Tá»§y bÃ²','Pate','Khoai tÃ¢y cá»ng','Láº¡p xÆ°á»Ÿng xÃ´ng khÃ³i','SÃ² huyáº¿t','Ba rá»i xÃ´ng khÃ³i','TrÃ¢u gÃ¡c báº¿p','Báº¯p bÃ²','Bao tá»­','Da heo','Má»¡ heo','PhÃ´ mai sá»£i']
       },
       hangkho: {
-        title: 'KIỂM KÊ HÀNG HÓA — HÀNG KHÔ / GIA VỊ',
+        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” HÃ€NG KHÃ” / GIA Vá»Š',
         leftItems: [
-          'Bột bắp','Bột chanh','Bột chiên giòn','Bột gạo','Bột mì','Bột năng','Bột ớt HQ','Bột ớt Việt','Bột xù trắng','Bột nếp','Bột nghệ','Bột cà ri','Đường cát','Đường phèn','Đường thốt nốt','Muối hột','Muối bọt','Muối Tây Ninh','Tiêu đen','Tiêu sọ','Ngũ vị hương','Hoa hồi','Quế cây','Cốm dẹp'
+          'Bá»™t báº¯p','Bá»™t chanh','Bá»™t chiÃªn giÃ²n','Bá»™t gáº¡o','Bá»™t mÃ¬','Bá»™t nÄƒng','Bá»™t á»›t HQ','Bá»™t á»›t Viá»‡t','Bá»™t xÃ¹ tráº¯ng','Bá»™t náº¿p','Bá»™t nghá»‡','Bá»™t cÃ  ri','ÄÆ°á»ng cÃ¡t','ÄÆ°á»ng phÃ¨n','ÄÆ°á»ng thá»‘t ná»‘t','Muá»‘i há»™t','Muá»‘i bá»t','Muá»‘i TÃ¢y Ninh','TiÃªu Ä‘en','TiÃªu sá»','NgÅ© vá»‹ hÆ°Æ¡ng','Hoa há»“i','Quáº¿ cÃ¢y','Cá»‘m dáº¹p'
         ],
         rightItems: [
-          'Dầu ăn (can 25l)','Giấm táo','Dầu hào','Nước mắm','Nước tương Nhị ca','Nước tương hấp cá LKK','Tương cà','Tương ớt','Tương xí muội','Tương ngọt','Dầu mè','Cà ri dầu','Rượu nếp','Rượu hoa tiêu','Vang trắng','Bánh pía','Bột ngọt','Pate gan','Phô mai Bò cười','Sữa đặc','Sữa tươi ko đường','Chao','Lạp xưởng','Bánh tráng cuốn'
+          'Dáº§u Äƒn (can 25l)','Giáº¥m tÃ¡o','Dáº§u hÃ o','NÆ°á»›c máº¯m','NÆ°á»›c tÆ°Æ¡ng Nhá»‹ ca','NÆ°á»›c tÆ°Æ¡ng háº¥p cÃ¡ LKK','TÆ°Æ¡ng cÃ ','TÆ°Æ¡ng á»›t','TÆ°Æ¡ng xÃ­ muá»™i','TÆ°Æ¡ng ngá»t','Dáº§u mÃ¨','CÃ  ri dáº§u','RÆ°á»£u náº¿p','RÆ°á»£u hoa tiÃªu','Vang tráº¯ng','BÃ¡nh pÃ­a','Bá»™t ngá»t','Pate gan','PhÃ´ mai BÃ² cÆ°á»i','Sá»¯a Ä‘áº·c','Sá»¯a tÆ°Æ¡i ko Ä‘Æ°á»ng','Chao','Láº¡p xÆ°á»Ÿng','BÃ¡nh trÃ¡ng cuá»‘n'
         ],
-        extraLeft: ['Mì Miliket','Mì trứng','Mì giòn','Miến thái','Mù tạt xanh','Mù tạt vàng','Nước cốt dừa','Bơ đậu phộng'],
-        extraRight: ['Kỉ tử','Nấm mèo','Nấm đông cô','Lá nguyệt quế','Mạch nha','Bơ Tường An','Sốt đồ nướng','Hắc xì dầu'],
-        extraRightTitle: 'KHÁC'
+        extraLeft: ['MÃ¬ Miliket','MÃ¬ trá»©ng','MÃ¬ giÃ²n','Miáº¿n thÃ¡i','MÃ¹ táº¡t xanh','MÃ¹ táº¡t vÃ ng','NÆ°á»›c cá»‘t dá»«a','BÆ¡ Ä‘áº­u phá»™ng'],
+        extraRight: ['Ká»‰ tá»­','Náº¥m mÃ¨o','Náº¥m Ä‘Ã´ng cÃ´','LÃ¡ nguyá»‡t quáº¿','Máº¡ch nha','BÆ¡ TÆ°á»ng An','Sá»‘t Ä‘á»“ nÆ°á»›ng','Háº¯c xÃ¬ dáº§u'],
+        extraRightTitle: 'KHÃC'
       },
       hangrau1: {
-        title: 'KIỂM KÊ HÀNG HÓA — HÀNG RAU 1',
+        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” HÃ€NG RAU 1',
         leftItems: [
-          'Bắp cải trắng:trái','Bầu:kg','Cà chua bi:kg','Cà chua lớn:kg','Cà tím:kg','Cà pháo:kg','Củ dền:kg','Củ sen:kg','Dưa leo Nhật:kg','Dưa leo nhỏ:kg','Đậu bắp:kg','Đu đủ:kg','Giá:kg','Gừng:kg','Hành phi:kg','Hạt sen:kg','Hẹ:kg','Húng lủi:kg','Khế:kg','Khoai lang:kg','Khoai mỡ:kg','Khoai tây:kg','Khổ qua:kg','Lá chanh:kg'
+          'Báº¯p cáº£i tráº¯ng:trÃ¡i','Báº§u:kg','CÃ  chua bi:kg','CÃ  chua lá»›n:kg','CÃ  tÃ­m:kg','CÃ  phÃ¡o:kg','Cá»§ dá»n:kg','Cá»§ sen:kg','DÆ°a leo Nháº­t:kg','DÆ°a leo nhá»:kg','Äáº­u báº¯p:kg','Äu Ä‘á»§:kg','GiÃ¡:kg','Gá»«ng:kg','HÃ nh phi:kg','Háº¡t sen:kg','Háº¹:kg','HÃºng lá»§i:kg','Kháº¿:kg','Khoai lang:kg','Khoai má»¡:kg','Khoai tÃ¢y:kg','Khá»• qua:kg','LÃ¡ chanh:kg'
         ],
         rightItems: [
-          'Lá dứa:kg','Lá lốt:kg','Lá mơ:kg','Lá ớt:kg','Lá quế:kg','Măng chua:kg','Măng le:kg','Bưởi:kg','Tảo xoăn:kg','Salad thủy tinh:kg','Salad fries:kg','Cải cầu vồng:kg','Măng tây:kg','Me vắt:kg','Mía cây:kg','Mồng tơi:kg','Mướp:kg','Nấm bạch tuyết:kg','Nấm đông cô:kg','Nấm đùi gà:kg','Nấm kim châm:kg','Nghệ:kg','Ngò gai:kg','Ngò rí:kg'
+          'LÃ¡ dá»©a:kg','LÃ¡ lá»‘t:kg','LÃ¡ mÆ¡:kg','LÃ¡ á»›t:kg','LÃ¡ quáº¿:kg','MÄƒng chua:kg','MÄƒng le:kg','BÆ°á»Ÿi:kg','Táº£o xoÄƒn:kg','Salad thá»§y tinh:kg','Salad fries:kg','Cáº£i cáº§u vá»“ng:kg','MÄƒng tÃ¢y:kg','Me váº¯t:kg','MÃ­a cÃ¢y:kg','Má»“ng tÆ¡i:kg','MÆ°á»›p:kg','Náº¥m báº¡ch tuyáº¿t:kg','Náº¥m Ä‘Ã´ng cÃ´:kg','Náº¥m Ä‘Ã¹i gÃ :kg','Náº¥m kim chÃ¢m:kg','Nghá»‡:kg','NgÃ² gai:kg','NgÃ² rÃ­:kg'
         ]
       },
       hangrau: {
-        title: 'KIỂM KÊ HÀNG HÓA — HÀNG RAU 2',
-        subtitle: 'NHẬP HÀNG NGÀY',
+        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” HÃ€NG RAU 2',
+        subtitle: 'NHáº¬P HÃ€NG NGÃ€Y',
         items: [
-          'Tỏi củ:kg','Hành tây:kg','Cà rốt:kg','Thơm lớn:kg','Tắc:kg','Ớt sừng:kg','Sả cây:kg','Tỏi xay:kg','Chanh:kg','Bắp Mỹ:kg','Ớt xiêm xanh:kg','Đậu rồng:kg','Hành tím:kg','Xoài keo:kg','Củ cải trắng:kg','Tiêu xanh:kg','Củ sấn:kg','Rau răm:kg','Đậu đũa:kg','Lá tía tô:kg','Hành lá:kg','Rau muống:kg','Súp lơ xanh:kg','Ớt chuông:kg'
+          'Tá»i cá»§:kg','HÃ nh tÃ¢y:kg','CÃ  rá»‘t:kg','ThÆ¡m lá»›n:kg','Táº¯c:kg','á»št sá»«ng:kg','Sáº£ cÃ¢y:kg','Tá»i xay:kg','Chanh:kg','Báº¯p Má»¹:kg','á»št xiÃªm xanh:kg','Äáº­u rá»“ng:kg','HÃ nh tÃ­m:kg','XoÃ i keo:kg','Cá»§ cáº£i tráº¯ng:kg','TiÃªu xanh:kg','Cá»§ sáº¥n:kg','Rau rÄƒm:kg','Äáº­u Ä‘Å©a:kg','LÃ¡ tÃ­a tÃ´:kg','HÃ nh lÃ¡:kg','Rau muá»‘ng:kg','SÃºp lÆ¡ xanh:kg','á»št chuÃ´ng:kg'
         ]
       }
     }
@@ -122,12 +122,12 @@ function defaults() {
     currentShift: null,
     shifts: [],
     categories: JSON.parse(JSON.stringify(defaultCategories)),
-    cashiers: ['Thu ngân 1', 'Thu ngân 2', 'Thu ngân 3'],
+    cashiers: ['Thu ngÃ¢n 1', 'Thu ngÃ¢n 2', 'Thu ngÃ¢n 3'],
     auditLog: [],
     notifications: [],
     settings: {
       storeName: "KING's GRILL",
-      storeAddress: '34, Hoàng Văn Thụ, Chánh Nghĩa, TDM, Bình Dương',
+      storeAddress: '34, HoÃ ng VÄƒn Thá»¥, ChÃ¡nh NghÄ©a, TDM, BÃ¬nh DÆ°Æ¡ng',
       autoSync: true,
       discrepancyThreshold: 50000,
       shiftWarningHours: 10,
@@ -146,14 +146,14 @@ export function resetPrintForms() {
   var s = getState();
   s.printForms.customTemplates = {};
   save();
-  addAudit('RESET_PRINT_FORMS', 'Khôi phục mẫu in mặc định');
+  addAudit('RESET_PRINT_FORMS', 'KhÃ´i phá»¥c máº«u in máº·c Ä‘á»‹nh');
 }
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 }
 
-// ── Load / Save ──────────────────────────────
+// â”€â”€ Load / Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getState() {
   if (!state) {
     try {
@@ -195,7 +195,7 @@ export function subscribe(fn) {
   };
 }
 
-// ── Audit Trail (Feature 10) ─────────────────
+// â”€â”€ Audit Trail (Feature 10) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function addAudit(action, details) {
   if (details === undefined) details = '';
   var s = getState();
@@ -216,7 +216,7 @@ export function getAuditLog() {
   return getState().auditLog || [];
 }
 
-// ── Notifications (Feature 5) ────────────────
+// â”€â”€ Notifications (Feature 5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function addNotification(message, type) {
   if (!type) type = 'info';
   var s = getState();
@@ -248,7 +248,7 @@ export function clearNotifications() {
   save();
 }
 
-// ── Login / Session (Feature 8 - RBAC) ───────
+// â”€â”€ Login / Session (Feature 8 - RBAC) â”€â”€â”€â”€â”€â”€â”€
 export function setLoggedInUser(user) {
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(user)); } catch (e) { /* ignore */ }
 }
@@ -276,7 +276,7 @@ export function hasRole(requiredRole) {
   return true;
 }
 
-// ── Settings (Feature 9) ─────────────────────
+// â”€â”€ Settings (Feature 9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getSettings() {
   var s = getState();
   return s.settings || defaults().settings;
@@ -292,7 +292,7 @@ export function updateSettings(newSettings) {
   addAudit('UPDATE_SETTINGS', JSON.stringify(newSettings));
 }
 
-// ── Current shift ────────────────────────────
+// â”€â”€ Current shift â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getCurrentShift() { return getState().currentShift; }
 
 export function openShift(opts) {
@@ -306,7 +306,7 @@ export function openShift(opts) {
 
   var s = getState();
   if (s.currentShift) {
-    throw new Error('Đã có ca đang mở. Hãy đóng ca trước.');
+    throw new Error('ÄÃ£ cÃ³ ca Ä‘ang má»Ÿ. HÃ£y Ä‘Ã³ng ca trÆ°á»›c.');
   }
 
   s.currentShift = {
@@ -332,26 +332,26 @@ export function openShift(opts) {
   console.log('[Store] Shift opened successfully:', s.currentShift.id);
 
   addAudit('OPEN_SHIFT', 'Ca ' + shiftNumber + ' - ' + cashierName);
-  addNotification('Ca ' + shiftNumber + ' đã được mở bởi ' + cashierName, 'success');
+  addNotification('Ca ' + shiftNumber + ' Ä‘Ã£ Ä‘Æ°á»£c má»Ÿ bá»Ÿi ' + cashierName, 'success');
   _syncCurrentShift();
   return s.currentShift;
 }
 
-/** Cập nhật tiền đầu ca (bổ sung thêm tiền mặt vào quỹ) */
+/** Cáº­p nháº­t tiá»n Ä‘áº§u ca (bá»• sung thÃªm tiá»n máº·t vÃ o quá»¹) */
 export function updateStartingCash(newAmount) {
   var s = getState();
-  if (!s.currentShift) throw new Error('Chưa có ca đang mở.');
+  if (!s.currentShift) throw new Error('ChÆ°a cÃ³ ca Ä‘ang má»Ÿ.');
   var old = s.currentShift.startingCash || 0;
   s.currentShift.startingCash = Number(newAmount) || 0;
   save();
-  addAudit('UPDATE_STARTING_CASH', 'Tiền đầu ca: ' + old.toLocaleString() + ' → ' + s.currentShift.startingCash.toLocaleString());
+  addAudit('UPDATE_STARTING_CASH', 'Tiá»n Ä‘áº§u ca: ' + old.toLocaleString() + ' â†’ ' + s.currentShift.startingCash.toLocaleString());
   return s.currentShift;
 }
 
 export function closeShift(opts) {
   if (!opts) opts = {};
   var s = getState();
-  if (!s.currentShift) throw new Error('Không có ca nào đang mở');
+  if (!s.currentShift) throw new Error('KhÃ´ng cÃ³ ca nÃ o Ä‘ang má»Ÿ');
 
   s.currentShift.endTime = new Date().toISOString();
   s.currentShift.status = 'closed';
@@ -361,7 +361,7 @@ export function closeShift(opts) {
 
   var summary = getShiftSummary(s.currentShift);
 
-  // ── Snapshot drink inventory for this shift ──
+  // â”€â”€ Snapshot drink inventory for this shift â”€â”€
   try {
     var invData = localStorage.getItem('kg-drink-inventory');
     if (invData) {
@@ -373,7 +373,7 @@ export function closeShift(opts) {
     }
   } catch (e) { /* ignore */ }
 
-  // ── Snapshot CUKCUK invoices for this shift's working day ──
+  // â”€â”€ Snapshot CUKCUK invoices for this shift's working day â”€â”€
   try {
     var invoiceData = localStorage.getItem('cukcuk_invoice_store');
     if (invoiceData) {
@@ -416,7 +416,7 @@ export function closeShift(opts) {
     }
   } catch (e) { /* ignore */ }
 
-  // ── Save summary snapshot for quick access ──
+  // â”€â”€ Save summary snapshot for quick access â”€â”€
   s.currentShift.summarySnapshot = {
     totalIncome: summary.totalIncome,
     totalExpense: summary.totalExpense,
@@ -434,25 +434,25 @@ export function closeShift(opts) {
   // Check discrepancy (Feature 5)
   var threshold = (s.settings && s.settings.discrepancyThreshold) ? s.settings.discrepancyThreshold : 50000;
   if (summary.cashCountTotal > 0 && Math.abs(summary.discrepancy) > threshold) {
-    addNotification('⚠️ Chênh lệch tiền mặt: ' + summary.discrepancy.toLocaleString('vi-VN') + 'đ', 'warning');
+    addNotification('âš ï¸ ChÃªnh lá»‡ch tiá»n máº·t: ' + summary.discrepancy.toLocaleString('vi-VN') + 'Ä‘', 'warning');
   }
 
   s.shifts.unshift(JSON.parse(JSON.stringify(s.currentShift)));
   var closedShift = s.currentShift;
   s.currentShift = null;
   save();
-  addAudit('CLOSE_SHIFT', 'Ca ' + closedShift.shiftNumber + ' - Doanh thu: ' + summary.totalIncome.toLocaleString('vi-VN') + 'đ');
-  addNotification('Ca ' + closedShift.shiftNumber + ' đã đóng - DT: ' + summary.totalIncome.toLocaleString('vi-VN') + 'đ', 'info');
+  addAudit('CLOSE_SHIFT', 'Ca ' + closedShift.shiftNumber + ' - Doanh thu: ' + summary.totalIncome.toLocaleString('vi-VN') + 'Ä‘');
+  addNotification('Ca ' + closedShift.shiftNumber + ' Ä‘Ã£ Ä‘Ã³ng - DT: ' + summary.totalIncome.toLocaleString('vi-VN') + 'Ä‘', 'info');
 
   if (_cloudClose) {
     try { _cloudClose(closedShift).catch(function() {}); } catch (e) { /* ignore */ }
   }
 }
 
-// ── Transactions ─────────────────────────────
+// â”€â”€ Transactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function addTransaction(opts) {
   var s = getState();
-  if (!s.currentShift) throw new Error('Chưa mở ca');
+  if (!s.currentShift) throw new Error('ChÆ°a má»Ÿ ca');
   var tx = {
     id: uid(),
     type: opts.type,
@@ -464,7 +464,7 @@ export function addTransaction(opts) {
   };
   s.currentShift.transactions.push(tx);
   save();
-  addAudit('ADD_TX', (opts.type === 'income' ? '+' : '-') + Number(opts.amount).toLocaleString('vi-VN') + 'đ - ' + opts.category);
+  addAudit('ADD_TX', (opts.type === 'income' ? '+' : '-') + Number(opts.amount).toLocaleString('vi-VN') + 'Ä‘ - ' + opts.category);
   _syncCurrentShift();
   return tx;
 }
@@ -481,13 +481,13 @@ export function removeTransaction(id) {
   }
   s.currentShift.transactions = s.currentShift.transactions.filter(function(t) { return t.id !== id; });
   save();
-  if (tx) addAudit('REMOVE_TX', tx.category + ' - ' + tx.amount.toLocaleString('vi-VN') + 'đ');
+  if (tx) addAudit('REMOVE_TX', tx.category + ' - ' + tx.amount.toLocaleString('vi-VN') + 'Ä‘');
   _syncCurrentShift();
 }
 
 export function editTransaction(id, updates) {
   var s = getState();
-  if (!s.currentShift) throw new Error('Chưa mở ca');
+  if (!s.currentShift) throw new Error('ChÆ°a má»Ÿ ca');
   for (var i = 0; i < s.currentShift.transactions.length; i++) {
     if (s.currentShift.transactions[i].id === id) {
       var tx = s.currentShift.transactions[i];
@@ -498,17 +498,17 @@ export function editTransaction(id, updates) {
       if (updates.note !== undefined) tx.note = updates.note;
       if (updates.type !== undefined) tx.type = updates.type;
       save();
-      addAudit('EDIT_TX', tx.category + ': ' + oldAmt.toLocaleString('vi-VN') + ' → ' + tx.amount.toLocaleString('vi-VN') + 'đ');
+      addAudit('EDIT_TX', tx.category + ': ' + oldAmt.toLocaleString('vi-VN') + ' â†’ ' + tx.amount.toLocaleString('vi-VN') + 'Ä‘');
       _syncCurrentShift();
       return tx;
     }
   }
-  throw new Error('Không tìm thấy giao dịch');
+  throw new Error('KhÃ´ng tÃ¬m tháº¥y giao dá»‹ch');
 }
 
 export function addOtherTransaction(opts) {
   var s = getState();
-  if (!s.currentShift) throw new Error('Chưa mở ca');
+  if (!s.currentShift) throw new Error('ChÆ°a má»Ÿ ca');
   var tx = {
     id: uid(),
     type: opts.type,
@@ -519,7 +519,7 @@ export function addOtherTransaction(opts) {
   };
   s.currentShift.otherTransactions.push(tx);
   save();
-  addAudit('ADD_OTHER_TX', opts.type + ': ' + opts.category + ' - ' + Number(opts.amount).toLocaleString('vi-VN') + 'đ');
+  addAudit('ADD_OTHER_TX', opts.type + ': ' + opts.category + ' - ' + Number(opts.amount).toLocaleString('vi-VN') + 'Ä‘');
   _syncCurrentShift();
   return tx;
 }
@@ -532,15 +532,15 @@ export function removeOtherTransaction(id) {
   _syncCurrentShift();
 }
 
-// ── Cash count ───────────────────────────────
+// â”€â”€ Cash count â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function updateCashCount(counts, pinnedCash, keepCash, handoverCash) {
   var s = getState();
-  if (!s.currentShift) throw new Error('Chưa mở ca');
+  if (!s.currentShift) throw new Error('ChÆ°a má»Ÿ ca');
   var newCounts = {};
   for (var key in counts) { newCounts[key] = counts[key]; }
   s.currentShift.cashCount = newCounts;
 
-  // Save denomination breakdown: ghim, giữ, giao
+  // Save denomination breakdown: ghim, giá»¯, giao
   if (pinnedCash) {
     var newPins = {};
     for (var pk in pinnedCash) { if (pinnedCash[pk] > 0) newPins[pk] = pinnedCash[pk]; }
@@ -571,14 +571,14 @@ export function updateCashCount(counts, pinnedCash, keepCash, handoverCash) {
 
   save();
   var total = totalKet + totalGiao;
-  addAudit('UPDATE_CASH_COUNT', 'Két: ' + totalKet.toLocaleString('vi-VN') + ' | Giao: ' + totalGiao.toLocaleString('vi-VN') + ' | Tổng: ' + total.toLocaleString('vi-VN') + 'đ');
+  addAudit('UPDATE_CASH_COUNT', 'KÃ©t: ' + totalKet.toLocaleString('vi-VN') + ' | Giao: ' + totalGiao.toLocaleString('vi-VN') + ' | Tá»•ng: ' + total.toLocaleString('vi-VN') + 'Ä‘');
   _syncCurrentShift();
 }
 
-// ── Invoices ─────────────────────────────────
+// â”€â”€ Invoices â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function addInvoice(opts) {
   var s = getState();
-  if (!s.currentShift) throw new Error('Chưa mở ca');
+  if (!s.currentShift) throw new Error('ChÆ°a má»Ÿ ca');
   var inv = {
     id: uid(),
     name: opts.name,
@@ -604,7 +604,7 @@ export function removeInvoice(id) {
   save();
 }
 
-// ── Summary ──────────────────────────────────
+// â”€â”€ Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getShiftSummary(shift) {
   if (!shift) shift = getState().currentShift;
   if (!shift) return null;
@@ -612,48 +612,17 @@ export function getShiftSummary(shift) {
   var otherTxs = shift.otherTransactions || [];
 
   var totalIncome = 0, totalExpense = 0, cashIncome = 0, cardIncome = 0, transferIncome = 0, cashExpense = 0, otherIncome = 0, otherExpense = 0, billCount = 0;
-  // CUKCUK breakdown (from shift.transactions — legacy tagged entries)
   var cukcukRevenue = 0, cukcukBills = 0;
   var manualIncome = 0, manualBills = 0;
 
-  for (var i = 0; i < txs.length; i++) {
-    var t = txs[i];
-    var isCukcuk = t.note && t.note.indexOf('[CUKCUK]') !== -1;
-    if (t.type === 'income') {
-      totalIncome += t.amount;
-      billCount++;
-      if (t.paymentMethod === 'cash') cashIncome += t.amount;
-      else if (t.paymentMethod === 'card') cardIncome += t.amount;
-      else if (t.paymentMethod === 'transfer') transferIncome += t.amount;
-      // Separate CUKCUK vs manual
-      if (isCukcuk) {
-        cukcukRevenue += t.amount;
-        cukcukBills++;
-      } else {
-        manualIncome += t.amount;
-        manualBills++;
-      }
-    } else {
-      totalExpense += t.amount;
-      if (t.paymentMethod === 'cash') cashExpense += t.amount;
-    }
-  }
-
-  for (var j = 0; j < otherTxs.length; j++) {
-    if (otherTxs[j].type === 'income') otherIncome += otherTxs[j].amount;
-    else otherExpense += otherTxs[j].amount;
-  }
-
-  // ── Also read CUKCUK invoices from Invoice Store (cukcuk_invoice_store) ──
-  // CUKCUK data is now stored separately from shift.transactions.
-  // Filter by working day bounds (12:00 today → 06:00 tomorrow) using refDate timestamp.
+  // â”€â”€ Step 1: Read CUKCUK invoices from invoiceStore (authoritative source) â”€â”€
+  var hasInvoiceStoreData = false;
   if (shift.date) {
     try {
       var storeData = localStorage.getItem('cukcuk_invoice_store');
       if (storeData) {
         var parsed = JSON.parse(storeData);
         if (parsed && parsed.invoices) {
-          // Build working day bounds from shift.date
           var dp = shift.date.split('-');
           var shiftDay = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
           var boundsStart = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate(), 12, 0, 0);
@@ -666,11 +635,9 @@ export function getShiftSummary(shift) {
             var inv = parsed.invoices[k];
             if (inv.unpaid) continue;
 
-            // Filter by refDate timestamp within working day bounds
             var matchDay = false;
             if (inv.refDate) {
               var rd = new Date(inv.refDate);
-              // Handle .NET /Date()/ format
               if (isNaN(rd.getTime()) && typeof inv.refDate === 'string') {
                 var netM = inv.refDate.match(/\/Date\((\d+)\)\//);
                 if (netM) rd = new Date(parseInt(netM[1]));
@@ -679,12 +646,12 @@ export function getShiftSummary(shift) {
                 matchDay = rd >= boundsStart && rd < boundsEnd;
               }
             }
-            // Fallback: simple date match (for legacy data without refDate)
             if (!matchDay && !inv.refDate) {
               matchDay = inv.date === shift.date;
             }
             if (!matchDay) continue;
-            
+
+            hasInvoiceStoreData = true;
             cukcukBills++;
             billCount++;
             var invTotal = 0;
@@ -702,7 +669,41 @@ export function getShiftSummary(shift) {
           }
         }
       }
-    } catch(e) { /* ignore — invoice store unavailable */ }
+    } catch(e) { /* ignore */ }
+  }
+
+  // â”€â”€ Step 2: Process shift.transactions â”€â”€
+  // Skip [CUKCUK]-tagged entries if invoiceStore already provided CUKCUK data (prevent double-counting)
+  for (var i = 0; i < txs.length; i++) {
+    var t = txs[i];
+    var isCukcuk = t.note && t.note.indexOf('[CUKCUK]') !== -1;
+
+    if (t.type === 'income') {
+      if (isCukcuk && hasInvoiceStoreData) {
+        // Skip â€” already counted from invoiceStore
+        continue;
+      }
+      totalIncome += t.amount;
+      billCount++;
+      if (t.paymentMethod === 'cash') cashIncome += t.amount;
+      else if (t.paymentMethod === 'card') cardIncome += t.amount;
+      else if (t.paymentMethod === 'transfer') transferIncome += t.amount;
+      if (isCukcuk) {
+        cukcukRevenue += t.amount;
+        cukcukBills++;
+      } else {
+        manualIncome += t.amount;
+        manualBills++;
+      }
+    } else {
+      totalExpense += t.amount;
+      if (t.paymentMethod === 'cash') cashExpense += t.amount;
+    }
+  }
+
+  for (var j = 0; j < otherTxs.length; j++) {
+    if (otherTxs[j].type === 'income') otherIncome += otherTxs[j].amount;
+    else otherExpense += otherTxs[j].amount;
   }
 
   var cashCountTotal = 0;
@@ -729,7 +730,6 @@ export function getShiftSummary(shift) {
     revenue: totalIncome,
     billCount: billCount,
     netTotal: expectedCash,
-    // CUKCUK breakdown
     cukcukRevenue: cukcukRevenue,
     cukcukBills: cukcukBills,
     manualIncome: manualIncome,
@@ -737,7 +737,8 @@ export function getShiftSummary(shift) {
   };
 }
 
-// ── History ──────────────────────────────────
+
+// â”€â”€ History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getShiftHistory() { return getState().shifts || []; }
 
 export function saveShiftToHistory(shift) {
@@ -760,7 +761,7 @@ export function deleteShiftFromHistory(id) {
 }
 
 /**
- * Sync shift history with cloud — merge cloud shifts into local history.
+ * Sync shift history with cloud â€” merge cloud shifts into local history.
  * Uses union merge: local shifts + cloud shifts not already in local.
  * Sorted by date descending (most recent first).
  */
@@ -797,17 +798,17 @@ export async function syncShiftHistory() {
       var cs = cloudShifts[j];
       if (!cs || !cs.id) continue;
       if (localIds[cs.id] === undefined) {
-        // Cloud shift not in local → add
+        // Cloud shift not in local â†’ add
         cs.invoices = cs.invoices || [];
         s.shifts.push(cs);
         added++;
       } else {
-        // Shift exists locally — update if cloud version has more data
+        // Shift exists locally â€” update if cloud version has more data
         var localShift = s.shifts[localIds[cs.id]];
         var localTxCount = (localShift.transactions || []).length;
         var cloudTxCount = (cs.transactions || []).length;
         if (cloudTxCount > localTxCount) {
-          // Cloud has more transactions → use cloud version, keep local invoices
+          // Cloud has more transactions â†’ use cloud version, keep local invoices
           cs.invoices = localShift.invoices || [];
           s.shifts[localIds[cs.id]] = cs;
           added++;
@@ -848,10 +849,10 @@ export function addCategory(type, name) {
   for (var i = 0; i < s.categories[type].length; i++) {
     if (s.categories[type][i].toLowerCase() === trimmed.toLowerCase()) return false;
   }
-  // Insert before "Thu khác" / "Chi khác" (the last item)
+  // Insert before "Thu khÃ¡c" / "Chi khÃ¡c" (the last item)
   var lastIdx = s.categories[type].length - 1;
   var lastItem = s.categories[type][lastIdx];
-  if (lastItem === 'Thu khác' || lastItem === 'Chi khác') {
+  if (lastItem === 'Thu khÃ¡c' || lastItem === 'Chi khÃ¡c') {
     s.categories[type].splice(lastIdx, 0, trimmed);
   } else {
     s.categories[type].push(trimmed);
@@ -911,7 +912,7 @@ export async function pullCategoriesFromCloud() {
         });
         s.categories = merged;
         save();
-        console.log('[Store] ☁️ Categories synced from cloud');
+        console.log('[Store] â˜ï¸ Categories synced from cloud');
       }
     }
   } catch(e) {
@@ -919,7 +920,7 @@ export async function pullCategoriesFromCloud() {
   }
 }
 
-// ── Cloud Sync ───────────────────────────────
+// â”€â”€ Cloud Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 var _syncTimer = null;
 var _shiftDirty = false;
 var _lastCloudPushTime = 0;
@@ -979,7 +980,7 @@ export async function syncCurrentShiftWithCloud() {
       const cloudShift = res.shift;
       const s = getState();
       
-      // Case 1: Cloud has no open shift but local does → shift was closed on another device
+      // Case 1: Cloud has no open shift but local does â†’ shift was closed on another device
       if (!cloudShift && s.currentShift) {
         // DON'T auto-close local shift! The cloud may just be empty.
         // Only push our local shift to cloud to restore sync.
@@ -988,13 +989,13 @@ export async function syncCurrentShiftWithCloud() {
       }
       
       // Case 2: Cloud has an open shift AND local also has an open shift with SAME ID
-      // → Sync updates (transactions, cash count, etc.) from other devices
+      // â†’ Sync updates (transactions, cash count, etc.) from other devices
       if (cloudShift && s.currentShift && s.currentShift.id === cloudShift.id) {
         const localCompare = JSON.stringify(Object.assign({}, s.currentShift, { invoices: [] }));
         const cloudCompare = JSON.stringify(Object.assign({}, cloudShift, { invoices: [] }));
 
         if (localCompare !== cloudCompare) {
-          // Same shift, different content → merge cloud data but keep local invoices
+          // Same shift, different content â†’ merge cloud data but keep local invoices
           cloudShift.invoices = s.currentShift.invoices;
           s.currentShift = cloudShift;
           save();
@@ -1003,17 +1004,17 @@ export async function syncCurrentShiftWithCloud() {
       }
 
       // Case 3: Both local and cloud have open shifts but DIFFERENT IDs
-      // → Keep the NEWER shift (by startTime), push it to cloud
+      // â†’ Keep the NEWER shift (by startTime), push it to cloud
       if (cloudShift && s.currentShift && s.currentShift.id !== cloudShift.id) {
         var localStart = new Date(s.currentShift.startTime || 0).getTime();
         var cloudStart = new Date(cloudShift.startTime || 0).getTime();
         if (localStart >= cloudStart) {
-          // Local is newer — push local to cloud, ignore stale cloud shift
+          // Local is newer â€” push local to cloud, ignore stale cloud shift
           console.log('[Store] Local shift is newer than cloud, pushing local to cloud');
           _syncCurrentShift();
           return false;
         } else {
-          // Cloud is newer — apply cloud shift
+          // Cloud is newer â€” apply cloud shift
           console.log('[Store] Cloud shift is newer, applying:', cloudShift.id);
           s.currentShift = cloudShift;
           s.currentShift.invoices = s.currentShift.invoices || [];
@@ -1022,7 +1023,7 @@ export async function syncCurrentShiftWithCloud() {
         }
       }
       
-      // Case 4: Cloud has an open shift but local does NOT → apply cloud shift
+      // Case 4: Cloud has an open shift but local does NOT â†’ apply cloud shift
       if (cloudShift && !s.currentShift) {
         console.log('[Store] Cloud shift applied locally:', cloudShift.id, '- Ca', cloudShift.shiftNumber);
         s.currentShift = cloudShift;
@@ -1037,7 +1038,7 @@ export async function syncCurrentShiftWithCloud() {
   return false;
 }
 
-// ── Analytics Helpers (Feature 4) ────────────
+// â”€â”€ Analytics Helpers (Feature 4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getDailyReport(dateStr) {
   var shifts = getShiftHistory().filter(function(s) { return s.date === dateStr; });
   var totalIncome = 0, totalExpense = 0, cashTotal = 0, cardTotal = 0, transferTotal = 0, billCount = 0;
@@ -1092,10 +1093,10 @@ export function updatePrintForms(data) {
   var s = getState();
   s.printForms = data;
   save();
-  addAudit('UPDATE_PRINT_FORMS', 'Cập nhật mẫu in');
+  addAudit('UPDATE_PRINT_FORMS', 'Cáº­p nháº­t máº«u in');
 }
 
-// ── Staff Cache (localStorage) ───────────────
+// â”€â”€ Staff Cache (localStorage) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Staff is cached locally so the shift open form always has data immediately
 export function getCachedStaff() {
   try {
