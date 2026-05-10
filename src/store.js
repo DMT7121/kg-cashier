@@ -885,21 +885,10 @@ export async function syncCurrentShiftWithCloud() {
       
       // Case 1: Cloud has no open shift but local does → shift was closed on another device
       if (!cloudShift && s.currentShift) {
-        // Save to local history before clearing (in case closeShift wasn't synced)
-        if (s.currentShift.status === 'open') {
-          s.currentShift.status = 'closed';
-          s.currentShift.endTime = s.currentShift.endTime || new Date().toISOString();
-          s.currentShift.notes = (s.currentShift.notes || '') + ' [Đóng từ thiết bị khác]';
-          if (!s.shifts) s.shifts = [];
-          var dup1 = false;
-          for (var h1 = 0; h1 < s.shifts.length; h1++) {
-            if (s.shifts[h1].id === s.currentShift.id) { dup1 = true; break; }
-          }
-          if (!dup1) s.shifts.unshift(JSON.parse(JSON.stringify(s.currentShift)));
-        }
-        s.currentShift = null;
-        save();
-        return true;
+        // DON'T auto-close local shift! The cloud may just be empty.
+        // Only push our local shift to cloud to restore sync.
+        _syncCurrentShift();
+        return false;
       }
       
       // Case 2: Cloud has an open shift AND local also has an open shift with SAME ID
@@ -916,9 +905,28 @@ export async function syncCurrentShiftWithCloud() {
           return true;
         }
       }
+
+      // Case 3: Both local and cloud have open shifts but DIFFERENT IDs
+      // → Keep the NEWER shift (by startTime), push it to cloud
+      if (cloudShift && s.currentShift && s.currentShift.id !== cloudShift.id) {
+        var localStart = new Date(s.currentShift.startTime || 0).getTime();
+        var cloudStart = new Date(cloudShift.startTime || 0).getTime();
+        if (localStart >= cloudStart) {
+          // Local is newer — push local to cloud, ignore stale cloud shift
+          console.log('[Store] Local shift is newer than cloud, pushing local to cloud');
+          _syncCurrentShift();
+          return false;
+        } else {
+          // Cloud is newer — apply cloud shift
+          console.log('[Store] Cloud shift is newer, applying:', cloudShift.id);
+          s.currentShift = cloudShift;
+          s.currentShift.invoices = s.currentShift.invoices || [];
+          save();
+          return true;
+        }
+      }
       
-      // Case 3: Cloud has an open shift but local does NOT → apply cloud shift
-      // This enables cross-device sync: open on localhost → see on production
+      // Case 4: Cloud has an open shift but local does NOT → apply cloud shift
       if (cloudShift && !s.currentShift) {
         console.log('[Store] Cloud shift applied locally:', cloudShift.id, '- Ca', cloudShift.shiftNumber);
         s.currentShift = cloudShift;
