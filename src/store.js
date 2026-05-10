@@ -361,6 +361,76 @@ export function closeShift(opts) {
 
   var summary = getShiftSummary(s.currentShift);
 
+  // ── Snapshot drink inventory for this shift ──
+  try {
+    var invData = localStorage.getItem('kg-drink-inventory');
+    if (invData) {
+      var parsed = JSON.parse(invData);
+      var sessionKey = s.currentShift.date + '_Ca ' + s.currentShift.shiftNumber;
+      if (parsed.sessions && parsed.sessions[sessionKey]) {
+        s.currentShift.drinkInventorySnapshot = parsed.sessions[sessionKey];
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  // ── Snapshot CUKCUK invoices for this shift's working day ──
+  try {
+    var invoiceData = localStorage.getItem('cukcuk_invoice_store');
+    if (invoiceData) {
+      var invStore = JSON.parse(invoiceData);
+      if (invStore && invStore.invoices) {
+        var shiftDate = s.currentShift.date;
+        var dp = shiftDate.split('-');
+        var shiftDay = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
+        var boundsStart = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate(), 12, 0, 0);
+        var nextDay = new Date(shiftDay);
+        nextDay.setDate(nextDay.getDate() + 1);
+        var boundsEnd = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate(), 6, 0, 0);
+
+        var matchedInvoices = [];
+        for (var k in invStore.invoices) {
+          if (!invStore.invoices.hasOwnProperty(k)) continue;
+          var inv = invStore.invoices[k];
+          if (inv.unpaid) continue;
+          var match = false;
+          if (inv.refDate) {
+            var rd = new Date(inv.refDate);
+            if (isNaN(rd.getTime()) && typeof inv.refDate === 'string') {
+              var netM = inv.refDate.match(/\/Date\((\d+)\)\//);
+              if (netM) rd = new Date(parseInt(netM[1]));
+            }
+            if (!isNaN(rd.getTime())) match = rd >= boundsStart && rd < boundsEnd;
+          }
+          if (!match && !inv.refDate) match = inv.date === shiftDate;
+          if (match) {
+            matchedInvoices.push({
+              refId: inv.refId, refNo: inv.refNo, refDate: inv.refDate,
+              tableName: inv.tableName, amount: inv.amount, payments: inv.payments
+            });
+          }
+        }
+        if (matchedInvoices.length > 0) {
+          s.currentShift.cukcukInvoicesSnapshot = matchedInvoices;
+        }
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  // ── Save summary snapshot for quick access ──
+  s.currentShift.summarySnapshot = {
+    totalIncome: summary.totalIncome,
+    totalExpense: summary.totalExpense,
+    cashIncome: summary.cashIncome,
+    cardIncome: summary.cardIncome,
+    transferIncome: summary.transferIncome,
+    cukcukRevenue: summary.cukcukRevenue,
+    cukcukBills: summary.cukcukBills,
+    billCount: summary.billCount,
+    expectedCash: summary.expectedCash,
+    cashCountTotal: summary.cashCountTotal,
+    discrepancy: summary.discrepancy
+  };
+
   // Check discrepancy (Feature 5)
   var threshold = (s.settings && s.settings.discrepancyThreshold) ? s.settings.discrepancyThreshold : 50000;
   if (summary.cashCountTotal > 0 && Math.abs(summary.discrepancy) > threshold) {
