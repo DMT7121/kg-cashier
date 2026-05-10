@@ -1,4 +1,4 @@
-﻿/* ============================================
+/* ============================================
    KG-CASHIER â€” Data Store (localStorage + Cloud Sync)
    COMPATIBLE: No optional chaining, no bare catch
    ============================================ */
@@ -173,6 +173,19 @@ export function getState() {
       console.error('[Store] Load error:', e);
       state = defaults();
     }
+  }
+  // One-time migration: recalculate summarySnapshot for history shifts
+  if (state && state.shifts && !state._migratedSummaryV2) {
+    for (var mi = 0; mi < state.shifts.length; mi++) {
+      var sh = state.shifts[mi];
+      if (sh && sh.summarySnapshot) {
+        // Will be recalculated by getShiftSummary when viewed
+        delete sh.summarySnapshot;
+      }
+    }
+    state._migratedSummaryV2 = true;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) { /* */ }
+    console.log('[Store] Migration v2: cleared stale summarySnapshots for', (state.shifts || []).length, 'shifts');
   }
   return state;
 }
