@@ -71,7 +71,10 @@ export function render() {
           </div>
           <div id="unlockError" style="display:none;padding:8px 12px;margin-bottom:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;font-weight:600;"></div>
           <button class="btn btn-primary" id="btnUnlockShift" style="width:100%;margin-top:8px;">Xác nhận</button>
-          <p class="text-muted" style="font-size:11px;margin-top:12px;">Mật khẩu do người mở ca thiết lập khi bắt đầu ca</p>
+          <p class="text-muted" style="font-size:11px;margin-top:12px;">Mật khẩu do người mở ca thiết lập khi bắt đầu ca. Hoặc dùng mật khẩu quản lý.</p>
+          <button class="btn btn-outline btn-sm" id="btnForceCloseGhost" style="margin-top:16px;font-size:11px;color:var(--danger);border-color:var(--danger);">
+            <span class="material-symbols-rounded" style="font-size:14px;">close</span> Đóng ca cưỡng chế
+          </button>
         </div>
       </div>
     `;
@@ -292,25 +295,26 @@ function _bindCardClicks() {
 
 export function init() {
   const shift = getCurrentShift();
-  const isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
+   const isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
 
   if (shift && !isValidated) {
     const input = document.getElementById('shiftUnlockPass');
     const btn = document.getElementById('btnUnlockShift');
     const errEl = document.getElementById('unlockError');
+    const adminPass = getSettings().adminPassword || '712121';
     const tryUnlock = async () => {
       if (!input.value) {
         if (errEl) { errEl.textContent = '⚠️ Vui lòng nhập mật khẩu'; errEl.style.display = 'block'; }
         input.focus();
         return;
       }
-      const match = (input.value === (shift.shiftPassword || ''));
+      const match = (input.value === (shift.shiftPassword || '')) || (input.value === adminPass);
       if (match) {
         sessionStorage.setItem('shift_validated', shift.id);
         showToast('Xác thực thành công!', 'success');
         window.refreshView?.();
       } else {
-        if (errEl) { errEl.textContent = '❌ Mật khẩu ca không đúng!'; errEl.style.display = 'block'; }
+        if (errEl) { errEl.textContent = '❌ Mật khẩu ca không đúng! (Thử mật khẩu quản lý)'; errEl.style.display = 'block'; }
         showToast('Mật khẩu ca không đúng!', 'error');
         input.value = '';
         input.focus();
@@ -318,6 +322,42 @@ export function init() {
     };
     btn?.addEventListener('click', tryUnlock);
     input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+
+    // Force-close ghost shift
+    document.getElementById('btnForceCloseGhost')?.addEventListener('click', async () => {
+      const ok = await showConfirm(
+        'Đóng ca cưỡng chế sẽ xóa ca hiện tại khỏi hệ thống mà KHÔNG lưu lịch sử. Bạn cần nhập mật khẩu quản lý để xác nhận.',
+        { title: 'Đóng ca cưỡng chế', confirmText: 'Xóa ca', type: 'danger' }
+      );
+      if (ok) {
+        const adminPass = getSettings().adminPassword || '712121';
+        showModal(`
+          <div class="modal-title" style="color:var(--danger);"><span class="material-symbols-rounded">warning</span> Xác nhận quản lý</div>
+          <div class="form-group"><label class="form-label">Mật khẩu quản lý</label><input type="password" id="forceClosePass" class="form-input" autofocus></div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
+            <button class="btn btn-danger" id="btnConfirmForceClose">Xóa ca</button>
+          </div>
+        `);
+        setTimeout(() => {
+          document.getElementById('btnConfirmForceClose')?.addEventListener('click', () => {
+            const passVal = document.getElementById('forceClosePass')?.value || '';
+            if (passVal !== adminPass) { showToast('Mật khẩu quản lý không đúng!', 'error'); return; }
+            // Clear current shift
+            var s = getState();
+            s.currentShift = null;
+            try { localStorage.setItem('kg-cashier-data', JSON.stringify(s)); } catch(e) { /* */ }
+            sessionStorage.removeItem('shift_validated');
+            hideModal();
+            showToast('Đã xóa ca cưỡng chế', 'success');
+            window.refreshView?.();
+          });
+          document.getElementById('forceClosePass')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('btnConfirmForceClose')?.click();
+          });
+        }, 100);
+      }
+    });
     return;
   }
 
