@@ -150,3 +150,92 @@ export function downloadCSV(filename, csv) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ── Money Input: auto-format + math expressions ──
+function _fmtDots(n) { return n.toLocaleString('vi-VN'); }
+
+function _safeEval(expr) {
+  // Only allow digits, dots, commas, spaces, +, -, *, /
+  var clean = expr.replace(/\./g, '').replace(/,/g, '.').replace(/\s/g, '');
+  if (!/^[\d.+\-*/()]+$/.test(clean)) return null;
+  try { return Function('"use strict"; return (' + clean + ')')(); } catch(e) { return null; }
+}
+
+/**
+ * Bind auto-format + math expression support to an input element.
+ * @param {HTMLInputElement} el - The input (should be type="text")
+ * @param {object} opts - { allowMath: true/false }
+ * Returns: { getValue: () => number }
+ */
+export function moneyInput(el, opts) {
+  if (!el) return { getValue: function() { return 0; } };
+  opts = opts || {};
+  var allowMath = opts.allowMath !== false;
+  var previewEl = null;
+
+  // Create math preview element if math is allowed
+  if (allowMath) {
+    previewEl = document.createElement('div');
+    previewEl.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;min-height:16px;';
+    if (el.parentElement) el.parentElement.appendChild(previewEl);
+  }
+
+  function formatDisplay() {
+    var raw = el.value.replace(/\./g, '');
+    // If contains math operators, show as expression
+    if (allowMath && /[+\-*/]/.test(raw)) {
+      var result = _safeEval(raw);
+      if (previewEl) {
+        if (result != null && !isNaN(result)) {
+          previewEl.textContent = '= ' + _fmtDots(Math.round(result)) + ' đ';
+          previewEl.style.color = 'var(--success)';
+        } else {
+          previewEl.textContent = '⚠ Biểu thức không hợp lệ';
+          previewEl.style.color = 'var(--danger)';
+        }
+      }
+      return; // Don't auto-format while typing expression
+    }
+    // Plain number — auto-format with dots
+    var num = parseInt(raw.replace(/\D/g, ''), 10);
+    if (isNaN(num)) { el.value = ''; if (previewEl) previewEl.textContent = ''; return; }
+    var cursor = el.selectionStart;
+    var oldLen = el.value.length;
+    el.value = _fmtDots(num);
+    var newLen = el.value.length;
+    var newCursor = cursor + (newLen - oldLen);
+    el.setSelectionRange(newCursor, newCursor);
+    if (previewEl) previewEl.textContent = '';
+  }
+
+  function getValue() {
+    var raw = el.value.replace(/\./g, '');
+    if (allowMath && /[+\-*/]/.test(raw)) {
+      var result = _safeEval(raw);
+      return (result != null && !isNaN(result)) ? Math.round(result) : 0;
+    }
+    return parseInt(raw.replace(/\D/g, ''), 10) || 0;
+  }
+
+  function getExpression() {
+    var raw = el.value;
+    if (/[+\-*/]/.test(raw)) return raw;
+    return null;
+  }
+
+  el.addEventListener('input', formatDisplay);
+  // Format initial value if present
+  if (el.value && /^\d+$/.test(el.value.trim())) {
+    var initNum = parseInt(el.value, 10);
+    if (!isNaN(initNum) && initNum > 0) el.value = _fmtDots(initNum);
+  }
+
+  return { getValue: getValue, getExpression: getExpression, format: formatDisplay };
+}
+
+/** Parse a money-formatted string (e.g. "2.495.000") to a number */
+export function parseMoneyValue(str) {
+  if (typeof str === 'number') return str;
+  if (!str) return 0;
+  return parseInt(String(str).replace(/\./g, '').replace(/\D/g, ''), 10) || 0;
+}

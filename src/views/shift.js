@@ -1,5 +1,5 @@
 import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff, updateStartingCash } from '../store.js';
-import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDuration, formatTime, formatDate, todayStr } from '../utils.js';
+import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDuration, formatTime, formatDate, todayStr, moneyInput } from '../utils.js';
 import { getStaffFromCloud, getConfigFromCloud } from '../api.js';
 
 let _staffList = [];
@@ -163,7 +163,7 @@ export function render() {
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">💰 Tiền đầu ca</label>
-            <input type="number" id="startingCash" class="form-input" placeholder="0" value="0" min="0">
+            <input type="text" id="startingCash" class="form-input" placeholder="0" value="0" autocomplete="off">
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">🔒 Mật khẩu ca <span style="color:var(--danger);">*</span></label>
@@ -337,8 +337,8 @@ export function init() {
         <p>Xác nhận đóng Ca ${shift.shiftNumber}?</p>
         <div class="form-group"><label class="form-label">Ghi chú (tùy chọn)</label><textarea id="closeNotes" class="form-input" rows="3" placeholder="Ghi chú bàn giao..."></textarea></div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="number" id="cashToKeep" class="form-input" value="0"></div>
-          <div class="form-group"><label class="form-label">Tiền nộp</label><input type="number" id="cashToDeposit" class="form-input" value="0"></div>
+          <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="text" id="cashToKeep" class="form-input" value="0" autocomplete="off"></div>
+          <div class="form-group"><label class="form-label">Tiền nộp</label><input type="text" id="cashToDeposit" class="form-input" value="0" autocomplete="off"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
@@ -346,12 +346,14 @@ export function init() {
         </div>
       `);
       setTimeout(() => {
+        var keepMoney = moneyInput(document.getElementById('cashToKeep'), { allowMath: false });
+        var depositMoney = moneyInput(document.getElementById('cashToDeposit'), { allowMath: false });
         document.getElementById('btnConfirmClose')?.addEventListener('click', () => {
           try {
             closeShift({
               notes: document.getElementById('closeNotes')?.value || '',
-              cashToKeep: Number(document.getElementById('cashToKeep')?.value) || 0,
-              cashToDeposit: Number(document.getElementById('cashToDeposit')?.value) || 0
+              cashToKeep: keepMoney.getValue(),
+              cashToDeposit: depositMoney.getValue()
             });
             sessionStorage.removeItem('shift_validated');
             hideModal();
@@ -380,7 +382,7 @@ export function init() {
       showModal(`
         <div class="modal-title"><span class="material-symbols-rounded" style="color:var(--warning);">account_balance_wallet</span> Bổ sung tiền đầu ca</div>
         <p style="margin-bottom:12px;color:var(--text-muted);">Hiện tại: <strong>${formatCurrency(shift.startingCash)}</strong></p>
-        <div class="form-group"><label class="form-label">Số tiền mới (tổng tiền đầu ca)</label><input type="number" id="newStartingCash" class="form-input" value="${shift.startingCash}" min="0" style="font-size:18px;font-weight:700;text-align:right;"></div>
+        <div class="form-group"><label class="form-label">Số tiền mới (tổng tiền đầu ca)</label><input type="text" id="newStartingCash" class="form-input" value="${shift.startingCash}" autocomplete="off" style="font-size:18px;font-weight:700;text-align:right;"></div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
           <button class="btn btn-primary" id="btnConfirmStartingCash"><span class="material-symbols-rounded">check</span> Cập nhật</button>
@@ -388,10 +390,11 @@ export function init() {
       `);
       setTimeout(() => {
         const input = document.getElementById('newStartingCash');
+        var cashMoney = moneyInput(input, { allowMath: false });
         input?.focus(); input?.select();
         document.getElementById('btnConfirmStartingCash')?.addEventListener('click', () => {
           try {
-            const val = Number(input?.value) || 0;
+            const val = cashMoney.getValue();
             updateStartingCash(val);
             hideModal();
             showToast('✅ Tiền đầu ca: ' + formatCurrency(val), 'success');
@@ -411,6 +414,9 @@ export function init() {
 
   // Bind card clicks
   _bindCardClicks();
+
+  // Bind moneyInput to startingCash
+  window._startingCashMoney = moneyInput(document.getElementById('startingCash'), { allowMath: false });
 
   // Background cloud refresh
   _loadStaffFromCloud(false);
@@ -481,7 +487,7 @@ export function init() {
     const shiftPass = (document.getElementById('shiftPassword')?.value || '').trim();
     const num = document.getElementById('shiftNumber').value;
     const date = document.getElementById('shiftDate').value;
-    const cash = document.getElementById('startingCash').value;
+    const cash = window._startingCashMoney ? window._startingCashMoney.getValue() : parseInt(String(document.getElementById('startingCash').value).replace(/\./g, ''), 10) || 0;
 
     if (!date) { _showFormError('Vui lòng chọn ngày'); return; }
     if (!shiftPass || shiftPass.length < 4) {

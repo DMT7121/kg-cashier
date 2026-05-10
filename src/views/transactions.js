@@ -2,7 +2,7 @@
    Tabs: [Thu Chi] [Chứng từ]
    ── */
 import { getCurrentShift, addTransaction, removeTransaction, editTransaction, addOtherTransaction, removeOtherTransaction, getCategories, addCategory } from '../store.js';
-import { formatCurrency, formatTime, showToast, showModal, hideModal, showConfirm } from '../utils.js';
+import { formatCurrency, formatTime, showToast, showModal, hideModal, showConfirm, moneyInput } from '../utils.js';
 
 // Sub-module
 import * as invoicesModule from './invoices.js';
@@ -197,7 +197,7 @@ function _showTxModal(type, editTx) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Số tiền (VNĐ)</label>
-        <input type="number" id="txAmount" class="form-input" placeholder="0" inputmode="numeric" value="${isEdit ? editTx.amount : ''}">
+        <input type="text" id="txAmount" class="form-input" placeholder="0" inputmode="numeric" value="${isEdit ? editTx.amount : ''}" autocomplete="off">
       </div>
       <div class="form-group">
         <label class="form-label">Phương thức${type === 'income' ? '' : ' TT'}</label>
@@ -255,20 +255,24 @@ function _showTxModal(type, editTx) {
     });
 
     var amtInput = document.getElementById('txAmount');
+    var amtMoney = moneyInput(amtInput, { allowMath: true });
     if (amtInput && !isEdit) amtInput.focus();
 
     var btnSave = document.getElementById('btnSaveTx');
     if (btnSave) btnSave.addEventListener('click', function() {
       var catValue = catSelect ? catSelect.value : '';
       if (catValue === '__new__') { showToast('Chọn hoặc thêm danh mục', 'warning'); return; }
-      var amount = Number(document.getElementById('txAmount').value);
+      var amount = amtMoney.getValue();
+      var mathExpr = amtMoney.getExpression();
       if (!amount || amount <= 0) { showToast('Nhập số tiền hợp lệ', 'warning'); return; }
       try {
+        var noteVal = document.getElementById('txNote').value;
+        if (mathExpr) noteVal = (noteVal ? noteVal + ' ' : '') + '[' + mathExpr + ']';
         if (isEdit) {
           editTransaction(editTx.id, {
             category: catValue, amount: amount,
             paymentMethod: document.getElementById('txPayment').value,
-            note: document.getElementById('txNote').value
+            note: noteVal
           });
           hideModal();
           showToast('✅ Đã cập nhật giao dịch', 'success');
@@ -276,7 +280,7 @@ function _showTxModal(type, editTx) {
           addTransaction({
             type: type, category: catValue, amount: amount,
             paymentMethod: document.getElementById('txPayment').value,
-            note: document.getElementById('txNote').value
+            note: noteVal
           });
           hideModal();
           showToast('Đã thêm ' + (type === 'income' ? 'thu' : 'chi') + ': ' + amount.toLocaleString('vi-VN') + 'đ', 'success');
