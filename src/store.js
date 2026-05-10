@@ -1038,6 +1038,18 @@ export async function syncCurrentShiftWithCloud() {
       
       // Case 4: Cloud has an open shift but local does NOT â†’ apply cloud shift
       if (cloudShift && !s.currentShift) {
+        var forceClosedIds = s._forceClosedIds || [];
+        if (forceClosedIds.indexOf(cloudShift.id) !== -1) {
+          console.log('[Store] Skipping cloud shift (force-closed locally):', cloudShift.id);
+          if (_cloudClose) {
+            try { _cloudClose(cloudShift).catch(function() {}); } catch (e) { /* */ }
+          }
+          return false;
+        }
+        if (cloudShift.status === 'closed') {
+          console.log('[Store] Skipping cloud shift (already closed):', cloudShift.id);
+          return false;
+        }
         console.log('[Store] Cloud shift applied locally:', cloudShift.id, '- Ca', cloudShift.shiftNumber);
         s.currentShift = cloudShift;
         s.currentShift.invoices = s.currentShift.invoices || [];

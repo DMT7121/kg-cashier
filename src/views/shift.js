@@ -340,16 +340,29 @@ export function init() {
           </div>
         `);
         setTimeout(() => {
-          document.getElementById('btnConfirmForceClose')?.addEventListener('click', () => {
+          document.getElementById('btnConfirmForceClose')?.addEventListener('click', async () => {
             const passVal = document.getElementById('forceClosePass')?.value || '';
             if (passVal !== adminPass) { showToast('Mật khẩu quản lý không đúng!', 'error'); return; }
-            // Clear current shift
+            // Clear current shift locally + on cloud
             var s = getState();
+            var closedId = s.currentShift ? s.currentShift.id : null;
+            // Mark this shift as force-closed so cloud sync won't restore it
+            if (closedId) {
+              if (!s._forceClosedIds) s._forceClosedIds = [];
+              s._forceClosedIds.push(closedId);
+            }
+            // Close on cloud
+            if (s.currentShift) {
+              try {
+                const { closeShiftOnCloud } = await import('../api.js');
+                closeShiftOnCloud(s.currentShift).catch(function(){});
+              } catch(e) { /* */ }
+            }
             s.currentShift = null;
             try { localStorage.setItem('kg-cashier-data', JSON.stringify(s)); } catch(e) { /* */ }
             sessionStorage.removeItem('shift_validated');
             hideModal();
-            showToast('Đã xóa ca cưỡng chế', 'success');
+            showToast('Đã xóa ca cưỡng chế (local + cloud)', 'success');
             window.refreshView?.();
           });
           document.getElementById('forceClosePass')?.addEventListener('keydown', (e) => {
