@@ -6,6 +6,15 @@ let _staffList = [];
 let _selectedStaff = null;
 let _timer = null;
 
+/** SHA-256 hash using Web Crypto API */
+async function _hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 function _autoShiftNumber() {
   var h = new Date().getHours();
   if (h < 14) return '1';
@@ -57,17 +66,19 @@ export function render() {
   // ── CASE 1: Shift OPEN but not validated ──
   if (shift && !isValidated) {
     return `
-      <div class="empty-state" style="padding:80px 20px;">
-        <span class="material-symbols-rounded" style="font-size:64px;color:var(--warning);margin-bottom:20px;">lock_open</span>
-        <h2>Ca đang mở</h2>
+      <div class="empty-state" style="padding:60px 20px;">
+        <span class="material-symbols-rounded" style="font-size:64px;color:var(--warning);margin-bottom:20px;">lock</span>
+        <h2>Ca đang mở — Xác thực</h2>
         <p>Nhân viên <b>${shift.cashierName}</b> đang mở Ca ${shift.shiftNumber}</p>
-        <p class="text-muted">Vui lòng nhập mật khẩu ca để tiếp tục hoặc để đóng ca</p>
-        <div style="max-width:300px;margin:24px auto;">
+        <p class="text-muted">Nhập mật khẩu ca để truy cập</p>
+        <div style="max-width:320px;margin:24px auto;">
           <div class="form-group">
-            <label class="form-label">Mật khẩu ca (mặc định 0000)</label>
+            <label class="form-label">🔒 Mật khẩu ca</label>
             <input type="password" id="shiftUnlockPass" class="form-input" style="text-align:center;font-size:24px;letter-spacing:4px;" placeholder="••••" autofocus>
           </div>
+          <div id="unlockError" style="display:none;padding:8px 12px;margin-bottom:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;font-weight:600;"></div>
           <button class="btn btn-primary" id="btnUnlockShift" style="width:100%;margin-top:8px;">Xác nhận</button>
+          <p class="text-muted" style="font-size:11px;margin-top:12px;">Mật khẩu do người mở ca thiết lập khi bắt đầu ca</p>
         </div>
       </div>
     `;
@@ -162,8 +173,9 @@ export function render() {
             <input type="number" id="startingCash" class="form-input" placeholder="0" value="0" min="0">
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">🔒 Mật khẩu ca</label>
-            <input type="password" id="shiftPassword" class="form-input" placeholder="0000" value="0000">
+            <label class="form-label">🔒 Mật khẩu ca <span style="color:var(--danger);">*</span></label>
+            <input type="password" id="shiftPassword" class="form-input" placeholder="Nhập mật khẩu..." minlength="4" required>
+            <p class="form-hint" style="font-size:10px;color:var(--text-muted);margin-top:2px;">Tối thiểu 4 ký tự — dùng để xác thực trên mọi thiết bị</p>
           </div>
         </div>
       </div>
@@ -292,12 +304,24 @@ export function init() {
   if (shift && !isValidated) {
     const input = document.getElementById('shiftUnlockPass');
     const btn = document.getElementById('btnUnlockShift');
-    const tryUnlock = () => {
-      if (input.value === (shift.shiftPassword || '0000')) {
+    const errEl = document.getElementById('unlockError');
+    const tryUnlock = async () => {
+      if (!input.value) {
+        if (errEl) { errEl.textContent = '⚠️ Vui lòng nhập mật khẩu'; errEl.style.display = 'block'; }
+        input.focus();
+        return;
+      }
+      const inputHash = await _hashPassword(input.value);
+      const storedPass = shift.shiftPassword || '';
+      // Support both hashed (64 char hex) and legacy plaintext passwords
+      const isHashed = storedPass.length === 64 && /^[a-f0-9]+$/.test(storedPass);
+      const match = isHashed ? (inputHash === storedPass) : (input.value === storedPass);
+      if (match) {
         sessionStorage.setItem('shift_validated', shift.id);
         showToast('Xác thực thành công!', 'success');
         window.refreshView?.();
       } else {
+        if (errEl) { errEl.textContent = '❌ Mật khẩu ca không đúng!'; errEl.style.display = 'block'; }
         showToast('Mật khẩu ca không đúng!', 'error');
         input.value = '';
         input.focus();
@@ -439,7 +463,7 @@ export function init() {
   const btnOpen = document.getElementById('btnOpenShift');
   if (!btnOpen) return;
 
-  btnOpen.addEventListener('click', function(e) {
+  btnOpen.addEventListener('click', async function(e) {
     e.preventDefault();
     _clearFormError();
 
@@ -465,15 +489,23 @@ export function init() {
       staffId = _selectedStaff.id;
     }
 
-    const shiftPass = document.getElementById('shiftPassword').value || '0000';
+    const shiftPass = (document.getElementById('shiftPassword')?.value || '').trim();
     const num = document.getElementById('shiftNumber').value;
     const date = document.getElementById('shiftDate').value;
     const cash = document.getElementById('startingCash').value;
 
     if (!date) { _showFormError('Vui lòng chọn ngày'); return; }
+    if (!shiftPass || shiftPass.length < 4) {
+      _showFormError('Mật khẩu ca phải có tối thiểu 4 ký tự');
+      var passEl = document.getElementById('shiftPassword');
+      if (passEl) { passEl.style.borderColor = 'var(--danger)'; passEl.focus(); setTimeout(function() { passEl.style.borderColor = ''; }, 3000); }
+      return;
+    }
 
     try {
-      const result = openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass });
+      // Hash password before storing
+      const hashedPass = await _hashPassword(shiftPass);
+      const result = openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: hashedPass });
       sessionStorage.setItem('shift_validated', result.id);
       if (!_isManualMode && _selectedStaff) setLoggedInUser(_selectedStaff);
       showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');
