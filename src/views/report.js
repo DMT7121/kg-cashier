@@ -379,7 +379,7 @@ function _buildHandoverHTML(revSummary) {
       <div class="a4-inner">
         <div class="a4-header">
           <div class="a4-header-left">
-            <div class="a4-brand">👑 ${settings.storeName || "KING's GRILL"}</div>
+            <div class="a4-brand"><img src="/android-chrome-192x192.png" style="width:32px;height:32px;vertical-align:middle;margin-right:8px;" alt="Logo">${settings.storeName || "KING's GRILL"}</div>
             <div class="a4-address">${settings.storeAddress || ''}</div>
           </div>
           <div class="a4-header-right">

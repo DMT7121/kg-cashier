@@ -886,7 +886,9 @@ function _buildHandoverHTML() {
   var fmtTime = function(iso) { if (!iso) return '...'; var d = new Date(iso); return d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0'); };
   var fmtDate = function(s) { if (!s) return '...'; var p = s.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
 
+  var logoUrl = window.location.origin + '/android-chrome-192x192.png';
   return '<div class="print-page" style="font-family:\'Times New Roman\',serif;color:#000;background:#fff;padding:10mm;font-size:12px;line-height:1.5;">' +
+    '<div style="text-align:center;margin-bottom:6px;"><img src="' + logoUrl + '" style="width:48px;height:48px;" alt="Logo"></div>' +
     '<div style="text-align:center;font-size:16px;font-weight:bold;margin-bottom:4px;">' + storeName + '</div>' +
     '<div style="text-align:center;font-size:14px;font-weight:bold;text-transform:uppercase;margin-bottom:2px;">PHIẾU BÀN GIAO CA</div>' +
     '<div style="text-align:center;font-size:11px;margin-bottom:16px;">Ngày ' + fmtDate(shift.date) + ' — Ca ' + shift.shiftNumber + '</div>' +
@@ -961,7 +963,9 @@ function _buildReceiptHTML(tx) {
   var d = tx.timestamp ? new Date(tx.timestamp) : new Date();
   var dateStr = d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear() + '  ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
 
+  var logoUrl = window.location.origin + '/android-chrome-192x192.png';
   return '<div style="font-family:\'Times New Roman\',serif;color:#000;background:#fff;padding:10mm;font-size:13px;max-width:400px;margin:0 auto;">' +
+    '<div style="text-align:center;margin-bottom:4px;"><img src="' + logoUrl + '" style="width:40px;height:40px;" alt="Logo"></div>' +
     '<div style="text-align:center;font-weight:bold;font-size:16px;">' + storeName + '</div>' +
     (addr ? '<div style="text-align:center;font-size:10px;margin-bottom:8px;">' + addr + '</div>' : '') +
     '<hr style="border:none;border-top:1.5px dashed #000;margin:8px 0;">' +
