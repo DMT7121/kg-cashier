@@ -1,99 +1,47 @@
-import { getPrintForms, updatePrintForms, resetPrintForms } from '../store.js';
+import { getPrintForms, updatePrintForms, resetPrintForms, getCurrentShift, getShiftSummary, getSettings } from '../store.js';
 
 let _activeEditor = null;
+let _activeTab = 'checklist';
 
 export function render() {
   return `
     <div class="section-header">
       <div>
         <h3>🖨️ Biểu mẫu in</h3>
-        <p>In checklist phục vụ và phiếu kiểm kê hàng hóa — khổ A4 dọc</p>
+        <p>In checklist, kiểm kê, phiếu bàn giao, biên lai — khổ A4</p>
       </div>
     </div>
 
-    <div class="dashboard-grid">
-      <!-- Checklist Card -->
-      <div class="card" id="cardChecklist">
-        <div class="card-body" style="text-align:center;padding:24px;">
-          <span class="material-symbols-rounded" style="font-size:40px;color:var(--primary);">checklist</span>
-          <h3 style="margin:12px 0 6px;">📋 Checklist Phục Vụ</h3>
-          <p class="text-muted" style="font-size:12px;margin-bottom:12px;">Đầu ca — Cuối ca</p>
-          <div style="display:flex;gap:8px;justify-content:center;">
-            <button class="btn btn-primary btn-sm" id="btnPrintChecklist">🖨️ In mẫu</button>
-            <button class="btn btn-outline btn-sm" id="btnEditChecklist" title="Sửa như Word">⚒️ Sửa thiết kế</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Inventory Card -->
-      <div class="card" id="cardInventory">
-        <div class="card-header" style="text-align:center;padding-bottom:0;border:none;">
-          <span class="material-symbols-rounded" style="font-size:40px;color:var(--success);">inventory_2</span>
-          <h3 style="margin:8px 0;">📦 Kiểm Kê Hàng Hóa</h3>
-        </div>
-        <div class="card-body" style="padding:16px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div style="display:flex;flex-direction:column;gap:5px;">
-              <button class="btn btn-success btn-sm" data-inv-tab="ncc">🥩 In NCC</button>
-              <button class="btn btn-outline btn-sm" id="btnEditNCC" style="font-size:11px;">⚒️ Sửa mẫu NCC</button>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:5px;">
-              <button class="btn btn-success btn-sm" data-inv-tab="hangkho">🧂 In Hàng Khô</button>
-              <button class="btn btn-outline btn-sm" id="btnEditHangKho" style="font-size:11px;">⚒️ Sửa mẫu Khô</button>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:5px;">
-              <button class="btn btn-success btn-sm" data-inv-tab="hangrau1">🥬 In Rau 1</button>
-              <button class="btn btn-outline btn-sm" id="btnEditRau1" style="font-size:11px;">⚒️ Sửa mẫu Rau 1</button>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:5px;">
-              <button class="btn btn-success btn-sm" data-inv-tab="hangrau">🌿 In Rau 2</button>
-              <button class="btn btn-outline btn-sm" id="btnEditRau2" style="font-size:11px;">⚒️ Sửa mẫu Rau 2</button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="settings-tabs" style="margin-bottom:20px;">
+      <button class="settings-tab${_activeTab==='checklist'?' active':''}" data-pftab="checklist">
+        <span class="material-symbols-rounded" style="font-size:18px;">checklist</span> Phục vụ
+      </button>
+      <button class="settings-tab${_activeTab==='inventory'?' active':''}" data-pftab="inventory">
+        <span class="material-symbols-rounded" style="font-size:18px;">inventory_2</span> Kiểm kê
+      </button>
+      <button class="settings-tab${_activeTab==='handover'?' active':''}" data-pftab="handover">
+        <span class="material-symbols-rounded" style="font-size:18px;">assignment_turned_in</span> Bàn giao
+      </button>
+      <button class="settings-tab${_activeTab==='receipt'?' active':''}" data-pftab="receipt">
+        <span class="material-symbols-rounded" style="font-size:18px;">receipt_long</span> Thu/Chi
+      </button>
+      <button class="settings-tab${_activeTab==='config'?' active':''}" data-pftab="config">
+        <span class="material-symbols-rounded" style="font-size:18px;">tune</span> Cài đặt
+      </button>
     </div>
 
-    <!-- Filter & Options -->
-    <div class="card" style="margin-top:20px;">
-      <div class="card-body" style="padding:16px;">
-        <h4 style="margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:bottom;">settings</span> Cấu hình in (Khổ A4)</h4>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Lề trên (mm)</label>
-            <input type="number" id="mrgTop" class="form-input" min="0" max="30" value="8">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Lề dưới (mm)</label>
-            <input type="number" id="mrgBottom" class="form-input" min="0" max="30" value="8">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Lề trái (mm)</label>
-            <input type="number" id="mrgLeft" class="form-input" min="0" max="30" value="8">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Lề phải (mm)</label>
-            <input type="number" id="mrgRight" class="form-input" min="0" max="30" value="8">
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Management Section -->
-    <div class="card mt-24">
-      <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;">
-        <span class="text-muted" style="font-size:13px;">Gặp lỗi khi sửa mẫu? Hãy khôi phục lại ban đầu.</span>
-        <button class="btn btn-danger btn-sm" id="btnResetTemplates">🔄 Khôi phục mặc định</button>
-      </div>
-    </div>
+    <div id="pfTabContent"></div>
 
     <!-- Preview area -->
     <div class="card mt-24" id="printPreviewCard" style="display:none;">
       <div class="card-header flex-between">
         <h3 id="previewTitle">Xem trước</h3>
-        <button class="btn btn-primary" id="btnPrint">
-          <span class="material-symbols-rounded">print</span> In trang này
-        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" id="btnEditPreview" title="Sửa thiết kế">⚒️ Sửa</button>
+          <button class="btn btn-primary" id="btnPrint">
+            <span class="material-symbols-rounded">print</span> In
+          </button>
+        </div>
       </div>
       <div class="card-body" style="padding:0;overflow:auto;max-height:70vh;">
         <div id="printContent"></div>
@@ -512,9 +460,106 @@ function _openVisualEditor(templateKey, initialHtml) {
         .rotate-90 { writing-mode: vertical-rl; transform: rotate(180deg); }
         .rotate-180 { transform: rotate(180deg); }
         .rotate-270 { writing-mode: vertical-rl; }
+        #ctxMenu { position:fixed;z-index:9999;background:#fff;border:1px solid #ccc;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.18);padding:4px 0;min-width:200px;font-family:system-ui,sans-serif;font-size:12px;display:none; }
+        #ctxMenu .ctx-item { padding:6px 14px;cursor:pointer;display:flex;align-items:center;gap:8px; }
+        #ctxMenu .ctx-item:hover { background:#e3f2fd; }
+        #ctxMenu .ctx-sep { height:1px;background:#eee;margin:3px 0; }
+        #ctxMenu .ctx-label { font-size:10px;color:#888;padding:4px 14px;font-weight:600;text-transform:uppercase; }
       </style>
-    </head><body contenteditable="true">${editableHtml}</body></html>`);
+    </head><body contenteditable="true">${editableHtml}<div id="ctxMenu"></div></body></html>`);
     doc.close();
+
+    // ── Context Menu ──
+    (function() {
+      var menu = doc.getElementById('ctxMenu');
+      var _ctxCell = null;
+      var _ctxRow = null;
+      var _ctxTable = null;
+
+      function _findCell(node) {
+        while (node && node.nodeName !== 'TD' && node.nodeName !== 'TH' && node.nodeName !== 'BODY') node = node.parentNode;
+        return (node && (node.nodeName === 'TD' || node.nodeName === 'TH')) ? node : null;
+      }
+
+      doc.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        _ctxCell = _findCell(e.target);
+        _ctxRow = _ctxCell ? _ctxCell.parentNode : null;
+        _ctxTable = _ctxRow ? _ctxRow.closest('table') : null;
+
+        var items = '';
+        items += '<div class="ctx-label">Văn bản</div>';
+        items += '<div class="ctx-item" data-cmd="bold">✏️ In đậm</div>';
+        items += '<div class="ctx-item" data-cmd="italic">✏️ In nghiêng</div>';
+        items += '<div class="ctx-item" data-cmd="checkbox">☑️ Chèn checkbox</div>';
+        items += '<div class="ctx-item" data-cmd="heading">📌 Chèn tiêu đề</div>';
+        items += '<div class="ctx-item" data-cmd="divider">➖ Chèn đường kẻ</div>';
+        items += '<div class="ctx-item" data-cmd="signature">✍️ Chèn khung ký tên</div>';
+
+        if (_ctxCell) {
+          items += '<div class="ctx-sep"></div>';
+          items += '<div class="ctx-label">Bảng</div>';
+          items += '<div class="ctx-item" data-cmd="addRowAbove">⬆️ Thêm dòng phía trên</div>';
+          items += '<div class="ctx-item" data-cmd="addRowBelow">⬇️ Thêm dòng phía dưới</div>';
+          items += '<div class="ctx-item" data-cmd="addCol">➡️ Thêm cột bên phải</div>';
+          items += '<div class="ctx-item" data-cmd="delRow">🗑️ Xóa dòng</div>';
+          items += '<div class="ctx-item" data-cmd="delCol">🗑️ Xóa cột</div>';
+          items += '<div class="ctx-sep"></div>';
+          items += '<div class="ctx-item" data-cmd="mergeRight">🔗 Gộp ngang →</div>';
+          items += '<div class="ctx-item" data-cmd="mergeDown">🔗 Gộp dọc ↓</div>';
+          items += '<div class="ctx-item" data-cmd="cellBg">🎨 Màu nền ô</div>';
+        }
+
+        menu.innerHTML = items;
+        menu.style.display = 'block';
+        var x = e.clientX, y = e.clientY;
+        if (x + 220 > doc.documentElement.clientWidth) x = doc.documentElement.clientWidth - 220;
+        if (y + 300 > doc.documentElement.clientHeight) y = Math.max(0, doc.documentElement.clientHeight - 300);
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+      });
+
+      doc.addEventListener('click', function(e) {
+        if (!menu.contains(e.target)) { menu.style.display = 'none'; return; }
+        var item = e.target.closest('[data-cmd]');
+        if (!item) return;
+        var cmd = item.dataset.cmd;
+        menu.style.display = 'none';
+
+        if (cmd === 'bold') doc.execCommand('bold');
+        else if (cmd === 'italic') doc.execCommand('italic');
+        else if (cmd === 'checkbox') doc.execCommand('insertHTML', false, '<p style="margin:2px 0;">☐ Hạng mục mới</p>');
+        else if (cmd === 'heading') doc.execCommand('insertHTML', false, '<div style="text-align:center;font-weight:bold;font-size:14px;margin:8px 0;text-transform:uppercase;">TIÊU ĐỀ MỚI</div>');
+        else if (cmd === 'divider') doc.execCommand('insertHTML', false, '<hr style="border:none;border-top:1.5px solid #000;margin:8px 0;">');
+        else if (cmd === 'signature') doc.execCommand('insertHTML', false,
+          '<table style="border:none!important;margin-top:12px;"><tr>' +
+          '<td style="border:none!important;text-align:center;width:33%;padding:4px;"><b>Người lập</b><br><br><br><br>(Ký tên)</td>' +
+          '<td style="border:none!important;text-align:center;width:33%;padding:4px;"><b>Quản lý</b><br><br><br><br>(Ký tên)</td>' +
+          '<td style="border:none!important;text-align:center;width:33%;padding:4px;"><b>Phê duyệt</b><br><br><br><br>(Ký tên)</td></tr></table>');
+        else if (cmd === 'addRowAbove' && _ctxRow) {
+          var nr = _ctxRow.cloneNode(true); nr.querySelectorAll('td,th').forEach(function(c){c.innerHTML='&nbsp;';c.removeAttribute('rowspan');c.removeAttribute('colspan');}); _ctxRow.parentNode.insertBefore(nr, _ctxRow);
+        } else if (cmd === 'addRowBelow' && _ctxRow) {
+          var nr2 = _ctxRow.cloneNode(true); nr2.querySelectorAll('td,th').forEach(function(c){c.innerHTML='&nbsp;';c.removeAttribute('rowspan');c.removeAttribute('colspan');}); _ctxRow.parentNode.insertBefore(nr2, _ctxRow.nextSibling);
+        } else if (cmd === 'addCol' && _ctxCell && _ctxRow) {
+          var idx = Array.from(_ctxRow.children).indexOf(_ctxCell);
+          _ctxRow.parentNode.querySelectorAll('tr').forEach(function(r){var nc=doc.createElement('td');nc.innerHTML='&nbsp;';var t=r.children[idx];if(t)r.insertBefore(nc,t.nextSibling);else r.appendChild(nc);});
+        } else if (cmd === 'delRow' && _ctxRow) { _ctxRow.parentNode.removeChild(_ctxRow); }
+        else if (cmd === 'delCol' && _ctxCell && _ctxRow) {
+          var ci = Array.from(_ctxRow.children).indexOf(_ctxCell);
+          _ctxRow.parentNode.querySelectorAll('tr').forEach(function(r){if(r.children[ci])r.removeChild(r.children[ci]);});
+        } else if (cmd === 'mergeRight' && _ctxCell) {
+          var nx = _ctxCell.nextElementSibling;
+          if(nx){var cs=(parseInt(_ctxCell.getAttribute('colspan'))||1)+(parseInt(nx.getAttribute('colspan'))||1);_ctxCell.setAttribute('colspan',cs);_ctxCell.innerHTML+=' '+nx.innerHTML;_ctxRow.removeChild(nx);}
+        } else if (cmd === 'mergeDown' && _ctxCell && _ctxRow) {
+          var ri = Array.from(_ctxRow.children).indexOf(_ctxCell);
+          var nxr = _ctxRow.nextElementSibling;
+          if(nxr&&nxr.children[ri]){var rs=(parseInt(_ctxCell.getAttribute('rowspan'))||1)+(parseInt(nxr.children[ri].getAttribute('rowspan'))||1);_ctxCell.setAttribute('rowspan',rs);_ctxCell.innerHTML+='<br>'+nxr.children[ri].innerHTML;nxr.removeChild(nxr.children[ri]);}
+        } else if (cmd === 'cellBg' && _ctxCell) {
+          var col = prompt('Mã màu (hex hoặc tên):', _ctxCell.style.backgroundColor || '#fffde7');
+          if (col) _ctxCell.style.backgroundColor = col;
+        }
+      });
+    })();
 
     // ── A4 Height Monitor ──
     var a4MaxH = 277 * 3.7795; // 297mm - 20mm margins ≈ 277mm usable
@@ -741,81 +786,257 @@ function _openVisualEditor(templateKey, initialHtml) {
   });
 }
 
-export function init() {
-  // Load saved margins
-  const f = getPrintForms();
-  if (f.margins) {
-    if (f.margins.top) document.getElementById('mrgTop').value = f.margins.top;
-    if (f.margins.bottom) document.getElementById('mrgBottom').value = f.margins.bottom;
-    if (f.margins.left) document.getElementById('mrgLeft').value = f.margins.left;
-    if (f.margins.right) document.getElementById('mrgRight').value = f.margins.right;
+// ─── Tab Content Builders ────────────────────
+var _currentPreviewKey = null;
+
+function _renderTabContent(tab) {
+  var c = document.getElementById('pfTabContent');
+  if (!c) return;
+  // Hide preview when switching tabs
+  var pv = document.getElementById('printPreviewCard');
+  if (pv) pv.style.display = 'none';
+
+  if (tab === 'checklist') {
+    c.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:24px;">' +
+      '<span class="material-symbols-rounded" style="font-size:40px;color:var(--primary);">checklist</span>' +
+      '<h3 style="margin:12px 0 6px;">📋 Checklist Phục Vụ</h3>' +
+      '<p class="text-muted" style="font-size:12px;margin-bottom:12px;">Đầu ca — Cuối ca</p>' +
+      '<div style="display:flex;gap:8px;justify-content:center;">' +
+      '<button class="btn btn-primary btn-sm" id="btnPrintChecklist">🖨️ Xem & In</button>' +
+      '<button class="btn btn-outline btn-sm" id="btnEditChecklist">⚒️ Sửa thiết kế</button>' +
+      '</div></div></div>';
+    document.getElementById('btnPrintChecklist')?.addEventListener('click', function() {
+      _showPreview('📋 Checklist Phục Vụ', _buildChecklistHTML(), 'checklist');
+    });
+    document.getElementById('btnEditChecklist')?.addEventListener('click', function() {
+      _openVisualEditor('checklist', _buildChecklistHTML());
+    });
+  } else if (tab === 'inventory') {
+    c.innerHTML = '<div class="card"><div class="card-body" style="padding:16px;">' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">' +
+      ['ncc|🥩 NCC (Thịt/Hải sản)', 'hangkho|🧂 Hàng Khô/Gia vị', 'hangrau1|🥬 Rau 1', 'hangrau|🌿 Rau 2'].map(function(x) {
+        var p = x.split('|');
+        return '<div style="display:flex;flex-direction:column;gap:6px;">' +
+          '<button class="btn btn-success btn-sm" data-inv-tab="' + p[0] + '">' + p[1] + '</button>' +
+          '<button class="btn btn-outline btn-sm" data-inv-edit="' + p[0] + '" style="font-size:11px;">⚒️ Sửa mẫu</button>' +
+          '</div>';
+      }).join('') + '</div></div></div>';
+    document.querySelectorAll('[data-inv-tab]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var k = btn.dataset.invTab;
+        var allData = getPrintForms().inventory || {};
+        _showPreview('📦 ' + (allData[k]?.title || 'Kiểm kê'), _buildInventoryHTML(k), 'inv_' + k);
+      });
+    });
+    document.querySelectorAll('[data-inv-edit]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _openVisualEditor('inv_' + btn.dataset.invEdit, _buildInventoryHTML(btn.dataset.invEdit));
+      });
+    });
+  } else if (tab === 'handover') {
+    _renderHandoverTab(c);
+  } else if (tab === 'receipt') {
+    _renderReceiptTab(c);
+  } else if (tab === 'config') {
+    _renderConfigTab(c);
   }
+}
 
-  // Save margins on change
-  ['mrgTop', 'mrgBottom', 'mrgLeft', 'mrgRight'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', () => {
-      f.margins[id.substring(3).toLowerCase()] = document.getElementById(id).value;
-      updatePrintForms(f);
+function _showPreview(title, html, key) {
+  _currentPreviewKey = key;
+  document.getElementById('printPreviewCard').style.display = 'block';
+  document.getElementById('previewTitle').textContent = title;
+  document.getElementById('printContent').innerHTML = html;
+}
+
+// ─── Handover Tab ────────────────────────────
+function _renderHandoverTab(c) {
+  var shift = getCurrentShift();
+  if (!shift) {
+    c.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;">' +
+      '<span class="material-symbols-rounded" style="font-size:48px;color:var(--text-muted);">block</span>' +
+      '<h3 style="margin:12px 0;">Chưa mở ca</h3>' +
+      '<p class="text-muted">Mở ca trước để tạo phiếu bàn giao</p></div></div>';
+    return;
+  }
+  c.innerHTML = '<div class="card"><div class="card-body" style="padding:20px;">' +
+    '<h4 style="margin-bottom:12px;">📄 Phiếu bàn giao ca</h4>' +
+    '<p class="text-muted" style="font-size:13px;margin-bottom:16px;">Tự động điền dữ liệu từ ca đang mở: Ca ' + shift.shiftNumber + ' — ' + shift.cashierName + '</p>' +
+    '<div style="display:flex;gap:8px;">' +
+    '<button class="btn btn-primary" id="btnGenHandover">📄 Tạo phiếu & In</button>' +
+    '<button class="btn btn-outline" id="btnEditHandover">⚒️ Sửa trước khi in</button>' +
+    '</div></div></div>';
+
+  document.getElementById('btnGenHandover')?.addEventListener('click', function() {
+    var html = _buildHandoverHTML();
+    _showPreview('📄 Phiếu bàn giao', html, 'handover');
+  });
+  document.getElementById('btnEditHandover')?.addEventListener('click', function() {
+    _openVisualEditor('handover', _buildHandoverHTML());
+  });
+}
+
+function _buildHandoverHTML() {
+  var shift = getCurrentShift();
+  if (!shift) return '<p>Chưa mở ca</p>';
+  var sm = getShiftSummary(shift);
+  var settings = getSettings();
+  var storeName = settings.storeName || "KING's GRILL";
+  var fmtC = function(n) { return (n||0).toLocaleString('vi-VN'); };
+  var fmtTime = function(iso) { if (!iso) return '...'; var d = new Date(iso); return d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0'); };
+  var fmtDate = function(s) { if (!s) return '...'; var p = s.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
+
+  return '<div class="print-page" style="font-family:\'Times New Roman\',serif;color:#000;background:#fff;padding:10mm;font-size:12px;line-height:1.5;">' +
+    '<div style="text-align:center;font-size:16px;font-weight:bold;margin-bottom:4px;">' + storeName + '</div>' +
+    '<div style="text-align:center;font-size:14px;font-weight:bold;text-transform:uppercase;margin-bottom:2px;">PHIẾU BÀN GIAO CA</div>' +
+    '<div style="text-align:center;font-size:11px;margin-bottom:16px;">Ngày ' + fmtDate(shift.date) + ' — Ca ' + shift.shiftNumber + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;border:1.5px solid #000;margin-bottom:12px;">' +
+    '<tr><td style="border:1px solid #000;padding:4px 8px;width:50%;"><b>Thu ngân:</b> ' + shift.cashierName + '</td>' +
+    '<td style="border:1px solid #000;padding:4px 8px;"><b>Bắt đầu:</b> ' + fmtTime(shift.startTime) + '</td></tr>' +
+    '<tr><td style="border:1px solid #000;padding:4px 8px;"><b>Tiền đầu ca:</b> ' + fmtC(shift.startingCash) + 'đ</td>' +
+    '<td style="border:1px solid #000;padding:4px 8px;"><b>Kết thúc:</b> ' + fmtTime(shift.endTime) + '</td></tr></table>' +
+    '<table style="width:100%;border-collapse:collapse;border:1.5px solid #000;margin-bottom:12px;">' +
+    '<tr style="background:#e8f5e9;"><td colspan="2" style="border:1px solid #000;padding:4px 8px;font-weight:bold;">DOANH THU</td></tr>' +
+    '<tr><td style="border:1px solid #000;padding:3px 8px;">Tiền mặt</td><td style="border:1px solid #000;padding:3px 8px;text-align:right;">' + fmtC(sm.cashIncome) + 'đ</td></tr>' +
+    '<tr><td style="border:1px solid #000;padding:3px 8px;">Chuyển khoản</td><td style="border:1px solid #000;padding:3px 8px;text-align:right;">' + fmtC(sm.transferIncome) + 'đ</td></tr>' +
+    '<tr><td style="border:1px solid #000;padding:3px 8px;">Thẻ</td><td style="border:1px solid #000;padding:3px 8px;text-align:right;">' + fmtC(sm.cardIncome) + 'đ</td></tr>' +
+    '<tr style="background:#f0f0f0;font-weight:bold;"><td style="border:1px solid #000;padding:4px 8px;">TỔNG DOANH THU (' + sm.billCount + ' bills)</td><td style="border:1px solid #000;padding:4px 8px;text-align:right;">' + fmtC(sm.totalIncome) + 'đ</td></tr>' +
+    '<tr style="background:#fce4ec;"><td colspan="2" style="border:1px solid #000;padding:4px 8px;font-weight:bold;">CHI PHÍ</td></tr>' +
+    '<tr style="font-weight:bold;"><td style="border:1px solid #000;padding:4px 8px;">Tổng chi</td><td style="border:1px solid #000;padding:4px 8px;text-align:right;">' + fmtC(sm.totalExpense + sm.otherExpense) + 'đ</td></tr>' +
+    '</table>' +
+    '<table style="width:100%;border-collapse:collapse;border:1.5px solid #000;margin-bottom:12px;">' +
+    '<tr style="background:#e3f2fd;"><td colspan="2" style="border:1px solid #000;padding:4px 8px;font-weight:bold;">KIỂM KÊ TIỀN MẶT</td></tr>' +
+    '<tr><td style="border:1px solid #000;padding:3px 8px;">Tiền mặt đếm được</td><td style="border:1px solid #000;padding:3px 8px;text-align:right;">' + fmtC(sm.cashCountTotal) + 'đ</td></tr>' +
+    '<tr><td style="border:1px solid #000;padding:3px 8px;">Tiền mặt kỳ vọng</td><td style="border:1px solid #000;padding:3px 8px;text-align:right;">' + fmtC(sm.expectedCash) + 'đ</td></tr>' +
+    '<tr style="font-weight:bold;"><td style="border:1px solid #000;padding:4px 8px;">Chênh lệch</td><td style="border:1px solid #000;padding:4px 8px;text-align:right;color:' + (sm.discrepancy >= 0 ? '#2e7d32' : '#c62828') + ';">' + (sm.discrepancy >= 0 ? '+' : '') + fmtC(sm.discrepancy) + 'đ</td></tr>' +
+    '</table>' +
+    '<table style="width:100%;border:none;margin-top:24px;"><tr>' +
+    '<td style="border:none;text-align:center;width:50%;padding:4px;"><b>Người giao</b><br><br><br><br>(Ký tên & ghi rõ)</td>' +
+    '<td style="border:none;text-align:center;width:50%;padding:4px;"><b>Người nhận</b><br><br><br><br>(Ký tên & ghi rõ)</td>' +
+    '</tr></table></div>';
+}
+
+// ─── Receipt Tab ─────────────────────────────
+function _renderReceiptTab(c) {
+  var shift = getCurrentShift();
+  if (!shift) {
+    c.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;">' +
+      '<span class="material-symbols-rounded" style="font-size:48px;color:var(--text-muted);">block</span>' +
+      '<h3 style="margin:12px 0;">Chưa mở ca</h3>' +
+      '<p class="text-muted">Mở ca để xem danh sách giao dịch</p></div></div>';
+    return;
+  }
+  var txs = (shift.transactions || []).concat(shift.otherTransactions || []);
+  if (txs.length === 0) {
+    c.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;">' +
+      '<span class="material-symbols-rounded" style="font-size:48px;color:var(--text-muted);">receipt_long</span>' +
+      '<h3 style="margin:12px 0;">Chưa có giao dịch</h3></div></div>';
+    return;
+  }
+  var rows = txs.map(function(tx) {
+    var isIncome = tx.type === 'income';
+    return '<tr data-txid="' + tx.id + '" style="cursor:pointer;" class="tx-row-select">' +
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border);">' + (isIncome ? '📥' : '📤') + ' ' + (tx.category || tx.note || '—') + '</td>' +
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;color:' + (isIncome ? 'var(--success)' : 'var(--danger)') + ';font-weight:600;">' + (isIncome ? '+' : '-') + (tx.amount||0).toLocaleString('vi-VN') + 'đ</td>' +
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;"><button class="btn btn-outline btn-sm" data-print-tx="' + tx.id + '">🖨️</button></td></tr>';
+  }).join('');
+  c.innerHTML = '<div class="card"><div class="card-body" style="padding:0;">' +
+    '<table style="width:100%;"><thead><tr><th style="padding:8px 10px;text-align:left;">Giao dịch</th><th style="padding:8px 10px;text-align:right;">Số tiền</th><th style="padding:8px 10px;width:60px;">In</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  document.querySelectorAll('[data-print-tx]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var txId = btn.dataset.printTx;
+      var tx = txs.find(function(t) { return t.id === txId; });
+      if (tx) { var html = _buildReceiptHTML(tx); _showPreview('🧾 Biên lai', html, 'receipt'); }
+    });
+  });
+}
+
+function _buildReceiptHTML(tx) {
+  var shift = getCurrentShift();
+  var settings = getSettings();
+  var storeName = settings.storeName || "KING's GRILL";
+  var addr = settings.storeAddress || '';
+  var isIncome = tx.type === 'income';
+  var fmtC = function(n) { return (n||0).toLocaleString('vi-VN'); };
+  var d = tx.timestamp ? new Date(tx.timestamp) : new Date();
+  var dateStr = d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear() + '  ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+
+  return '<div style="font-family:\'Times New Roman\',serif;color:#000;background:#fff;padding:10mm;font-size:13px;max-width:400px;margin:0 auto;">' +
+    '<div style="text-align:center;font-weight:bold;font-size:16px;">' + storeName + '</div>' +
+    (addr ? '<div style="text-align:center;font-size:10px;margin-bottom:8px;">' + addr + '</div>' : '') +
+    '<hr style="border:none;border-top:1.5px dashed #000;margin:8px 0;">' +
+    '<div style="text-align:center;font-weight:bold;font-size:14px;margin:8px 0;">PHIẾU ' + (isIncome ? 'THU' : 'CHI') + '</div>' +
+    '<div style="text-align:center;font-size:11px;margin-bottom:12px;">' + dateStr + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;">' +
+    '<tr><td style="padding:4px 0;">Nội dung:</td><td style="padding:4px 0;text-align:right;font-weight:bold;">' + (tx.category || '—') + '</td></tr>' +
+    '<tr><td style="padding:4px 0;">Số tiền:</td><td style="padding:4px 0;text-align:right;font-weight:bold;font-size:16px;">' + fmtC(tx.amount) + 'đ</td></tr>' +
+    (tx.paymentMethod ? '<tr><td style="padding:4px 0;">Hình thức:</td><td style="padding:4px 0;text-align:right;">' + ({cash:'Tiền mặt',card:'Thẻ',transfer:'Chuyển khoản'}[tx.paymentMethod]||tx.paymentMethod) + '</td></tr>' : '') +
+    (tx.note ? '<tr><td style="padding:4px 0;">Ghi chú:</td><td style="padding:4px 0;text-align:right;">' + tx.note + '</td></tr>' : '') +
+    '<tr><td style="padding:4px 0;">Thu ngân:</td><td style="padding:4px 0;text-align:right;">' + (shift?.cashierName||'') + '</td></tr>' +
+    '</table>' +
+    '<hr style="border:none;border-top:1.5px dashed #000;margin:12px 0;">' +
+    '<table style="width:100%;border:none;"><tr>' +
+    '<td style="border:none;text-align:center;width:50%;font-size:11px;"><b>Người lập</b><br><br><br>(Ký tên)</td>' +
+    '<td style="border:none;text-align:center;width:50%;font-size:11px;"><b>Khách hàng</b><br><br><br>(Ký tên)</td>' +
+    '</tr></table></div>';
+}
+
+// ─── Config Tab ──────────────────────────────
+function _renderConfigTab(c) {
+  var f = getPrintForms();
+  var m = f.margins || {top:8,bottom:8,left:8,right:8};
+  c.innerHTML = '<div class="card"><div class="card-body" style="padding:16px;">' +
+    '<h4 style="margin-bottom:12px;"><span class="material-symbols-rounded" style="font-size:18px;vertical-align:bottom;">tune</span> Cấu hình in (Khổ A4)</h4>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label class="form-label">Lề trên (mm)</label><input type="number" id="mrgTop" class="form-input" min="0" max="30" value="' + m.top + '"></div>' +
+    '<div class="form-group"><label class="form-label">Lề dưới (mm)</label><input type="number" id="mrgBottom" class="form-input" min="0" max="30" value="' + m.bottom + '"></div>' +
+    '<div class="form-group"><label class="form-label">Lề trái (mm)</label><input type="number" id="mrgLeft" class="form-input" min="0" max="30" value="' + m.left + '"></div>' +
+    '<div class="form-group"><label class="form-label">Lề phải (mm)</label><input type="number" id="mrgRight" class="form-input" min="0" max="30" value="' + m.right + '"></div>' +
+    '</div></div></div>' +
+    '<div class="card" style="margin-top:16px;"><div class="card-body" style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;">' +
+    '<span class="text-muted" style="font-size:13px;">Gặp lỗi khi sửa mẫu? Khôi phục lại mặc định.</span>' +
+    '<button class="btn btn-danger btn-sm" id="btnResetTemplates">🔄 Khôi phục mặc định</button></div></div>';
+
+  ['mrgTop','mrgBottom','mrgLeft','mrgRight'].forEach(function(id) {
+    document.getElementById(id)?.addEventListener('change', function() {
+      var ff = getPrintForms();
+      if (!ff.margins) ff.margins = {};
+      ff.margins[id.substring(3).toLowerCase()] = document.getElementById(id).value;
+      updatePrintForms(ff);
+    });
+  });
+  document.getElementById('btnResetTemplates')?.addEventListener('click', async function() {
+    var { showConfirm } = await import('../utils.js');
+    var ok = await showConfirm('Xóa tất cả tùy chỉnh mẫu in và quay về mặc định?', { title: 'Reset mẫu in', confirmText: 'Reset', type: 'warning' });
+    if (ok) { resetPrintForms(); window.refreshView?.(); }
+  });
+}
+
+export function init() {
+  // Tab switching
+  document.querySelectorAll('[data-pftab]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _activeTab = btn.dataset.pftab;
+      document.querySelectorAll('[data-pftab]').forEach(function(b) { b.classList.toggle('active', b.dataset.pftab === _activeTab); });
+      _renderTabContent(_activeTab);
     });
   });
 
-  // Print buttons
-  document.getElementById('btnPrintChecklist')?.addEventListener('click', () => {
-    const html = _buildChecklistHTML();
-    document.getElementById('printPreviewCard').style.display = 'block';
-    document.getElementById('previewTitle').textContent = '📋 Checklist Phục Vụ';
-    document.getElementById('printContent').innerHTML = html;
-  });
+  // Render initial tab
+  _renderTabContent(_activeTab);
 
-  let currentTab = 'ncc';
-  const showInventory = (tab) => {
-    currentTab = tab;
-    document.querySelectorAll('[data-inv-tab]').forEach(b => {
-      b.className = b.dataset.invTab === currentTab ? 'btn btn-success btn-sm' : 'btn btn-outline btn-sm';
-    });
-    const html = _buildInventoryHTML(currentTab);
-    document.getElementById('printPreviewCard').style.display = 'block';
-    const allData = getPrintForms().inventory || {};
-    document.getElementById('previewTitle').textContent = '📦 ' + (allData[currentTab]?.title || 'Kiểm kê');
-    document.getElementById('printContent').innerHTML = html;
-  };
-
-  document.querySelectorAll('[data-inv-tab]').forEach(btn => {
-    btn.addEventListener('click', () => showInventory(btn.dataset.invTab));
-  });
-
-  document.getElementById('btnPrint')?.addEventListener('click', () => {
-    const content = document.getElementById('printContent').innerHTML;
+  // Print button
+  document.getElementById('btnPrint')?.addEventListener('click', function() {
+    var content = document.getElementById('printContent')?.innerHTML;
     if (content) _printHTML(content);
   });
 
-  // ── Management Buttons ──
-  document.getElementById('btnEditChecklist')?.addEventListener('click', () => {
-    _openVisualEditor('checklist', _buildChecklistHTML());
-  });
-
-  document.getElementById('btnEditNCC')?.addEventListener('click', () => {
-    _openVisualEditor('inv_ncc', _buildInventoryHTML('ncc'));
-  });
-
-  document.getElementById('btnEditHangKho')?.addEventListener('click', () => {
-    _openVisualEditor('inv_hangkho', _buildInventoryHTML('hangkho'));
-  });
-
-  document.getElementById('btnEditRau1')?.addEventListener('click', () => {
-    _openVisualEditor('inv_hangrau1', _buildInventoryHTML('hangrau1'));
-  });
-
-  document.getElementById('btnEditRau2')?.addEventListener('click', () => {
-    _openVisualEditor('inv_hangrau', _buildInventoryHTML('hangrau'));
-  });
-
-  document.getElementById('btnResetTemplates')?.addEventListener('click', async () => {
-    const { showConfirm } = await import('../utils.js');
-    var ok = await showConfirm('Xóa tất cả tùy chỉnh mẫu in và quay về mặc định?', { title: 'Reset mẫu in', confirmText: 'Reset', type: 'warning' });
-    if (ok) {
-      resetPrintForms();
-      window.refreshView?.();
+  // Edit preview button
+  document.getElementById('btnEditPreview')?.addEventListener('click', function() {
+    if (_currentPreviewKey) {
+      var content = document.getElementById('printContent')?.innerHTML;
+      if (content) _openVisualEditor(_currentPreviewKey, content);
     }
   });
 }
+
