@@ -6,14 +6,7 @@ let _staffList = [];
 let _selectedStaff = null;
 let _timer = null;
 
-/** SHA-256 hash using Web Crypto API */
-async function _hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+
 
 function _autoShiftNumber() {
   var h = new Date().getHours();
@@ -311,11 +304,7 @@ export function init() {
         input.focus();
         return;
       }
-      const inputHash = await _hashPassword(input.value);
-      const storedPass = shift.shiftPassword || '';
-      // Support both hashed (64 char hex) and legacy plaintext passwords
-      const isHashed = storedPass.length === 64 && /^[a-f0-9]+$/.test(storedPass);
-      const match = isHashed ? (inputHash === storedPass) : (input.value === storedPass);
+      const match = (input.value === (shift.shiftPassword || ''));
       if (match) {
         sessionStorage.setItem('shift_validated', shift.id);
         showToast('Xác thực thành công!', 'success');
@@ -503,9 +492,7 @@ export function init() {
     }
 
     try {
-      // Hash password before storing
-      const hashedPass = await _hashPassword(shiftPass);
-      const result = openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: hashedPass });
+      const result = openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass });
       sessionStorage.setItem('shift_validated', result.id);
       if (!_isManualMode && _selectedStaff) setLoggedInUser(_selectedStaff);
       showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');
