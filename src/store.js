@@ -576,18 +576,44 @@ export function getShiftSummary(shift) {
 
   // ── Also read CUKCUK invoices from Invoice Store (cukcuk_invoice_store) ──
   // CUKCUK data is now stored separately from shift.transactions.
-  // Match invoices to shift by date (working day).
+  // Filter by working day bounds (12:00 today → 06:00 tomorrow) using refDate timestamp.
   if (shift.date) {
     try {
       var storeData = localStorage.getItem('cukcuk_invoice_store');
       if (storeData) {
         var parsed = JSON.parse(storeData);
         if (parsed && parsed.invoices) {
+          // Build working day bounds from shift.date
+          var dp = shift.date.split('-');
+          var shiftDay = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
+          var boundsStart = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate(), 12, 0, 0);
+          var nextDay = new Date(shiftDay);
+          nextDay.setDate(nextDay.getDate() + 1);
+          var boundsEnd = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate(), 6, 0, 0);
+
           for (var k in parsed.invoices) {
             if (!parsed.invoices.hasOwnProperty(k)) continue;
             var inv = parsed.invoices[k];
             if (inv.unpaid) continue;
-            if (inv.date !== shift.date) continue;
+
+            // Filter by refDate timestamp within working day bounds
+            var matchDay = false;
+            if (inv.refDate) {
+              var rd = new Date(inv.refDate);
+              // Handle .NET /Date()/ format
+              if (isNaN(rd.getTime()) && typeof inv.refDate === 'string') {
+                var netM = inv.refDate.match(/\/Date\((\d+)\)\//);
+                if (netM) rd = new Date(parseInt(netM[1]));
+              }
+              if (!isNaN(rd.getTime())) {
+                matchDay = rd >= boundsStart && rd < boundsEnd;
+              }
+            }
+            // Fallback: simple date match (for legacy data without refDate)
+            if (!matchDay && !inv.refDate) {
+              matchDay = inv.date === shift.date;
+            }
+            if (!matchDay) continue;
             
             cukcukBills++;
             billCount++;
