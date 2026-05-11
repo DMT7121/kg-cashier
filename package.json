@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && npx wrangler pages deploy dist --project-name=kg-cashier"
+    "deploy": "vite build && npx wrangler pages deploy dist --project-name=kg-cashier --branch master"
   },
   "devDependencies": {
     "vite": "^6.0.0"
