@@ -1757,6 +1757,13 @@ body.printing-a4 .view-container { padding: 0 !important; }
   border-radius: 8px;
   flex-shrink: 0;
 }
+.di-product-image {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: transparent;
+}
 .di-product-info { min-width: 0; }
 .di-product-name {
   display: block;

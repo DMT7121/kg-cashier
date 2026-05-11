@@ -12,24 +12,24 @@ const DRINK_PRODUCTS_KEY = 'kg-drink-products';
 // ── Default Products ──────────────────────────
 const DEFAULT_PRODUCTS = [
   // ═══ BIA ═══
-  { id: 'dp1',  name: 'Corona',                 category: 'Bia',         unit: 'chai', emoji: '🍺', active: true, sort: 1,  volume: '250ml', caseSize: 24, caseSizeUnit: 'chai', cukcukAliases: ['corona'] },
-  { id: 'dp3',  name: 'Heineken 330ml',          category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 3,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken 330ml'] },
-  { id: 'dp4',  name: 'Heineken Silver 330ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 4,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 330ml'] },
-  { id: 'dp5',  name: 'Heineken Silver 250ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 5,  volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 250ml'] },
-  { id: 'dp6',  name: 'Tiger Nâu 330ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 6,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger nâu 330ml', 'tiger nâu'] },
-  { id: 'dp7',  name: 'Tiger Bạc 330ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 7,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger bạc 330ml'] },
-  { id: 'dp8',  name: 'Tiger Bạc 250ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', active: true, sort: 8,  volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger bạc 250ml'] },
+  { id: 'dp1',  name: 'Corona',                 category: 'Bia',         unit: 'chai', emoji: '🍺', image: '/kiemkho/Corona.png', active: true, sort: 1,  volume: '250ml', caseSize: 24, caseSizeUnit: 'chai', cukcukAliases: ['corona'] },
+  { id: 'dp3',  name: 'Heineken 330ml',          category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Heineken 330ml.png', active: true, sort: 3,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken 330ml'] },
+  { id: 'dp4',  name: 'Heineken Silver 330ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Heineken Silver 330ml.png', active: true, sort: 4,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 330ml'] },
+  { id: 'dp5',  name: 'Heineken Silver 250ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Heineken Silver 250ml.png', active: true, sort: 5,  volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 250ml'] },
+  { id: 'dp6',  name: 'Tiger Nâu 330ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Tiger Nâu 330ml.png', active: true, sort: 6,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger nâu 330ml', 'tiger nâu'] },
+  { id: 'dp7',  name: 'Tiger Bạc 330ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Tiger Bạc 330ml.png', active: true, sort: 7,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger bạc 330ml'] },
+  { id: 'dp8',  name: 'Tiger Bạc 250ml',         category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Tiger Bạc 250ml.png', active: true, sort: 8,  volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['tiger bạc 250ml'] },
   // ═══ RƯỢU ═══
-  { id: 'dp9',  name: 'Soju',                    category: 'Rượu',        unit: 'chai', emoji: '🍶', active: true, sort: 9,  volume: '360ml', caseSize: 20, caseSizeUnit: 'chai', cukcukAliases: ['soju'] },
+  { id: 'dp9',  name: 'Soju',                    category: 'Rượu',        unit: 'chai', emoji: '🍶', image: '/kiemkho/Soju.png', active: true, sort: 9,  volume: '360ml', caseSize: 20, caseSizeUnit: 'chai', cukcukAliases: ['soju'] },
   // ═══ NƯỚC NGỌT ═══
-  { id: 'dp10', name: 'Coca Cola',               category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 10, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['coca cola'] },
-  { id: 'dp11', name: 'Pepsi',                   category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 11, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['pepsi'] },
-  { id: 'dp12', name: 'Sting',                   category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 12, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['sting'] },
-  { id: 'dp13', name: '7up',                     category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', active: true, sort: 13, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['7up'] },
+  { id: 'dp10', name: 'Coca Cola',               category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', image: '/kiemkho/Coca cola.png', active: true, sort: 10, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['coca cola'] },
+  { id: 'dp11', name: 'Pepsi',                   category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', image: '/kiemkho/Pepsi.png', active: true, sort: 11, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['pepsi'] },
+  { id: 'dp12', name: 'Sting',                   category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', image: '/kiemkho/Sting.png', active: true, sort: 12, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['sting'] },
+  { id: 'dp13', name: '7up',                     category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', image: '/kiemkho/7up.png', active: true, sort: 13, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['7up'] },
   // ═══ NƯỚC TĂNG LỰC ═══
   { id: 'dp14', name: 'Redbull',                 category: 'Nước tăng lực', unit: 'lon', emoji: '⚡', active: true, sort: 14, volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['redbull', 'red bull'] },
   // ═══ NƯỚC SUỐI ═══
-  { id: 'dp15', name: 'Nước suối',               category: 'Nước suối',   unit: 'chai', emoji: '💧', active: true, sort: 15, volume: '400ml', caseSize: 20, caseSizeUnit: 'chai', cukcukAliases: ['nước suối'] },
+  { id: 'dp15', name: 'Nước suối',               category: 'Nước suối',   unit: 'chai', emoji: '💧', image: '/kiemkho/Nước suối Lavie 400ml.png', active: true, sort: 15, volume: '400ml', caseSize: 20, caseSizeUnit: 'chai', cukcukAliases: ['nước suối'] },
 ];
 // ── Safe Math Expression Evaluator ────────────
 // Recursive-descent parser: only supports +, -, *, /, (), numbers
@@ -132,17 +132,17 @@ function uid() {
 }
 
 // ── Data Store ────────────────────────────────
-var DRINK_PRODUCTS_VERSION = 'kg-drink-products-v4'; // bump version when DEFAULT_PRODUCTS changes
+var DRINK_PRODUCTS_VERSION = 'kg-drink-products-v5'; // bump version when DEFAULT_PRODUCTS changes
 
 function getProducts() {
   try {
     // Check if product version matches - if not, reset to new defaults
     var currentVersion = localStorage.getItem('kg-drink-products-version');
-    if (currentVersion !== 'v4') {
+    if (currentVersion !== 'v5') {
       // Upgrade: replace with CUKCUK-synced product list
-      console.log('[DrinkStock] Upgrading product list to v4 (CUKCUK sync)');
+      console.log('[DrinkStock] Upgrading product list to v5 (images added)');
       localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-      localStorage.setItem('kg-drink-products-version', 'v4');
+      localStorage.setItem('kg-drink-products-version', 'v5');
       return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
     }
     var saved = localStorage.getItem(DRINK_PRODUCTS_KEY);
@@ -153,7 +153,7 @@ function getProducts() {
   } catch (e) { /* ignore */ }
   // First-time: save defaults
   localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-  localStorage.setItem('kg-drink-products-version', 'v4');
+  localStorage.setItem('kg-drink-products-version', 'v5');
   return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
 }
 
@@ -474,7 +474,7 @@ export function render() {
                   <!-- Product -->
                   <td class="di-td-product">
                     <div class="di-product-cell">
-                      <span class="di-product-emoji">${p.emoji || '🥤'}</span>
+                      ${p.image ? '<img src="' + p.image + '" alt="' + p.name + '" class="di-product-image">' : '<span class="di-product-emoji">' + (p.emoji || '🥤') + '</span>'}
                       <div class="di-product-info">
                         <span class="di-product-name">${p.name}</span>
                         <span class="di-product-meta">${p.category} · ${p.unit}${p.volume ? ' · ' + p.volume : ''}${p.caseSize ? ' <span style="color:var(--primary);font-size:9px;">[' + p.caseSize + '/' + (p.caseSizeUnit || 'thùng') + ']</span>' : ''}</span>
