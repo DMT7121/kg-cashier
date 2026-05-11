@@ -27,7 +27,7 @@ const DEFAULT_PRODUCTS = [
   { id: 'dp12', name: 'Sting',                   category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', image: '/kiemkho/Sting.png', active: true, sort: 12, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['sting'] },
   { id: 'dp13', name: '7up',                     category: 'Nước ngọt',   unit: 'lon',  emoji: '🥤', image: '/kiemkho/7up.png', active: true, sort: 13, volume: '320ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['7up'] },
   // ═══ NƯỚC TĂNG LỰC ═══
-  { id: 'dp14', name: 'Redbull',                 category: 'Nước tăng lực', unit: 'lon', emoji: '⚡', active: true, sort: 14, volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['redbull', 'red bull'] },
+  { id: 'dp14', name: 'Redbull',                 category: 'Nước tăng lực', unit: 'lon', emoji: '⚡', image: '/kiemkho/Redbull.png', active: true, sort: 14, volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['redbull', 'red bull'] },
   // ═══ NƯỚC SUỐI ═══
   { id: 'dp15', name: 'Nước suối',               category: 'Nước suối',   unit: 'chai', emoji: '💧', image: '/kiemkho/Nước suối Lavie 400ml.png', active: true, sort: 15, volume: '400ml', caseSize: 20, caseSizeUnit: 'chai', cukcukAliases: ['nước suối'] },
 ];
@@ -132,17 +132,17 @@ function uid() {
 }
 
 // ── Data Store ────────────────────────────────
-var DRINK_PRODUCTS_VERSION = 'kg-drink-products-v5'; // bump version when DEFAULT_PRODUCTS changes
+var DRINK_PRODUCTS_VERSION = 'kg-drink-products-v6'; // bump version when DEFAULT_PRODUCTS changes
 
 function getProducts() {
   try {
     // Check if product version matches - if not, reset to new defaults
     var currentVersion = localStorage.getItem('kg-drink-products-version');
-    if (currentVersion !== 'v5') {
+    if (currentVersion !== 'v6') {
       // Upgrade: replace with CUKCUK-synced product list
-      console.log('[DrinkStock] Upgrading product list to v5 (images added)');
+      console.log('[DrinkStock] Upgrading product list to v6 (Redbull image added)');
       localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-      localStorage.setItem('kg-drink-products-version', 'v5');
+      localStorage.setItem('kg-drink-products-version', 'v6');
       return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
     }
     var saved = localStorage.getItem(DRINK_PRODUCTS_KEY);
@@ -153,7 +153,7 @@ function getProducts() {
   } catch (e) { /* ignore */ }
   // First-time: save defaults
   localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-  localStorage.setItem('kg-drink-products-version', 'v5');
+  localStorage.setItem('kg-drink-products-version', 'v6');
   return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
 }
 
