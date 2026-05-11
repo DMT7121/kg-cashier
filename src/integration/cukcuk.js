@@ -43,7 +43,7 @@ var _lastSyncHadNewData = false;
 // ── Daily Revenue Cache ──
 var DAILY_REVENUE_KEY = 'cukcuk_daily_revenue';
 var CACHE_VERSION_KEY = 'cukcuk_cache_version';
-var CACHE_VERSION = 3; // Bump: force re-sync with tax-inclusive amounts
+var CACHE_VERSION = 4; // Bump: force re-sync to fetch SAInvoiceDetails (drink inventory items)
 
 // ── Auto-migrate: clear corrupted cache from old versions ──
 (function _migrateCacheIfNeeded() {
@@ -52,6 +52,7 @@ var CACHE_VERSION = 3; // Bump: force re-sync with tax-inclusive amounts
     if (!ver || parseInt(ver) < CACHE_VERSION) {
       localStorage.removeItem(DAILY_REVENUE_KEY);
       localStorage.removeItem('cukcuk_sync_meta');
+      localStorage.removeItem('cukcuk_invoice_store'); // Force re-fetch of all invoice details
       // Clear all synced ref indexes
       var keysToRemove = [];
       for (var i = 0; i < localStorage.length; i++) {
@@ -758,6 +759,20 @@ export async function syncSingleInvoice(refId) {
 
     var effectiveAmount = (invCash + invCard + invTransfer) || detailAmount;
 
+    // ── Extract Items (for Drink Inventory) ──
+    var itemsList = detail.SAInvoiceDetails || detail.Details || [];
+    var extractedItems = [];
+    if (itemsList.length > 0) {
+      for (var it = 0; it < itemsList.length; it++) {
+        var itemData = itemsList[it];
+        var itemName = itemData.InventoryItemName || itemData.ItemName || itemData.Name || '';
+        var itemQty = itemData.Quantity || itemData.Qty || 1;
+        if (itemName) {
+          extractedItems.push({ name: itemName, quantity: itemQty });
+        }
+      }
+    }
+
     // Get existing record to preserve metadata
     var existing = invoiceStore.getInvoice(refId);
     var record = {
@@ -769,6 +784,7 @@ export async function syncSingleInvoice(refId) {
       employeeName: (existing && existing.employeeName) || (detail.EmployeeName || ''),
       amount: effectiveAmount,
       payments: invoicePayments,
+      items: extractedItems, // Save items for inventory
       unpaid: false,
       confirmed: true,
       syncedAt: new Date().toISOString(),
