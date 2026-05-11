@@ -12,7 +12,7 @@ const DRINK_PRODUCTS_KEY = 'kg-drink-products';
 // ── Default Products ──────────────────────────
 const DEFAULT_PRODUCTS = [
   // ═══ BIA ═══
-  { id: 'dp1',  name: 'Corona',                 category: 'Bia',         unit: 'chai', emoji: '🍺', image: '/kiemkho/Corona.png', active: true, sort: 1,  volume: '250ml', caseSize: 24, caseSizeUnit: 'chai', cukcukAliases: ['corona'] },
+  { id: 'dp1',  name: 'Corona',                 category: 'Bia',         unit: 'chai', emoji: '🍺', image: '/kiemkho/Corona.png', active: true, sort: 1,  volume: '300ml', caseSize: 24, caseSizeUnit: 'chai', cukcukAliases: ['corona'] },
   { id: 'dp3',  name: 'Heineken 330ml',          category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Heineken 330ml.png', active: true, sort: 3,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken 330ml'] },
   { id: 'dp4',  name: 'Heineken Silver 330ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Heineken Silver 330ml.png', active: true, sort: 4,  volume: '330ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 330ml'] },
   { id: 'dp5',  name: 'Heineken Silver 250ml',   category: 'Bia',         unit: 'lon',  emoji: '🍺', image: '/kiemkho/Heineken Silver 250ml.png', active: true, sort: 5,  volume: '250ml', caseSize: 24, caseSizeUnit: 'lon',  cukcukAliases: ['heineken silver 250ml'] },
@@ -132,17 +132,17 @@ function uid() {
 }
 
 // ── Data Store ────────────────────────────────
-var DRINK_PRODUCTS_VERSION = 'kg-drink-products-v6'; // bump version when DEFAULT_PRODUCTS changes
+var DRINK_PRODUCTS_VERSION = 'kg-drink-products-v7'; // bump version when DEFAULT_PRODUCTS changes
 
 function getProducts() {
   try {
     // Check if product version matches - if not, reset to new defaults
     var currentVersion = localStorage.getItem('kg-drink-products-version');
-    if (currentVersion !== 'v6') {
+    if (currentVersion !== 'v7') {
       // Upgrade: replace with CUKCUK-synced product list
-      console.log('[DrinkStock] Upgrading product list to v6 (Redbull image added)');
+      console.log('[DrinkStock] Upgrading product list to v7 (Corona updated to 300ml)');
       localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-      localStorage.setItem('kg-drink-products-version', 'v6');
+      localStorage.setItem('kg-drink-products-version', 'v7');
       return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
     }
     var saved = localStorage.getItem(DRINK_PRODUCTS_KEY);
@@ -153,7 +153,7 @@ function getProducts() {
   } catch (e) { /* ignore */ }
   // First-time: save defaults
   localStorage.setItem(DRINK_PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-  localStorage.setItem('kg-drink-products-version', 'v6');
+  localStorage.setItem('kg-drink-products-version', 'v7');
   return JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
 }
 
@@ -471,7 +471,9 @@ export function render() {
 
               // Calculate proportional scale based on volume
               var scaleFactor = 1;
-              if (p.volume) {
+              if (p.name === 'Corona') {
+                scaleFactor = 1.25; // Taller than Lavie 400ml (1.18)
+              } else if (p.volume) {
                 var ml = parseInt(p.volume.replace(/\\D/g, ''));
                 if (ml <= 250) {
                   // Tall 250ml cans have transparent padding on canvas to match 330ml dimensions
