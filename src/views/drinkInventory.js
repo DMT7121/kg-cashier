@@ -469,12 +469,23 @@ export function render() {
               var diffLabel = diffType === 'MATCH' ? 'Khớp' : diffType === 'SURPLUS' ? ('Dư ' + formatNum(Math.abs(row.difference))) : ('Thiếu ' + formatNum(Math.abs(row.difference)));
               var isExpanded = _expandedRow === row.id;
 
+              // Calculate proportional scale based on volume
+              var scaleFactor = 1;
+              if (p.volume) {
+                var ml = parseInt(p.volume.replace(/\\D/g, ''));
+                if (ml <= 250) scaleFactor = 0.82;
+                else if (ml <= 320) scaleFactor = 0.94;
+                else if (ml <= 330) scaleFactor = 1.0;
+                else if (ml <= 360) scaleFactor = 1.08;
+                else if (ml >= 400) scaleFactor = 1.18;
+              }
+
               return `
                 <tr class="di-row ${idx % 2 === 0 ? '' : 'di-row-alt'}" data-row-id="${row.id}">
                   <!-- Product -->
                   <td class="di-td-product">
                     <div class="di-product-cell">
-                      ${p.image ? '<img src="' + p.image + '" alt="' + p.name + '" class="di-product-image">' : '<span class="di-product-emoji">' + (p.emoji || '🥤') + '</span>'}
+                      ${p.image ? '<img src="' + p.image + '" alt="' + p.name + '" class="di-product-image" style="--scale-factor: ' + scaleFactor + ';">' : '<span class="di-product-emoji">' + (p.emoji || '🥤') + '</span>'}
                       <div class="di-product-info">
                         <span class="di-product-name">${p.name}</span>
                         <span class="di-product-meta">${p.category} · ${p.unit}${p.volume ? ' · ' + p.volume : ''}${p.caseSize ? ' <span style="color:var(--primary);font-size:9px;">[' + p.caseSize + '/' + (p.caseSizeUnit || 'thùng') + ']</span>' : ''}</span>
