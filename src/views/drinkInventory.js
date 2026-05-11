@@ -473,7 +473,14 @@ export function render() {
               var scaleFactor = 1;
               if (p.volume) {
                 var ml = parseInt(p.volume.replace(/\\D/g, ''));
-                if (ml <= 250) scaleFactor = 0.82;
+                if (ml <= 250) {
+                  // Tall 250ml cans have transparent padding on canvas to match 330ml dimensions
+                  if (p.name.includes('Tiger Bạc 250ml') || p.name.includes('Heineken Silver 250ml')) {
+                    scaleFactor = 1.0;
+                  } else {
+                    scaleFactor = 0.82;
+                  }
+                }
                 else if (ml <= 320) scaleFactor = 0.94;
                 else if (ml <= 330) scaleFactor = 1.0;
                 else if (ml <= 360) scaleFactor = 1.08;
