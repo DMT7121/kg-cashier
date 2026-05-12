@@ -624,7 +624,7 @@ Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải th�
 {
   "tenDonVi": "Tên công ty/đơn vị NGƯỜI MUA HÀNG",
   "mst": "Mã số thuế của NGƯỜI MUA HÀNG (chỉ gồm các chữ số và dấu gạch ngang)",
-  "tongTien": "Số tiền 'Tổng cộng' thanh toán (Grand Total / đã bao gồm VAT). Nằm ở dòng TỔNG CỘNG cuối hóa đơn. Trả về CHỈ SỐ NGUYÊN, KHÔNG CÓ DẤU CHẤM/PHẨY (ví dụ: 720000)",
+  "tongTien": "Tìm chữ 'Tổng cộng', 'Tổng cộng tiền thanh toán', hoặc 'Tổng tiền thanh toán' ở phần cuối hóa đơn. Lấy con số LỚN NHẤT nằm ở cột ngoài cùng bên phải hoặc phía dưới chữ đó (thường có giá trị hàng trăm nghìn hoặc hàng triệu, ví dụ: 720.000, 1.500.000). TUYỆT ĐỐI KHÔNG TRẢ VỀ 0. Trả về CHỈ SỐ NGUYÊN, KHÔNG CÓ DẤU CHẤM/PHẨY (ví dụ: 720000)",
   "ngayKy": "Ngày lập/ký hóa đơn, chuẩn định dạng DD/MM/YYYY (ví dụ: 05/12/2023)",
   "diaChi": "Địa chỉ của NGƯỜI MUA HÀNG"
 }`;
