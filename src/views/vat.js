@@ -609,16 +609,16 @@ async function autoScanAndUpload(id) {
             }
             item.rawText = txt;
         }
-        const prompt = `Nhiệm vụ: Trích xuất thông tin hóa đơn VAT từ văn bản thô sau.
+        const prompt = `Nhiệm vụ: Trích xuất thông tin hóa đơn VAT từ văn bản thô sau. LƯU Ý: Lấy thông tin của NGƯỜI MUA HÀNG (Khách hàng), TUYỆT ĐỐI KHÔNG lấy thông tin của bên Bán (King's Grill).
 Văn bản: "${item.rawText.substring(0, 3000)}"
 
 Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải thích, với 5 trường sau:
 {
-  "tenDonVi": "Tên công ty/đơn vị BÁN HÀNG (xuất hóa đơn)",
-  "mst": "Mã số thuế của bên bán (chỉ gồm các chữ số và dấu gạch ngang)",
-  "tongTien": "Số tiền tổng cộng thanh toán (Grand Total / đã bao gồm VAT). Trả về CHỈ SỐ NGUYÊN, KHÔNG CÓ DẤU CHẤM/PHẨY (ví dụ: 1500000)",
+  "tenDonVi": "Tên công ty/đơn vị NGƯỜI MUA HÀNG",
+  "mst": "Mã số thuế của NGƯỜI MUA HÀNG (chỉ gồm các chữ số và dấu gạch ngang)",
+  "tongTien": "Số tiền 'Tổng cộng' thanh toán (Grand Total / đã bao gồm VAT). Nằm ở dòng TỔNG CỘNG cuối hóa đơn. Trả về CHỈ SỐ NGUYÊN, KHÔNG CÓ DẤU CHẤM/PHẨY (ví dụ: 720000)",
   "ngayKy": "Ngày lập/ký hóa đơn, chuẩn định dạng DD/MM/YYYY (ví dụ: 05/12/2023)",
-  "diaChi": "Địa chỉ của đơn vị bán hàng"
+  "diaChi": "Địa chỉ của NGƯỜI MUA HÀNG"
 }`;
         
         const res = await callAI_Unified(prompt, 'extract', id);
