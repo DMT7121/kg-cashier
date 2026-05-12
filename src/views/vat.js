@@ -179,10 +179,12 @@ function _renderSearch() {
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:13px; color:var(--text-muted);">
-            <div>Đang hiển thị <strong id="vat-display-count" style="color:var(--text);">0</strong> kết quả</div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span>Đang hiển thị <strong id="vat-display-count" style="color:var(--text);">0</strong> kết quả</span>
+                <button class="btn btn-outline btn-sm" onclick="window.vatSyncData()" style="color:var(--info); border-color:var(--info); padding: 4px 8px;"><span class="material-symbols-rounded" style="font-size:16px;">sync</span> Đồng bộ</button>
+            </div>
             <div id="vat-bulk-actions" style="display:none; align-items:center; gap:8px;">
                 <button class="btn btn-outline btn-sm" onclick="window.vatSelectAllToggle()" id="vat-btn-select-all">Chọn tất cả</button>
-                <button class="btn btn-outline btn-sm" onclick="window.vatSyncData()" style="color:var(--info); border-color:var(--info);"><span class="material-symbols-rounded" style="font-size:16px;">sync</span> Đồng bộ</button>
                 <button class="btn btn-outline btn-sm" onclick="window.vatBulkDelete()" id="vat-btn-bulk-delete" style="color:var(--danger); border-color:var(--danger);">Xóa (<span id="vat-bulk-count">0</span>)</button>
             </div>
             <div id="vat-pagination-controls" style="display:none; align-items:center; gap:8px;">
