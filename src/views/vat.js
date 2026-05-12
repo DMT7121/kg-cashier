@@ -182,6 +182,7 @@ function _renderSearch() {
             <div>Đang hiển thị <strong id="vat-display-count" style="color:var(--text);">0</strong> kết quả</div>
             <div id="vat-bulk-actions" style="display:none; align-items:center; gap:8px;">
                 <button class="btn btn-outline btn-sm" onclick="window.vatSelectAllToggle()" id="vat-btn-select-all">Chọn tất cả</button>
+                <button class="btn btn-outline btn-sm" onclick="window.vatSyncData()" style="color:var(--info); border-color:var(--info);"><span class="material-symbols-rounded" style="font-size:16px;">sync</span> Đồng bộ</button>
                 <button class="btn btn-outline btn-sm" onclick="window.vatBulkDelete()" id="vat-btn-bulk-delete" style="color:var(--danger); border-color:var(--danger);">Xóa (<span id="vat-bulk-count">0</span>)</button>
             </div>
             <div id="vat-pagination-controls" style="display:none; align-items:center; gap:8px;">
@@ -1126,6 +1127,27 @@ window.vatBulkDelete = async function() {
     updateBulkUI();
     doSearch(true);
     getDriveCount();
+};
+
+window.vatSyncData = async function() {
+    const confirmed = await showConfirm(`Bạn có chắc muốn Đồng bộ dữ liệu? Quá trình này sẽ rà soát và xóa các hóa đơn rác (bóng ma) hoặc trùng lặp trong hệ thống.`, {title: 'Đồng bộ hệ thống', type: 'info'});
+    if (!confirmed) return;
+    
+    showToast(`Đang đồng bộ dữ liệu với Drive... Vui lòng đợi`, 'info');
+    try {
+        const res = await callAPI({ action: 'sync_db' });
+        if(res.status === 'success') {
+            showToast(res.message || `Đồng bộ hoàn tất!`, 'success');
+            selectedInvoices.clear();
+            updateBulkUI();
+            doSearch(true);
+            getDriveCount();
+        } else {
+            showToast('Lỗi: ' + res.message, 'error');
+        }
+    } catch(e) {
+        showToast('Lỗi kết nối khi đồng bộ.', 'error');
+    }
 };
 
 function updateBulkUI() {
