@@ -673,8 +673,8 @@ async function uploadItem(id) {
         r.onload = () => {
             let finalFileName = item.file.name;
             if (item.data.ngayKy && item.data.mst) {
-                // Đồng nhất tên file theo yêu cầu: "DD/MM/YYYY - [MST]"
-                finalFileName = `${item.data.ngayKy} - ${item.data.mst}.pdf`;
+                // Đồng nhất tên file theo chuẩn cũ: "DD/MM/YYYY-MST" (viết liền không khoảng trắng)
+                finalFileName = `${item.data.ngayKy}-${item.data.mst}.pdf`;
             }
 
             callAPI({ 
