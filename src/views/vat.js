@@ -645,11 +645,18 @@ Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải th�
             if (match) data.ngayKy = `${match[1].padStart(2,'0')}/${match[2].padStart(2,'0')}/${match[3]}`;
         }
         
+        // KIỂM TRA NGHIÊM NGẶT: TUYỆT ĐỐI KHÔNG CHẤP NHẬN 0đ
+        if (!data.tongTien || data.tongTien === '0') {
+            item.data = { ...item.data, ...data }; // Vẫn lưu nháp nhưng báo lỗi
+            renderQueue();
+            return updateStatusUI(id, 'error', 'Lỗi: Tổng tiền 0đ');
+        }
+        
         item.data = { ...item.data, ...data };
         renderQueue(); 
         
-        // Auto upload if we have mst and date
-        if (item.data.mst && item.data.ngayKy) await uploadItem(id); 
+        // Auto upload if we have mst and date and tongTien
+        if (item.data.mst && item.data.ngayKy && item.data.tongTien) await uploadItem(id); 
         else updateStatusUI(id, 'ready');
     } catch (e) { 
         console.error(e);
@@ -663,15 +670,27 @@ async function uploadItem(id) {
     return new Promise(resolve => {
         // Kiểm tra trùng lặp trước khi đọc file
         if (item.data.mst && item.data.ngayKy && item.data.tongTien) {
-            const isDuplicate = currentSearchData.some(d => 
+            // Kiểm tra trong DB hiện tại
+            let isDuplicate = currentSearchData.some(d => 
                 d.mst === item.data.mst && 
                 d.ngayKy === item.data.ngayKy && 
                 String(d.tongTien) === String(item.data.tongTien)
             );
             
+            // CŨNG PHẢI KIỂM TRA TRONG NHỮNG FILE VỪA UPLOAD THÀNH CÔNG (Nhưng chưa kịp đồng bộ vào currentSearchData)
+            if (!isDuplicate) {
+                isDuplicate = uploadQueue.some(q => 
+                    q.id !== id && 
+                    q.status === 'done' && 
+                    q.data.mst === item.data.mst && 
+                    q.data.ngayKy === item.data.ngayKy && 
+                    String(q.data.tongTien) === String(item.data.tongTien)
+                );
+            }
+            
             if (isDuplicate) {
                 updateStatusUI(id, 'error', 'Trùng lặp');
-                showToast(`Hóa đơn của ${item.data.mst} (ngày ${item.data.ngayKy}) đã tồn tại trên hệ thống!`, 'warning');
+                showToast(`Hóa đơn của ${item.data.mst} (ngày ${item.data.ngayKy} - ${item.data.tongTien}đ) đã tồn tại! Bỏ qua.`, 'warning');
                 resolve();
                 return;
             }
