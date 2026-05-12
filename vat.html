@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Hóa Đơn VAT (Octa-Core AI)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+        .loader { border-top-color: #3B82F6; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        
+        .chat-bubble { max-width: 80%; border-radius: 1rem; padding: 0.75rem 1rem; margin-bottom: 0.5rem; font-size: 0.95rem; line-height: 1.5; }
+        .chat-user { background-color: #eff6ff; color: #1e3a8a; align-self: flex-end; border-bottom-right-radius: 0.25rem; }
+        .chat-ai { background-color: #f0fdf4; color: #14532d; align-self: flex-start; border-bottom-left-radius: 0.25rem; border: 1px solid #dcfce7; }
+        .persona-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-bottom: 4px; display: inline-block; text-transform: uppercase; }
+        
+        .p-gemini { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; } 
+        .p-groq { background: #fef9c3; color: #ca8a04; border: 1px solid #fde047; }
+        .p-cerebras { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+        .p-hf { background: #fce7f3; color: #db2777; border: 1px solid #fbcfe8; }
+        .p-sambanova { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
+        .p-deepseek { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        .p-mistral { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
+        .p-nvidia { background: #ecfccb; color: #65a30d; border: 1px solid #d9f99d; }
+    </style>
+</head>
+<body>
+
+    <script>
+        // *** HÃY CẬP NHẬT URL NÀY SAU KHI DEPLOY LẠI CODE.GS MỚI ***
+        const API_URL = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec"; 
+        
+        // Load Keys
+        let geminiKeys = JSON.parse(localStorage.getItem("vat_master_gemini_keys") || "[]");
+        let groqKeys = JSON.parse(localStorage.getItem("vat_master_groq_keys") || "[]");
+        let hfKeys = JSON.parse(localStorage.getItem("vat_master_hf_keys") || "[]");
+        let cerebrasKeys = JSON.parse(localStorage.getItem("vat_master_cerebras_keys") || "[]");
+        let sambanovaKeys = JSON.parse(localStorage.getItem("vat_master_sambanova_keys") || "[]");
+        let deepseekKeys = JSON.parse(localStorage.getItem("vat_master_deepseek_keys") || "[]");
+        let mistralKeys = JSON.parse(localStorage.getItem("vat_master_mistral_keys") || "[]");
+        let nvidiaKeys = JSON.parse(localStorage.getItem("vat_master_nvidia_keys") || "[]");
+        
+        let idx = { gemini: 0, groq: 0, hf: 0, cerebras: 0, sambanova: 0, deepseek: 0, mistral: 0, nvidia: 0 };
+        let currentPersona = 'gemini'; 
+        let availablePersonas = [];
+    </script>
+
+    <div id="app" class="min-h-screen flex flex-col md:flex-row">
+        <aside class="w-full md:w-64 bg-slate-900 text-white flex flex-col transition-all duration-300 z-20">
+            <div class="p-6 border-b border-slate-700">
+                <h1 class="text-2xl font-bold text-blue-400"><i class="fa-solid fa-file-invoice-dollar mr-2"></i>VAT Master</h1>
+                <p class="text-xs text-slate-400 mt-1">Biệt Đội 8 AI Hùng Mạnh 🦸‍♂️</p>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <button onclick="switchTab('upload')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition bg-blue-600 text-white shadow-lg shadow-blue-500/30" id="btn-upload"><i class="fa-solid fa-cloud-arrow-up w-6"></i> Upload Hóa Đơn</button>
+                <button onclick="switchTab('search')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition text-slate-300" id="btn-search"><i class="fa-solid fa-magnifying-glass w-6"></i> Tra Cứu & Kho</button>
+                <button onclick="switchTab('chat')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition text-slate-300" id="btn-chat"><i class="fa-solid fa-wand-magic-sparkles w-6 text-yellow-400"></i> Chatbot Lầy Lội</button>
+                <button onclick="switchTab('history')" class="nav-btn w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition text-slate-300" id="btn-history"><i class="fa-solid fa-clock-rotate-left w-6"></i> Lịch Sử</button>
+                <div class="pt-4 mt-4 border-t border-slate-700">
+                    <button onclick="openSettingsModal()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition text-slate-300 flex justify-between items-center" id="btn-settings"><span><i class="fa-solid fa-sliders w-6"></i> Cấu hình & Admin</span><span id="api-status-dot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span></button>
+                </div>
+            </nav>
+            <div class="p-4 bg-slate-800 text-xs text-center text-slate-400">
+                <div id="drive-count" class="text-xl font-bold text-white mb-1">...</div>
+                File thực trên Drive
+            </div>
+        </aside>
+
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto h-screen relative bg-gradient-to-br from-gray-50 to-blue-50">
+            <div id="global-loader" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center backdrop-blur-sm">
+                <div class="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center animate-bounce-small"><div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div><p class="text-gray-700 font-semibold" id="loading-text">Đang xử lý...</p></div>
+            </div>
+
+            <!-- TAB 1: UPLOAD -->
+            <div id="tab-upload" class="section-content animate-fade-in block">
+                <div class="max-w-5xl mx-auto">
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 mb-8 text-white shadow-xl relative overflow-hidden">
+                        <div class="absolute -right-10 -top-10 text-white opacity-10 text-9xl"><i class="fa-solid fa-network-wired"></i></div>
+                        <h2 class="text-3xl font-bold mb-2">Hệ Thống Scan Đa Nhân Cách</h2>
+                        <p class="text-blue-100 max-w-xl">Hỗ trợ 8 dòng AI (Gemini, DeepSeek, Groq, SambaNova, Mistral, Nvidia...) xử lý song song.</p>
+                    </div>
+                    <div class="glass-panel p-8 mb-8">
+                        <div class="border-2 border-dashed border-blue-300 rounded-xl p-10 text-center bg-blue-50/50 hover:bg-blue-100/50 transition cursor-pointer relative group" id="drop-zone">
+                            <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="application/pdf" multiple onchange="handleFileSelect(this.files)">
+                            <div class="pointer-events-none transform group-hover:scale-105 transition duration-300">
+                                <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600"><i class="fa-solid fa-cloud-arrow-up text-4xl"></i></div>
+                                <h3 class="text-xl font-bold text-gray-700">Kéo thả loạt file PDF vào đây</h3>
+                                <p class="text-gray-500 mt-2">Biệt đội AI đang chờ lệnh!</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="upload-list" class="space-y-4"></div>
+                </div>
+            </div>
+
+            <!-- TAB 2: SEARCH -->
+            <div id="tab-search" class="section-content hidden">
+                <div class="max-w-6xl mx-auto">
+                    <div class="glass-panel p-6 mb-8 sticky top-0 z-10 shadow-md">
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <div class="flex-1 relative">
+                                <i class="fa-solid fa-search absolute left-4 top-4 text-gray-400"></i>
+                                <input type="text" id="search-input" placeholder="Nhập MST, Tên, Tiền hoặc Ngày (DD, DD/MM, DD-MM, DD.MM)..." class="w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition" onkeyup="handleSearchInput(event)">
+                            </div>
+                            <button onclick="doSearch()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2"><i class="fa-solid fa-filter"></i> Tìm Kiếm</button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center mb-4 text-sm text-gray-500 font-medium">
+                        <div id="search-stats">Đang hiển thị <span id="display-count">0</span> kết quả</div>
+                        <div id="pagination-controls" class="flex items-center gap-2 hidden">
+                            <button onclick="changePage(-1)" id="btn-prev" class="px-3 py-1.5 rounded-lg border bg-white hover:bg-gray-100 disabled:opacity-50"><i class="fa-solid fa-chevron-left"></i></button>
+                            <span id="page-info" class="mx-2">Trang 1</span>
+                            <button onclick="changePage(1)" id="btn-next" class="px-3 py-1.5 rounded-lg border bg-white hover:bg-gray-100 disabled:opacity-50"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="search-results"></div>
+                </div>
+            </div>
+
+            <!-- TAB 3: CHAT AI -->
+            <div id="tab-chat" class="section-content hidden h-[calc(100vh-140px)]">
+                <div class="max-w-5xl mx-auto h-full flex flex-col glass-panel overflow-hidden">
+                    <div class="p-4 border-b bg-gradient-to-r from-green-50 to-blue-50 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-500 flex items-center justify-center text-white shadow"><i class="fa-solid fa-sparkles"></i></div>
+                            <div><h2 class="font-bold text-gray-800">Chatbot Lầy Lội</h2><p class="text-xs text-gray-500" id="chat-subtitle">AI đang trực ban</p></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="btn-switch-persona" onclick="manualSwitchPersona()" class="text-xs bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 hover:text-blue-600 px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm font-medium"><i class="fa-solid fa-shuffle"></i> Đổi Trợ Lý</button>
+                            <button onclick="clearChat()" class="text-xs text-gray-400 hover:text-red-500 underline ml-2">Xóa hội thoại</button>
+                        </div>
+                    </div>
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 bg-white/50">
+                        <div class="flex flex-col items-start chat-ai chat-bubble shadow-sm"><span class="persona-badge p-gemini">Giáo Sư Biết Tuốt</span><p>Chào bạn trẻ! Có hóa đơn nào cần soi hay muốn tâm sự mỏng thì bảo lẹ! 🤓</p></div>
+                    </div>
+                    <div class="p-4 bg-white border-t"><div class="relative flex items-center"><input type="text" id="chat-input" placeholder="Hỏi gì khó khó xíu..." class="w-full pl-4 pr-14 py-3 border border-gray-200 rounded-xl outline-none shadow-sm" onkeyup="if(event.key === 'Enter') sendChat()"><button onclick="sendChat()" class="absolute right-2 p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition w-10 h-10 flex items-center justify-center"><i class="fa-solid fa-paper-plane"></i></button></div></div>
+                </div>
+            </div>
+
+            <!-- TAB 4: HISTORY -->
+            <div id="tab-history" class="section-content hidden">
+                <div class="max-w-4xl mx-auto glass-panel p-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-4 flex items-center"><i class="fa-solid fa-list-check text-blue-500 mr-3"></i> Nhật Ký Hoạt Động</h2>
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr class="bg-gray-50 border-b border-gray-200"><th class="py-4 px-6 text-sm rounded-tl-lg">Thời gian</th><th class="py-4 px-6 text-sm rounded-tr-lg">Hoạt động</th></tr></thead><tbody id="history-list" class="text-sm text-gray-700 divide-y divide-gray-100"></tbody></table></div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- MODALS -->
+        <div id="preview-modal" class="fixed inset-0 bg-slate-900/95 z-[999] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl flex flex-col relative shadow-2xl overflow-hidden animate-zoom-in">
+                <div class="flex justify-between items-center p-4 border-b bg-gray-50 px-6"><h3 class="font-bold text-lg text-gray-800 flex items-center gap-2"><i class="fa-regular fa-file-pdf text-red-500"></i> Chi tiết</h3><button onclick="closePreview()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-red-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button></div>
+                <div class="flex-1 bg-gray-100 relative"><iframe id="preview-frame" class="w-full h-full" src=""></iframe></div>
+            </div>
+        </div>
+
+        <div id="email-modal" class="fixed inset-0 bg-black/60 z-[1000] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-zoom-in flex flex-col">
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-6 flex justify-between items-center text-white"><h3 class="font-bold text-xl">Gửi Hóa Đơn</h3><button onclick="closeEmailModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+                <div class="p-6 space-y-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Người nhận</label><input type="email" id="email-to" class="w-full p-3 border border-gray-300 rounded-lg outline-none"></div>
+                    <div class="flex justify-between items-center"><label class="block text-sm font-medium text-gray-700">Nội dung</label><button onclick="generateAIEmail()" class="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1.5 rounded-full font-bold shadow hover:shadow-md"><i class="fa-solid fa-wand-magic-sparkles"></i> Viết bằng AI</button></div>
+                    <textarea id="email-body" rows="6" class="w-full p-3 border border-gray-300 rounded-lg outline-none text-sm leading-relaxed"></textarea>
+                    <input type="hidden" id="email-meta-data">
+                </div>
+                <div class="p-4 bg-gray-50 border-t flex justify-end gap-3"><button onclick="closeEmailModal()" class="px-5 py-2.5 rounded-lg hover:bg-gray-200">Hủy</button><button onclick="sendFinalEmail()" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-lg">Gửi Ngay</button></div>
+            </div>
+        </div>
+
+        <div id="settings-modal" class="fixed inset-0 bg-black/60 z-[1000] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-zoom-in flex flex-col max-h-[90vh]">
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 flex justify-between items-center text-white"><h3 class="font-bold text-xl"><i class="fa-solid fa-user-secret mr-2"></i> Khu Vực Cấu Hình</h3><button onclick="closeSettingsModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+                <div class="p-6 space-y-6 overflow-y-auto">
+                    <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mb-4">
+                        <label class="block text-sm font-bold text-indigo-900 mb-2"><i class="fa-solid fa-key text-indigo-600"></i> Admin Access (Để mượn API)</label>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex gap-2">
+                                <input type="password" id="admin-password" class="flex-1 p-2 border border-indigo-200 rounded-lg outline-none text-sm" placeholder="Nhập mã truy cập...">
+                                <button onclick="handleAdminLogin()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700">Lấy Key Full Quyền</button>
+                            </div>
+                            <div class="text-right"><button onclick="showAdminContact()" class="text-xs text-indigo-600 hover:text-indigo-800 underline font-medium cursor-pointer"><i class="fa-solid fa-circle-question"></i> Quên/Chưa có mã?</button></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="space-y-4">
+                            <div><label class="block text-sm font-bold text-blue-800 mb-1 flex justify-between"><span>Gemini</span><a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-blue-600 bg-blue-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-gemini-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                            <div><label class="block text-sm font-bold text-green-800 mb-1 flex justify-between"><span>DeepSeek</span><a href="https://platform.deepseek.com/api_keys" target="_blank" class="text-[10px] text-green-600 bg-green-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-deepseek-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div><label class="block text-sm font-bold text-orange-800 mb-1 flex justify-between"><span>Groq</span><a href="https://console.groq.com/keys" target="_blank" class="text-[10px] text-orange-600 bg-orange-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-groq-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                            <div><label class="block text-sm font-bold text-indigo-800 mb-1 flex justify-between"><span>SambaNova</span><a href="https://cloud.sambanova.ai/" target="_blank" class="text-[10px] text-indigo-600 bg-indigo-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-sambanova-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div><label class="block text-sm font-bold text-red-800 mb-1 flex justify-between"><span>Cerebras</span><a href="https://cloud.cerebras.ai/" target="_blank" class="text-[10px] text-red-600 bg-red-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-cerebras-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                            <div><label class="block text-sm font-bold text-pink-800 mb-1 flex justify-between"><span>HuggingFace</span><a href="https://huggingface.co/settings/tokens" target="_blank" class="text-[10px] text-pink-600 bg-pink-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-hf-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div><label class="block text-sm font-bold text-purple-800 mb-1 flex justify-between"><span>Mistral AI</span><a href="https://console.mistral.ai/api-keys/" target="_blank" class="text-[10px] text-purple-600 bg-purple-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-mistral-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                            <div><label class="block text-sm font-bold text-[#76b900] mb-1 flex justify-between"><span>NVIDIA</span><a href="https://build.nvidia.com/explore/discover" target="_blank" class="text-[10px] text-[#76b900] bg-gray-50 px-1 rounded border">Lấy Key</a></label><textarea id="input-nvidia-keys" rows="2" class="w-full p-2 border rounded text-xs"></textarea></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 border-t flex justify-end gap-3"><button onclick="closeSettingsModal()" class="px-5 py-2.5 rounded-lg hover:bg-gray-200">Đóng</button><button onclick="saveSettings()" class="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-lg">Lưu & Đồng Bộ</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        let uploadQueue = [];
+        let aiScanQueue = [];
+        let activeScans = 0;
+        const MAX_CONCURRENT_SCANS = 8; 
+        
+        let currentSearchData = [];
+        let currentPage = 1;
+        const itemsPerPage = 30;
+        let searchDebounceTimer;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            updateApiStatusUI();
+            determineInitialPersona();
+            getDriveCount();
+            if(API_URL !== "YOUR_GAS_WEBAPP_URL_HERE") doSearch(true);
+        });
+
+        // --- UTILS ---
+        function formatCurrencyVN(amount) {
+            if (!amount) return '0đ';
+            let str = String(amount);
+            str = str.replace(/[.,]0+$/, ''); 
+            const num = str.replace(/[^0-9]/g, '');
+            if (!num) return '0đ';
+            return new Intl.NumberFormat('vi-VN').format(num) + 'đ';
+        }
+
+        function formatDateVN(dateInput) {
+            if (!dateInput) return '';
+            if (typeof dateInput === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateInput)) return dateInput;
+            const date = new Date(dateInput);
+            if (!isNaN(date.getTime())) {
+                 const day = String(date.getDate()).padStart(2, '0');
+                 const month = String(date.getMonth() + 1).padStart(2, '0');
+                 const year = date.getFullYear();
+                 return `${day}/${month}/${year}`;
+            }
+            return dateInput;
+        }
+
+        // Helper to parse date string (DD/MM/YYYY) to timestamp for sorting
+        function parseDate(dateStr) {
+            if (!dateStr) return 0;
+            // Handle ISO strings
+            if (dateStr.includes('T') || dateStr.includes('-')) return new Date(dateStr).getTime();
+            // Handle DD/MM/YYYY
+            const parts = dateStr.split('/');
+            if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+            return 0;
+        }
+
+        function getDriveCount() {
+            callAPI({action: 'get_drive_count'}).then(res => {
+                 if (res.status === 'success') document.getElementById('drive-count').innerText = res.total;
+            });
+        }
+
+        // --- SETTINGS ---
+        function updateApiStatusUI() {
+            const total = geminiKeys.length + groqKeys.length + hfKeys.length + cerebrasKeys.length + sambanovaKeys.length + deepseekKeys.length + mistralKeys.length + nvidiaKeys.length;
+            const dot = document.getElementById('api-status-dot');
+            if (total > 0) dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]";
+            else dot.className = "w-2 h-2 rounded-full bg-red-500 animate-pulse";
+        }
+
+        function determineInitialPersona() {
+            availablePersonas = [];
+            if (geminiKeys.length) availablePersonas.push('gemini');
+            if (deepseekKeys.length) availablePersonas.push('deepseek');
+            if (groqKeys.length) availablePersonas.push('groq');
+            if (sambanovaKeys.length) availablePersonas.push('sambanova');
+            if (cerebrasKeys.length) availablePersonas.push('cerebras');
+            if (mistralKeys.length) availablePersonas.push('mistral');
+            if (nvidiaKeys.length) availablePersonas.push('nvidia');
+            if (hfKeys.length) availablePersonas.push('hf');
+
+            if (!availablePersonas.length) currentPersona = 'gemini'; 
+            else if (!availablePersonas.includes(currentPersona)) currentPersona = availablePersonas[0];
+            updateChatSubtitle();
+            updateSwitchButtonState();
+        }
+
+        function updateSwitchButtonState() {
+            const btn = document.getElementById('btn-switch-persona');
+            if (!btn) return;
+            if (availablePersonas.length > 1) {
+                btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.classList.add('hover:bg-gray-100', 'hover:text-blue-600', 'shadow-sm');
+            } else {
+                btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); btn.classList.remove('hover:bg-gray-100', 'hover:text-blue-600', 'shadow-sm');
+            }
+        }
+
+        function updateChatSubtitle() {
+            const map = { 'gemini': 'Giáo Sư Biết Tuốt', 'deepseek': 'Thám Tử Tư', 'groq': 'Thánh Tốc Độ', 'sambanova': 'Tia Chớp Đen', 'cerebras': 'Cỗ Máy Hủy Diệt', 'mistral': 'Pháp Sư Âu Châu', 'nvidia': 'Siêu Máy Tính', 'hf': 'Bà Hàng Xóm' };
+            const el = document.getElementById('chat-subtitle');
+            if (availablePersonas.length === 0) { el.innerText = 'Chưa có nhân viên (Thiếu Key)'; el.classList.add('text-red-500'); } 
+            else { el.innerText = `${map[currentPersona]} đang trực ban`; el.classList.remove('text-red-500'); }
+        }
+
+        function openSettingsModal() {
+            document.getElementById('input-gemini-keys').value = geminiKeys.join('\n');
+            document.getElementById('input-groq-keys').value = groqKeys.join('\n');
+            document.getElementById('input-hf-keys').value = hfKeys.join('\n');
+            document.getElementById('input-cerebras-keys').value = cerebrasKeys.join('\n');
+            document.getElementById('input-sambanova-keys').value = sambanovaKeys.join('\n');
+            document.getElementById('input-deepseek-keys').value = deepseekKeys.join('\n');
+            document.getElementById('input-mistral-keys').value = mistralKeys.join('\n');
+            document.getElementById('input-nvidia-keys').value = nvidiaKeys.join('\n');
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+        function closeSettingsModal() { document.getElementById('settings-modal').classList.add('hidden'); }
+
+        function parseKeys(id) { return document.getElementById(id).value.split('\n').map(k=>k.trim()).filter(k=>k.length>5); }
+
+        async function saveSettings() {
+            geminiKeys = parseKeys('input-gemini-keys');
+            groqKeys = parseKeys('input-groq-keys');
+            hfKeys = parseKeys('input-hf-keys');
+            cerebrasKeys = parseKeys('input-cerebras-keys');
+            sambanovaKeys = parseKeys('input-sambanova-keys');
+            deepseekKeys = parseKeys('input-deepseek-keys');
+            mistralKeys = parseKeys('input-mistral-keys');
+            nvidiaKeys = parseKeys('input-nvidia-keys');
+
+            localStorage.setItem("vat_master_gemini_keys", JSON.stringify(geminiKeys));
+            localStorage.setItem("vat_master_groq_keys", JSON.stringify(groqKeys));
+            localStorage.setItem("vat_master_hf_keys", JSON.stringify(hfKeys));
+            localStorage.setItem("vat_master_cerebras_keys", JSON.stringify(cerebrasKeys));
+            localStorage.setItem("vat_master_sambanova_keys", JSON.stringify(sambanovaKeys));
+            localStorage.setItem("vat_master_deepseek_keys", JSON.stringify(deepseekKeys));
+            localStorage.setItem("vat_master_mistral_keys", JSON.stringify(mistralKeys));
+            localStorage.setItem("vat_master_nvidia_keys", JSON.stringify(nvidiaKeys));
+            
+            updateApiStatusUI(); determineInitialPersona();
+            
+            callAPI({ action: 'save_system_keys', gemini: geminiKeys, groq: groqKeys, hf: hfKeys, cerebras: cerebrasKeys, sambanova: sambanovaKeys, deepseek: deepseekKeys, mistral: mistralKeys, nvidia: nvidiaKeys });
+            const total = geminiKeys.length + groqKeys.length + hfKeys.length + cerebrasKeys.length + sambanovaKeys.length + deepseekKeys.length + mistralKeys.length + nvidiaKeys.length;
+            Swal.fire('Thành công', `${total} API key đã được lụm thành công, cảm ơn các hạ! Tại hạ cáo từ 😄!`, 'success');
+            closeSettingsModal();
+        }
+
+        function showAdminContact() { Swal.fire({ title: 'Cần mã gấp?', text: 'Liên hệ 0336667301 (ADMIN của tụi tui nè) để được cấp mã truy cập xịn nhé!', icon: 'info', confirmButtonText: 'Đã hiểu' }); }
+
+        function handleAdminLogin() {
+            const pass = document.getElementById('admin-password').value;
+            if (!pass) return Swal.fire('Lỗi', 'Vui lòng nhập mã truy cập!', 'warning');
+            const btn = document.querySelector('#settings-modal button.bg-indigo-600'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            callAPI({ action: 'get_system_keys', password: pass }).then(res => {
+                btn.innerHTML = 'Lấy API';
+                if (res.status === 'success') {
+                    if(res.gemini) document.getElementById('input-gemini-keys').value = res.gemini.join('\n');
+                    if(res.groq) document.getElementById('input-groq-keys').value = res.groq.join('\n');
+                    if(res.hf) document.getElementById('input-hf-keys').value = res.hf.join('\n');
+                    if(res.cerebras) document.getElementById('input-cerebras-keys').value = res.cerebras.join('\n');
+                    if(res.sambanova) document.getElementById('input-sambanova-keys').value = res.sambanova.join('\n');
+                    if(res.deepseek) document.getElementById('input-deepseek-keys').value = res.deepseek.join('\n');
+                    if(res.mistral) document.getElementById('input-mistral-keys').value = res.mistral.join('\n');
+                    if(res.nvidia) document.getElementById('input-nvidia-keys').value = res.nvidia.join('\n');
+                    Swal.fire('Đã lấy Key', 'Đã mượn được hàng nóng từ kho Admin!', 'success');
+                } else Swal.fire('Lỗi', res.message || 'Mã không đúng!', 'error');
+            });
+        }
+
+        function checkApiKey() {
+            if (!availablePersonas.length) { Swal.fire({ title: 'Chưa có API Key', text: 'Hệ thống cần ít nhất 1 Key để hoạt động.', icon: 'warning', confirmButtonText: 'Cấu hình ngay' }).then(() => openSettingsModal()); return false; }
+            return true;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.getElementById('tab-' + tabId).classList.add('animate-fade-in');
+            document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('bg-blue-600', 'text-white', 'shadow-lg'); el.classList.add('text-slate-300'); });
+            const btn = document.getElementById('btn-' + tabId);
+            btn.classList.remove('text-slate-300');
+            if (tabId === 'chat') btn.classList.add('text-white', 'bg-slate-800', 'border', 'border-slate-700'); else btn.classList.add('bg-blue-600', 'text-white', 'shadow-lg');
+            if (tabId === 'history') loadHistory();
+            if (tabId === 'search') doSearch(true);
+        }
+
+        // --- AI LOGIC ---
+        async function callAI_Unified(promptText, mode = 'extract', fileId = null) {
+            if (!checkApiKey()) return null;
+            
+            const tryProv = (p, prompt, m) => tryProvider(p, prompt, m, fileId);
+
+            // Priorities:
+            if (geminiKeys.length) try { return await tryProv('gemini', promptText, mode); } catch(e) {}
+            if (deepseekKeys.length) try { return await tryProv('deepseek', promptText, mode); } catch(e) {}
+            if (groqKeys.length) try { return await tryProv('groq', promptText, mode); } catch(e) {}
+            if (sambanovaKeys.length) try { return await tryProv('sambanova', promptText, mode); } catch(e) {}
+            if (cerebrasKeys.length) try { return await tryProv('cerebras', promptText, mode); } catch(e) {}
+            if (mistralKeys.length) try { return await tryProv('mistral', promptText, mode); } catch(e) {}
+            if (nvidiaKeys.length) try { return await tryProv('nvidia', promptText, mode); } catch(e) {}
+            if (hfKeys.length) try { return await tryProv('hf', promptText, mode); } catch(e) {}
+            throw new Error("Tất cả các AI đều bận. Vui lòng thử lại!");
+        }
+
+        async function callAI_Persona(promptText) {
+            if (!checkApiKey()) return null;
+            if (!availablePersonas.includes(currentPersona)) {
+                if (availablePersonas.length) currentPersona = availablePersonas[0];
+                else return `Xin lỗi, chưa có Key nào được cấu hình.`;
+            }
+            let attemptOrder = availablePersonas.slice(availablePersonas.indexOf(currentPersona)).concat(availablePersonas.slice(0, availablePersonas.indexOf(currentPersona)));
+            for (const persona of attemptOrder) {
+                try {
+                    if (currentPersona !== persona) { currentPersona = persona; updateChatSubtitle(); updateSwitchButtonState(); }
+                    const res = await tryProvider(persona, promptText, 'chat');
+                    if (persona !== attemptOrder[0]) return `_(⚠️ ${getPersonaDisplayName(attemptOrder[0])} bận, **${getPersonaDisplayName(persona)}** trả lời thay)_\n\n${res}`;
+                    return res;
+                } catch (e) {}
+            }
+            return `Toang rồi! Tất cả các trợ lý đều bận.`;
+        }
+
+        async function tryProvider(provider, prompt, mode, fileId = null) {
+            let keys = [], runner = null;
+            let displayNames = {
+                'gemini': 'Gemini', 'groq': 'Groq', 'cerebras': 'Cerebras', 
+                'hf': 'HuggingFace', 'sambanova': 'SambaNova', 'deepseek': 'DeepSeek',
+                'mistral': 'Mistral', 'nvidia': 'NVIDIA'
+            };
+
+            if (provider==='gemini'){ keys=geminiKeys; runner=callGeminiDirect; }
+            else if(provider==='groq'){ keys=groqKeys; runner=callGroqDirect; }
+            else if(provider==='cerebras'){ keys=cerebrasKeys; runner=callCerebrasDirect; }
+            else if(provider==='hf'){ keys=hfKeys; runner=callHuggingFaceDirect; }
+            else if(provider==='sambanova'){ keys=sambanovaKeys; runner=callSambaNovaDirect; }
+            else if(provider==='deepseek'){ keys=deepseekKeys; runner=callDeepSeekDirect; }
+            else if(provider==='mistral'){ keys=mistralKeys; runner=callMistralDirect; }
+            else if(provider==='nvidia'){ keys=nvidiaKeys; runner=callNvidiaDirect; }
+
+            for (let i=0; i<keys.length; i++) {
+                let startIdx = idx[provider]; idx[provider] = (idx[provider] + 1) % keys.length;
+                
+                if (mode === 'extract' && fileId) {
+                    const badge = document.getElementById(`status-badge-${fileId}`);
+                    if(badge) {
+                        badge.innerText = `${displayNames[provider]} đang đọc...`;
+                        badge.className = `text-xs font-bold px-2 py-1 rounded-full border bg-blue-50 text-blue-600 border-blue-200`;
+                    }
+                }
+                
+                try { return await runner(keys[(startIdx + i) % keys.length], prompt, mode); } catch (e) { console.warn(`${provider} key failed`); }
+            }
+            throw new Error(`${provider} exhausted`);
+        }
+
+        const SYSTEM_INSTRUCTION = "YÊU CẦU: Trả lời NGẮN GỌN, SÚC TÍCH, ĐẦY ĐỦ Ý. Giọng điệu: HÀI HƯỚC, LẦY LỘI nhưng LỊCH SỰ. Không lan man. Ngày tháng luôn dùng định dạng DD/MM/YYYY. Tiền bạc lấy số nguyên, không dấu chấm phẩy.";
+        
+        async function callGeminiDirect(key, prompt, mode) {
+            const p = mode==='chat' ? `Bạn là 'Giáo Sư Biết Tuốt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤓📚. User: ` + prompt : prompt;
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}]})});
+            if(!res.ok) throw new Error(res.status); return (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text;
+        }
+        async function callDeepSeekDirect(key, prompt, mode) {
+            const sys = mode==='chat' ? `Bạn là 'Thám Tử Tư'. ${SYSTEM_INSTRUCTION} Dùng icon 🕵️‍♂️.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+            const res = await fetch("https://api.deepseek.com/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"deepseek-chat",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+            if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+        }
+        async function callGroqDirect(key, prompt, mode) {
+            const sys = mode==='chat' ? `Bạn là 'Thánh Tốc Độ'. ${SYSTEM_INSTRUCTION} Dùng icon 🚀.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+            if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+        }
+        async function callSambaNovaDirect(key, prompt, mode) {
+            const sys = mode==='chat' ? `Bạn là 'Tia Chớp Đen'. ${SYSTEM_INSTRUCTION} Dùng icon ⚡.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+            const res = await fetch("https://api.sambanova.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"Meta-Llama-3.1-70B-Instruct",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+            if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+        }
+        async function callCerebrasDirect(key, prompt, mode) {
+            const sys = mode==='chat' ? `Bạn là 'Cỗ Máy Hủy Diệt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤖.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+            const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"llama3.1-70b",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+            if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+        }
+        async function callMistralDirect(key, prompt, mode) {
+             const p = mode==='chat' ? `[INST] Bạn là 'Pháp Sư Âu Châu'. ${SYSTEM_INSTRUCTION} User: ${prompt} [/INST]` : `[INST] Extract JSON. Date format DD/MM/YYYY. Amount pure number. Content: ${prompt} [/INST]`;
+             const res = await fetch("https://api.mistral.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"mistral-small-latest",messages:[{role:"user",content:p}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+             if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+        }
+        async function callNvidiaDirect(key, prompt, mode) {
+             const sys = mode==='chat' ? `Bạn là 'Siêu Máy Tính'. ${SYSTEM_INSTRUCTION}` : "Extract JSON.";
+             const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"meta/llama-3.1-405b-instruct",messages:[{role:"system",content:sys},{role:"user",content:prompt}],max_tokens: 1024, stream: false})});
+             if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+        }
+        async function callHuggingFaceDirect(key, prompt, mode) {
+            const p = mode==='chat' ? `[INST] Bạn là 'Bà Hàng Xóm'. ${SYSTEM_INSTRUCTION} User: ${prompt} [/INST]` : `[INST] Extract JSON. Date format DD/MM/YYYY. Amount pure number. Content: ${prompt} [/INST]`;
+            const res = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({inputs:p,parameters:{max_new_tokens:1000,return_full_text:false}})});
+            if(!res.ok) throw new Error(res.status); const d = await res.json(); return Array.isArray(d) ? d[0].generated_text : d.generated_text;
+        }
+
+        // --- UPLOAD & SCAN ---
+        function handleFileSelect(files) {
+            Array.from(files).forEach(file => {
+                if (file.type !== 'application/pdf') return Swal.fire('Lỗi', 'Chỉ nhận file PDF', 'warning');
+                const id = Date.now() + Math.random().toString(36).substr(2, 9);
+                uploadQueue.unshift({ id, file, status: 'pending', rawText: '', data: { tenDonVi: '', mst: '', tongTien: '', ngayKy: '', diaChi: '' } });
+                aiScanQueue.push(id);
+            });
+            renderQueue(); processScanQueue();
+        }
+
+        async function processScanQueue() {
+            if (!aiScanQueue.length || activeScans >= MAX_CONCURRENT_SCANS) return;
+            while (aiScanQueue.length > 0 && activeScans < MAX_CONCURRENT_SCANS) {
+                const id = aiScanQueue.shift();
+                const item = uploadQueue.find(i => i.id === id);
+                if (item && item.status === 'pending') {
+                    activeScans++;
+                    autoScanAndUpload(id).finally(() => { activeScans--; processScanQueue(); });
+                }
+            }
+        }
+
+        async function autoScanAndUpload(id) {
+            const item = uploadQueue.find(i => i.id === id);
+            updateStatusUI(id, 'scanning', 'Đang xếp hàng...');
+            
+            try {
+                if (!item.rawText) {
+                    const buf = await item.file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(buf).promise;
+                    let txt = ''; for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) txt += (await (await pdf.getPage(i)).getTextContent()).items.map(s => s.str).join(' ') + '\n';
+                    item.rawText = txt;
+                }
+                const prompt = `Trích xuất JSON (tenDonVi, mst, tongTien, ngayKy, diaChi) từ văn bản: "${item.rawText.substring(0, 3000)}".
+                Quy tắc BẮT BUỘC:
+                1. Ngày ký: Phải chuẩn định dạng DD/MM/YYYY. Ví dụ 05/01/2024.
+                2. TỔNG TIỀN (Quan trọng nhất): Tìm số tiền thanh toán cuối cùng (Grand Total) bao gồm thuế GTGT.
+                   - Chiến thuật: Tìm tất cả các con số tiền tệ trong phần cuối hóa đơn. Số LỚN NHẤT tìm được chính là Tổng Tiền.
+                   - Nếu có dòng "Tổng cộng tiền thanh toán", "Cộng tiền thanh toán" thì lấy số ở dòng đó.
+                   - Bỏ hết dấu chấm phẩy, chỉ trả về số nguyên (VD: 3,339,980 -> 3339980; 3.339.980 -> 3339980).
+                3. Địa chỉ: Lấy đầy đủ địa chỉ đơn vị mua.`;
+                
+                // Pass fileId to allow UI update from deep inside the provider logic
+                const res = await callAI_Unified(prompt, 'extract', id);
+                
+                if (!res) return updateStatusUI(id, 'ready');
+                
+                let json = res.replace(/```json/g, '').replace(/```/g, '').trim();
+                if(json.includes('{')) json = json.substring(json.indexOf('{'), json.lastIndexOf('}')+1);
+                const data = JSON.parse(json);
+                
+                item.data = { ...item.data, ...data };
+                renderQueue(); 
+                if (item.data.mst && item.data.ngayKy) await uploadItem(id); else updateStatusUI(id, 'ready');
+            } catch (e) { updateStatusUI(id, 'error', 'Lỗi AI'); }
+        }
+
+        async function uploadItem(id) {
+            const item = uploadQueue.find(i => i.id === id);
+            updateStatusUI(id, 'uploading', 'Đang lưu...');
+            return new Promise(resolve => {
+                const r = new FileReader(); r.readAsDataURL(item.file);
+                r.onload = () => {
+                    // --- CHUẨN HÓA TÊN FILE: [NGÀY KÍ]-[MST] (VD: 02/01/2026-123456789.pdf) ---
+                    let finalFileName = item.file.name;
+                    if (item.data.ngayKy && item.data.mst) {
+                        finalFileName = `${item.data.ngayKy}-${item.data.mst}.pdf`;
+                    }
+
+                    callAPI({ 
+                        action: 'upload', 
+                        fileBase64: r.result.split(',')[1], 
+                        mimeType: item.file.type, 
+                        fileName: finalFileName, // Gửi tên file chuẩn hóa xuống backend
+                        ...item.data 
+                    }).then(res => {
+                        updateStatusUI(id, res.status==='success'?'done':'error', res.status==='success'?'Đã lưu':'Lỗi');
+                        if(res.status==='success') { doSearch(true); getDriveCount(); }
+                        resolve();
+                    });
+                };
+            });
+        }
+
+        // --- NEW: DELETE/REPLACE LOGIC ---
+        function confirmDelete(fileName, id) {
+            Swal.fire({
+                title: 'Thay thế hóa đơn?',
+                text: "Bạn có chắc muốn xóa hóa đơn cũ này để nạp lại bản mới không?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Đúng, xóa và nạp lại!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    deleteInvoice(fileName);
+                }
+            })
+        }
+
+        function deleteInvoice(fileName) {
+            document.getElementById('global-loader').classList.remove('hidden');
+            callAPI({ action: 'delete_invoice', fileName: fileName }).then(res => {
+                document.getElementById('global-loader').classList.add('hidden');
+                if(res.status === 'success') {
+                    Swal.fire('Đã xóa', 'Hóa đơn cũ đã bay màu. Hãy chọn file mới để upload.', 'success');
+                    doSearch(true);
+                    getDriveCount();
+                    switchTab('upload');
+                } else {
+                    Swal.fire('Lỗi', 'Không xóa được file.', 'error');
+                }
+            });
+        }
+
+        function renderQueue() {
+            document.getElementById('upload-list').innerHTML = uploadQueue.map(item => `
+                <div class="glass-panel p-5 flex flex-col xl:flex-row items-start gap-5 border border-gray-100" id="item-${item.id}">
+                    <div class="flex items-center gap-4 w-full xl:w-1/4">
+                        <div class="w-14 h-14 bg-red-50 rounded-xl flex items-center justify-center text-red-500 shrink-0 border border-red-100"><i class="fa-solid fa-file-pdf text-2xl"></i></div>
+                        <div class="overflow-hidden"><h4 class="font-bold text-gray-800 truncate text-sm mb-1">${item.file.name}</h4><span class="text-xs font-bold px-2 py-1 rounded-full ${getStatusColor(item.status)} border" id="status-badge-${item.id}">${getStatusText(item.status)}</span></div>
+                    </div>
+                    <div class="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div class="relative"><label class="text-xs text-gray-400 absolute left-2 top-1">Đơn vị</label><input type="text" value="${item.data.tenDonVi}" onchange="updateItemData('${item.id}', 'tenDonVi', this.value)" class="pt-5 pb-2 px-2 w-full border rounded outline-none font-medium"></div>
+                        <div class="relative"><label class="text-xs text-gray-400 absolute left-2 top-1">MST</label><input type="text" value="${item.data.mst}" onchange="updateItemData('${item.id}', 'mst', this.value)" class="pt-5 pb-2 px-2 w-full border rounded outline-none font-mono font-medium text-blue-700"></div>
+                        <div class="relative"><label class="text-xs text-gray-400 absolute left-2 top-1">Địa chỉ</label><input type="text" value="${item.data.diaChi}" onchange="updateItemData('${item.id}', 'diaChi', this.value)" class="pt-5 pb-2 px-2 w-full border rounded outline-none font-medium text-gray-600"></div>
+                        <div class="relative"><label class="text-xs text-gray-400 absolute left-2 top-1">Tiền</label><input type="text" value="${formatCurrencyVN(item.data.tongTien)}" onchange="updateItemData('${item.id}', 'tongTien', this.value)" class="pt-5 pb-2 px-2 w-full border rounded outline-none font-bold text-green-600"></div>
+                    </div>
+                    <div class="flex xl:flex-col gap-2 shrink-0 w-full xl:w-auto mt-2 xl:mt-0" id="actions-${item.id}">${getActionButtons(item)}</div>
+                </div>
+            `).join('');
+        }
+
+        function getActionButtons(item) {
+            if (['ready', 'error'].includes(item.status)) return `<button onclick="retryAI('${item.id}')" class="bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 px-4 py-2 rounded-lg text-sm font-semibold flex-1 mb-1"><i class="fa-solid fa-rotate-right"></i> Thử lại</button><button onclick="uploadItem('${item.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex-1">Lưu tay</button>`;
+            if (item.status === 'done') return `<div class="w-full text-center text-green-600 font-bold bg-green-50 p-2 rounded border border-green-200"><i class="fa-solid fa-check-circle"></i> Đã lưu</div>`;
+            return `<button onclick="removeItem('${item.id}')" class="bg-gray-100 hover:bg-gray-200 text-gray-500 px-4 py-2 rounded-lg text-sm flex-1"><i class="fa-solid fa-trash"></i></button>`;
+        }
+
+        function updateItemData(id, key, val) { const i = uploadQueue.find(x => x.id === id); if(i) i.data[key] = val; }
+        function removeItem(id) { uploadQueue = uploadQueue.filter(x => x.id !== id); aiScanQueue = aiScanQueue.filter(x => x !== id); renderQueue(); }
+        function retryAI(id) { const i = uploadQueue.find(x => x.id === id); if(i) { i.status = 'pending'; renderQueue(); aiScanQueue.push(id); processScanQueue(); } }
+        function updateStatusUI(id, s, t) { 
+            const i = uploadQueue.find(x => x.id === id); 
+            if(i) { 
+                i.status = s; 
+                // Don't overwrite the provider-specific text if it's already set and status is scanning
+                const badge = document.getElementById(`status-badge-${id}`);
+                if (badge) {
+                    if (s !== 'scanning') { // Only reset text if not scanning (or if status changed)
+                         badge.innerText = getStatusText(s);
+                         badge.className = `text-xs font-bold px-2 py-1 rounded-full ${getStatusColor(s)} border`;
+                    } else if (!badge.innerText.includes('đang đọc')) {
+                         badge.innerText = t || getStatusText(s);
+                    }
+                }
+                const actions = document.getElementById(`actions-${id}`);
+                if (actions) actions.innerHTML = getActionButtons(i);
+            } 
+        }
+        function getStatusColor(s) { return { pending: 'bg-gray-100 text-gray-500', scanning: 'bg-yellow-100 text-yellow-700 border-yellow-200', ready: 'bg-blue-50 text-blue-600 border-blue-200', uploading: 'bg-purple-100 text-purple-600', done: 'bg-green-100 text-green-600 border-green-200', error: 'bg-red-100 text-red-600' }[s] || ''; }
+        function getStatusText(s) { return { pending: 'Chờ...', scanning: 'Đang đọc...', ready: 'Xong', uploading: 'Lưu...', done: 'Xong', error: 'Lỗi' }[s]; }
+
+        // --- SEARCH, EMAIL, PAGINATION ---
+        function handleSearchInput(e) {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => doSearch(true), 300); 
+        }
+
+        function doSearch(bg=false) {
+            let q = document.getElementById('search-input').value.trim();
+            // Input normalization: 2-1 or 2.1 or 2 1 -> 02/01
+            if (/^(\d{1,2})[-.\s](\d{1,2})(?:[-.\s](\d{4}))?$/.test(q)) {
+                 const match = q.match(/^(\d{1,2})[-.\s](\d{1,2})(?:[-.\s](\d{4}))?$/);
+                 const d = match[1].padStart(2, '0');
+                 const m = match[2].padStart(2, '0');
+                 const y = match[3];
+                 q = y ? `${d}/${m}/${y}` : `${d}/${m}`;
+            }
+
+            if(!bg) document.getElementById('global-loader').classList.remove('hidden');
+            // ADDED limit: 5000 to fetch ALL invoices (fixing 60 limit issue) and nocache
+            callAPI({ action: 'search', query: q, limit: 5000, nocache: new Date().getTime() }).then(res => {
+                if(!bg) document.getElementById('global-loader').classList.add('hidden');
+                if(res.status === 'success') {
+                    // STORE DATA & SORT DESCENDING BY DATE
+                    currentSearchData = res.data.sort((a, b) => parseDate(b.ngayKy) - parseDate(a.ngayKy));
+                    
+                    // RESET TO PAGE 1 & RENDER
+                    currentPage = 1;
+                    renderPagedResults();
+                }
+            });
+        }
+
+        function renderPagedResults() {
+            const container = document.getElementById('search-results');
+            const totalItems = currentSearchData.length;
+            document.getElementById('display-count').innerText = totalItems;
+            
+            // PAGINATION LOGIC
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const pageData = currentSearchData.slice(startIndex, endIndex);
+
+            // RENDER CONTROLS
+            const controls = document.getElementById('pagination-controls');
+            if (totalItems > itemsPerPage) {
+                controls.classList.remove('hidden');
+                document.getElementById('page-info').innerText = `Trang ${currentPage} / ${totalPages}`;
+                document.getElementById('btn-prev').disabled = currentPage === 1;
+                document.getElementById('btn-next').disabled = currentPage === totalPages;
+            } else {
+                controls.classList.add('hidden');
+            }
+
+            // RENDER GRID
+            container.innerHTML = pageData.map(d => `
+                <div class="glass-panel p-0 hover:shadow-xl transition flex flex-col h-full animate-fade-in">
+                    <div class="p-6 flex-1">
+                        <div class="flex justify-between items-start mb-4"><h3 class="font-bold text-gray-800 text-lg line-clamp-2">${d.tenDonVi}</h3><span class="ml-2 bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full border whitespace-nowrap">${d.mst}</span></div>
+                        <p class="text-xs text-gray-500 mb-3"><i class="fa-solid fa-location-dot"></i> ${d.diaChi}</p>
+                        <div class="space-y-3 text-sm text-gray-600">
+                            <div class="flex justify-between p-2 bg-gray-50 rounded-lg"><span><i class="fa-solid fa-calendar-days text-gray-400"></i> Ngày</span><span class="font-medium">${formatDateVN(d.ngayKy)}</span></div>
+                            <div class="flex justify-between p-2 bg-green-50 rounded-lg"><span><i class="fa-solid fa-money-bill-wave text-green-500"></i> Tiền</span><span class="font-bold text-green-700">${formatCurrencyVN(d.tongTien)}</span></div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 border-t flex gap-2">
+                        <button onclick="previewFile('${d.linkView}')" class="flex-1 bg-white border py-2.5 rounded-lg text-sm font-semibold hover:shadow text-blue-600">Xem</button>
+                        <button onclick="confirmDelete('${d.fileName}')" class="w-10 bg-white border rounded-lg hover:shadow text-red-500" title="Thay thế/Xóa"><i class="fa-solid fa-rotate"></i></button>
+                        <button onclick="copyLink('${d.linkView}')" class="w-10 bg-white border rounded-lg hover:shadow text-gray-600" title="Copy Link"><i class="fa-regular fa-copy"></i></button>
+                        <button onclick="openEmailModal('${d.tenDonVi}','${d.mst}','${d.ngayKy}','${d.tongTien}','${d.linkView}','${d.fileName}','${d.diaChi}')" class="w-10 bg-blue-600 text-white rounded-lg hover:shadow" title="Gửi Mail"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function changePage(step) {
+            const totalPages = Math.ceil(currentSearchData.length / itemsPerPage);
+            const newPage = currentPage + step;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderPagedResults();
+                document.getElementById('tab-search').scrollTop = 0; // Scroll to top
+            }
+        }
+
+        // --- CHAT ---
+        function rotatePersona() { if (availablePersonas.length > 1) { currentPersona = availablePersonas[(availablePersonas.indexOf(currentPersona) + 1) % availablePersonas.length]; updateChatSubtitle(); return currentPersona; } }
+        function manualSwitchPersona() { if (availablePersonas.length > 1) { rotatePersona(); const container = document.getElementById('chat-messages'); container.innerHTML += `<div class="chat-system">Đã đổi sang: <b>${getPersonaDisplayName(currentPersona)}</b>. Sẵn sàng phục vụ!</div>`; container.scrollTop = container.scrollHeight; } }
+        function getPersonaDisplayName(p) { return { 'gemini': 'Giáo Sư Biết Tuốt', 'deepseek': 'Thám Tử Tư', 'groq': 'Thánh Tốc Độ', 'sambanova': 'Tia Chớp Đen', 'cerebras': 'Cỗ Máy Hủy Diệt', 'mistral': 'Pháp Sư Âu Châu', 'nvidia': 'Siêu Máy Tính', 'hf': 'Bà Hàng Xóm' }[p] || 'AI'; }
+        
+        async function sendChat() {
+            const msg = document.getElementById('chat-input').value.trim(); if(!msg) return;
+            const container = document.getElementById('chat-messages');
+            container.innerHTML += `<div class="chat-user chat-bubble shadow-sm">${msg}</div>`;
+            document.getElementById('chat-input').value = ''; container.scrollTop = container.scrollHeight;
+            const lid = 'l-'+Date.now(); container.innerHTML += `<div id="${lid}" class="chat-ai chat-bubble shadow-sm text-gray-400"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang suy nghĩ...</div>`; container.scrollTop = container.scrollHeight;
+            const context = currentSearchData.slice(0,30).map(d=>`- ${d.tenDonVi} (${d.tongTien})`).join('\n');
+            const res = await callAI_Persona(`Dữ liệu:\n${context}\nHỏi: "${msg}"`);
+            document.getElementById(lid).remove();
+            container.innerHTML += `<div class="chat-ai chat-bubble shadow-sm"><span class="persona-badge p-${currentPersona}">${getPersonaDisplayName(currentPersona)}</span>${marked.parse(res)}</div>`;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearChat() { document.getElementById('chat-messages').innerHTML = ''; }
+        function openEmailModal(ten, mst, ngay, tien, link, file, dc) { document.getElementById('email-modal').classList.remove('hidden'); document.getElementById('email-to').value=''; document.getElementById('email-body').value=`Gửi ${ten},\n\nHóa đơn ${file}\nTiền: ${formatCurrencyVN(tien)}\n\nTrân trọng.`; document.getElementById('email-meta-data').value=JSON.stringify({tenDonVi:ten,mst,ngayKy:ngay,tongTien:tien,fileName:file,linkView:link,diaChi:dc}); }
+        function closeEmailModal() { document.getElementById('email-modal').classList.add('hidden'); }
+        async function generateAIEmail() { const meta = JSON.parse(document.getElementById('email-meta-data').value); const res = await callAI_Unified(`Viết email gửi hóa đơn cho ${meta.tenDonVi}, Tiền: ${meta.tongTien}. Lịch sự.`, 'extract'); if(res) document.getElementById('email-body').value = res; }
+        function sendFinalEmail() { const meta = JSON.parse(document.getElementById('email-meta-data').value); closeEmailModal(); document.getElementById('loading-text').innerText="Đang gửi mail..."; document.getElementById('global-loader').classList.remove('hidden'); callAPI({action:'send_email', email: document.getElementById('email-to').value, ...meta}).then(res => { document.getElementById('global-loader').classList.add('hidden'); Swal.fire(res.status==='success'?'Thành công':'Lỗi', res.message||'Đã gửi', res.status==='success'?'success':'error'); }); }
+        function previewFile(url) { document.getElementById('preview-frame').src=url.replace('/view','/preview'); document.getElementById('preview-modal').classList.remove('hidden'); }
+        function closePreview() { document.getElementById('preview-modal').classList.add('hidden'); document.getElementById('preview-frame').src=''; }
+        function copyLink(txt) { navigator.clipboard.writeText(txt); Swal.mixin({toast:true,position:'top-end',showConfirmButton:false,timer:2000}).fire({icon:'success',title:'Đã copy'}); }
+        function loadHistory() { callAPI({action:'get_history'}).then(res => { if(res.status==='success') document.getElementById('history-list').innerHTML=res.data.map(r=>`<tr><td class="py-4 px-6 border-b text-xs">${new Date(r[0]).toLocaleString('vi-VN')}</td><td class="py-4 px-6 border-b">${r[1]}</td></tr>`).join(''); }); }
+        async function callAPI(d) { try { return await (await fetch(API_URL, {method:'POST',body:JSON.stringify(d)})).json(); } catch(e) { return {status:'error',message:'Lỗi mạng'}; } }
+    </script>
+</body>
+</html>

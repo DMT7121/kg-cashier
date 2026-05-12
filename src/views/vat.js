@@ -1,0 +1,965 @@
+import { showConfirm } from '../utils.js';
+
+let _activeTab = 'upload';
+const _tabs = [
+  { key: 'upload', icon: 'cloud_upload', label: 'Upload Hóa Đơn' },
+  { key: 'search', icon: 'search', label: 'Tra Cứu & Kho' },
+  { key: 'chat', icon: 'smart_toy', label: 'Chatbot Lầy Lội' },
+  { key: 'history', icon: 'history', label: 'Lịch Sử' },
+  { key: 'settings', icon: 'settings', label: 'Cấu hình & Admin' }
+];
+
+// --- STATE ---
+let uploadQueue = [];
+let aiScanQueue = [];
+let activeScans = 0;
+const MAX_CONCURRENT_SCANS = 8; 
+
+let currentSearchData = [];
+let currentPage = 1;
+const itemsPerPage = 30;
+let searchDebounceTimer;
+
+const API_URL = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec"; 
+
+// Keys
+let geminiKeys = JSON.parse(localStorage.getItem("vat_master_gemini_keys") || "[]");
+let groqKeys = JSON.parse(localStorage.getItem("vat_master_groq_keys") || "[]");
+let hfKeys = JSON.parse(localStorage.getItem("vat_master_hf_keys") || "[]");
+let cerebrasKeys = JSON.parse(localStorage.getItem("vat_master_cerebras_keys") || "[]");
+let sambanovaKeys = JSON.parse(localStorage.getItem("vat_master_sambanova_keys") || "[]");
+let deepseekKeys = JSON.parse(localStorage.getItem("vat_master_deepseek_keys") || "[]");
+let mistralKeys = JSON.parse(localStorage.getItem("vat_master_mistral_keys") || "[]");
+let nvidiaKeys = JSON.parse(localStorage.getItem("vat_master_nvidia_keys") || "[]");
+
+let idx = { gemini: 0, groq: 0, hf: 0, cerebras: 0, sambanova: 0, deepseek: 0, mistral: 0, nvidia: 0 };
+let currentPersona = 'gemini'; 
+let availablePersonas = [];
+let driveCount = '...';
+
+// --- UTILS ---
+function formatCurrencyVN(amount) {
+    if (!amount) return '0đ';
+    let str = String(amount);
+    str = str.replace(/[.,]0+$/, ''); 
+    const num = str.replace(/[^0-9]/g, '');
+    if (!num) return '0đ';
+    return new Intl.NumberFormat('vi-VN').format(num) + 'đ';
+}
+
+function formatDateVN(dateInput) {
+    if (!dateInput) return '';
+    if (typeof dateInput === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateInput)) return dateInput;
+    const date = new Date(dateInput);
+    if (!isNaN(date.getTime())) {
+         const day = String(date.getDate()).padStart(2, '0');
+         const month = String(date.getMonth() + 1).padStart(2, '0');
+         const year = date.getFullYear();
+         return `${day}/${month}/${year}`;
+    }
+    return dateInput;
+}
+
+function parseDate(dateStr) {
+    if (!dateStr) return 0;
+    if (dateStr.includes('T') || dateStr.includes('-')) return new Date(dateStr).getTime();
+    const parts = dateStr.split('/');
+    if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+    return 0;
+}
+
+async function callAPI(d) { 
+    try { 
+        return await (await fetch(API_URL, {method:'POST',body:JSON.stringify(d)})).json(); 
+    } catch(e) { 
+        return {status:'error',message:'Lỗi mạng'}; 
+    } 
+}
+
+function getDriveCount() {
+    callAPI({action: 'get_drive_count'}).then(res => {
+         if (res.status === 'success') {
+             driveCount = res.total;
+             const el = document.getElementById('vat-drive-count');
+             if(el) el.innerText = driveCount;
+         }
+    });
+}
+
+function determineInitialPersona() {
+    availablePersonas = [];
+    if (geminiKeys.length) availablePersonas.push('gemini');
+    if (deepseekKeys.length) availablePersonas.push('deepseek');
+    if (groqKeys.length) availablePersonas.push('groq');
+    if (sambanovaKeys.length) availablePersonas.push('sambanova');
+    if (cerebrasKeys.length) availablePersonas.push('cerebras');
+    if (mistralKeys.length) availablePersonas.push('mistral');
+    if (nvidiaKeys.length) availablePersonas.push('nvidia');
+    if (hfKeys.length) availablePersonas.push('hf');
+
+    if (!availablePersonas.length) currentPersona = 'gemini'; 
+    else if (!availablePersonas.includes(currentPersona)) currentPersona = availablePersonas[0];
+    
+    updateChatSubtitle();
+}
+
+function getPersonaDisplayName(p) { return { 'gemini': 'Giáo Sư Biết Tuốt', 'deepseek': 'Thám Tử Tư', 'groq': 'Thánh Tốc Độ', 'sambanova': 'Tia Chớp Đen', 'cerebras': 'Cỗ Máy Hủy Diệt', 'mistral': 'Pháp Sư Âu Châu', 'nvidia': 'Siêu Máy Tính', 'hf': 'Bà Hàng Xóm' }[p] || 'AI'; }
+
+function updateChatSubtitle() {
+    const el = document.getElementById('chat-subtitle');
+    if(!el) return;
+    if (availablePersonas.length === 0) { 
+        el.innerText = 'Chưa có nhân viên (Thiếu Key)'; 
+        el.style.color = 'var(--danger)'; 
+    } else { 
+        el.innerText = `${getPersonaDisplayName(currentPersona)} đang trực ban`; 
+        el.style.color = 'var(--success)'; 
+    }
+}
+
+// --- RENDER VIEWS ---
+
+function _renderTabs() {
+  const hasKeys = (geminiKeys.length + groqKeys.length + hfKeys.length + cerebrasKeys.length + sambanovaKeys.length + deepseekKeys.length + mistralKeys.length + nvidiaKeys.length) > 0;
+  return `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <div class="settings-tabs" style="margin-bottom:0;">
+            ${_tabs.map(t => `
+            <button class="settings-tab ${_activeTab === t.key ? 'active' : ''}" data-vattab="${t.key}">
+                <span class="material-symbols-rounded">${t.icon}</span>
+                <span>${t.label}</span>
+                ${t.key === 'settings' ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${hasKeys ? 'var(--success)' : 'var(--danger)'};margin-left:4px;"></span>` : ''}
+            </button>
+            `).join('')}
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); background:var(--bg-card); padding:8px 12px; border-radius:var(--radius); border:1px solid var(--border);">
+            Đang có <strong id="vat-drive-count" style="color:var(--primary);">${driveCount}</strong> file trên Drive
+        </div>
+    </div>
+  `;
+}
+
+function _renderUpload() {
+    return `
+    <div class="card animate-fade-in" style="margin-bottom:20px;">
+        <div class="card-header" style="background:linear-gradient(90deg, rgba(59,130,246,0.1), transparent); border-bottom:1px solid rgba(59,130,246,0.2);">
+            <h3 style="color:var(--info); display:flex; align-items:center; gap:8px;">
+                <span class="material-symbols-rounded">psychology</span> Hệ Thống Scan Đa Nhân Cách
+            </h3>
+        </div>
+        <div class="card-body">
+            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">Hỗ trợ 8 dòng AI (Gemini, DeepSeek, Groq, SambaNova, Mistral, Nvidia...) xử lý song song.</p>
+            <div id="vat-drop-zone" style="border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; cursor: pointer; transition: all .3s; position: relative;">
+                <input type="file" id="vat-file-input" style="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="application/pdf" multiple style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                <span class="material-symbols-rounded" style="font-size: 48px; color: var(--info); margin-bottom: 12px;">cloud_upload</span>
+                <h3 style="font-size: 16px; margin-bottom: 8px;">Kéo thả file PDF vào đây</h3>
+                <p style="font-size: 13px; color: var(--text-muted);">Biệt đội AI đang chờ lệnh!</p>
+            </div>
+            
+            <div id="vat-upload-list" style="margin-top: 20px; display:flex; flex-direction:column; gap:12px;"></div>
+        </div>
+    </div>
+    `;
+}
+
+function _renderSearch() {
+    return `
+    <div class="animate-fade-in">
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-body" style="display:flex; gap:12px; flex-wrap:wrap;">
+                <div style="flex:1; position:relative;">
+                    <span class="material-symbols-rounded" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted);">search</span>
+                    <input type="text" id="vat-search-input" placeholder="Nhập MST, Tên, Tiền hoặc Ngày (DD/MM)..." class="form-input" style="padding-left:40px;">
+                </div>
+                <button class="btn btn-primary" id="vat-btn-search">
+                    <span class="material-symbols-rounded">filter_alt</span> Tìm Kiếm
+                </button>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:13px; color:var(--text-muted);">
+            <div>Đang hiển thị <strong id="vat-display-count" style="color:var(--text);">0</strong> kết quả</div>
+            <div id="vat-pagination-controls" style="display:none; align-items:center; gap:8px;">
+                <button class="btn-icon border" id="vat-btn-prev"><span class="material-symbols-rounded">chevron_left</span></button>
+                <span id="vat-page-info">Trang 1</span>
+                <button class="btn-icon border" id="vat-btn-next"><span class="material-symbols-rounded">chevron_right</span></button>
+            </div>
+        </div>
+
+        <div id="vat-search-results" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:16px;">
+        </div>
+    </div>
+    `;
+}
+
+function _renderChat() {
+    return `
+    <div class="card animate-fade-in" style="height: calc(100vh - 180px); display:flex; flex-direction:column;">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:36px; height:36px; border-radius:50%; background:var(--primary-glow); display:flex; align-items:center; justify-content:center; color:var(--primary);">
+                    <span class="material-symbols-rounded">auto_awesome</span>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:15px;">Chatbot Lầy Lội</h3>
+                    <p id="chat-subtitle" style="margin:0; font-size:11px; color:var(--success);">AI đang trực ban</p>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn btn-outline btn-sm" id="vat-btn-switch-persona">
+                    <span class="material-symbols-rounded" style="font-size:16px;">swap_horiz</span> Đổi Trợ Lý
+                </button>
+                <button class="btn btn-outline btn-sm" id="vat-btn-clear-chat" style="color:var(--danger); border-color:transparent;">Xóa</button>
+            </div>
+        </div>
+        <div id="vat-chat-messages" style="flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:12px; background:var(--bg);">
+            <div style="align-self:flex-start; background:var(--bg-secondary); border:1px solid var(--border); padding:10px 14px; border-radius:12px; border-bottom-left-radius:2px; max-width:80%; font-size:13px;">
+                <div style="font-size:10px; font-weight:700; color:var(--primary); margin-bottom:4px; text-transform:uppercase;">Giáo Sư Biết Tuốt</div>
+                Chào bạn trẻ! Có hóa đơn nào cần soi hay muốn tâm sự mỏng thì bảo lẹ! 🤓
+            </div>
+        </div>
+        <div style="padding:16px; border-top:1px solid var(--border); background:var(--bg-secondary);">
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="vat-chat-input" class="form-input" placeholder="Hỏi gì khó khó xíu..." style="flex:1;">
+                <button class="btn btn-primary" id="vat-btn-send-chat">
+                    <span class="material-symbols-rounded">send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    `;
+}
+
+function _renderHistory() {
+    return `
+    <div class="card animate-fade-in">
+        <div class="card-header">
+            <h3><span class="material-symbols-rounded" style="vertical-align:middle; margin-right:8px; color:var(--info);">list_alt</span> Nhật Ký Hoạt Động</h3>
+        </div>
+        <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>Hoạt động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vat-history-list">
+                        <tr><td colspan="2" class="text-center text-muted">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    `;
+}
+
+function _renderSettings() {
+    return `
+    <div class="card animate-fade-in">
+        <div class="card-header" style="background:var(--bg-secondary);">
+            <h3><span class="material-symbols-rounded" style="vertical-align:middle; margin-right:8px;">admin_panel_settings</span> Cấu Hình API Keys</h3>
+            <button class="btn btn-primary btn-sm" id="vat-btn-save-settings">Lưu & Đồng Bộ</button>
+        </div>
+        <div class="card-body">
+            
+            <div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:var(--radius); padding:16px; margin-bottom:20px;">
+                <label class="form-label" style="color:#818cf8;"><span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">key</span> Admin Access (Lấy key tự động)</label>
+                <div style="display:flex; gap:8px; max-width:400px;">
+                    <input type="password" id="vat-admin-password" class="form-input" placeholder="Nhập mã truy cập admin...">
+                    <button class="btn" style="background:#4f46e5; color:#fff;" id="vat-btn-admin-login">Lấy Key</button>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:16px;">
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Gemini</span> <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-gemini" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>DeepSeek</span> <a href="https://platform.deepseek.com/api_keys" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-deepseek" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Groq</span> <a href="https://console.groq.com/keys" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-groq" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>SambaNova</span> <a href="https://cloud.sambanova.ai/" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-sambanova" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Cerebras</span> <a href="https://cloud.cerebras.ai/" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-cerebras" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>HuggingFace</span> <a href="https://huggingface.co/settings/tokens" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-hf" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Mistral AI</span> <a href="https://console.mistral.ai/api-keys/" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-mistral" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>NVIDIA</span> <a href="https://build.nvidia.com/explore/discover" target="_blank" style="font-size:10px;">Lấy Key</a></label>
+                    <textarea id="vat-key-nvidia" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+}
+
+export function render() {
+  var content = '';
+  if (_activeTab === 'upload') content = _renderUpload();
+  else if (_activeTab === 'search') content = _renderSearch();
+  else if (_activeTab === 'chat') content = _renderChat();
+  else if (_activeTab === 'history') content = _renderHistory();
+  else if (_activeTab === 'settings') content = _renderSettings();
+
+  return `
+    ${_renderTabs()}
+    <div id="vatTabContent">
+      ${content}
+    </div>
+  `;
+}
+
+// --- INIT & LOGIC ---
+
+function _switchTab(tabKey) {
+  _activeTab = tabKey;
+  window.refreshView();
+}
+
+function _bindEvents() {
+    document.querySelectorAll('[data-vattab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            _switchTab(btn.dataset.vattab);
+        });
+    });
+
+    if (_activeTab === 'settings') {
+        document.getElementById('vat-key-gemini').value = geminiKeys.join('\n');
+        document.getElementById('vat-key-deepseek').value = deepseekKeys.join('\n');
+        document.getElementById('vat-key-groq').value = groqKeys.join('\n');
+        document.getElementById('vat-key-sambanova').value = sambanovaKeys.join('\n');
+        document.getElementById('vat-key-cerebras').value = cerebrasKeys.join('\n');
+        document.getElementById('vat-key-hf').value = hfKeys.join('\n');
+        document.getElementById('vat-key-mistral').value = mistralKeys.join('\n');
+        document.getElementById('vat-key-nvidia').value = nvidiaKeys.join('\n');
+
+        document.getElementById('vat-btn-save-settings')?.addEventListener('click', saveSettings);
+        document.getElementById('vat-btn-admin-login')?.addEventListener('click', handleAdminLogin);
+    }
+    
+    if (_activeTab === 'upload') {
+        const fileInput = document.getElementById('vat-file-input');
+        if(fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                handleFileSelect(e.target.files);
+            });
+        }
+        renderQueue();
+    }
+
+    if (_activeTab === 'search') {
+        const searchInput = document.getElementById('vat-search-input');
+        if(searchInput) {
+            searchInput.addEventListener('keyup', (e) => {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(() => doSearch(true), 300);
+            });
+        }
+        document.getElementById('vat-btn-search')?.addEventListener('click', () => doSearch(false));
+        document.getElementById('vat-btn-prev')?.addEventListener('click', () => changePage(-1));
+        document.getElementById('vat-btn-next')?.addEventListener('click', () => changePage(1));
+        
+        // Auto load if empty
+        if(currentSearchData.length === 0) doSearch(true);
+        else renderPagedResults();
+    }
+
+    if (_activeTab === 'history') {
+        loadHistory();
+    }
+
+    if (_activeTab === 'chat') {
+        document.getElementById('vat-btn-send-chat')?.addEventListener('click', sendChat);
+        document.getElementById('vat-chat-input')?.addEventListener('keyup', (e) => {
+            if(e.key === 'Enter') sendChat();
+        });
+        document.getElementById('vat-btn-clear-chat')?.addEventListener('click', () => {
+            document.getElementById('vat-chat-messages').innerHTML = '';
+        });
+        document.getElementById('vat-btn-switch-persona')?.addEventListener('click', manualSwitchPersona);
+        updateChatSubtitle();
+    }
+}
+
+export function init() {
+    determineInitialPersona();
+    if(driveCount === '...') getDriveCount();
+    _bindEvents();
+}
+
+// --- SETTINGS LOGIC ---
+
+function parseKeys(id) { 
+    const val = document.getElementById(id).value;
+    if(!val) return [];
+    return val.split('\n').map(k=>k.trim()).filter(k=>k.length>5); 
+}
+
+function saveSettings() {
+    geminiKeys = parseKeys('vat-key-gemini');
+    groqKeys = parseKeys('vat-key-groq');
+    hfKeys = parseKeys('vat-key-hf');
+    cerebrasKeys = parseKeys('vat-key-cerebras');
+    sambanovaKeys = parseKeys('vat-key-sambanova');
+    deepseekKeys = parseKeys('vat-key-deepseek');
+    mistralKeys = parseKeys('vat-key-mistral');
+    nvidiaKeys = parseKeys('vat-key-nvidia');
+
+    localStorage.setItem("vat_master_gemini_keys", JSON.stringify(geminiKeys));
+    localStorage.setItem("vat_master_groq_keys", JSON.stringify(groqKeys));
+    localStorage.setItem("vat_master_hf_keys", JSON.stringify(hfKeys));
+    localStorage.setItem("vat_master_cerebras_keys", JSON.stringify(cerebrasKeys));
+    localStorage.setItem("vat_master_sambanova_keys", JSON.stringify(sambanovaKeys));
+    localStorage.setItem("vat_master_deepseek_keys", JSON.stringify(deepseekKeys));
+    localStorage.setItem("vat_master_mistral_keys", JSON.stringify(mistralKeys));
+    localStorage.setItem("vat_master_nvidia_keys", JSON.stringify(nvidiaKeys));
+    
+    determineInitialPersona();
+    callAPI({ action: 'save_system_keys', gemini: geminiKeys, groq: groqKeys, hf: hfKeys, cerebras: cerebrasKeys, sambanova: sambanovaKeys, deepseek: deepseekKeys, mistral: mistralKeys, nvidia: nvidiaKeys });
+    
+    alert("Đã lưu API Keys thành công!");
+    window.refreshView();
+}
+
+function handleAdminLogin() {
+    const pass = document.getElementById('vat-admin-password').value;
+    if (!pass) return alert('Vui lòng nhập mã truy cập!');
+    
+    const btn = document.getElementById('vat-btn-admin-login');
+    const oldText = btn.innerText;
+    btn.innerText = 'Đang tải...';
+    
+    callAPI({ action: 'get_system_keys', password: pass }).then(res => {
+        btn.innerText = oldText;
+        if (res.status === 'success') {
+            if(res.gemini) document.getElementById('vat-key-gemini').value = res.gemini.join('\n');
+            if(res.groq) document.getElementById('vat-key-groq').value = res.groq.join('\n');
+            if(res.hf) document.getElementById('vat-key-hf').value = res.hf.join('\n');
+            if(res.cerebras) document.getElementById('vat-key-cerebras').value = res.cerebras.join('\n');
+            if(res.sambanova) document.getElementById('vat-key-sambanova').value = res.sambanova.join('\n');
+            if(res.deepseek) document.getElementById('vat-key-deepseek').value = res.deepseek.join('\n');
+            if(res.mistral) document.getElementById('vat-key-mistral').value = res.mistral.join('\n');
+            if(res.nvidia) document.getElementById('vat-key-nvidia').value = res.nvidia.join('\n');
+            alert('Đã mượn được hàng nóng từ kho Admin!');
+        } else alert(res.message || 'Mã không đúng!');
+    });
+}
+
+function checkApiKey() {
+    if (!availablePersonas.length) { 
+        alert("Hệ thống cần ít nhất 1 Key để hoạt động. Vui lòng cấu hình!");
+        _switchTab('settings');
+        return false; 
+    }
+    return true;
+}
+
+// --- UPLOAD LOGIC ---
+
+function handleFileSelect(files) {
+    if(!files || files.length===0) return;
+    Array.from(files).forEach(file => {
+        if (file.type !== 'application/pdf') return alert('Chỉ nhận file PDF');
+        const id = Date.now() + Math.random().toString(36).substr(2, 9);
+        uploadQueue.unshift({ id, file, status: 'pending', rawText: '', data: { tenDonVi: '', mst: '', tongTien: '', ngayKy: '', diaChi: '' } });
+        aiScanQueue.push(id);
+    });
+    renderQueue(); 
+    processScanQueue();
+}
+
+function renderQueue() {
+    const list = document.getElementById('vat-upload-list');
+    if(!list) return;
+    
+    if(uploadQueue.length === 0) {
+        list.innerHTML = '';
+        return;
+    }
+    
+    list.innerHTML = uploadQueue.map(item => `
+        <div class="card" id="item-${item.id}">
+            <div class="card-body" style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; padding:12px 16px;">
+                <div style="display:flex; align-items:center; gap:12px; min-width:200px; flex:1;">
+                    <div style="width:40px; height:40px; background:var(--danger-bg); color:var(--danger); border-radius:8px; display:flex; align-items:center; justify-content:center;">
+                        <span class="material-symbols-rounded">picture_as_pdf</span>
+                    </div>
+                    <div style="overflow:hidden;">
+                        <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.file.name}">${item.file.name}</div>
+                        <span class="tag ${getStatusColor(item.status)}" id="status-badge-${item.id}" style="margin-top:4px;">${getStatusText(item.status)}</span>
+                    </div>
+                </div>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; flex:2; min-width:300px;">
+                    <input type="text" class="form-input" style="font-size:12px; padding:6px 10px;" placeholder="Đơn vị" value="${item.data.tenDonVi}" onchange="window.vatUpdateItem('${item.id}', 'tenDonVi', this.value)">
+                    <input type="text" class="form-input" style="font-size:12px; padding:6px 10px; color:var(--info); font-family:monospace;" placeholder="MST" value="${item.data.mst}" onchange="window.vatUpdateItem('${item.id}', 'mst', this.value)">
+                    <input type="text" class="form-input" style="font-size:12px; padding:6px 10px;" placeholder="Địa chỉ" value="${item.data.diaChi}" onchange="window.vatUpdateItem('${item.id}', 'diaChi', this.value)">
+                    <input type="text" class="form-input" style="font-size:12px; padding:6px 10px; color:var(--success); font-weight:bold;" placeholder="Tổng tiền" value="${formatCurrencyVN(item.data.tongTien)}" onchange="window.vatUpdateItem('${item.id}', 'tongTien', this.value)">
+                </div>
+                
+                <div style="display:flex; gap:8px; flex-direction:column; min-width:100px;" id="actions-${item.id}">
+                    ${getActionButtons(item)}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getStatusColor(s) { 
+    return { pending: '', scanning: 'tag-warning', ready: 'tag-info', uploading: 'tag-transfer', done: 'tag-success', error: 'tag-expense' }[s] || ''; 
+}
+function getStatusText(s) { 
+    return { pending: 'Chờ...', scanning: 'Đang đọc...', ready: 'Sẵn sàng', uploading: 'Đang lưu...', done: 'Hoàn tất', error: 'Lỗi' }[s]; 
+}
+
+function getActionButtons(item) {
+    if (['ready', 'error'].includes(item.status)) return `
+        <button onclick="window.vatRetryAI('${item.id}')" class="btn btn-outline btn-sm" style="color:var(--warning); border-color:var(--warning);"><span class="material-symbols-rounded" style="font-size:14px;">refresh</span> Thử lại</button>
+        <button onclick="window.vatUploadItem('${item.id}')" class="btn btn-primary btn-sm">Lưu tay</button>
+    `;
+    if (item.status === 'done') return `<div style="text-align:center; color:var(--success); font-weight:bold; font-size:12px;"><span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">check_circle</span> Đã lưu</div>`;
+    return `<button onclick="window.vatRemoveItem('${item.id}')" class="btn btn-outline btn-sm" style="color:var(--danger); border-color:transparent;"><span class="material-symbols-rounded" style="font-size:16px;">delete</span> Xóa</button>`;
+}
+
+// Attach globals for inline handlers
+window.vatUpdateItem = (id, key, val) => { const i = uploadQueue.find(x => x.id === id); if(i) i.data[key] = val; };
+window.vatRemoveItem = (id) => { uploadQueue = uploadQueue.filter(x => x.id !== id); aiScanQueue = aiScanQueue.filter(x => x !== id); renderQueue(); };
+window.vatRetryAI = (id) => { const i = uploadQueue.find(x => x.id === id); if(i) { i.status = 'pending'; renderQueue(); aiScanQueue.push(id); processScanQueue(); } };
+window.vatUploadItem = uploadItem;
+window.vatDeleteInvoice = deleteInvoice;
+window.vatPreviewFile = (url) => window.open(url.replace('/view','/preview'), '_blank');
+window.vatCopyLink = (url) => navigator.clipboard.writeText(url);
+
+function updateStatusUI(id, s, t) { 
+    const i = uploadQueue.find(x => x.id === id); 
+    if(i) { 
+        i.status = s; 
+        const badge = document.getElementById(`status-badge-${id}`);
+        if (badge) {
+            badge.className = `tag ${getStatusColor(s)}`;
+            if (s !== 'scanning') badge.innerText = getStatusText(s);
+            else if (!badge.innerText.includes('đang đọc')) badge.innerText = t || getStatusText(s);
+        }
+        const actions = document.getElementById(`actions-${id}`);
+        if (actions) actions.innerHTML = getActionButtons(i);
+    } 
+}
+
+async function processScanQueue() {
+    if (!aiScanQueue.length || activeScans >= MAX_CONCURRENT_SCANS) return;
+    while (aiScanQueue.length > 0 && activeScans < MAX_CONCURRENT_SCANS) {
+        const id = aiScanQueue.shift();
+        const item = uploadQueue.find(i => i.id === id);
+        if (item && item.status === 'pending') {
+            activeScans++;
+            autoScanAndUpload(id).finally(() => { activeScans--; processScanQueue(); });
+        }
+    }
+}
+
+// Add simple pdfjs worker injection for text extraction (we assume it's loaded in index.html if needed, 
+// but since we shouldn't modify index.html heavily unless needed, we can load it dynamically or just rely on backend parsing if needed.
+// Actually, original vat.html uses CDN for pdf.js. We need to inject it.
+let pdfjsLibLoaded = false;
+async function loadPdfJs() {
+    if(pdfjsLibLoaded || window.pdfjsLib) return;
+    return new Promise(resolve => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
+        script.onload = () => {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+            pdfjsLibLoaded = true;
+            resolve();
+        };
+        document.head.appendChild(script);
+    });
+}
+
+async function autoScanAndUpload(id) {
+    const item = uploadQueue.find(i => i.id === id);
+    updateStatusUI(id, 'scanning', 'Đang xếp hàng...');
+    
+    try {
+        await loadPdfJs();
+        if (!item.rawText) {
+            const buf = await item.file.arrayBuffer();
+            const pdf = await window.pdfjsLib.getDocument(buf).promise;
+            let txt = ''; 
+            for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) {
+                txt += (await (await pdf.getPage(i)).getTextContent()).items.map(s => s.str).join(' ') + '\n';
+            }
+            item.rawText = txt;
+        }
+        const prompt = `Trích xuất JSON (tenDonVi, mst, tongTien, ngayKy, diaChi) từ văn bản: "${item.rawText.substring(0, 3000)}".
+        Quy tắc BẮT BUỘC:
+        1. Ngày ký: Phải chuẩn định dạng DD/MM/YYYY. Ví dụ 05/01/2024.
+        2. TỔNG TIỀN: Tìm số tiền thanh toán cuối cùng (Grand Total) bao gồm thuế GTGT.
+        3. Địa chỉ: Lấy đầy đủ địa chỉ đơn vị mua.`;
+        
+        const res = await callAI_Unified(prompt, 'extract', id);
+        
+        if (!res) return updateStatusUI(id, 'ready');
+        
+        let json = res.replace(/```json/g, '').replace(/```/g, '').trim();
+        if(json.includes('{')) json = json.substring(json.indexOf('{'), json.lastIndexOf('}')+1);
+        const data = JSON.parse(json);
+        
+        item.data = { ...item.data, ...data };
+        renderQueue(); 
+        
+        // Auto upload if we have mst and date
+        if (item.data.mst && item.data.ngayKy) await uploadItem(id); 
+        else updateStatusUI(id, 'ready');
+    } catch (e) { 
+        console.error(e);
+        updateStatusUI(id, 'error', 'Lỗi AI'); 
+    }
+}
+
+async function uploadItem(id) {
+    const item = uploadQueue.find(i => i.id === id);
+    updateStatusUI(id, 'uploading', 'Đang lưu...');
+    return new Promise(resolve => {
+        const r = new FileReader(); r.readAsDataURL(item.file);
+        r.onload = () => {
+            let finalFileName = item.file.name;
+            if (item.data.ngayKy && item.data.mst) {
+                finalFileName = `${item.data.ngayKy.replace(/\//g,'-')}-${item.data.mst}.pdf`;
+            }
+
+            callAPI({ 
+                action: 'upload', 
+                fileBase64: r.result.split(',')[1], 
+                mimeType: item.file.type, 
+                fileName: finalFileName,
+                ...item.data 
+            }).then(res => {
+                updateStatusUI(id, res.status==='success'?'done':'error', res.status==='success'?'Đã lưu':'Lỗi');
+                if(res.status==='success') { 
+                    doSearch(true); 
+                    getDriveCount(); 
+                }
+                resolve();
+            });
+        };
+    });
+}
+
+function deleteInvoice(fileName) {
+    showConfirm('Thay thế hóa đơn?', 'Bạn có chắc muốn xóa hóa đơn cũ này để nạp lại bản mới không?', () => {
+        callAPI({ action: 'delete_invoice', fileName: fileName }).then(res => {
+            if(res.status === 'success') {
+                alert('Đã xóa hóa đơn cũ. Hãy chọn file mới để upload.');
+                doSearch(true);
+                getDriveCount();
+                _switchTab('upload');
+            } else {
+                alert('Không xóa được file.');
+            }
+        });
+    });
+}
+
+// --- SEARCH LOGIC ---
+
+function doSearch(bg=false) {
+    const searchInput = document.getElementById('vat-search-input');
+    let q = searchInput ? searchInput.value.trim() : '';
+    
+    if (/^(\d{1,2})[-.\s](\d{1,2})(?:[-.\s](\d{4}))?$/.test(q)) {
+         const match = q.match(/^(\d{1,2})[-.\s](\d{1,2})(?:[-.\s](\d{4}))?$/);
+         const d = match[1].padStart(2, '0');
+         const m = match[2].padStart(2, '0');
+         const y = match[3];
+         q = y ? `${d}/${m}/${y}` : `${d}/${m}`;
+    }
+
+    if(!bg) {
+        const btn = document.getElementById('vat-btn-search');
+        if(btn) btn.innerHTML = '<span class="material-symbols-rounded spin-icon">sync</span> Đang tìm...';
+    }
+    
+    callAPI({ action: 'search', query: q, limit: 5000, nocache: new Date().getTime() }).then(res => {
+        if(!bg) {
+            const btn = document.getElementById('vat-btn-search');
+            if(btn) btn.innerHTML = '<span class="material-symbols-rounded">filter_alt</span> Tìm Kiếm';
+        }
+        if(res.status === 'success') {
+            currentSearchData = res.data.sort((a, b) => parseDate(b.ngayKy) - parseDate(a.ngayKy));
+            currentPage = 1;
+            renderPagedResults();
+        }
+    });
+}
+
+function renderPagedResults() {
+    const container = document.getElementById('vat-search-results');
+    if(!container) return;
+    
+    const totalItems = currentSearchData.length;
+    const countEl = document.getElementById('vat-display-count');
+    if(countEl) countEl.innerText = totalItems;
+    
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = currentSearchData.slice(startIndex, endIndex);
+
+    const controls = document.getElementById('vat-pagination-controls');
+    if (controls) {
+        if (totalItems > itemsPerPage) {
+            controls.style.display = 'flex';
+            document.getElementById('vat-page-info').innerText = `Trang ${currentPage} / ${totalPages}`;
+            document.getElementById('vat-btn-prev').disabled = currentPage === 1;
+            document.getElementById('vat-btn-next').disabled = currentPage === totalPages;
+        } else {
+            controls.style.display = 'none';
+        }
+    }
+
+    if(pageData.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><span class="material-symbols-rounded empty-icon">search_off</span><h3>Không tìm thấy dữ liệu</h3><p>Vui lòng thử từ khóa khác</p></div>';
+        return;
+    }
+
+    container.innerHTML = pageData.map(d => `
+        <div class="card" style="display:flex; flex-direction:column;">
+            <div class="card-body" style="flex:1;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                    <h3 style="font-size:14px; margin:0; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${d.tenDonVi}</h3>
+                    <span class="tag tag-info" style="margin-left:8px;">${d.mst}</span>
+                </div>
+                <p style="font-size:11px; color:var(--text-muted); margin-bottom:12px; display:flex; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">location_on</span> ${d.diaChi}</p>
+                <div style="background:var(--bg-secondary); border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; font-size:12px;">
+                        <span style="color:var(--text-muted);"><span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">calendar_today</span> Ngày ký</span>
+                        <span style="font-weight:600;">${formatDateVN(d.ngayKy)}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px;">
+                        <span style="color:var(--success);"><span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">payments</span> Tiền</span>
+                        <span style="font-weight:700; color:var(--success);">${formatCurrencyVN(d.tongTien)}</span>
+                    </div>
+                </div>
+            </div>
+            <div style="padding:12px; border-top:1px solid var(--border); display:flex; gap:8px; background:var(--bg-secondary);">
+                <button onclick="window.vatPreviewFile('${d.linkView}')" class="btn btn-outline btn-sm" style="flex:1;">Xem</button>
+                <button onclick="window.vatDeleteInvoice('${d.fileName}')" class="btn btn-outline btn-sm" style="color:var(--danger);" title="Thay thế/Xóa"><span class="material-symbols-rounded" style="font-size:16px;">delete</span></button>
+                <button onclick="window.vatCopyLink('${d.linkView}')" class="btn btn-outline btn-sm" title="Copy Link"><span class="material-symbols-rounded" style="font-size:16px;">content_copy</span></button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function changePage(step) {
+    const totalPages = Math.ceil(currentSearchData.length / itemsPerPage);
+    const newPage = currentPage + step;
+    if (newPage >= 1 && newPage <= totalPages) {
+        currentPage = newPage;
+        renderPagedResults();
+    }
+}
+
+// --- HISTORY LOGIC ---
+
+function loadHistory() {
+    callAPI({action:'get_history'}).then(res => { 
+        const list = document.getElementById('vat-history-list');
+        if(list && res.status==='success') {
+            list.innerHTML=res.data.map(r=>`
+                <tr>
+                    <td style="font-size:12px; color:var(--text-muted);">${new Date(r[0]).toLocaleString('vi-VN')}</td>
+                    <td>${r[1]}</td>
+                </tr>
+            `).join(''); 
+        }
+    }); 
+}
+
+// --- CHAT LOGIC ---
+
+function rotatePersona() { 
+    if (availablePersonas.length > 1) { 
+        currentPersona = availablePersonas[(availablePersonas.indexOf(currentPersona) + 1) % availablePersonas.length]; 
+        updateChatSubtitle(); 
+        return currentPersona; 
+    } 
+}
+
+function manualSwitchPersona() { 
+    if (availablePersonas.length > 1) { 
+        rotatePersona(); 
+        const container = document.getElementById('vat-chat-messages'); 
+        if(container) {
+            container.innerHTML += `<div style="text-align:center; font-size:11px; color:var(--text-muted); margin:10px 0;">Đã đổi sang: <b>${getPersonaDisplayName(currentPersona)}</b>. Sẵn sàng phục vụ!</div>`; 
+            container.scrollTop = container.scrollHeight; 
+        }
+    } 
+}
+
+async function sendChat() {
+    const input = document.getElementById('vat-chat-input');
+    const msg = input.value.trim(); 
+    if(!msg) return;
+    
+    const container = document.getElementById('vat-chat-messages');
+    
+    // User message
+    container.innerHTML += `
+        <div style="align-self:flex-end; background:var(--primary-glow); border:1px solid rgba(232,168,56,.2); color:var(--primary); padding:10px 14px; border-radius:12px; border-bottom-right-radius:2px; max-width:80%; font-size:13px;">
+            ${msg}
+        </div>
+    `;
+    input.value = ''; 
+    container.scrollTop = container.scrollHeight;
+    
+    const lid = 'l-'+Date.now(); 
+    container.innerHTML += `
+        <div id="${lid}" style="align-self:flex-start; color:var(--text-muted); padding:10px 14px; font-size:13px;">
+            <span class="material-symbols-rounded spin-icon" style="font-size:16px; vertical-align:middle;">sync</span> Đang suy nghĩ...
+        </div>
+    `; 
+    container.scrollTop = container.scrollHeight;
+    
+    const context = currentSearchData.slice(0,20).map(d=>`- ${d.tenDonVi} (${d.tongTien})`).join('\n');
+    const res = await callAI_Persona(`Dữ liệu hóa đơn:\n${context}\nHỏi: "${msg}"`);
+    
+    document.getElementById(lid).remove();
+    
+    // AI message
+    container.innerHTML += `
+        <div style="align-self:flex-start; background:var(--bg-secondary); border:1px solid var(--border); padding:10px 14px; border-radius:12px; border-bottom-left-radius:2px; max-width:80%; font-size:13px; line-height:1.5;">
+            <div style="font-size:10px; font-weight:700; color:var(--success); margin-bottom:4px; text-transform:uppercase;">${getPersonaDisplayName(currentPersona)}</div>
+            ${res.replace(/\n/g, '<br>')}
+        </div>
+    `;
+    container.scrollTop = container.scrollHeight;
+}
+
+// --- AI API CALLS ---
+
+async function callAI_Unified(promptText, mode = 'extract', fileId = null) {
+    if (!checkApiKey()) return null;
+    
+    const tryProv = (p, prompt, m) => tryProvider(p, prompt, m, fileId);
+
+    if (geminiKeys.length) try { return await tryProv('gemini', promptText, mode); } catch(e) {}
+    if (deepseekKeys.length) try { return await tryProv('deepseek', promptText, mode); } catch(e) {}
+    if (groqKeys.length) try { return await tryProv('groq', promptText, mode); } catch(e) {}
+    if (sambanovaKeys.length) try { return await tryProv('sambanova', promptText, mode); } catch(e) {}
+    if (cerebrasKeys.length) try { return await tryProv('cerebras', promptText, mode); } catch(e) {}
+    if (mistralKeys.length) try { return await tryProv('mistral', promptText, mode); } catch(e) {}
+    if (nvidiaKeys.length) try { return await tryProv('nvidia', promptText, mode); } catch(e) {}
+    if (hfKeys.length) try { return await tryProv('hf', promptText, mode); } catch(e) {}
+    throw new Error("Tất cả các AI đều bận. Vui lòng thử lại!");
+}
+
+async function callAI_Persona(promptText) {
+    if (!checkApiKey()) return null;
+    if (!availablePersonas.includes(currentPersona)) {
+        if (availablePersonas.length) currentPersona = availablePersonas[0];
+        else return `Xin lỗi, chưa có Key nào được cấu hình.`;
+    }
+    let attemptOrder = availablePersonas.slice(availablePersonas.indexOf(currentPersona)).concat(availablePersonas.slice(0, availablePersonas.indexOf(currentPersona)));
+    for (const persona of attemptOrder) {
+        try {
+            if (currentPersona !== persona) { currentPersona = persona; updateChatSubtitle(); }
+            const res = await tryProvider(persona, promptText, 'chat');
+            if (persona !== attemptOrder[0]) return `_(⚠️ ${getPersonaDisplayName(attemptOrder[0])} bận, **${getPersonaDisplayName(persona)}** trả lời thay)_\n\n${res}`;
+            return res;
+        } catch (e) {}
+    }
+    return `Toang rồi! Tất cả các trợ lý đều bận.`;
+}
+
+async function tryProvider(provider, prompt, mode, fileId = null) {
+    let keys = [], runner = null;
+    let displayNames = {
+        'gemini': 'Gemini', 'groq': 'Groq', 'cerebras': 'Cerebras', 
+        'hf': 'HuggingFace', 'sambanova': 'SambaNova', 'deepseek': 'DeepSeek',
+        'mistral': 'Mistral', 'nvidia': 'NVIDIA'
+    };
+
+    if (provider==='gemini'){ keys=geminiKeys; runner=callGeminiDirect; }
+    else if(provider==='groq'){ keys=groqKeys; runner=callGroqDirect; }
+    else if(provider==='cerebras'){ keys=cerebrasKeys; runner=callCerebrasDirect; }
+    else if(provider==='hf'){ keys=hfKeys; runner=callHuggingFaceDirect; }
+    else if(provider==='sambanova'){ keys=sambanovaKeys; runner=callSambaNovaDirect; }
+    else if(provider==='deepseek'){ keys=deepseekKeys; runner=callDeepSeekDirect; }
+    else if(provider==='mistral'){ keys=mistralKeys; runner=callMistralDirect; }
+    else if(provider==='nvidia'){ keys=nvidiaKeys; runner=callNvidiaDirect; }
+
+    for (let i=0; i<keys.length; i++) {
+        let startIdx = idx[provider]; idx[provider] = (idx[provider] + 1) % keys.length;
+        
+        if (mode === 'extract' && fileId) {
+            const badge = document.getElementById(`status-badge-${fileId}`);
+            if(badge) {
+                badge.innerText = `${displayNames[provider]} đang đọc...`;
+            }
+        }
+        
+        try { return await runner(keys[(startIdx + i) % keys.length], prompt, mode); } catch (e) { console.warn(`${provider} key failed`); }
+    }
+    throw new Error(`${provider} exhausted`);
+}
+
+const SYSTEM_INSTRUCTION = "YÊU CẦU: Trả lời NGẮN GỌN, SÚC TÍCH, ĐẦY ĐỦ Ý. Giọng điệu: HÀI HƯỚC, LẦY LỘI nhưng LỊCH SỰ. Không lan man. Ngày tháng luôn dùng định dạng DD/MM/YYYY. Tiền bạc lấy số nguyên, không dấu chấm phẩy.";
+
+async function callGeminiDirect(key, prompt, mode) {
+    const p = mode==='chat' ? `Bạn là 'Giáo Sư Biết Tuốt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤓📚. User: ` + prompt : prompt;
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}]})});
+    if(!res.ok) throw new Error(res.status); return (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text;
+}
+async function callDeepSeekDirect(key, prompt, mode) {
+    const sys = mode==='chat' ? `Bạn là 'Thám Tử Tư'. ${SYSTEM_INSTRUCTION} Dùng icon 🕵️‍♂️.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+    const res = await fetch("https://api.deepseek.com/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"deepseek-chat",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+}
+async function callGroqDirect(key, prompt, mode) {
+    const sys = mode==='chat' ? `Bạn là 'Thánh Tốc Độ'. ${SYSTEM_INSTRUCTION} Dùng icon 🚀.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+}
+async function callSambaNovaDirect(key, prompt, mode) {
+    const sys = mode==='chat' ? `Bạn là 'Tia Chớp Đen'. ${SYSTEM_INSTRUCTION} Dùng icon ⚡.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+    const res = await fetch("https://api.sambanova.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"Meta-Llama-3.1-70B-Instruct",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+}
+async function callCerebrasDirect(key, prompt, mode) {
+    const sys = mode==='chat' ? `Bạn là 'Cỗ Máy Hủy Diệt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤖.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
+    const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"llama3.1-70b",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+}
+async function callMistralDirect(key, prompt, mode) {
+     const p = mode==='chat' ? `[INST] Bạn là 'Pháp Sư Âu Châu'. ${SYSTEM_INSTRUCTION} User: ${prompt} [/INST]` : `[INST] Extract JSON. Date format DD/MM/YYYY. Amount pure number. Content: ${prompt} [/INST]`;
+     const res = await fetch("https://api.mistral.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"mistral-small-latest",messages:[{role:"user",content:p}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
+     if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+}
+async function callNvidiaDirect(key, prompt, mode) {
+     const sys = mode==='chat' ? `Bạn là 'Siêu Máy Tính'. ${SYSTEM_INSTRUCTION}` : "Extract JSON.";
+     const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"meta/llama-3.1-405b-instruct",messages:[{role:"system",content:sys},{role:"user",content:prompt}],max_tokens: 1024, stream: false})});
+     if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+}
+async function callHuggingFaceDirect(key, prompt, mode) {
+    const p = mode==='chat' ? `[INST] Bạn là 'Bà Hàng Xóm'. ${SYSTEM_INSTRUCTION} User: ${prompt} [/INST]` : `[INST] Extract JSON. Date format DD/MM/YYYY. Amount pure number. Content: ${prompt} [/INST]`;
+    const res = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({inputs:p,parameters:{max_new_tokens:1000,return_full_text:false}})});
+    if(!res.ok) throw new Error(res.status); const d = await res.json(); return Array.isArray(d) ? d[0].generated_text : d.generated_text;
+}

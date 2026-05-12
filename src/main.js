@@ -34,6 +34,7 @@ import * as revenueView from './views/revenue.js';
 import * as historyView from './views/history.js';
 import * as settingsView from './views/settings.js';
 import * as drinkInventoryView from './views/drinkInventory.js';
+import * as vatView from './views/vat.js';
 
 // ── View Registry ────────────────────────────
 var views = {
@@ -45,6 +46,7 @@ var views = {
   'history':      { module: historyView,      title: 'Lịch sử ca' },
   'settings':     { module: settingsView,     title: 'Cài đặt' },
   'drink-inventory': { module: drinkInventoryView, title: 'Kiểm kho đồ uống' },
+  'vat':          { module: vatView,          title: 'Hóa đơn VAT' },
 };
 
 var currentView = 'dashboard';
