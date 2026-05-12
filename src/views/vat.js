@@ -1,4 +1,4 @@
-import { showConfirm } from '../utils.js';
+import { showConfirm, showModal, hideModal, showToast } from '../utils.js';
 
 let _activeTab = 'upload';
 const _tabs = [
@@ -694,34 +694,86 @@ function deleteInvoice(fileName) {
 }
 
 function promptEmail(fileName, tenDonVi, tongTien) {
-    const email = window.prompt(`Gửi hóa đơn VAT cho: ${tenDonVi}\nTổng tiền: ${formatCurrencyVN(tongTien)}\n\nVui lòng nhập Email khách hàng:`);
-    if (!email || !email.trim()) return;
-    if (!email.includes('@')) return alert('Email không hợp lệ!');
-    
-    const toastId = 'toast-' + Date.now();
-    const toast = document.createElement('div');
-    toast.id = toastId;
-    toast.style.cssText = 'position:fixed; top:20px; right:20px; background:var(--bg-card); border:1px solid var(--info); padding:12px 20px; border-radius:8px; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.2); display:flex; align-items:center; gap:8px;';
-    toast.innerHTML = `<span class="material-symbols-rounded spin-icon" style="color:var(--info);">sync</span> <span>Đang gửi email...</span>`;
-    document.body.appendChild(toast);
+    const inputId = 'vatEmailInput_' + Date.now();
+    const html = `
+        <div style="padding:10px 0;">
+            <div style="display:flex; justify-content:center; margin-bottom:16px;">
+                <div style="width:48px; height:48px; border-radius:50%; background:var(--info-dim); color:var(--info); display:flex; align-items:center; justify-content:center;">
+                    <span class="material-symbols-rounded" style="font-size:24px;">mail</span>
+                </div>
+            </div>
+            <h3 style="font-size:18px; font-weight:700; text-align:center; margin-bottom:8px;">Gửi Hóa Đơn</h3>
+            <p style="font-size:14px; text-align:center; color:var(--text-muted); margin-bottom:16px;">
+                ${tenDonVi}<br>
+                <strong style="color:var(--text); font-size:16px;">${formatCurrencyVN(tongTien)}</strong>
+            </p>
+            <div class="form-group" style="margin-bottom:24px;">
+                <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Email khách hàng</label>
+                <input type="email" id="${inputId}" class="form-input" placeholder="Nhập địa chỉ email..." autocomplete="email" style="width:100%; text-align:center;">
+            </div>
+            <div style="display:flex; gap:10px; justify-content:center;">
+                <button class="btn btn-outline" id="vatEmailCancel" style="flex:1;">Hủy</button>
+                <button class="btn btn-primary" id="vatEmailSubmit" style="flex:1; background:var(--info); border-color:var(--info);">Gửi Email</button>
+            </div>
+        </div>
+    `;
 
-    callAPI({ 
-        action: 'send_email', 
-        email: email.trim(), 
-        fileName: fileName,
-        tenDonVi: tenDonVi,
-        tongTien: tongTien
-    }).then(res => {
-        const t = document.getElementById(toastId); if(t) t.remove();
-        if(res.status === 'success') {
-            alert(`Đã gửi email thành công đến: ${email}`);
-        } else {
-            alert('Lỗi: ' + (res.message || 'Backend chưa xử lý send_email'));
+    showModal(html);
+
+    setTimeout(() => {
+        const inputEl = document.getElementById(inputId);
+        const cancelBtn = document.getElementById('vatEmailCancel');
+        const submitBtn = document.getElementById('vatEmailSubmit');
+
+        if (inputEl) inputEl.focus();
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => hideModal());
         }
-    }).catch(e => {
-        const t = document.getElementById(toastId); if(t) t.remove();
-        alert('Lỗi kết nối.');
-    });
+
+        if (submitBtn) {
+            submitBtn.addEventListener('click', () => {
+                const email = inputEl.value.trim();
+                if (!email) {
+                    showToast('Vui lòng nhập email', 'error');
+                    inputEl.focus();
+                    return;
+                }
+                if (!email.includes('@')) {
+                    showToast('Email không hợp lệ', 'error');
+                    inputEl.focus();
+                    return;
+                }
+                
+                hideModal();
+                
+                const toastId = 'toast-' + Date.now();
+                const toast = document.createElement('div');
+                toast.id = toastId;
+                toast.style.cssText = 'position:fixed; top:20px; right:20px; background:var(--bg-card); border:1px solid var(--info); padding:12px 20px; border-radius:8px; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.2); display:flex; align-items:center; gap:8px;';
+                toast.innerHTML = `<span class="material-symbols-rounded spin-icon" style="color:var(--info);">sync</span> <span>Đang gửi email...</span>`;
+                document.body.appendChild(toast);
+
+                callAPI({ 
+                    action: 'send_email', 
+                    email: email, 
+                    fileName: fileName,
+                    tenDonVi: tenDonVi,
+                    tongTien: tongTien
+                }).then(res => {
+                    const t = document.getElementById(toastId); if(t) t.remove();
+                    if(res.status === 'success') {
+                        showToast(`Đã gửi email thành công đến: ${email}`, 'success');
+                    } else {
+                        showToast('Lỗi: ' + (res.message || 'Backend chưa xử lý send_email'), 'error');
+                    }
+                }).catch(e => {
+                    const t = document.getElementById(toastId); if(t) t.remove();
+                    showToast('Lỗi kết nối.', 'error');
+                });
+            });
+        }
+    }, 50);
 }
 
 // --- SEARCH LOGIC ---
