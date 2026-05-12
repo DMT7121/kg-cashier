@@ -608,11 +608,17 @@ async function autoScanAndUpload(id) {
             }
             item.rawText = txt;
         }
-        const prompt = `Trích xuất JSON (tenDonVi, mst, tongTien, ngayKy, diaChi) từ văn bản: "${item.rawText.substring(0, 3000)}".
-        Quy tắc BẮT BUỘC:
-        1. Ngày ký: Phải chuẩn định dạng DD/MM/YYYY. Ví dụ 05/01/2024.
-        2. TỔNG TIỀN: Tìm số tiền thanh toán cuối cùng (Grand Total) bao gồm thuế GTGT.
-        3. Địa chỉ: Lấy đầy đủ địa chỉ đơn vị mua.`;
+        const prompt = `Nhiệm vụ: Trích xuất thông tin hóa đơn VAT từ văn bản thô sau.
+Văn bản: "${item.rawText.substring(0, 3000)}"
+
+Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải thích, với 5 trường sau:
+{
+  "tenDonVi": "Tên công ty/đơn vị BÁN HÀNG (xuất hóa đơn)",
+  "mst": "Mã số thuế của bên bán (chỉ gồm các chữ số và dấu gạch ngang)",
+  "tongTien": "Số tiền tổng cộng thanh toán (Grand Total / đã bao gồm VAT). Trả về CHỈ SỐ NGUYÊN, KHÔNG CÓ DẤU CHẤM/PHẨY (ví dụ: 1500000)",
+  "ngayKy": "Ngày lập/ký hóa đơn, chuẩn định dạng DD/MM/YYYY (ví dụ: 05/12/2023)",
+  "diaChi": "Địa chỉ của đơn vị bán hàng"
+}`;
         
         const res = await callAI_Unified(prompt, 'extract', id);
         
@@ -621,6 +627,14 @@ async function autoScanAndUpload(id) {
         let json = res.replace(/```json/g, '').replace(/```/g, '').trim();
         if(json.includes('{')) json = json.substring(json.indexOf('{'), json.lastIndexOf('}')+1);
         const data = JSON.parse(json);
+        
+        // Chuẩn hóa dữ liệu trả về từ bất kỳ AI nào để đảm bảo đồng bộ tuyệt đối
+        if (data.tongTien) data.tongTien = String(data.tongTien).replace(/[^0-9]/g, '');
+        if (data.mst) data.mst = String(data.mst).replace(/[^0-9-]/g, '');
+        if (data.ngayKy) {
+            let match = String(data.ngayKy).match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+            if (match) data.ngayKy = `${match[1].padStart(2,'0')}/${match[2].padStart(2,'0')}/${match[3]}`;
+        }
         
         item.data = { ...item.data, ...data };
         renderQueue(); 
