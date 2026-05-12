@@ -653,11 +653,28 @@ async function uploadItem(id) {
     const item = uploadQueue.find(i => i.id === id);
     updateStatusUI(id, 'uploading', 'Đang lưu...');
     return new Promise(resolve => {
+        // Kiểm tra trùng lặp trước khi đọc file
+        if (item.data.mst && item.data.ngayKy && item.data.tongTien) {
+            const isDuplicate = currentSearchData.some(d => 
+                d.mst === item.data.mst && 
+                d.ngayKy === item.data.ngayKy && 
+                String(d.tongTien) === String(item.data.tongTien)
+            );
+            
+            if (isDuplicate) {
+                updateStatusUI(id, 'error', 'Trùng lặp');
+                showToast(`Hóa đơn của ${item.data.mst} (ngày ${item.data.ngayKy}) đã tồn tại trên hệ thống!`, 'warning');
+                resolve();
+                return;
+            }
+        }
+
         const r = new FileReader(); r.readAsDataURL(item.file);
         r.onload = () => {
             let finalFileName = item.file.name;
             if (item.data.ngayKy && item.data.mst) {
-                finalFileName = `${item.data.ngayKy.replace(/\//g,'-')}-${item.data.mst}.pdf`;
+                // Đồng nhất tên file theo yêu cầu: "DD/MM/YYYY - [MST]"
+                finalFileName = `${item.data.ngayKy} - ${item.data.mst}.pdf`;
             }
 
             callAPI({ 
