@@ -701,7 +701,8 @@ async function uploadItem(id) {
 }
 
 function deleteInvoice(fileName) {
-    showConfirm('Thay thế hóa đơn?', 'Bạn có chắc muốn xóa hóa đơn cũ này để nạp lại bản mới không?', () => {
+    showConfirm('Bạn có chắc muốn xóa hóa đơn cũ này để nạp lại bản mới không?', {title: 'Thay thế hóa đơn?'}).then(confirmed => {
+        if (!confirmed) return;
         callAPI({ action: 'delete_invoice', fileName: fileName }).then(res => {
             if(res.status === 'success') {
                 alert('Đã xóa hóa đơn cũ. Hãy chọn file mới để upload.');
@@ -1106,24 +1107,25 @@ window.vatSelectAllToggle = function() {
     updateBulkUI();
 };
 
-window.vatBulkDelete = function() {
+window.vatBulkDelete = async function() {
     if(selectedInvoices.size === 0) return;
-    showConfirm('Xóa hàng loạt?', `Bạn có chắc muốn xóa ${selectedInvoices.size} hóa đơn đã chọn không?`, async () => {
-        let successCount = 0;
-        const filesToDelete = Array.from(selectedInvoices);
-        showToast(`Đang xóa ${filesToDelete.length} hóa đơn...`, 'info');
-        for(const fileName of filesToDelete) {
-            try {
-                const res = await callAPI({ action: 'delete_invoice', fileName: fileName });
-                if(res.status === 'success') successCount++;
-            } catch(e) {}
-        }
-        showToast(`Đã xóa thành công ${successCount}/${filesToDelete.length} hóa đơn.`);
-        selectedInvoices.clear();
-        updateBulkUI();
-        doSearch(true);
-        getDriveCount();
-    });
+    const confirmed = await showConfirm(`Bạn có chắc muốn xóa ${selectedInvoices.size} hóa đơn đã chọn không?`, {title: 'Xóa hàng loạt?', type: 'danger'});
+    if (!confirmed) return;
+    
+    let successCount = 0;
+    const filesToDelete = Array.from(selectedInvoices);
+    showToast(`Đang xóa ${filesToDelete.length} hóa đơn...`, 'info');
+    for(const fileName of filesToDelete) {
+        try {
+            const res = await callAPI({ action: 'delete_invoice', fileName: fileName });
+            if(res.status === 'success') successCount++;
+        } catch(e) {}
+    }
+    showToast(`Đã xóa thành công ${successCount}/${filesToDelete.length} hóa đơn.`);
+    selectedInvoices.clear();
+    updateBulkUI();
+    doSearch(true);
+    getDriveCount();
 };
 
 function updateBulkUI() {
