@@ -19,6 +19,7 @@ let currentSearchData = [];
 let currentPage = 1;
 const itemsPerPage = 30;
 let searchDebounceTimer;
+let selectedInvoices = new Set();
 
 const API_URL = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec"; 
 
@@ -179,6 +180,10 @@ function _renderSearch() {
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:13px; color:var(--text-muted);">
             <div>Đang hiển thị <strong id="vat-display-count" style="color:var(--text);">0</strong> kết quả</div>
+            <div id="vat-bulk-actions" style="display:none; align-items:center; gap:8px;">
+                <button class="btn btn-outline btn-sm" onclick="window.vatSelectAllToggle()" id="vat-btn-select-all">Chọn tất cả</button>
+                <button class="btn btn-outline btn-sm" onclick="window.vatBulkDelete()" id="vat-btn-bulk-delete" style="color:var(--danger); border-color:var(--danger);">Xóa (<span id="vat-bulk-count">0</span>)</button>
+            </div>
             <div id="vat-pagination-controls" style="display:none; align-items:center; gap:8px;">
                 <button class="btn-icon border" id="vat-btn-prev"><span class="material-symbols-rounded">chevron_left</span></button>
                 <span id="vat-page-info">Trang 1</span>
@@ -856,7 +861,10 @@ function renderPagedResults() {
     }
 
     container.innerHTML = pageData.map(d => `
-        <div class="card" style="display:flex; flex-direction:column;">
+        <div class="card" style="display:flex; flex-direction:column; position:relative;">
+            <div style="position:absolute; top:12px; right:12px; z-index:10;">
+                <input type="checkbox" class="vat-invoice-checkbox" value="${d.fileName}" ${selectedInvoices.has(d.fileName) ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;" onchange="window.vatToggleSelection('${d.fileName}', this.checked)">
+            </div>
             <div class="card-body" style="flex:1;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
                     <h3 style="font-size:14px; margin:0; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${d.tenDonVi}</h3>
@@ -1078,4 +1086,55 @@ async function callHuggingFaceDirect(key, prompt, mode) {
     const p = mode==='chat' ? `[INST] Bạn là 'Bà Hàng Xóm'. ${SYSTEM_INSTRUCTION} User: ${prompt} [/INST]` : `[INST] Extract JSON. Date format DD/MM/YYYY. Amount pure number. Content: ${prompt} [/INST]`;
     const res = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({inputs:p,parameters:{max_new_tokens:1000,return_full_text:false}})});
     if(!res.ok) throw new Error(res.status); const d = await res.json(); return Array.isArray(d) ? d[0].generated_text : d.generated_text;
+}
+
+window.vatToggleSelection = function(fileName, isChecked) {
+    if(isChecked) selectedInvoices.add(fileName);
+    else selectedInvoices.delete(fileName);
+    updateBulkUI();
+};
+
+window.vatSelectAllToggle = function() {
+    const checkboxes = document.querySelectorAll('.vat-invoice-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    if (allChecked) {
+        checkboxes.forEach(cb => { cb.checked = false; selectedInvoices.delete(cb.value); });
+    } else {
+        checkboxes.forEach(cb => { cb.checked = true; selectedInvoices.add(cb.value); });
+    }
+    updateBulkUI();
+};
+
+window.vatBulkDelete = function() {
+    if(selectedInvoices.size === 0) return;
+    showConfirm('Xóa hàng loạt?', `Bạn có chắc muốn xóa ${selectedInvoices.size} hóa đơn đã chọn không?`, async () => {
+        let successCount = 0;
+        const filesToDelete = Array.from(selectedInvoices);
+        showToast(`Đang xóa ${filesToDelete.length} hóa đơn...`, 'info');
+        for(const fileName of filesToDelete) {
+            try {
+                const res = await callAPI({ action: 'delete_invoice', fileName: fileName });
+                if(res.status === 'success') successCount++;
+            } catch(e) {}
+        }
+        showToast(`Đã xóa thành công ${successCount}/${filesToDelete.length} hóa đơn.`);
+        selectedInvoices.clear();
+        updateBulkUI();
+        doSearch(true);
+        getDriveCount();
+    });
+};
+
+function updateBulkUI() {
+    const bulkBar = document.getElementById('vat-bulk-actions');
+    const bulkCount = document.getElementById('vat-bulk-count');
+    if(bulkBar) {
+        if(selectedInvoices.size > 0) {
+            bulkBar.style.display = 'flex';
+            if(bulkCount) bulkCount.innerText = selectedInvoices.size;
+        } else {
+            bulkBar.style.display = 'none';
+        }
+    }
 }
