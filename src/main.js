@@ -85,7 +85,7 @@ function navigateTo(viewName) {
   var isValidated = sessionStorage.getItem('shift_validated') === (shift ? shift.id : '');
 
   // If shift is open but not validated, force 'shift' view (Unlock screen)
-  if (shift && !isValidated && viewName !== 'shift' && viewName !== 'settings') {
+  if (shift && !isValidated && viewName !== 'shift' && viewName !== 'settings' && viewName !== 'vat') {
     viewName = 'shift';
   }
 

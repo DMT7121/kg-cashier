@@ -547,6 +547,7 @@ window.vatUploadItem = uploadItem;
 window.vatDeleteInvoice = deleteInvoice;
 window.vatPreviewFile = (url) => window.open(url.replace('/view','/preview'), '_blank');
 window.vatCopyLink = (url) => navigator.clipboard.writeText(url);
+window.vatPromptEmail = promptEmail;
 
 function updateStatusUI(id, s, t) { 
     const i = uploadQueue.find(x => x.id === id); 
@@ -692,6 +693,37 @@ function deleteInvoice(fileName) {
     });
 }
 
+function promptEmail(fileName, tenDonVi, tongTien) {
+    const email = window.prompt(`Gửi hóa đơn VAT cho: ${tenDonVi}\nTổng tiền: ${formatCurrencyVN(tongTien)}\n\nVui lòng nhập Email khách hàng:`);
+    if (!email || !email.trim()) return;
+    if (!email.includes('@')) return alert('Email không hợp lệ!');
+    
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.style.cssText = 'position:fixed; top:20px; right:20px; background:var(--bg-card); border:1px solid var(--info); padding:12px 20px; border-radius:8px; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.2); display:flex; align-items:center; gap:8px;';
+    toast.innerHTML = `<span class="material-symbols-rounded spin-icon" style="color:var(--info);">sync</span> <span>Đang gửi email...</span>`;
+    document.body.appendChild(toast);
+
+    callAPI({ 
+        action: 'send_email', 
+        email: email.trim(), 
+        fileName: fileName,
+        tenDonVi: tenDonVi,
+        tongTien: tongTien
+    }).then(res => {
+        const t = document.getElementById(toastId); if(t) t.remove();
+        if(res.status === 'success') {
+            alert(`Đã gửi email thành công đến: ${email}`);
+        } else {
+            alert('Lỗi: ' + (res.message || 'Backend chưa xử lý send_email'));
+        }
+    }).catch(e => {
+        const t = document.getElementById(toastId); if(t) t.remove();
+        alert('Lỗi kết nối.');
+    });
+}
+
 // --- SEARCH LOGIC ---
 
 function doSearch(bg=false) {
@@ -775,6 +807,7 @@ function renderPagedResults() {
             </div>
             <div style="padding:12px; border-top:1px solid var(--border); display:flex; gap:8px; background:var(--bg-secondary);">
                 <button onclick="window.vatPreviewFile('${d.linkView}')" class="btn btn-outline btn-sm" style="flex:1;">Xem</button>
+                <button onclick="window.vatPromptEmail('${d.fileName}', '${d.tenDonVi.replace(/'/g, "\\'")}', '${d.tongTien}')" class="btn btn-outline btn-sm" style="color:var(--info); border-color:transparent;" title="Gửi Email"><span class="material-symbols-rounded" style="font-size:16px;">mail</span></button>
                 <button onclick="window.vatDeleteInvoice('${d.fileName}')" class="btn btn-outline btn-sm" style="color:var(--danger);" title="Thay thế/Xóa"><span class="material-symbols-rounded" style="font-size:16px;">delete</span></button>
                 <button onclick="window.vatCopyLink('${d.linkView}')" class="btn btn-outline btn-sm" title="Copy Link"><span class="material-symbols-rounded" style="font-size:16px;">content_copy</span></button>
             </div>
