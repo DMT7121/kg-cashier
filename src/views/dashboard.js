@@ -1,5 +1,5 @@
 /* ── Dashboard View ─────────────────────────── */
-import { getCurrentShift, getShiftSummary, getShiftHistory, getSettings, getNotifications, getUnreadCount, markAllRead } from '../store.js';
+import { getCurrentShift, getShiftSummary, getHistorySummary, getShiftHistory, getSettings, getNotifications, getUnreadCount, markAllRead } from '../store.js';
 import { formatCurrency, formatDate, formatTime, formatDuration, showConfirm } from '../utils.js';
 
 let _revenuePeriod = 'month'; // default view
@@ -220,7 +220,7 @@ function renderShiftDashboard(shift) {
           const history = getShiftHistory().slice(0, 5);
           if (history.length === 0) return '<div class="text-muted text-center" style="padding:20px;">Chưa có lịch sử ca</div>';
           return history.map(function(sh) {
-            const sm = getShiftSummary(sh);
+            const sm = getHistorySummary(sh);
             return '<div class="tx-row" style="cursor:pointer;" onclick="window.navigateTo(\'history\')">' +
               '<div class="tx-info">' +
                 '<span class="tx-type type-income">Ca' + sh.shiftNumber + '</span>' +

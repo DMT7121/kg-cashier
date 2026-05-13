@@ -174,19 +174,7 @@ export function getState() {
       state = defaults();
     }
   }
-  // One-time migration: recalculate summarySnapshot for history shifts
-  if (state && state.shifts && !state._migratedSummaryV2) {
-    for (var mi = 0; mi < state.shifts.length; mi++) {
-      var sh = state.shifts[mi];
-      if (sh && sh.summarySnapshot) {
-        // Will be recalculated by getShiftSummary when viewed
-        delete sh.summarySnapshot;
-      }
-    }
-    state._migratedSummaryV2 = true;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) { /* */ }
-    console.log('[Store] Migration v2: cleared stale summarySnapshots for', (state.shifts || []).length, 'shifts');
-  }
+  // Migration v2 removed — summarySnapshot is now preserved as frozen data for history
   return state;
 }
 
@@ -429,7 +417,7 @@ export function closeShift(opts) {
     }
   } catch (e) { /* ignore */ }
 
-  // â”€â”€ Save summary snapshot for quick access â”€â”€
+  // â”€â”€ Save summary snapshot FROZEN at close time (history reads this) â”€â”€
   s.currentShift.summarySnapshot = {
     totalIncome: summary.totalIncome,
     totalExpense: summary.totalExpense,
@@ -441,7 +429,14 @@ export function closeShift(opts) {
     billCount: summary.billCount,
     expectedCash: summary.expectedCash,
     cashCountTotal: summary.cashCountTotal,
-    discrepancy: summary.discrepancy
+    cashExpense: summary.cashExpense,
+    discrepancy: summary.discrepancy,
+    manualIncome: summary.manualIncome,
+    manualBills: summary.manualBills,
+    otherIncome: summary.otherIncome,
+    otherExpense: summary.otherExpense,
+    revenue: summary.revenue,
+    netTotal: summary.netTotal
   };
 
   // Check discrepancy (Feature 5)
@@ -752,6 +747,31 @@ export function getShiftSummary(shift) {
 
 
 // â”€â”€ History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/**
+ * Get shift summary for HISTORY display.
+ * Uses frozen summarySnapshot for closed shifts (immutable data at close time).
+ * Falls back to live getShiftSummary() for current/legacy shifts without snapshot.
+ */
+export function getHistorySummary(shift) {
+  if (!shift) return null;
+  if (shift.summarySnapshot && shift.status === 'closed') {
+    var snap = shift.summarySnapshot;
+    return {
+      totalIncome: snap.totalIncome || 0, totalExpense: snap.totalExpense || 0,
+      cashIncome: snap.cashIncome || 0, cardIncome: snap.cardIncome || 0,
+      transferIncome: snap.transferIncome || 0, cashExpense: snap.cashExpense || 0,
+      cukcukRevenue: snap.cukcukRevenue || 0, cukcukBills: snap.cukcukBills || 0,
+      billCount: snap.billCount || 0, expectedCash: snap.expectedCash || 0,
+      cashCountTotal: snap.cashCountTotal || 0, discrepancy: snap.discrepancy || 0,
+      manualIncome: snap.manualIncome || 0, manualBills: snap.manualBills || 0,
+      otherIncome: snap.otherIncome || 0, otherExpense: snap.otherExpense || 0,
+      revenue: snap.revenue || snap.totalIncome || 0,
+      netTotal: snap.netTotal || snap.expectedCash || 0
+    };
+  }
+  return getShiftSummary(shift);
+}
+
 export function getShiftHistory() { return getState().shifts || []; }
 
 export function saveShiftToHistory(shift) {
@@ -816,12 +836,13 @@ export async function syncShiftHistory() {
         s.shifts.push(cs);
         added++;
       } else {
-        // Shift exists locally â€” update if cloud version has more data
+        // Shift exists locally — closed shifts are IMMUTABLE (final data)
         var localShift = s.shifts[localIds[cs.id]];
+        if (localShift.status === 'closed') continue;
+        // Only update open shifts if cloud has more data
         var localTxCount = (localShift.transactions || []).length;
         var cloudTxCount = (cs.transactions || []).length;
         if (cloudTxCount > localTxCount) {
-          // Cloud has more transactions â†’ use cloud version, keep local invoices
           cs.invoices = localShift.invoices || [];
           s.shifts[localIds[cs.id]] = cs;
           added++;
@@ -829,8 +850,32 @@ export async function syncShiftHistory() {
       }
     }
 
+    // Dedup: remove duplicate shifts with same (date + shiftNumber + cashierName + startTime)
+    var seenKey = {};
+    var deduped = [];
+    for (var di = 0; di < s.shifts.length; di++) {
+      var ds = s.shifts[di];
+      var dkey = (ds.date || '') + '_' + (ds.shiftNumber || '') + '_' + (ds.cashierName || '') + '_' + (ds.startTime || '').substring(0, 19);
+      if (seenKey[dkey]) {
+        var prev = seenKey[dkey];
+        if (ds.status === 'closed' && prev.status !== 'closed') {
+          deduped = deduped.filter(function(x) { return x !== prev; });
+          deduped.push(ds);
+          seenKey[dkey] = ds;
+        }
+        continue;
+      }
+      seenKey[dkey] = ds;
+      deduped.push(ds);
+    }
+    if (deduped.length < s.shifts.length) {
+      var removed = s.shifts.length - deduped.length;
+      s.shifts = deduped;
+      added += removed;
+      console.log('[Store] Dedup: removed ' + removed + ' duplicate shifts');
+    }
+
     if (added > 0) {
-      // Sort by date descending, then by startTime descending
       s.shifts.sort(function(a, b) {
         var da = (a.date || '') + (a.startTime || '');
         var db = (b.date || '') + (b.startTime || '');

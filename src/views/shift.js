@@ -390,8 +390,8 @@ export function init() {
         <p>Xác nhận đóng Ca ${shift.shiftNumber}?</p>
         <div class="form-group"><label class="form-label">Ghi chú (tùy chọn)</label><textarea id="closeNotes" class="form-input" rows="3" placeholder="Ghi chú bàn giao..."></textarea></div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="text" id="cashToKeep" class="form-input" value="0" autocomplete="off"></div>
-          <div class="form-group"><label class="form-label">Tiền nộp</label><input type="text" id="cashToDeposit" class="form-input" value="0" autocomplete="off"></div>
+          <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="text" id="cashToKeep" class="form-input" value="${shift.cashToKeep || 0}" autocomplete="off"></div>
+          <div class="form-group"><label class="form-label">Tiền nộp</label><input type="text" id="cashToDeposit" class="form-input" value="${shift.cashToDeposit || 0}" autocomplete="off"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>

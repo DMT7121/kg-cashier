@@ -718,6 +718,12 @@ function _cleanupOldSyncIndexes() {
 // ── Sync a single invoice by RefId ──
 export async function syncSingleInvoice(refId) {
   try {
+    var existing = invoiceStore.getInvoice(refId);
+    if (existing && existing.isManuallyEdited) {
+       showToast('⚠️ Hóa đơn đã được khóa do chỉnh sửa thủ công', 'warning');
+       return { success: false, message: 'Hóa đơn đã bị khóa' };
+    }
+
     var cached = _getCachedToken();
     if (!cached) {
       var loginResult = await loginAndGetToken();
@@ -774,7 +780,6 @@ export async function syncSingleInvoice(refId) {
     }
 
     // Get existing record to preserve metadata
-    var existing = invoiceStore.getInvoice(refId);
     var record = {
       refId: refId,
       refNo: (existing && existing.refNo) || (detail.RefNo || ''),
@@ -803,6 +808,41 @@ export async function syncSingleInvoice(refId) {
     console.error('[CUKCUK] Single sync error:', e);
     showToast('❌ Lỗi: ' + e.message, 'error');
     return { success: false, message: e.message };
+  }
+}
+
+// ── Push manual edit to Google Sheets ──
+export async function pushManualEditToSheets(refId) {
+  var inv = invoiceStore.getInvoice(refId);
+  if (!inv) return { success: false };
+  var shift = getCurrentShift() || { id: 'manual' };
+  
+  var invCash = 0, invCard = 0, invTransfer = 0;
+  (inv.payments || []).forEach(function(p) {
+    if (p.method === 'cash') invCash += p.amount;
+    else if (p.method === 'card') invCard += p.amount;
+    else if (p.method === 'transfer') invTransfer += p.amount;
+  });
+  
+  var sheetData = [{
+    refId: inv.refId, refNo: inv.refNo || '', refDate: inv.refDate || '',
+    tableName: inv.tableName || '', employeeName: inv.employeeName || '', amount: inv.amount,
+    cashAmount: invCash, cardAmount: invCard, transferAmount: invTransfer,
+    paymentInfo: inv.payments.map(function(pp) { return pp.label + ': ' + pp.amount.toLocaleString('vi-VN'); }).join(' + ')
+  }];
+  
+  try {
+    var sheetsRes = await syncCukcukRevenueToCloud(sheetData, shift.id);
+    if (sheetsRes && sheetsRes.success) {
+      invoiceStore.markPushedToSheets([refId]);
+      return { success: true };
+    } else {
+      retryQueue.enqueue(sheetData, shift.id, [refId]);
+      return { success: false, queued: true };
+    }
+  } catch(e) {
+    retryQueue.enqueue(sheetData, shift.id, [refId]);
+    return { success: false, queued: true };
   }
 }
 

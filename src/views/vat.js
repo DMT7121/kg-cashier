@@ -149,7 +149,7 @@ function _renderUpload() {
             </h3>
         </div>
         <div class="card-body">
-            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">Hỗ trợ 8 dòng AI (Gemini, DeepSeek, Groq, SambaNova, Mistral, Nvidia...) xử lý song song.</p>
+            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">Hỗ trợ 8 dòng AI xử lý song song. ${geminiKeys.length ? '<span style="color:var(--success); font-weight:600;">🔬 Gemini Vision: ON</span> — Đọc PDF bằng mắt, chính xác cao.' : '<span style="color:var(--warning);">⚠️ Chưa có Gemini key — đang dùng pdf.js (độ chính xác thấp hơn)</span>'}</p>
             <div id="vat-drop-zone" style="border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; cursor: pointer; transition: all .3s; position: relative;">
                 <input type="file" id="vat-file-input" style="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="application/pdf" multiple style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
                 <span class="material-symbols-rounded" style="font-size: 48px; color: var(--info); margin-bottom: 12px;">cloud_upload</span>
@@ -182,6 +182,7 @@ function _renderSearch() {
             <div style="display:flex; align-items:center; gap:12px;">
                 <span>Đang hiển thị <strong id="vat-display-count" style="color:var(--text);">0</strong> kết quả</span>
                 <button class="btn btn-outline btn-sm" onclick="window.vatSyncData()" style="color:var(--info); border-color:var(--info); padding: 4px 8px;"><span class="material-symbols-rounded" style="font-size:16px;">sync</span> Đồng bộ</button>
+                <button class="btn btn-outline btn-sm" onclick="window.vatRescanAll()" id="vat-btn-rescan" style="color:var(--warning); border-color:var(--warning); padding: 4px 8px;" ${!geminiKeys.length ? 'disabled title="Cần Gemini key"' : ''}><span class="material-symbols-rounded" style="font-size:16px;">auto_fix_high</span> Re-Scan AI</button>
             </div>
             <div id="vat-bulk-actions" style="display:none; align-items:center; gap:8px;">
                 <button class="btn btn-outline btn-sm" onclick="window.vatSelectAllToggle()" id="vat-btn-select-all">Chọn tất cả</button>
@@ -602,34 +603,124 @@ async function loadPdfJs() {
     });
 }
 
+const VISION_EXTRACT_PROMPT = `BẠN LÀ CHUYÊN GIA TRÍCH XUẤT HÓA ĐƠN VAT VIỆT NAM.
+
+NHÌN vào file PDF hóa đơn VAT này và trích xuất thông tin NGƯỜI MUA HÀNG (KHÔNG PHẢI người bán/King's Grill).
+
+CẤU TRÚC HÓA ĐƠN VAT:
+- "Cộng tiền hàng" = tiền chưa thuế
+- "Tiền thuế GTGT" = thuế (8% hoặc 10%)
+- "Tổng cộng tiền thanh toán" = TỔNG CUỐI CÙNG (tiền hàng + thuế) → ĐÂY LÀ tongTien
+
+QUY TẮC:
+1. tongTien = "Tổng cộng tiền thanh toán", PHẢI LỚN HƠN "Cộng tiền hàng"
+2. Kiểm chứng bằng dòng "Bằng chữ" nếu có
+3. tongTien là SỐ NGUYÊN, không dấu chấm phẩy (ví dụ: 660000)
+4. TUYỆT ĐỐI KHÔNG trả về 0
+5. mst chỉ gồm chữ số và dấu gạch ngang
+
+Trả về JSON:
+{
+  "tenDonVi": "Tên NGƯỜI MUA",
+  "mst": "MST NGƯỜI MUA",
+  "tongTien": "Số nguyên",
+  "ngayKy": "DD/MM/YYYY",
+  "diaChi": "Địa chỉ NGƯỜI MUA"
+}`;
+
+const TEXT_EXTRACT_PROMPT_TEMPLATE = (rawText) => `BẠN LÀ CHUYÊN GIA TRÍCH XUẤT HÓA ĐƠN VAT VIỆT NAM.
+
+Đọc văn bản thô từ hóa đơn VAT. Trích xuất thông tin NGƯỜI MUA HÀNG (KHÔNG PHẢI người bán/King's Grill).
+
+Văn bản hóa đơn:
+"""
+${rawText.substring(0, 3500)}
+"""
+
+CẤU TRÚC HÓA ĐƠN VAT:
+- "Cộng tiền hàng" = tiền chưa thuế
+- "Tiền thuế GTGT" = thuế (8% hoặc 10%)
+- "Tổng cộng tiền thanh toán" = TỔNG CUỐI CÙNG (tiền hàng + thuế) → ĐÂY LÀ tongTien
+
+QUY TẮC:
+1. tongTien = "Tổng cộng tiền thanh toán", PHẢI LỚN HƠN "Cộng tiền hàng"
+2. Kiểm chứng bằng dòng "Bằng chữ" nếu có
+3. tongTien là SỐ NGUYÊN, không dấu chấm phẩy
+4. TUYỆT ĐỐI KHÔNG trả về 0
+5. mst chỉ gồm chữ số và dấu gạch ngang
+
+Trả về DUY NHẤT JSON hợp lệ:
+{
+  "tenDonVi": "Tên NGƯỜI MUA",
+  "mst": "MST NGƯỜI MUA",
+  "tongTien": "Số nguyên",
+  "ngayKy": "DD/MM/YYYY",
+  "diaChi": "Địa chỉ NGƯỜI MUA"
+}`;
+
+// Gemini Vision: gửi PDF trực tiếp, đọc bằng mắt
+async function callGeminiVision(pdfBase64, fileId) {
+    for (let i = 0; i < geminiKeys.length; i++) {
+        const key = geminiKeys[(idx.gemini + i) % geminiKeys.length];
+        idx.gemini = (idx.gemini + 1) % geminiKeys.length;
+        
+        const badge = fileId ? document.getElementById(`status-badge-${fileId}`) : null;
+        if (badge) badge.innerText = '🔬 Gemini Vision đang nhìn...';
+
+        try {
+            const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [
+                        { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } },
+                        { text: VISION_EXTRACT_PROMPT }
+                    ]}],
+                    generationConfig: { responseMimeType: 'application/json' }
+                })
+            }, 30000); // 30s timeout for vision
+            if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
+            const json = await res.json();
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error('Gemini Vision returned empty');
+            console.log('[VAT Vision] Gemini Vision succeeded');
+            return text;
+        } catch (e) {
+            console.warn(`[VAT Vision] Gemini key #${i} failed:`, e.message);
+        }
+    }
+    return null; // All Gemini keys failed → will fallback to text-based
+}
+
 async function autoScanAndUpload(id) {
     const item = uploadQueue.find(i => i.id === id);
     updateStatusUI(id, 'scanning', 'Đang xếp hàng...');
     
     try {
-        await loadPdfJs();
-        if (!item.rawText) {
-            const buf = await item.file.arrayBuffer();
-            const pdf = await window.pdfjsLib.getDocument(buf).promise;
-            let txt = ''; 
-            for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) {
-                txt += (await (await pdf.getPage(i)).getTextContent()).items.map(s => s.str).join(' ') + '\n';
-            }
-            item.rawText = txt;
-        }
-        const prompt = `Nhiệm vụ: Trích xuất thông tin hóa đơn VAT từ văn bản thô sau. LƯU Ý: Lấy thông tin của NGƯỜI MUA HÀNG (Khách hàng), TUYỆT ĐỐI KHÔNG lấy thông tin của bên Bán (King's Grill).
-Văn bản: "${item.rawText.substring(0, 3000)}"
-
-Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải thích, với 5 trường sau:
-{
-  "tenDonVi": "Tên công ty/đơn vị NGƯỜI MUA HÀNG",
-  "mst": "Mã số thuế của NGƯỜI MUA HÀNG (chỉ gồm các chữ số và dấu gạch ngang)",
-  "tongTien": "Tìm chữ 'Tổng cộng', 'Tổng cộng tiền thanh toán', hoặc 'Tổng tiền thanh toán' ở phần cuối hóa đơn. Lấy con số LỚN NHẤT nằm ở cột ngoài cùng bên phải hoặc phía dưới chữ đó (thường có giá trị hàng trăm nghìn hoặc hàng triệu, ví dụ: 720.000, 1.500.000). TUYỆT ĐỐI KHÔNG TRẢ VỀ 0. Trả về CHỈ SỐ NGUYÊN, KHÔNG CÓ DẤU CHẤM/PHẨY (ví dụ: 720000)",
-  "ngayKy": "Ngày lập/ký hóa đơn, chuẩn định dạng DD/MM/YYYY (ví dụ: 05/12/2023)",
-  "diaChi": "Địa chỉ của NGƯỜI MUA HÀNG"
-}`;
+        let res = null;
         
-        const res = await callAI_Unified(prompt, 'extract', id);
+        // === ĐƯỜNG 1: Gemini Vision (ưu tiên — gửi PDF trực tiếp, đọc bằng mắt) ===
+        if (geminiKeys.length) {
+            updateStatusUI(id, 'scanning', '🔬 Vision đang đọc...');
+            const buf = await item.file.arrayBuffer();
+            const base64 = btoa(new Uint8Array(buf).reduce((d, b) => d + String.fromCharCode(b), ''));
+            res = await callGeminiVision(base64, id);
+        }
+        
+        // === ĐƯỜNG 2: Fallback — pdf.js text extraction + AI text mode ===
+        if (!res) {
+            updateStatusUI(id, 'scanning', 'pdf.js đang trích...');
+            await loadPdfJs();
+            if (!item.rawText) {
+                const buf = await item.file.arrayBuffer();
+                const pdf = await window.pdfjsLib.getDocument(buf).promise;
+                let txt = ''; 
+                for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) {
+                    txt += (await (await pdf.getPage(i)).getTextContent()).items.map(s => s.str).join(' ') + '\n';
+                }
+                item.rawText = txt;
+            }
+            res = await callAI_Unified(TEXT_EXTRACT_PROMPT_TEMPLATE(item.rawText), 'extract', id);
+        }
         
         if (!res) return updateStatusUI(id, 'ready');
         
@@ -637,7 +728,7 @@ Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải th�
         if(json.includes('{')) json = json.substring(json.indexOf('{'), json.lastIndexOf('}')+1);
         const data = JSON.parse(json);
         
-        // Chuẩn hóa dữ liệu trả về từ bất kỳ AI nào để đảm bảo đồng bộ tuyệt đối
+        // Chuẩn hóa dữ liệu trả về từ bất kỳ AI nào
         if (data.tongTien) data.tongTien = String(data.tongTien).replace(/[^0-9]/g, '');
         if (data.mst) data.mst = String(data.mst).replace(/[^0-9-]/g, '');
         if (data.ngayKy) {
@@ -647,7 +738,7 @@ Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải th�
         
         // KIỂM TRA NGHIÊM NGẶT: TUYỆT ĐỐI KHÔNG CHẤP NHẬN 0đ
         if (!data.tongTien || data.tongTien === '0') {
-            item.data = { ...item.data, ...data }; // Vẫn lưu nháp nhưng báo lỗi
+            item.data = { ...item.data, ...data };
             renderQueue();
             return updateStatusUI(id, 'error', 'Lỗi: Tổng tiền 0đ');
         }
@@ -655,12 +746,12 @@ Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm text giải th�
         item.data = { ...item.data, ...data };
         renderQueue(); 
         
-        // Auto upload if we have mst and date and tongTien
         if (item.data.mst && item.data.ngayKy && item.data.tongTien) await uploadItem(id); 
         else updateStatusUI(id, 'ready');
     } catch (e) { 
-        console.error(e);
-        updateStatusUI(id, 'error', 'Lỗi AI'); 
+        console.error('[VAT Scan Error]', e);
+        const shortMsg = e.message && e.message.length > 60 ? e.message.substring(0, 60) + '…' : (e.message || 'Lỗi AI');
+        updateStatusUI(id, 'error', shortMsg); 
     }
 }
 
@@ -907,7 +998,7 @@ function renderPagedResults() {
             </div>
             <div style="padding:12px; border-top:1px solid var(--border); display:flex; gap:8px; background:var(--bg-secondary);">
                 <button onclick="window.vatPreviewFile('${d.linkView}')" class="btn btn-outline btn-sm" style="flex:1;">Xem</button>
-                <button onclick="window.vatPromptEmail('${d.fileName}', '${d.tenDonVi.replace(/'/g, "\\'")}', '${d.tongTien}')" class="btn btn-outline btn-sm" style="color:var(--info); border-color:transparent;" title="Gửi Email"><span class="material-symbols-rounded" style="font-size:16px;">mail</span></button>
+                <button onclick="window.vatPromptEmail('${d.fileName}', '${(d.tenDonVi||'').replace(/'/g, "\\'")}', '${d.tongTien||''}')" class="btn btn-outline btn-sm" style="color:var(--info); border-color:transparent;" title="Gửi Email"><span class="material-symbols-rounded" style="font-size:16px;">mail</span></button>
                 <button onclick="window.vatDeleteInvoice('${d.fileName}')" class="btn btn-outline btn-sm" style="color:var(--danger);" title="Thay thế/Xóa"><span class="material-symbols-rounded" style="font-size:16px;">delete</span></button>
                 <button onclick="window.vatCopyLink('${d.linkView}')" class="btn btn-outline btn-sm" title="Copy Link"><span class="material-symbols-rounded" style="font-size:16px;">content_copy</span></button>
             </div>
@@ -1006,16 +1097,25 @@ async function callAI_Unified(promptText, mode = 'extract', fileId = null) {
     if (!checkApiKey()) return null;
     
     const tryProv = (p, prompt, m) => tryProvider(p, prompt, m, fileId);
+    const errors = [];
+    const providers = [
+        ['gemini', geminiKeys], ['deepseek', deepseekKeys], ['groq', groqKeys],
+        ['sambanova', sambanovaKeys], ['cerebras', cerebrasKeys], ['mistral', mistralKeys],
+        ['nvidia', nvidiaKeys], ['hf', hfKeys]
+    ];
 
-    if (geminiKeys.length) try { return await tryProv('gemini', promptText, mode); } catch(e) {}
-    if (deepseekKeys.length) try { return await tryProv('deepseek', promptText, mode); } catch(e) {}
-    if (groqKeys.length) try { return await tryProv('groq', promptText, mode); } catch(e) {}
-    if (sambanovaKeys.length) try { return await tryProv('sambanova', promptText, mode); } catch(e) {}
-    if (cerebrasKeys.length) try { return await tryProv('cerebras', promptText, mode); } catch(e) {}
-    if (mistralKeys.length) try { return await tryProv('mistral', promptText, mode); } catch(e) {}
-    if (nvidiaKeys.length) try { return await tryProv('nvidia', promptText, mode); } catch(e) {}
-    if (hfKeys.length) try { return await tryProv('hf', promptText, mode); } catch(e) {}
-    throw new Error("Tất cả các AI đều bận. Vui lòng thử lại!");
+    for (const [name, keys] of providers) {
+        if (!keys.length) continue;
+        try {
+            return await tryProv(name, promptText, mode);
+        } catch (e) {
+            const msg = `${name}: ${e.message}`;
+            errors.push(msg);
+            console.warn('[VAT AI Fallback]', msg);
+        }
+    }
+    console.error('[VAT AI] All providers failed:', errors);
+    throw new Error('Tất cả AI đều lỗi: ' + errors.join(' → '));
 }
 
 async function callAI_Persona(promptText) {
@@ -1036,79 +1136,177 @@ async function callAI_Persona(promptText) {
     return `Toang rồi! Tất cả các trợ lý đều bận.`;
 }
 
+// Timeout wrapper — kills hung requests after 25s
+function fetchWithTimeout(url, opts, timeoutMs = 25000) {
+    return Promise.race([
+        fetch(url, opts),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs))
+    ]);
+}
+
+const PROVIDER_MAP = {
+    gemini:    { label: 'Gemini',      get keys() { return geminiKeys; },    runner: callGeminiDirect },
+    deepseek:  { label: 'DeepSeek',    get keys() { return deepseekKeys; },  runner: callDeepSeekDirect },
+    groq:      { label: 'Groq',        get keys() { return groqKeys; },      runner: callGroqDirect },
+    sambanova: { label: 'SambaNova',   get keys() { return sambanovaKeys; }, runner: callSambaNovaDirect },
+    cerebras:  { label: 'Cerebras',    get keys() { return cerebrasKeys; },  runner: callCerebrasDirect },
+    mistral:   { label: 'Mistral',     get keys() { return mistralKeys; },   runner: callMistralDirect },
+    nvidia:    { label: 'NVIDIA',      get keys() { return nvidiaKeys; },    runner: callNvidiaDirect },
+    hf:        { label: 'HuggingFace', get keys() { return hfKeys; },        runner: callHuggingFaceDirect }
+};
+
 async function tryProvider(provider, prompt, mode, fileId = null) {
-    let keys = [], runner = null;
-    let displayNames = {
-        'gemini': 'Gemini', 'groq': 'Groq', 'cerebras': 'Cerebras', 
-        'hf': 'HuggingFace', 'sambanova': 'SambaNova', 'deepseek': 'DeepSeek',
-        'mistral': 'Mistral', 'nvidia': 'NVIDIA'
-    };
+    const cfg = PROVIDER_MAP[provider];
+    if (!cfg) throw new Error(`Unknown provider: ${provider}`);
+    const keys = cfg.keys;
+    const runner = cfg.runner;
 
-    if (provider==='gemini'){ keys=geminiKeys; runner=callGeminiDirect; }
-    else if(provider==='groq'){ keys=groqKeys; runner=callGroqDirect; }
-    else if(provider==='cerebras'){ keys=cerebrasKeys; runner=callCerebrasDirect; }
-    else if(provider==='hf'){ keys=hfKeys; runner=callHuggingFaceDirect; }
-    else if(provider==='sambanova'){ keys=sambanovaKeys; runner=callSambaNovaDirect; }
-    else if(provider==='deepseek'){ keys=deepseekKeys; runner=callDeepSeekDirect; }
-    else if(provider==='mistral'){ keys=mistralKeys; runner=callMistralDirect; }
-    else if(provider==='nvidia'){ keys=nvidiaKeys; runner=callNvidiaDirect; }
-
-    for (let i=0; i<keys.length; i++) {
+    for (let i = 0; i < keys.length; i++) {
         let startIdx = idx[provider]; idx[provider] = (idx[provider] + 1) % keys.length;
         
         if (mode === 'extract' && fileId) {
             const badge = document.getElementById(`status-badge-${fileId}`);
-            if(badge) {
-                badge.innerText = `${displayNames[provider]} đang đọc...`;
-            }
+            if (badge) badge.innerText = `${cfg.label} đang đọc...`;
         }
         
-        try { return await runner(keys[(startIdx + i) % keys.length], prompt, mode); } catch (e) { console.warn(`${provider} key failed`); }
+        try {
+            return await runner(keys[(startIdx + i) % keys.length], prompt, mode);
+        } catch (e) {
+            console.warn(`[VAT] ${cfg.label} key #${i} failed:`, e.message);
+        }
     }
-    throw new Error(`${provider} exhausted`);
+    throw new Error(`${cfg.label}: hết key`);
 }
 
 const SYSTEM_INSTRUCTION = "YÊU CẦU: Trả lời NGẮN GỌN, SÚC TÍCH, ĐẦY ĐỦ Ý. Giọng điệu: HÀI HƯỚC, LẦY LỘI nhưng LỊCH SỰ. Không lan man. Ngày tháng luôn dùng định dạng DD/MM/YYYY. Tiền bạc lấy số nguyên, không dấu chấm phẩy.";
+const EXTRACT_SYS = "You are a Vietnamese VAT invoice extraction expert. Output ONLY valid JSON. Rules: (1) Date format DD/MM/YYYY. (2) tongTien = 'Tổng cộng tiền thanh toán' which is the FINAL total AFTER tax, NOT 'Cộng tiền hàng' (pre-tax subtotal). It equals subtotal + VAT tax. (3) tongTien must be a pure integer with no dots or commas (e.g. 660000 not 660.000). (4) NEVER return 0 for tongTien. (5) Do NOT confuse tax ID numbers or invoice serial numbers with money amounts.";
 
 async function callGeminiDirect(key, prompt, mode) {
-    const p = mode==='chat' ? `Bạn là 'Giáo Sư Biết Tuốt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤓📚. User: ` + prompt : prompt;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}]})});
-    if(!res.ok) throw new Error(res.status); return (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text;
+    const sys = mode === 'chat' ? `Bạn là 'Giáo Sư Biết Tuốt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤓📚.` : EXTRACT_SYS;
+    const p = mode === 'chat' ? prompt : prompt;
+    const reqBody = {
+        system_instruction: { parts: [{ text: sys }] },
+        contents: [{ parts: [{ text: p }] }]
+    };
+    if (mode === 'extract') reqBody.generationConfig = { responseMimeType: 'application/json' };
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reqBody)
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
+    const json = await res.json();
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('Gemini returned empty response');
+    return text;
 }
+
 async function callDeepSeekDirect(key, prompt, mode) {
-    const sys = mode==='chat' ? `Bạn là 'Thám Tử Tư'. ${SYSTEM_INSTRUCTION} Dùng icon 🕵️‍♂️.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
-    const res = await fetch("https://api.deepseek.com/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"deepseek-chat",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
-    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+    const sys = mode === 'chat' ? `Bạn là 'Thám Tử Tư'. ${SYSTEM_INSTRUCTION} Dùng icon 🕵️‍♂️.` : EXTRACT_SYS;
+    // Try deepseek-chat (alias for v4-flash, retiring July 2026)
+    const res = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], response_format: mode === 'extract' ? { type: 'json_object' } : undefined, max_tokens: 1024 })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('DeepSeek returned empty');
+    return content;
 }
+
 async function callGroqDirect(key, prompt, mode) {
-    const sys = mode==='chat' ? `Bạn là 'Thánh Tốc Độ'. ${SYSTEM_INSTRUCTION} Dùng icon 🚀.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
-    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+    const sys = mode === 'chat' ? `Bạn là 'Thánh Tốc Độ'. ${SYSTEM_INSTRUCTION} Dùng icon 🚀.` : EXTRACT_SYS;
+    const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], response_format: mode === 'extract' ? { type: 'json_object' } : undefined })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
+    return (await res.json()).choices[0].message.content;
 }
+
 async function callSambaNovaDirect(key, prompt, mode) {
-    const sys = mode==='chat' ? `Bạn là 'Tia Chớp Đen'. ${SYSTEM_INSTRUCTION} Dùng icon ⚡.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
-    const res = await fetch("https://api.sambanova.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"Meta-Llama-3.1-70B-Instruct",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
-    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+    const sys = mode === 'chat' ? `Bạn là 'Tia Chớp Đen'. ${SYSTEM_INSTRUCTION} Dùng icon ⚡.` : EXTRACT_SYS;
+    const models = ['Meta-Llama-3.3-70B-Instruct', 'Llama-4-Scout-17B-16E-Instruct'];
+    let lastErr = null;
+    for (const model of models) {
+        try {
+            const body = { model, messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], max_tokens: 1024 };
+            if (mode === 'extract') body.response_format = { type: 'json_object' };
+            const res = await fetchWithTimeout('https://api.sambanova.ai/v1/chat/completions', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) { lastErr = await res.text(); continue; }
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) return content;
+        } catch (e) { lastErr = e.message; }
+    }
+    throw new Error(`SambaNova all models failed: ${String(lastErr).substring(0, 100)}`);
 }
+
 async function callCerebrasDirect(key, prompt, mode) {
-    const sys = mode==='chat' ? `Bạn là 'Cỗ Máy Hủy Diệt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤖.` : "Extract JSON. Date format DD/MM/YYYY. Amount pure number.";
-    const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"llama3.1-70b",messages:[{role:"system",content:sys},{role:"user",content:prompt}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
-    if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+    const sys = mode === 'chat' ? `Bạn là 'Cỗ Máy Hủy Diệt'. ${SYSTEM_INSTRUCTION} Dùng icon 🤖.` : EXTRACT_SYS;
+    const res = await fetchWithTimeout('https://api.cerebras.ai/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: 'llama-4-scout-17b-16e-instruct', messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], response_format: mode === 'extract' ? { type: 'json_object' } : undefined })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
+    return (await res.json()).choices[0].message.content;
 }
+
 async function callMistralDirect(key, prompt, mode) {
-     const p = mode==='chat' ? `[INST] Bạn là 'Pháp Sư Âu Châu'. ${SYSTEM_INSTRUCTION} User: ${prompt} [/INST]` : `[INST] Extract JSON. Date format DD/MM/YYYY. Amount pure number. Content: ${prompt} [/INST]`;
-     const res = await fetch("https://api.mistral.ai/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"mistral-small-latest",messages:[{role:"user",content:p}],response_format:mode==='extract'?{type:"json_object"}:undefined})});
-     if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+    const sys = mode === 'chat' ? `Bạn là 'Pháp Sư Âu Châu'. ${SYSTEM_INSTRUCTION}` : EXTRACT_SYS;
+    const res = await fetchWithTimeout('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: 'mistral-small-latest', messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], response_format: mode === 'extract' ? { type: 'json_object' } : undefined })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
+    return (await res.json()).choices[0].message.content;
 }
+
 async function callNvidiaDirect(key, prompt, mode) {
-     const sys = mode==='chat' ? `Bạn là 'Siêu Máy Tính'. ${SYSTEM_INSTRUCTION}` : "Extract JSON.";
-     const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:"meta/llama-3.1-405b-instruct",messages:[{role:"system",content:sys},{role:"user",content:prompt}],max_tokens: 1024, stream: false})});
-     if(!res.ok) throw new Error(res.status); return (await res.json()).choices[0].message.content;
+    const sys = mode === 'chat' ? `Bạn là 'Siêu Máy Tính'. ${SYSTEM_INSTRUCTION}` : EXTRACT_SYS;
+    const body = {
+        model: 'meta/llama-3.3-70b-instruct', 
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], 
+        max_tokens: 1024, stream: false
+    };
+    if (mode === 'extract') body.response_format = { type: 'json_object' };
+    const res = await fetchWithTimeout('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify(body)
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
+    return (await res.json()).choices[0].message.content;
 }
+
 async function callHuggingFaceDirect(key, prompt, mode) {
-    const p = mode==='chat' ? `[INST] Bạn là 'Bà Hàng Xóm'. ${SYSTEM_INSTRUCTION} User: ${prompt} [/INST]` : `[INST] Extract JSON. Date format DD/MM/YYYY. Amount pure number. Content: ${prompt} [/INST]`;
-    const res = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({inputs:p,parameters:{max_new_tokens:1000,return_full_text:false}})});
-    if(!res.ok) throw new Error(res.status); const d = await res.json(); return Array.isArray(d) ? d[0].generated_text : d.generated_text;
+    const sys = mode === 'chat' ? `Bạn là 'Bà Hàng Xóm'. ${SYSTEM_INSTRUCTION}` : EXTRACT_SYS;
+    const models = [
+        'Qwen/Qwen2.5-72B-Instruct',
+        'meta-llama/Llama-3.3-70B-Instruct',
+        'mistralai/Mistral-Small-24B-Instruct-2501'
+    ];
+    let lastErr = null;
+    for (const model of models) {
+        try {
+            const body = { model, messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], max_tokens: 1024, stream: false };
+            if (mode === 'extract') body.response_format = { type: 'json_object' };
+            const res = await fetchWithTimeout(`https://api-inference.huggingface.co/models/${model}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const errText = await res.text();
+                lastErr = `${model}: ${res.status} ${errText.substring(0, 80)}`;
+                continue;
+            }
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) return content;
+        } catch (e) { lastErr = `${model}: ${e.message}`; }
+    }
+    throw new Error(`HuggingFace: ${lastErr}`);
 }
 
 window.vatToggleSelection = function(fileName, isChecked) {
@@ -1168,6 +1366,74 @@ window.vatSyncData = async function() {
         }
     } catch(e) {
         showToast('Lỗi kết nối khi đồng bộ.', 'error');
+    }
+};
+
+window.vatRescanAll = async function() {
+    if (!geminiKeys.length) {
+        showToast('Cần cấu hình Gemini API Key trước khi Re-Scan!', 'error');
+        return;
+    }
+    
+    const confirmed = await showConfirm(
+        'Re-Scan sẽ dùng Gemini Vision đọc lại TẤT CẢ file PDF trên Drive và tự động cập nhật thông tin (tên, MST, tổng tiền, ngày, địa chỉ).\n\nQuá trình này mất vài phút tùy số lượng file.',
+        { title: '🔬 Re-Scan bằng Gemini Vision?', type: 'info' }
+    );
+    if (!confirmed) return;
+    
+    const btn = document.getElementById('vat-btn-rescan');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded spin-icon" style="font-size:16px;">sync</span> Đang scan...'; }
+    
+    let totalProcessed = 0, totalUpdated = 0, totalErrors = 0, totalFiles = 0;
+    let startIndex = 0;
+    const batchSize = 15;
+    let hasMore = true;
+    
+    try {
+        while (hasMore) {
+            showToast(`🔬 Đang scan batch ${startIndex + 1}-${startIndex + batchSize}...`, 'info');
+            
+            const res = await callAPI({ 
+                action: 'rescan_batch', 
+                startIndex: startIndex, 
+                batchSize: batchSize 
+            });
+            
+            if (res.status !== 'success') {
+                showToast('Lỗi Re-Scan: ' + (res.message || 'Unknown error'), 'error');
+                break;
+            }
+            
+            totalFiles = res.total;
+            totalProcessed += res.processed;
+            totalUpdated += res.updated;
+            totalErrors += res.errors;
+            hasMore = res.hasMore;
+            startIndex = res.nextIndex;
+            
+            // Log chi tiết
+            if (res.details) {
+                res.details.forEach(d => {
+                    if (d.status === 'updated') console.log(`[Re-Scan] ✅ ${d.fileName}: cập nhật`, d.old, '→', d.newData || d.new);
+                    else if (d.status === 'error') console.warn(`[Re-Scan] ❌ ${d.fileName}:`, d.message);
+                });
+            }
+        }
+        
+        showToast(
+            `✅ Re-Scan hoàn tất! ${totalProcessed}/${totalFiles} file: ${totalUpdated} cập nhật, ${totalErrors} lỗi.`,
+            totalErrors > 0 ? 'warning' : 'success'
+        );
+        
+        // Refresh dữ liệu
+        doSearch(true);
+        getDriveCount();
+        
+    } catch (e) {
+        console.error('[Re-Scan Error]', e);
+        showToast('Lỗi kết nối khi Re-Scan: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">auto_fix_high</span> Re-Scan AI'; }
     }
 };
 

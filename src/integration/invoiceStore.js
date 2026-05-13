@@ -583,7 +583,8 @@ export async function pushInvoicesToCloud(dateStr) {
         refId: inv.refId, refNo: inv.refNo, refDate: inv.refDate, date: inv.date,
         tableName: inv.tableName, employeeName: inv.employeeName,
         amount: inv.amount, payments: inv.payments,
-        unpaid: inv.unpaid, syncedAt: inv.syncedAt
+        unpaid: inv.unpaid, syncedAt: inv.syncedAt,
+        isManuallyEdited: inv.isManuallyEdited
       };
     });
 
@@ -619,8 +620,16 @@ export async function pullInvoicesFromCloud(dateStr) {
           tableName: inv.tableName || '', employeeName: inv.employeeName || '',
           amount: inv.amount || 0, payments: inv.payments || [],
           unpaid: !!inv.unpaid, confirmed: true,
-          syncedAt: inv.syncedAt || new Date().toISOString(), pushedToSheets: false
+          syncedAt: inv.syncedAt || new Date().toISOString(), pushedToSheets: false,
+          isManuallyEdited: !!inv.isManuallyEdited
         };
+        added++;
+      } else if (inv.isManuallyEdited && !store.invoices[key].isManuallyEdited) {
+        // If cloud version is manually edited but local is not, update local
+        store.invoices[key].payments = inv.payments || [];
+        store.invoices[key].amount = inv.amount || 0;
+        store.invoices[key].isManuallyEdited = true;
+        store.invoices[key].unpaid = false;
         added++;
       }
     }

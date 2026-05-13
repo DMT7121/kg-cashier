@@ -1,5 +1,5 @@
 /* ── History View — Tabbed shift detail w/ snapshot data ── */
-import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, saveShiftToHistory } from '../store.js';
+import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
 import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
 
@@ -52,7 +52,7 @@ function _renderHistoryCards(shifts) {
   }
 
   return shifts.map(sh => {
-    const sm = getShiftSummary(sh);
+    const sm = getHistorySummary(sh);
     return `
       <div class="history-card" data-shift-id="${sh.id}">
         <div class="history-header">
@@ -84,7 +84,7 @@ function _renderHistoryCards(shifts) {
 function _showShiftDetail(shiftId) {
   const sh = allHistory.find(s => s.id === shiftId) || cloudHistory.find(s => s.id === shiftId);
   if (!sh) return;
-  const sm = getShiftSummary(sh);
+  const sm = getHistorySummary(sh);
   _renderShiftDetailModal(sh, sm);
 }
 
@@ -205,7 +205,7 @@ export function init() {
     if (allHistory.length === 0) { showToast('Không có dữ liệu', 'warning'); return; }
     let csv = 'Ngày,Ca,Thu ngân,Doanh thu,Chi phí,Bills,Chênh lệch,Ghi chú\n';
     allHistory.forEach(sh => {
-      const sm = getShiftSummary(sh);
+      const sm = getHistorySummary(sh);
       csv += `"${sh.date}","${sh.shiftNumber}","${(sh.cashierName || '').replace(/"/g, '""')}",${sm.totalIncome},${sm.totalExpense},${sm.billCount},${sm.discrepancy},"${(sh.notes || '').replace(/"/g, '""')}"\n`;
     });
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
