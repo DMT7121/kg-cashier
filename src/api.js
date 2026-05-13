@@ -77,6 +77,10 @@ export async function closeShiftOnCloud(shiftData) {
   return apiCall('closeShift', shiftData);
 }
 
+export async function deleteShiftFromCloud(shiftId) {
+  return apiCall('deleteShift', { id: shiftId });
+}
+
 export async function getShiftsFromCloud(limit) {
   return apiCall('getShifts', null);
 }

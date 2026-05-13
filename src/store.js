@@ -845,8 +845,17 @@ export function saveShiftToHistory(shift) {
 export function deleteShiftFromHistory(id) {
   var s = getState();
   s.shifts = s.shifts.filter(function(sh) { return sh.id !== id; });
+  // Tombstone: remember deleted IDs so cloud sync won't re-add
+  if (!s._deletedShiftIds) s._deletedShiftIds = [];
+  if (s._deletedShiftIds.indexOf(id) === -1) s._deletedShiftIds.push(id);
+  // Cap tombstone list at 200
+  if (s._deletedShiftIds.length > 200) s._deletedShiftIds = s._deletedShiftIds.slice(-200);
   save();
   addAudit('DELETE_SHIFT_HISTORY', 'ID: ' + id);
+  // Also delete from cloud (best-effort, don't block)
+  import('./api.js').then(function(api) {
+    if (api.deleteShiftFromCloud) api.deleteShiftFromCloud(id).catch(function() {});
+  }).catch(function() {});
 }
 
 /**
@@ -881,11 +890,14 @@ export async function syncShiftHistory() {
       localIds[s.shifts[i].id] = i;
     }
 
-    // Merge: add cloud shifts missing from local
+    // Merge: add cloud shifts missing from local (skip tombstoned)
+    var deletedIds = s._deletedShiftIds || [];
     var added = 0;
     for (var j = 0; j < cloudShifts.length; j++) {
       var cs = cloudShifts[j];
       if (!cs || !cs.id) continue;
+      // Skip shifts that were explicitly deleted by user
+      if (deletedIds.indexOf(cs.id) !== -1) continue;
       if (localIds[cs.id] === undefined) {
         // Cloud shift not in local â†’ add
         cs.invoices = cs.invoices || [];
