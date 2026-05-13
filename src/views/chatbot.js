@@ -7,6 +7,7 @@ import { formatCurrency, showToast } from '../utils.js';
 var _isOpen = false;
 var _messages = [];
 var _isProcessing = false;
+var _pendingAction = null;
 var HISTORY_KEY = 'kg_chatbot_history';
 var MAX_MESSAGES = 200;
 
@@ -84,7 +85,11 @@ async function _call(prov, key, sys, msg) {
     });
     if (!res.ok) { var errText = await res.text().catch(function() { return ''; }); throw new Error(res.status + ': ' + errText.substring(0, 100)); }
     var j = await res.json();
-    var text = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] ? j.candidates[0].content.parts[0].text : '';
+    var allParts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+    var text = '';
+    for (var pi = allParts.length - 1; pi >= 0; pi--) {
+      if (!allParts[pi].thought && allParts[pi].text) { text = allParts[pi].text; break; }
+    }
     if (!text) throw new Error('Empty response');
     return text;
   }
@@ -127,18 +132,20 @@ function _exec(act) {
 
   if (act.action === 'add_income' || act.action === 'add_expense') {
     if (!shift) return { ok: false, text: '⚠️ Chưa mở ca. Nhấn Alt+2 để mở ca trước.' };
+    if (!act.amount || Number(act.amount) <= 0) return { ok: false, text: '⚠️ Số tiền không hợp lệ (0 hoặc âm).' };
     try {
-      addTransaction({ type: act.action === 'add_income' ? 'income' : 'expense', category: act.category || 'Khác', amount: Number(act.amount) || 0, paymentMethod: act.payment || 'cash', note: (act.note || '') + ' [AI]' });
+      addTransaction({ type: act.action === 'add_income' ? 'income' : 'expense', category: act.category || 'Khác', amount: Number(act.amount), paymentMethod: act.payment || 'cash', note: (act.note || '') + ' [AI]' });
       window.refreshView && window.refreshView();
-      return { ok: true, text: '✅ Đã thêm ' + (act.action === 'add_income' ? 'thu' : 'chi') + ': "' + (act.category || '') + '" — ' + formatCurrency(act.amount || 0) + ' (' + ({ transfer:'CK', card:'Thẻ', cash:'TM' }[act.payment] || 'TM') + ')' };
+      return { ok: true, text: '✅ Đã thêm ' + (act.action === 'add_income' ? 'thu' : 'chi') + ': "' + (act.category || '') + '" — ' + formatCurrency(act.amount) + ' (' + ({ transfer:'CK', card:'Thẻ', cash:'TM' }[act.payment] || 'TM') + ')' };
     } catch (e) { return { ok: false, text: '❌ ' + e.message }; }
   }
   if (act.action === 'add_other') {
     if (!shift) return { ok: false, text: '⚠️ Chưa mở ca.' };
+    if (!act.amount || Number(act.amount) <= 0) return { ok: false, text: '⚠️ Số tiền không hợp lệ.' };
     try {
-      addOtherTransaction({ type: act.type || 'expense', category: act.category || '', amount: Number(act.amount) || 0, note: (act.note || '') + ' [AI]' });
+      addOtherTransaction({ type: act.type || 'expense', category: act.category || '', amount: Number(act.amount), note: (act.note || '') + ' [AI]' });
       window.refreshView && window.refreshView();
-      return { ok: true, text: '✅ Đã thêm: "' + (act.category || '') + '" — ' + formatCurrency(act.amount || 0) };
+      return { ok: true, text: '✅ Đã thêm: "' + (act.category || '') + '" — ' + formatCurrency(act.amount) };
     } catch (e) { return { ok: false, text: '❌ ' + e.message }; }
   }
   if (act.action === 'navigate') {
@@ -151,6 +158,14 @@ function _exec(act) {
     return { ok: true, text: '📊 Ca ' + shift.shiftNumber + ' (' + shift.cashierName + '):\n• Tổng thu: ' + formatCurrency(sm.totalIncome || 0) + '\n• Tổng chi: ' + formatCurrency(sm.totalExpense || 0) + '\n• Số GD: ' + (sm.transactionCount || 0) };
   }
   return null;
+}
+
+// ── Helpers ──
+function _isFinancial(act) { return act.action === 'add_income' || act.action === 'add_expense' || act.action === 'add_other'; }
+function _describeAction(act) {
+  var t = act.action === 'add_income' ? '➕ Thu' : act.action === 'add_expense' ? '➖ Chi' : '📝 Thu chi khác';
+  var p = act.payment ? ' (' + ({cash:'TM',card:'Thẻ',transfer:'CK'}[act.payment] || 'TM') + ')' : '';
+  return t + ': "' + (act.category || 'Khác') + '" — ' + formatCurrency(act.amount || 0) + p + (act.note ? '\nGhi chú: ' + act.note : '');
 }
 
 // ── Persistence ──
@@ -169,13 +184,19 @@ function _renderMsgs() {
   var html = '<div class="cb-msg cb-ai"><div class="cb-name">🤖 AI Assistant</div>' +
     (shift ? 'Ca ' + shift.shiftNumber + ' đang mở! Tôi giúp thêm thu/chi, báo cáo, tra cứu hóa đơn.' :
       'Xin chào! Tôi giúp tra cứu hóa đơn VAT, tìm MST. Mở ca để dùng đầy đủ chức năng.') + '</div>';
+  var prevDate = '';
   for (var i = 0; i < _messages.length; i++) {
     var m = _messages[i];
+    var md = m.ts ? m.ts.substring(0, 10) : '';
+    if (md && md !== prevDate) { var dp = md.split('-'); html += '<div class="cb-date-div">── ' + dp[2] + '/' + dp[1] + '/' + dp[0] + ' ──</div>'; prevDate = md; }
     if (m.role === 'user') {
       html += '<div class="cb-msg cb-user">' + _esc(m.text) + '</div>';
     } else {
       html += '<div class="cb-msg cb-ai">';
-      if (m.actionResult) {
+      if (m.pending) {
+        html += '<div class="cb-action cb-action-pending">📋 Xác nhận thao tác:<br>' + _esc(m.text).replace(/\n/g, '<br>') + '</div>';
+        html += '<div class="cb-confirm-row"><button class="cb-btn-yes" data-cb-confirm="' + i + '">✅ Xác nhận</button><button class="cb-btn-no" data-cb-cancel="' + i + '">❌ Hủy</button></div>';
+      } else if (m.actionResult) {
         html += '<div class="cb-action ' + (m.actionResult.ok ? 'cb-action-ok' : 'cb-action-warn') + '">' + _esc(m.actionResult.text) + '</div>';
         if (m.rest) html += '<div style="margin-top:6px">' + _fmt(m.rest) + '</div>';
       } else { html += _fmt(m.text); }
@@ -184,6 +205,19 @@ function _renderMsgs() {
   }
   el.innerHTML = html;
   el.scrollTop = el.scrollHeight;
+  el.querySelectorAll('[data-cb-confirm]').forEach(function(b) { b.addEventListener('click', function() { _confirmPending(Number(b.dataset.cbConfirm)); }); });
+  el.querySelectorAll('[data-cb-cancel]').forEach(function(b) { b.addEventListener('click', function() { _cancelPending(Number(b.dataset.cbCancel)); }); });
+}
+
+function _confirmPending(idx) {
+  var msg = _messages[idx]; if (!msg || !msg.pendingAction) return;
+  msg.actionResult = _exec(msg.pendingAction); msg.pending = false; msg.pendingAction = null;
+  _save(); _renderMsgs();
+}
+function _cancelPending(idx) {
+  var msg = _messages[idx]; if (!msg) return;
+  msg.pending = false; msg.pendingAction = null; msg.actionResult = { ok: false, text: '❌ Đã hủy thao tác.' };
+  _save(); _renderMsgs();
 }
 
 function _chips() {
@@ -253,13 +287,13 @@ async function _send() {
     var msgObj = { role: 'ai', ts: new Date().toISOString() };
 
     if (parsed) {
-      var result = _exec(parsed.action);
-      if (result) {
-        msgObj.actionResult = result;
-        msgObj.rest = parsed.rest;
-        msgObj.text = result.text + (parsed.rest ? '\n' + parsed.rest : '');
+      if (_isFinancial(parsed.action)) {
+        msgObj.pending = true; msgObj.pendingAction = parsed.action;
+        msgObj.rest = parsed.rest; msgObj.text = _describeAction(parsed.action);
       } else {
-        msgObj.text = resp;
+        var result = _exec(parsed.action);
+        if (result) { msgObj.actionResult = result; msgObj.rest = parsed.rest; msgObj.text = result.text + (parsed.rest ? '\n' + parsed.rest : ''); }
+        else { msgObj.text = resp; }
       }
     } else {
       msgObj.text = resp;
@@ -316,5 +350,7 @@ export function initChatbot() {
 }
 
 export function refreshChatbot() {
-  if (_isOpen) _renderPanel();
+  if (!_isOpen || _isProcessing) return;
+  var sub = document.querySelector('.cb-sub');
+  if (sub) { var s = getCurrentShift(); sub.textContent = s ? '💼 Ca ' + s.shiftNumber + ' — ' + s.cashierName : '📄 Hỗ trợ hóa đơn'; }
 }

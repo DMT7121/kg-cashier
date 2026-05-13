@@ -223,18 +223,23 @@ function initApp() {
     if (e.altKey && !e.ctrlKey && !e.shiftKey) {
       var altViews = { '1':'dashboard', '2':'shift', '3':'transactions', '4':'cash-count', '5':'drink-inventory', '6':'revenue', '7':'history', '8':'vat', '9':'settings' };
       if (altViews[e.key]) { e.preventDefault(); navigateTo(altViews[e.key]); return; }
+      // Guard: skip action shortcuts when typing in input/textarea
+      var inInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
       switch (e.key.toLowerCase()) {
         case 't': e.preventDefault();
+          if (inInput) return;
           if (!getCurrentShift()) { showToast('⚠️ Cần mở ca trước', 'warning'); return; }
           if (window._showTxModal) window._showTxModal('income');
           else { navigateTo('transactions'); showToast('Nhấn nút Thêm thu', 'info'); }
           break;
         case 'c': e.preventDefault();
+          if (inInput) return;
           if (!getCurrentShift()) { showToast('⚠️ Cần mở ca trước', 'warning'); return; }
           if (window._showTxModal) window._showTxModal('expense');
           else { navigateTo('transactions'); showToast('Nhấn nút Thêm chi', 'info'); }
           break;
         case 'k': e.preventDefault();
+          if (inInput) return;
           if (!getCurrentShift()) { showToast('⚠️ Cần mở ca trước', 'warning'); return; }
           if (window._showOtherTxModal) window._showOtherTxModal();
           else { navigateTo('transactions'); showToast('Nhấn nút Thêm thu chi khác', 'info'); }
@@ -394,6 +399,12 @@ function initApp() {
       try { cv.module.destroy(); } catch(e) { /* ignore */ }
     }
   });
+
+  // Onboarding toast (one-time)
+  if (!localStorage.getItem('kg_onboard_v2')) {
+    setTimeout(function() { showToast('💡 Mới! Nhấn Alt+/ mở AI Assistant, Alt+T thêm thu nhanh', 'info', 6000); }, 2000);
+    localStorage.setItem('kg_onboard_v2', '1');
+  }
 
   console.log('[KG-CASHIER] Ready!');
 }

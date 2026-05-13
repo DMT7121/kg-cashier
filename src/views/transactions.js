@@ -394,11 +394,12 @@ function _initTransactionsTab() {
   });
 }
 
+// ── Expose for global keyboard shortcuts (Alt+T, Alt+C, Alt+K) ──
+window._showTxModal = _showTxModal;
+window._showOtherTxModal = _showOtherTxModal;
+
 // ── MAIN INIT ──
 export function init() {
-  // Expose for global keyboard shortcuts (Alt+T, Alt+C, Alt+K)
-  window._showTxModal = _showTxModal;
-  window._showOtherTxModal = _showOtherTxModal;
 
   // Bind tab clicks
   document.querySelectorAll('[data-txtab]').forEach(btn => {

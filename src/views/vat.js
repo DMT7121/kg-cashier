@@ -666,7 +666,8 @@ async function callGeminiVision(pdfBase64, fileId) {
             }, 30000); // 30s timeout for vision
             if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
             const json = await res.json();
-            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            const gParts = json.candidates?.[0]?.content?.parts || [];
+            let text = ''; for (let pi = gParts.length - 1; pi >= 0; pi--) { if (!gParts[pi].thought && gParts[pi].text) { text = gParts[pi].text; break; } }
             if (!text) throw new Error('Gemini Vision returned empty');
             console.log('[VAT Vision] Gemini Vision succeeded');
             return text;
@@ -1180,7 +1181,8 @@ async function callGeminiDirect(key, prompt, mode) {
     });
     if (!res.ok) { const err = await res.text(); throw new Error(`${res.status}: ${err.substring(0, 120)}`); }
     const json = await res.json();
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+    const gParts = json.candidates?.[0]?.content?.parts || [];
+    let text = ''; for (let pi = gParts.length - 1; pi >= 0; pi--) { if (!gParts[pi].thought && gParts[pi].text) { text = gParts[pi].text; break; } }
     if (!text) throw new Error('Gemini returned empty response');
     return text;
 }
