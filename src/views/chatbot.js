@@ -1,0 +1,312 @@
+/* ── Chatbot AI — Global Floating Assistant ──
+   2 modes: Default (invoice help) + Cashier (when shift is open)
+   ── */
+import { getCurrentShift, addTransaction, addOtherTransaction, getCategories, getShiftSummary } from '../store.js';
+import { formatCurrency, showToast } from '../utils.js';
+
+var _isOpen = false;
+var _messages = [];
+var _isProcessing = false;
+var HISTORY_KEY = 'kg_chatbot_history';
+var MAX_MESSAGES = 200;
+
+// ── AI Keys (shared with VAT module) ──
+function _getKeys(p) { return JSON.parse(localStorage.getItem('vat_master_' + p + '_keys') || '[]'); }
+
+function _getProvider() {
+  var ps = ['gemini','deepseek','groq','sambanova','cerebras','mistral','nvidia','hf'];
+  for (var i = 0; i < ps.length; i++) { if (_getKeys(ps[i]).length) return ps[i]; }
+  return null;
+}
+
+// ── System Prompt (2-mode) ──
+function _buildPrompt() {
+  var shift = getCurrentShift();
+  var base = 'Bạn là trợ lý AI cho nhà hàng KING\'s GRILL. Trả lời ngắn gọn, thân thiện, tiếng Việt. ' +
+    'Hỗ trợ tra cứu hóa đơn VAT, tìm MST, hướng dẫn sử dụng webapp thu ngân.';
+
+  if (!shift) {
+    return base + '\n\nHiện CHƯA MỞ CA thu ngân. ' +
+      'Nếu user yêu cầu thêm giao dịch, báo cáo doanh thu, hoặc kiểm kê, ' +
+      'hãy từ chối lịch sự và nhắc mở ca trước (Alt+2). KHÔNG tạo JSON action thu/chi.';
+  }
+
+  var cats = getCategories();
+  return base +
+    '\n\n💼 CA MỞ: ' + shift.cashierName + ', Ca ' + shift.shiftNumber + ', Ngày ' + shift.date +
+    '\nKhi user yêu cầu thao tác, trả về ĐÚNG 1 dòng JSON action ĐẦU TIÊN, rồi text giải thích bên dưới.' +
+    '\nActions:' +
+    '\n{"action":"add_expense","category":"...","amount":NUMBER,"note":"...","payment":"cash|card|transfer"}' +
+    '\n{"action":"add_income","category":"...","amount":NUMBER,"note":"...","payment":"cash|card|transfer"}' +
+    '\n{"action":"add_other","type":"income|expense","category":"...","amount":NUMBER,"note":"..."}' +
+    '\n{"action":"navigate","view":"dashboard|shift|transactions|cash-count|drink-inventory|revenue|history|vat|settings"}' +
+    '\n{"action":"query","type":"shift_summary"}' +
+    '\nDANH MỤC THU: ' + cats.income.join(', ') +
+    '\nDANH MỤC CHI: ' + cats.expense.join(', ') +
+    '\nVD: "Chi cọc D1 1tr" → {"action":"add_expense","category":"Trả cọc","amount":1000000,"note":"D1","payment":"cash"}' +
+    '\nHỏi chuyện bình thường → trả lời text, KHÔNG JSON.';
+}
+
+// ── AI Call ──
+async function _callAI(msg) {
+  var provider = _getProvider();
+  if (!provider) return '⚠️ Chưa có API key. Vào Hóa đơn VAT → Cấu hình để thêm key.';
+
+  var sys = _buildPrompt();
+  var ctx = _messages.slice(-6).map(function(m) { return (m.role === 'user' ? 'User: ' : 'AI: ') + m.text; }).join('\n');
+  var full = ctx ? ctx + '\nUser: ' + msg : msg;
+
+  // Try primary provider
+  var keys = _getKeys(provider);
+  for (var i = 0; i < keys.length; i++) {
+    try { var r = await _call(provider, keys[i], sys, full); if (r) return r; } catch (e) {}
+  }
+  // Fallback
+  var all = ['gemini','deepseek','groq','sambanova','cerebras','mistral','nvidia','hf'];
+  for (var p = 0; p < all.length; p++) {
+    if (all[p] === provider) continue;
+    var ks = _getKeys(all[p]);
+    for (var k = 0; k < ks.length; k++) {
+      try { return await _call(all[p], ks[k], sys, full); } catch (e) {}
+    }
+  }
+  return '❌ AI không phản hồi. Thử lại sau.';
+}
+
+async function _call(prov, key, sys, msg) {
+  var res;
+  if (prov === 'gemini') {
+    res = await _ft('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents: [{ parts: [{ text: msg }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 1024 } })
+    });
+    var j = await res.json();
+    return j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] ? j.candidates[0].content.parts[0].text : '';
+  }
+  var eps = { deepseek:'https://api.deepseek.com/v1/chat/completions', groq:'https://api.groq.com/openai/v1/chat/completions', sambanova:'https://api.sambanova.ai/v1/chat/completions', cerebras:'https://api.cerebras.ai/v1/chat/completions', mistral:'https://api.mistral.ai/v1/chat/completions', nvidia:'https://integrate.api.nvidia.com/v1/chat/completions', hf:'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1/v1/chat/completions' };
+  var mods = { deepseek:'deepseek-chat', groq:'llama-3.3-70b-versatile', sambanova:'Meta-Llama-3.3-70B-Instruct', cerebras:'llama-3.3-70b', mistral:'mistral-large-latest', nvidia:'meta/llama-3.1-70b-instruct', hf:'mistralai/Mixtral-8x7B-Instruct-v0.1' };
+  if (!eps[prov]) throw new Error('unknown');
+  res = await _ft(eps[prov], {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify({ model: mods[prov], messages: [{ role: 'system', content: sys }, { role: 'user', content: msg }], temperature: 0.7, max_tokens: 1024 })
+  });
+  var j2 = await res.json();
+  return j2.choices && j2.choices[0] && j2.choices[0].message ? j2.choices[0].message.content : '';
+}
+
+function _ft(url, opts) {
+  return Promise.race([fetch(url, opts), new Promise(function(_, rej) { setTimeout(function() { rej(new Error('timeout')); }, 20000); })]);
+}
+
+// ── Action Parser + Executor ──
+function _parseAction(text) {
+  if (!text) return null;
+  var lines = text.split('\n');
+  for (var i = 0; i < Math.min(lines.length, 5); i++) {
+    var ln = lines[i].trim();
+    if (ln.charAt(0) === '{' && ln.charAt(ln.length - 1) === '}') {
+      try { var o = JSON.parse(ln); if (o.action) return { action: o, rest: lines.slice(i + 1).join('\n').trim() }; } catch (e) {}
+    }
+  }
+  var m = text.match(/\{[^{}]*"action"\s*:\s*"[^"]+?"[^{}]*\}/);
+  if (m) { try { var o2 = JSON.parse(m[0]); if (o2.action) return { action: o2, rest: text.replace(m[0], '').trim() }; } catch (e) {} }
+  return null;
+}
+
+function _exec(act) {
+  var shift = getCurrentShift();
+  var viewNames = { dashboard:'Tổng quan', shift:'Quản lý ca', transactions:'Giao dịch', 'cash-count':'Kiểm kê tiền', 'drink-inventory':'Kiểm kho', revenue:'Doanh thu', history:'Lịch sử ca', vat:'Hóa đơn VAT', settings:'Cài đặt' };
+
+  if (act.action === 'add_income' || act.action === 'add_expense') {
+    if (!shift) return { ok: false, text: '⚠️ Chưa mở ca. Nhấn Alt+2 để mở ca trước.' };
+    try {
+      addTransaction({ type: act.action === 'add_income' ? 'income' : 'expense', category: act.category || 'Khác', amount: Number(act.amount) || 0, paymentMethod: act.payment || 'cash', note: (act.note || '') + ' [AI]' });
+      window.refreshView && window.refreshView();
+      return { ok: true, text: '✅ Đã thêm ' + (act.action === 'add_income' ? 'thu' : 'chi') + ': "' + (act.category || '') + '" — ' + formatCurrency(act.amount || 0) + ' (' + ({ transfer:'CK', card:'Thẻ', cash:'TM' }[act.payment] || 'TM') + ')' };
+    } catch (e) { return { ok: false, text: '❌ ' + e.message }; }
+  }
+  if (act.action === 'add_other') {
+    if (!shift) return { ok: false, text: '⚠️ Chưa mở ca.' };
+    try {
+      addOtherTransaction({ type: act.type || 'expense', category: act.category || '', amount: Number(act.amount) || 0, note: (act.note || '') + ' [AI]' });
+      window.refreshView && window.refreshView();
+      return { ok: true, text: '✅ Đã thêm: "' + (act.category || '') + '" — ' + formatCurrency(act.amount || 0) };
+    } catch (e) { return { ok: false, text: '❌ ' + e.message }; }
+  }
+  if (act.action === 'navigate') {
+    window.navigateTo && window.navigateTo(act.view);
+    return { ok: true, text: '✅ Đã chuyển sang ' + (viewNames[act.view] || act.view) };
+  }
+  if (act.action === 'query') {
+    if (!shift) return { ok: false, text: '⚠️ Chưa mở ca — không có dữ liệu.' };
+    var sm = getShiftSummary(shift);
+    return { ok: true, text: '📊 Ca ' + shift.shiftNumber + ' (' + shift.cashierName + '):\n• Tổng thu: ' + formatCurrency(sm.totalIncome || 0) + '\n• Tổng chi: ' + formatCurrency(sm.totalExpense || 0) + '\n• Số GD: ' + (sm.transactionCount || 0) };
+  }
+  return null;
+}
+
+// ── Persistence ──
+function _save() { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(_messages.slice(-MAX_MESSAGES))); } catch (e) {} }
+function _load() { try { _messages = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch (e) { _messages = []; } }
+
+// ── HTML Helpers ──
+function _esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function _fmt(s) { return _esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>'); }
+
+// ── Render ──
+function _renderMsgs() {
+  var el = document.getElementById('cbMsgs');
+  if (!el) return;
+  var shift = getCurrentShift();
+  var html = '<div class="cb-msg cb-ai"><div class="cb-name">🤖 AI Assistant</div>' +
+    (shift ? 'Ca ' + shift.shiftNumber + ' đang mở! Tôi giúp thêm thu/chi, báo cáo, tra cứu hóa đơn.' :
+      'Xin chào! Tôi giúp tra cứu hóa đơn VAT, tìm MST. Mở ca để dùng đầy đủ chức năng.') + '</div>';
+  for (var i = 0; i < _messages.length; i++) {
+    var m = _messages[i];
+    if (m.role === 'user') {
+      html += '<div class="cb-msg cb-user">' + _esc(m.text) + '</div>';
+    } else {
+      html += '<div class="cb-msg cb-ai">';
+      if (m.actionResult) {
+        html += '<div class="cb-action ' + (m.actionResult.ok ? 'cb-action-ok' : 'cb-action-warn') + '">' + _esc(m.actionResult.text) + '</div>';
+        if (m.rest) html += '<div style="margin-top:6px">' + _fmt(m.rest) + '</div>';
+      } else { html += _fmt(m.text); }
+      html += '</div>';
+    }
+  }
+  el.innerHTML = html;
+  el.scrollTop = el.scrollHeight;
+}
+
+function _chips() {
+  var shift = getCurrentShift();
+  var cs = shift
+    ? [['Tóm tắt ca','summarize'],['Thu 500k TM','add_circle'],['Chi vật tư 200k','remove_circle']]
+    : [['Hướng dẫn mở ca','help'],['Tìm hóa đơn','search']];
+  return cs.map(function(c) { return '<button class="cb-chip" data-chip="' + c[0] + '"><span class="material-symbols-rounded" style="font-size:14px">' + c[1] + '</span> ' + c[0] + '</button>'; }).join('');
+}
+
+function _renderPanel() {
+  var panel = document.getElementById('chatbotPanel');
+  if (!panel) return;
+  var shift = getCurrentShift();
+  var prov = _getProvider();
+
+  panel.innerHTML =
+    '<div class="cb-head">' +
+      '<div class="cb-head-l"><span class="material-symbols-rounded" style="color:var(--primary);font-size:22px">smart_toy</span><div><div class="cb-title">AI Assistant</div><div class="cb-sub">' +
+      (shift ? '💼 Ca ' + shift.shiftNumber + ' — ' + shift.cashierName : '📄 Hỗ trợ hóa đơn') +
+      '</div></div></div>' +
+      '<div><button class="cb-hbtn" id="cbClear" title="Xóa chat"><span class="material-symbols-rounded" style="font-size:18px">delete_sweep</span></button>' +
+      '<button class="cb-hbtn" id="cbClose" title="Đóng"><span class="material-symbols-rounded" style="font-size:18px">close</span></button></div>' +
+    '</div>' +
+    '<div class="cb-msgs" id="cbMsgs"></div>' +
+    (!prov ? '<div class="cb-warn">⚠️ Chưa có API key. <a href="#" id="cbGoVat">Cấu hình</a></div>' : '') +
+    '<div class="cb-chips" id="cbChips">' + _chips() + '</div>' +
+    '<div class="cb-foot"><input type="text" id="cbIn" class="form-input" placeholder="' +
+    (shift ? 'Nhập lệnh hoặc hỏi...' : 'Hỏi về hóa đơn...') + '" autocomplete="off">' +
+    '<button class="btn btn-primary cb-send" id="cbSend"' + (!prov ? ' disabled' : '') + '><span class="material-symbols-rounded">send</span></button></div>';
+
+  setTimeout(function() {
+    document.getElementById('cbClose').addEventListener('click', toggleChatbot);
+    document.getElementById('cbClear').addEventListener('click', function() { _messages = []; _save(); _renderMsgs(); showToast('Đã xóa lịch sử chat', 'info'); });
+    document.getElementById('cbSend').addEventListener('click', _send);
+    var inp = document.getElementById('cbIn');
+    if (inp) { inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); _send(); } }); if (_isOpen) inp.focus(); }
+    var goVat = document.getElementById('cbGoVat');
+    if (goVat) goVat.addEventListener('click', function(e) { e.preventDefault(); window.navigateTo && window.navigateTo('vat'); });
+    document.querySelectorAll('[data-chip]').forEach(function(el) {
+      el.addEventListener('click', function() { var inp2 = document.getElementById('cbIn'); if (inp2) { inp2.value = el.dataset.chip; _send(); } });
+    });
+    _renderMsgs();
+  }, 50);
+}
+
+// ── Send ──
+async function _send() {
+  var inp = document.getElementById('cbIn');
+  if (!inp || _isProcessing) return;
+  var text = inp.value.trim();
+  if (!text) return;
+
+  _isProcessing = true;
+  _messages.push({ role: 'user', text: text, ts: new Date().toISOString() });
+  inp.value = '';
+  _renderMsgs();
+
+  // Loading indicator
+  var el = document.getElementById('cbMsgs');
+  var lid = 'cbl' + Date.now();
+  if (el) { el.innerHTML += '<div id="' + lid + '" class="cb-msg cb-ai cb-loading"><span class="material-symbols-rounded spin-icon" style="font-size:16px">sync</span> Đang suy nghĩ...</div>'; el.scrollTop = el.scrollHeight; }
+
+  try {
+    var resp = await _callAI(text);
+    var parsed = _parseAction(resp);
+    var msgObj = { role: 'ai', ts: new Date().toISOString() };
+
+    if (parsed) {
+      var result = _exec(parsed.action);
+      if (result) {
+        msgObj.actionResult = result;
+        msgObj.rest = parsed.rest;
+        msgObj.text = result.text + (parsed.rest ? '\n' + parsed.rest : '');
+      } else {
+        msgObj.text = resp;
+      }
+    } else {
+      msgObj.text = resp;
+    }
+    _messages.push(msgObj);
+  } catch (e) {
+    _messages.push({ role: 'ai', text: '❌ Lỗi: ' + e.message, ts: new Date().toISOString() });
+  }
+
+  _isProcessing = false;
+  var loadEl = document.getElementById(lid);
+  if (loadEl) loadEl.remove();
+  _save();
+  _renderMsgs();
+
+  // Update chips (shift state may have changed)
+  var chipsEl = document.getElementById('cbChips');
+  if (chipsEl) {
+    chipsEl.innerHTML = _chips();
+    document.querySelectorAll('[data-chip]').forEach(function(el) {
+      el.addEventListener('click', function() { var inp2 = document.getElementById('cbIn'); if (inp2) { inp2.value = el.dataset.chip; _send(); } });
+    });
+  }
+}
+
+// ── Public API ──
+export function toggleChatbot() {
+  _isOpen = !_isOpen;
+  var panel = document.getElementById('chatbotPanel');
+  var fab = document.getElementById('chatbotFab');
+  if (panel) panel.classList.toggle('cb-open', _isOpen);
+  if (fab) fab.classList.toggle('cb-fab-active', _isOpen);
+  if (_isOpen) {
+    _renderPanel();
+    setTimeout(function() { var inp = document.getElementById('cbIn'); if (inp) inp.focus(); }, 100);
+  }
+}
+
+export function initChatbot() {
+  _load();
+  // Create FAB + Panel in DOM
+  var fab = document.createElement('button');
+  fab.id = 'chatbotFab';
+  fab.className = 'cb-fab';
+  fab.title = 'AI Assistant (Alt+/)';
+  fab.innerHTML = '<span class="material-symbols-rounded" style="font-size:28px">smart_toy</span>';
+  fab.addEventListener('click', toggleChatbot);
+  document.body.appendChild(fab);
+
+  var panel = document.createElement('div');
+  panel.id = 'chatbotPanel';
+  panel.className = 'cb-panel';
+  document.body.appendChild(panel);
+}
+
+export function refreshChatbot() {
+  if (_isOpen) _renderPanel();
+}

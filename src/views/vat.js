@@ -4,7 +4,6 @@ let _activeTab = 'upload';
 const _tabs = [
   { key: 'upload', icon: 'cloud_upload', label: 'Upload Hóa Đơn' },
   { key: 'search', icon: 'search', label: 'Tra Cứu & Kho' },
-  { key: 'chat', icon: 'smart_toy', label: 'Chatbot Lầy Lội' },
   { key: 'history', icon: 'history', label: 'Lịch Sử' },
   { key: 'settings', icon: 'settings', label: 'Cấu hình & Admin' }
 ];
@@ -324,7 +323,6 @@ export function render() {
   var content = '';
   if (_activeTab === 'upload') content = _renderUpload();
   else if (_activeTab === 'search') content = _renderSearch();
-  else if (_activeTab === 'chat') content = _renderChat();
   else if (_activeTab === 'history') content = _renderHistory();
   else if (_activeTab === 'settings') content = _renderSettings();
 
@@ -393,18 +391,6 @@ function _bindEvents() {
 
     if (_activeTab === 'history') {
         loadHistory();
-    }
-
-    if (_activeTab === 'chat') {
-        document.getElementById('vat-btn-send-chat')?.addEventListener('click', sendChat);
-        document.getElementById('vat-chat-input')?.addEventListener('keyup', (e) => {
-            if(e.key === 'Enter') sendChat();
-        });
-        document.getElementById('vat-btn-clear-chat')?.addEventListener('click', () => {
-            document.getElementById('vat-chat-messages').innerHTML = '';
-        });
-        document.getElementById('vat-btn-switch-persona')?.addEventListener('click', manualSwitchPersona);
-        updateChatSubtitle();
     }
 }
 
