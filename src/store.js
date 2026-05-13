@@ -852,9 +852,12 @@ export function deleteShiftFromHistory(id) {
   if (s._deletedShiftIds.length > 200) s._deletedShiftIds = s._deletedShiftIds.slice(-200);
   save();
   addAudit('DELETE_SHIFT_HISTORY', 'ID: ' + id);
-  // Also delete from cloud (best-effort, don't block)
+  // Also delete from cloud + push tombstone list for cross-device sync
   import('./api.js').then(function(api) {
     if (api.deleteShiftFromCloud) api.deleteShiftFromCloud(id).catch(function() {});
+    // Push tombstones to cloud so other devices skip this shift too
+    var tombstones = getState()._deletedShiftIds || [];
+    api.saveConfigToCloud('deleted_shift_ids', JSON.stringify(tombstones)).catch(function() {});
   }).catch(function() {});
 }
 
@@ -892,6 +895,21 @@ export async function syncShiftHistory() {
 
     // Merge: add cloud shifts missing from local (skip tombstoned)
     var deletedIds = s._deletedShiftIds || [];
+    // Pull tombstones from cloud for cross-device sync
+    try {
+      var configRes = await api.getConfigFromCloud();
+      if (configRes && configRes.success && configRes.config) {
+        var cloudTombStr = configRes.config.deleted_shift_ids;
+        if (cloudTombStr) {
+          var cloudTombs = typeof cloudTombStr === 'string' ? JSON.parse(cloudTombStr) : cloudTombStr;
+          if (Array.isArray(cloudTombs)) {
+            for (var ti = 0; ti < cloudTombs.length; ti++) {
+              if (deletedIds.indexOf(cloudTombs[ti]) === -1) deletedIds.push(cloudTombs[ti]);
+            }
+          }
+        }
+      }
+    } catch(tombErr) { /* ignore */ }
     var added = 0;
     for (var j = 0; j < cloudShifts.length; j++) {
       var cs = cloudShifts[j];
@@ -1026,21 +1044,9 @@ export async function pullCategoriesFromCloud() {
       }
       if (cloudCats && cloudCats.income && cloudCats.expense) {
         var s = getState();
-        var localCats = s.categories || defaultCategories;
-        // Merge: union of local + cloud (keep all)
-        var merged = { income: [], expense: [] };
-        var seen = { income: {}, expense: {} };
-        ['income', 'expense'].forEach(function(type) {
-          var all = (localCats[type] || []).concat(cloudCats[type] || []);
-          for (var i = 0; i < all.length; i++) {
-            var c = all[i];
-            if (!seen[type][c.toLowerCase()]) {
-              seen[type][c.toLowerCase()] = true;
-              merged[type].push(c);
-            }
-          }
-        });
-        s.categories = merged;
+        // Cloud-wins: cloud is pushed on every add/remove, so it is always the latest
+        // This ensures deletions propagate across devices
+        s.categories = cloudCats;
         save();
         console.log('[Store] â˜ï¸ Categories synced from cloud');
       }
@@ -1051,6 +1057,21 @@ export async function pullCategoriesFromCloud() {
 }
 
 // â”€â”€ Cloud Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/** Merge two transaction arrays by id (union). Used for cross-device sync. */
+function _mergeTransactions(localTxs, cloudTxs) {
+  var byId = {};
+  var merged = [];
+  var arr1 = localTxs || [];
+  var arr2 = cloudTxs || [];
+  for (var i = 0; i < arr1.length; i++) { byId[arr1[i].id] = true; merged.push(arr1[i]); }
+  for (var j = 0; j < arr2.length; j++) {
+    if (!byId[arr2[j].id]) { merged.push(arr2[j]); }
+  }
+  return merged.sort(function(a, b) {
+    return (a.timestamp || '') > (b.timestamp || '') ? 1 : -1;
+  });
+}
+
 var _syncTimer = null;
 var _shiftDirty = false;
 var _lastCloudPushTime = 0;
@@ -1128,9 +1149,18 @@ export async function syncCurrentShiftWithCloud() {
         const cloudCompare = JSON.stringify(Object.assign({}, cloudShift, { invoices: [] }));
 
         if (localCompare !== cloudCompare) {
-          // Same shift, different content â†’ merge cloud data but keep local invoices
+          // Same shift, different content → MERGE transactions by ID (union)
+          var mergedTxs = _mergeTransactions(
+            s.currentShift.transactions, cloudShift.transactions
+          );
+          var mergedOtherTxs = _mergeTransactions(
+            s.currentShift.otherTransactions, cloudShift.otherTransactions
+          );
+          // Use cloud as base for non-array fields (cashCount, notes, etc.)
+          cloudShift.transactions = mergedTxs;
+          cloudShift.otherTransactions = mergedOtherTxs;
           cloudShift.invoices = s.currentShift.invoices;
-          // Fix 2B: Preserve security fields from local
+          // Preserve security fields from local
           cloudShift.shiftPassword = cloudShift.shiftPassword || s.currentShift.shiftPassword;
           s.currentShift = cloudShift;
           save();

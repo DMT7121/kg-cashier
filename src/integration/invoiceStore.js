@@ -603,9 +603,12 @@ export async function pullInvoicesFromCloud(dateStr) {
   try {
     var { getConfigFromCloud } = await import('../api.js');
     var result = await getConfigFromCloud();
-    if (!result || !result.success || !result.data) return 0;
+    if (!result || !result.success) return 0;
+    // GAS config API returns result.config — support result.data as fallback
+    var configData = result.config || result.data || {};
+    if (!configData || typeof configData !== 'object') return 0;
 
-    var cloudInvoices = result.data['cukcuk_invoices_' + dateStr];
+    var cloudInvoices = configData['cukcuk_invoices_' + dateStr];
     if (!Array.isArray(cloudInvoices) || cloudInvoices.length === 0) return 0;
 
     // Merge: add only invoices not already in local store

@@ -318,6 +318,37 @@ function initApp() {
   // 3) Pull categories from cloud (cross-device sync)
   pullCategoriesFromCloud().catch(function() {});
 
+  // 5) Pull settings from cloud (cross-device: CUKCUK config, thresholds, etc.)
+  import('./api.js').then(function(api) {
+    if (!api.getSettingsFromCloud) return;
+    api.getSettingsFromCloud().then(function(res) {
+      if (res && res.success && res.settings) {
+        import('./store.js').then(function(store) {
+          var local = store.getSettings();
+          // Cloud wins for shared config, local wins for device-specific
+          var merged = Object.assign({}, local, res.settings);
+          // Preserve device-specific fields
+          merged.requireLogin = local.requireLogin;
+          store.updateSettings(merged);
+          console.log('[Main] Startup: Settings synced from cloud');
+        });
+      }
+    }).catch(function() {});
+  }).catch(function() {});
+
+  // 6) Pre-fetch staff from cloud to update cache for shift open form
+  import('./api.js').then(function(api) {
+    if (!api.getStaffFromCloud) return;
+    api.getStaffFromCloud().then(function(res) {
+      if (res && res.success && res.staff && Array.isArray(res.staff)) {
+        import('./store.js').then(function(store) {
+          store.setCachedStaff(res.staff);
+          console.log('[Main] Startup: Staff cache refreshed from cloud (' + res.staff.length + ')');
+        });
+      }
+    }).catch(function() {});
+  }).catch(function() {});
+
   // 4) Pull CUKCUK invoices from cloud (cross-device sync)
   try {
     var shift = getCurrentShift();
@@ -348,6 +379,10 @@ function initApp() {
         clearShiftDirty();
         renderCurrentView();
       }
+    });
+    // Also sync history periodically (cross-device: see shifts closed on other devices)
+    syncShiftHistory().then(function(changed) {
+      if (changed && window.location.hash === '#history') renderCurrentView();
     });
   }, 60000));
 
