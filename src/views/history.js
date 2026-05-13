@@ -51,10 +51,10 @@ function _renderHistoryCards(shifts) {
     return '<div class="empty-state" style="padding:40px;"><span class="material-symbols-rounded empty-icon">history</span><h3>Chưa có lịch sử</h3><p>Các ca đã đóng sẽ hiện ở đây</p></div>';
   }
 
-  // Fix 3B: Dedup by compound key before rendering
+  // Fix 3B: Dedup by compound key before rendering (no startTime — clones differ by seconds)
   var seen = {};
   shifts = shifts.filter(function(sh) {
-    var key = (sh.date || '') + '_' + (sh.shiftNumber || '') + '_' + (sh.startTime || '').substring(0, 19);
+    var key = (sh.date || '') + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '');
     if (seen[key]) return false;
     seen[key] = true;
     return true;

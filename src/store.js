@@ -900,15 +900,19 @@ export async function syncShiftHistory() {
       }
     }
 
-    // Dedup: remove duplicate shifts with same (date + shiftNumber + cashierName + startTime)
+    // Dedup: remove duplicate shifts with same (date + shiftNumber + cashierName)
+    // Clones may differ by seconds in startTime — ignore startTime in key
     var seenKey = {};
     var deduped = [];
     for (var di = 0; di < s.shifts.length; di++) {
       var ds = s.shifts[di];
-      var dkey = (ds.date || '') + '_' + (ds.shiftNumber || '') + '_' + (ds.cashierName || '') + '_' + (ds.startTime || '').substring(0, 19);
+      var dkey = (ds.date || '') + '_' + (ds.shiftNumber || '') + '_' + (ds.cashierName || '');
       if (seenKey[dkey]) {
         var prev = seenKey[dkey];
-        if (ds.status === 'closed' && prev.status !== 'closed') {
+        // Keep the "better" version: closed > open, more transactions wins
+        var prevScore = (prev.status === 'closed' ? 1000 : 0) + ((prev.transactions || []).length);
+        var dsScore = (ds.status === 'closed' ? 1000 : 0) + ((ds.transactions || []).length);
+        if (dsScore > prevScore) {
           deduped = deduped.filter(function(x) { return x !== prev; });
           deduped.push(ds);
           seenKey[dkey] = ds;
