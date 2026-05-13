@@ -308,12 +308,15 @@ export function init() {
         input.focus();
         return;
       }
-      const match = (input.value === (shift.shiftPassword || '')) || (input.value === adminPass);
+      const pw = (input.value || '').trim();
+      const shiftPw = (shift.shiftPassword || '').trim();
+      const match = (pw.length > 0) && (pw === shiftPw || pw === adminPass);
       if (match) {
         sessionStorage.setItem('shift_validated', shift.id);
         showToast('Xác thực thành công!', 'success');
         window.refreshView?.();
       } else {
+        if (pw.length > 0) console.warn('[Shift] Password mismatch:', { inputLen: pw.length, hasShiftPw: !!shiftPw, shiftPwLen: shiftPw.length, hasAdminPw: !!adminPass });
         if (errEl) { errEl.textContent = '❌ Mật khẩu ca không đúng! (Thử mật khẩu quản lý)'; errEl.style.display = 'block'; }
         showToast('Mật khẩu ca không đúng!', 'error');
         input.value = '';
@@ -401,9 +404,9 @@ export function init() {
       setTimeout(() => {
         var keepMoney = moneyInput(document.getElementById('cashToKeep'), { allowMath: false });
         var depositMoney = moneyInput(document.getElementById('cashToDeposit'), { allowMath: false });
-        document.getElementById('btnConfirmClose')?.addEventListener('click', () => {
+        document.getElementById('btnConfirmClose')?.addEventListener('click', async () => {
           try {
-            closeShift({
+            await closeShift({
               notes: document.getElementById('closeNotes')?.value || '',
               cashToKeep: keepMoney.getValue(),
               cashToDeposit: depositMoney.getValue()
@@ -551,7 +554,7 @@ export function init() {
     }
 
     try {
-      const result = openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass });
+      const result = await openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass });
       sessionStorage.setItem('shift_validated', result.id);
       if (!_isManualMode && _selectedStaff) setLoggedInUser(_selectedStaff);
       showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');

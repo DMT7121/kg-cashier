@@ -296,7 +296,7 @@ export function updateSettings(newSettings) {
 // â”€â”€ Current shift â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getCurrentShift() { return getState().currentShift; }
 
-export function openShift(opts) {
+export async function openShift(opts) {
   var cashierName = opts.cashierName;
   var shiftNumber = opts.shiftNumber;
   var date = opts.date;
@@ -308,6 +308,21 @@ export function openShift(opts) {
   var s = getState();
   if (s.currentShift) {
     throw new Error('ÄÃ£ cÃ³ ca Ä‘ang má»Ÿ. HÃ£y Ä‘Ã³ng ca trÆ°á»›c.');
+  }
+
+  // Pre-check: is there an active shift on cloud from another device?
+  if (_cloudGetShift) {
+    try {
+      var cloudCheck = await _cloudGetShift();
+      if (cloudCheck.success && cloudCheck.shift && cloudCheck.shift.status !== 'closed') {
+        var cloudName = cloudCheck.shift.cashierName || 'unknown';
+        var cloudNum = cloudCheck.shift.shiftNumber || '?';
+        throw new Error('Thi\u1EBFt b\u1ECB kh\u00E1c \u0111ang m\u1EDF Ca ' + cloudNum + ' b\u1EDFi ' + cloudName + '. H\u00E3y \u0111\u00F3ng ca \u0111\u00F3 tr\u01B0\u1EDBc.');
+      }
+    } catch (e) {
+      if (e.message && e.message.indexOf('kh\u00E1c') > -1) throw e;
+      // Network error \u2192 allow offline open
+    }
   }
 
   s.currentShift = {
@@ -342,6 +357,14 @@ export function openShift(opts) {
 export function updateStartingCash(newAmount) {
   var s = getState();
   if (!s.currentShift) throw new Error('ChÆ°a cÃ³ ca Ä‘ang má»Ÿ.');
+
+  // Fix 5: Block all sync during close
+  _closeInProgress = true;
+
+  // Fix 8: Integrity validation
+  if (!s.currentShift.id) { _closeInProgress = false; throw new Error('Ca thi\u1EBFu ID'); }
+  if (!s.currentShift.date) { _closeInProgress = false; throw new Error('Ca thi\u1EBFu ng\u00E0y'); }
+  if (!s.currentShift.cashierName) { _closeInProgress = false; throw new Error('Ca thi\u1EBFu t\u00EAn thu ng\u00E2n'); }
   var old = s.currentShift.startingCash || 0;
   s.currentShift.startingCash = Number(newAmount) || 0;
   save();
@@ -349,7 +372,7 @@ export function updateStartingCash(newAmount) {
   return s.currentShift;
 }
 
-export function closeShift(opts) {
+export async function closeShift(opts) {
   if (!opts) opts = {};
   var s = getState();
   if (!s.currentShift) throw new Error('KhÃ´ng cÃ³ ca nÃ o Ä‘ang má»Ÿ');
@@ -447,14 +470,31 @@ export function closeShift(opts) {
 
   s.shifts.unshift(JSON.parse(JSON.stringify(s.currentShift)));
   var closedShift = s.currentShift;
+  // Fix 1B: Track recently closed IDs to prevent cloud restore race condition
+  if (!s._recentlyClosedIds) s._recentlyClosedIds = [];
+  s._recentlyClosedIds.push(closedShift.id);
+  if (s._recentlyClosedIds.length > 20) s._recentlyClosedIds.shift();
   s.currentShift = null;
   save();
   addAudit('CLOSE_SHIFT', 'Ca ' + closedShift.shiftNumber + ' - Doanh thu: ' + summary.totalIncome.toLocaleString('vi-VN') + 'Ä‘');
   addNotification('Ca ' + closedShift.shiftNumber + ' Ä‘Ã£ Ä‘Ã³ng - DT: ' + summary.totalIncome.toLocaleString('vi-VN') + 'Ä‘', 'info');
 
+  // Fix 4: Retry cloud close up to 3 times
   if (_cloudClose) {
-    try { _cloudClose(closedShift).catch(function() {}); } catch (e) { /* ignore */ }
+    for (var _attempt = 1; _attempt <= 3; _attempt++) {
+      try {
+        var _closeResult = await _cloudClose(closedShift);
+        if (_closeResult && _closeResult.success) {
+          console.log('[Store] Cloud close confirmed on attempt', _attempt);
+          break;
+        }
+      } catch (e) {
+        console.warn('[Store] Cloud close attempt', _attempt, 'failed:', e.message);
+        if (_attempt < 3) await new Promise(function(r) { setTimeout(r, 1000 * _attempt); });
+      }
+    }
   }
+  _closeInProgress = false;
 }
 
 // â”€â”€ Transactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -772,7 +812,17 @@ export function getHistorySummary(shift) {
   return getShiftSummary(shift);
 }
 
-export function getShiftHistory() { return getState().shifts || []; }
+export function getShiftHistory() {
+  var shifts = getState().shifts || [];
+  // Fix 3A: Dedup by compound key
+  var seen = {};
+  return shifts.filter(function(sh) {
+    var key = (sh.date || '') + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '') + '_' + (sh.startTime || '').substring(0, 19);
+    if (seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
 
 export function saveShiftToHistory(shift) {
   if (!shift || !shift.id) return;
@@ -982,11 +1032,13 @@ export async function pullCategoriesFromCloud() {
 var _syncTimer = null;
 var _shiftDirty = false;
 var _lastCloudPushTime = 0;
+var _closeInProgress = false;
 
 function _syncCurrentShift() {
   var settings = getState().settings;
   if (!settings || !settings.autoSync) return;
   if (!_cloudSync) return;
+  if (_closeInProgress) return;
 
   _shiftDirty = true;
 
@@ -1028,6 +1080,7 @@ export function getCloudSyncMeta() {
 
 export async function syncCurrentShiftWithCloud() {
   if (!_cloudGetShift) return;
+  if (_closeInProgress) return false;
   
   // If we are currently waiting to push local changes, don't pull (avoid race conditions)
   if (_syncTimer) return false;
@@ -1055,9 +1108,21 @@ export async function syncCurrentShiftWithCloud() {
         if (localCompare !== cloudCompare) {
           // Same shift, different content â†’ merge cloud data but keep local invoices
           cloudShift.invoices = s.currentShift.invoices;
+          // Fix 2B: Preserve security fields from local
+          cloudShift.shiftPassword = cloudShift.shiftPassword || s.currentShift.shiftPassword;
           s.currentShift = cloudShift;
           save();
           return true;
+        }
+      }
+
+      // Fix 1C: Check if cloud shift was already closed in history
+      if (cloudShift && s.currentShift && s.currentShift.id !== cloudShift.id) {
+        var cloudInHistory = (s.shifts || []).some(function(h) { return h.id === cloudShift.id; });
+        if (cloudInHistory) {
+          console.log('[Store] Cloud shift already in history, keeping local');
+          _syncCurrentShift();
+          return false;
         }
       }
 
@@ -1074,6 +1139,7 @@ export async function syncCurrentShiftWithCloud() {
         } else {
           // Cloud is newer â€” apply cloud shift
           console.log('[Store] Cloud shift is newer, applying:', cloudShift.id);
+          cloudShift.shiftPassword = cloudShift.shiftPassword || s.currentShift.shiftPassword;
           s.currentShift = cloudShift;
           s.currentShift.invoices = s.currentShift.invoices || [];
           save();
@@ -1081,6 +1147,23 @@ export async function syncCurrentShiftWithCloud() {
         }
       }
       
+      // Fix 1A: Check if this shift was already closed and saved to history
+      if (cloudShift && !s.currentShift) {
+        var _alreadyClosed = (s.shifts || []).some(function(h) { return h.id === cloudShift.id; });
+        if (_alreadyClosed) {
+          console.log('[Store] Skipping cloud shift (already in history):', cloudShift.id);
+          if (_cloudClose) { try { _cloudClose(cloudShift).catch(function(){}); } catch(e) {} }
+          return false;
+        }
+        // Fix 1B: Check recently closed IDs (race condition protection)
+        var _recentlyClosed = (s._recentlyClosedIds || []).indexOf(cloudShift.id) !== -1;
+        if (_recentlyClosed) {
+          console.log('[Store] Skipping cloud shift (recently closed):', cloudShift.id);
+          if (_cloudClose) { try { _cloudClose(cloudShift).catch(function(){}); } catch(e) {} }
+          return false;
+        }
+      }
+
       // Case 4: Cloud has an open shift but local does NOT â†’ apply cloud shift
       if (cloudShift && !s.currentShift) {
         var forceClosedIds = s._forceClosedIds || [];

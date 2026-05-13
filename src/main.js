@@ -71,14 +71,7 @@ function navigateTo(viewName) {
     viewName = 'revenue';
   }
 
-  // Sync with cloud to ensure state is fresh (fire-and-forget, no re-navigation)
-  syncCurrentShiftWithCloud().then(function(changed) {
-    if (changed) {
-      console.log('[Main] Shift state synchronized from cloud');
-      // Only re-render the current view, do NOT re-call navigateTo to avoid infinite loop
-      renderCurrentView();
-    }
-  });
+  // Cloud sync removed from navigateTo (Fix 6) — runs on startup + 60s timer + Ctrl+S only
 
   // ── Shift Protection Logic ──
   var shift = getCurrentShift();
