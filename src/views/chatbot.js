@@ -56,46 +56,54 @@ async function _callAI(msg) {
   var ctx = _messages.slice(-6).map(function(m) { return (m.role === 'user' ? 'User: ' : 'AI: ') + m.text; }).join('\n');
   var full = ctx ? ctx + '\nUser: ' + msg : msg;
 
-  // Try primary provider
-  var keys = _getKeys(provider);
-  for (var i = 0; i < keys.length; i++) {
-    try { var r = await _call(provider, keys[i], sys, full); if (r) return r; } catch (e) {}
-  }
-  // Fallback
+  var errors = [];
+  // Try all providers in order
   var all = ['gemini','deepseek','groq','sambanova','cerebras','mistral','nvidia','hf'];
   for (var p = 0; p < all.length; p++) {
-    if (all[p] === provider) continue;
     var ks = _getKeys(all[p]);
     for (var k = 0; k < ks.length; k++) {
-      try { return await _call(all[p], ks[k], sys, full); } catch (e) {}
+      try {
+        var r = await _call(all[p], ks[k], sys, full);
+        if (r && r.trim()) { console.log('[Chatbot] OK via ' + all[p]); return r; }
+      } catch (e) {
+        var errMsg = all[p] + ': ' + (e.message || 'unknown');
+        errors.push(errMsg);
+        console.warn('[Chatbot]', errMsg);
+      }
     }
   }
-  return '❌ AI không phản hồi. Thử lại sau.';
+  console.error('[Chatbot] All failed:', errors);
+  return '❌ AI không phản hồi: ' + (errors[0] || 'Không có key') + '. Thử lại sau.';
 }
 
 async function _call(prov, key, sys, msg) {
-  var res;
   if (prov === 'gemini') {
-    res = await _ft('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key, {
+    var res = await _ft('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents: [{ parts: [{ text: msg }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 1024 } })
     });
+    if (!res.ok) { var errText = await res.text().catch(function() { return ''; }); throw new Error(res.status + ': ' + errText.substring(0, 100)); }
     var j = await res.json();
-    return j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] ? j.candidates[0].content.parts[0].text : '';
+    var text = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] ? j.candidates[0].content.parts[0].text : '';
+    if (!text) throw new Error('Empty response');
+    return text;
   }
   var eps = { deepseek:'https://api.deepseek.com/v1/chat/completions', groq:'https://api.groq.com/openai/v1/chat/completions', sambanova:'https://api.sambanova.ai/v1/chat/completions', cerebras:'https://api.cerebras.ai/v1/chat/completions', mistral:'https://api.mistral.ai/v1/chat/completions', nvidia:'https://integrate.api.nvidia.com/v1/chat/completions', hf:'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1/v1/chat/completions' };
   var mods = { deepseek:'deepseek-chat', groq:'llama-3.3-70b-versatile', sambanova:'Meta-Llama-3.3-70B-Instruct', cerebras:'llama-3.3-70b', mistral:'mistral-large-latest', nvidia:'meta/llama-3.1-70b-instruct', hf:'mistralai/Mixtral-8x7B-Instruct-v0.1' };
-  if (!eps[prov]) throw new Error('unknown');
-  res = await _ft(eps[prov], {
+  if (!eps[prov]) throw new Error('unknown provider');
+  var res2 = await _ft(eps[prov], {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
     body: JSON.stringify({ model: mods[prov], messages: [{ role: 'system', content: sys }, { role: 'user', content: msg }], temperature: 0.7, max_tokens: 1024 })
   });
-  var j2 = await res.json();
-  return j2.choices && j2.choices[0] && j2.choices[0].message ? j2.choices[0].message.content : '';
+  if (!res2.ok) { var errText2 = await res2.text().catch(function() { return ''; }); throw new Error(res2.status + ': ' + errText2.substring(0, 100)); }
+  var j2 = await res2.json();
+  var text2 = j2.choices && j2.choices[0] && j2.choices[0].message ? j2.choices[0].message.content : '';
+  if (!text2) throw new Error('Empty response');
+  return text2;
 }
 
 function _ft(url, opts) {
-  return Promise.race([fetch(url, opts), new Promise(function(_, rej) { setTimeout(function() { rej(new Error('timeout')); }, 20000); })]);
+  return Promise.race([fetch(url, opts), new Promise(function(_, rej) { setTimeout(function() { rej(new Error('timeout 25s')); }, 25000); })]);
 }
 
 // ── Action Parser + Executor ──
