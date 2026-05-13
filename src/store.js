@@ -663,26 +663,36 @@ export function getShiftSummary(shift) {
   var cukcukRevenue = 0, cukcukBills = 0;
   var manualIncome = 0, manualBills = 0;
 
-  // â”€â”€ Step 1: Read CUKCUK invoices from invoiceStore (authoritative source) â”€â”€
+  // Step 1: CUKCUK invoices — use shift actual time window
+  // CLOSED shifts: frozen summarySnapshot (immutable)
+  // OPEN shifts: filter by startTime→now
   var hasInvoiceStoreData = false;
-  if (shift.date) {
+  if (shift.status === 'closed' && shift.summarySnapshot && shift.summarySnapshot.cukcukRevenue !== undefined) {
+    cukcukRevenue = shift.summarySnapshot.cukcukRevenue || 0;
+    cukcukBills = shift.summarySnapshot.cukcukBills || 0;
+    totalIncome += cukcukRevenue;
+    billCount += cukcukBills;
+    var snap = shift.summarySnapshot;
+    cashIncome += snap.cashIncome || 0;
+    cardIncome += snap.cardIncome || 0;
+    transferIncome += snap.transferIncome || 0;
+    hasInvoiceStoreData = true;
+  } else if (shift.date) {
     try {
       var storeData = localStorage.getItem('cukcuk_invoice_store');
       if (storeData) {
         var parsed = JSON.parse(storeData);
         if (parsed && parsed.invoices) {
-          var dp = shift.date.split('-');
-          var shiftDay = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
-          var boundsStart = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate(), 12, 0, 0);
-          var nextDay = new Date(shiftDay);
-          nextDay.setDate(nextDay.getDate() + 1);
-          var boundsEnd = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate(), 6, 0, 0);
-
+          var shiftStart = shift.startTime ? new Date(shift.startTime) : null;
+          var shiftEnd = shift.endTime ? new Date(shift.endTime) : new Date();
+          if (!shiftStart || isNaN(shiftStart.getTime())) {
+            var dp = shift.date.split('-');
+            shiftStart = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 0, 0, 0);
+          }
           for (var k in parsed.invoices) {
             if (!parsed.invoices.hasOwnProperty(k)) continue;
             var inv = parsed.invoices[k];
             if (inv.unpaid) continue;
-
             var matchDay = false;
             if (inv.refDate) {
               var rd = new Date(inv.refDate);
@@ -691,14 +701,10 @@ export function getShiftSummary(shift) {
                 if (netM) rd = new Date(parseInt(netM[1]));
               }
               if (!isNaN(rd.getTime())) {
-                matchDay = rd >= boundsStart && rd < boundsEnd;
+                matchDay = rd >= shiftStart && rd < shiftEnd;
               }
             }
-            if (!matchDay && !inv.refDate) {
-              matchDay = inv.date === shift.date;
-            }
             if (!matchDay) continue;
-
             hasInvoiceStoreData = true;
             cukcukBills++;
             billCount++;
