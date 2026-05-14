@@ -873,7 +873,19 @@ export function rebuildHistorySnapshots() {
 
 
 export function getShiftHistory() {
-  var shifts = getState().shifts || [];
+  var s = getState();
+  var shifts = s.shifts || [];
+  // Fix: remove stale copies of the currently open shift from history
+  var currentId = s.currentShift ? s.currentShift.id : null;
+  if (currentId) {
+    var beforeLen = shifts.length;
+    shifts = shifts.filter(function(sh) { return sh.id !== currentId; });
+    if (shifts.length < beforeLen) {
+      s.shifts = shifts;
+      save();
+      console.log('[Store] getShiftHistory: removed ' + (beforeLen - shifts.length) + ' stale copy of current shift');
+    }
+  }
   // Fix 3A: Dedup by compound key
   var seen = {};
   return shifts.filter(function(sh) {
