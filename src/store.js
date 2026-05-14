@@ -798,21 +798,32 @@ export function getShiftSummary(shift) {
  */
 export function getHistorySummary(shift) {
   if (!shift) return null;
-  // Always read fresh CUKCUK data from invoice store so history matches handover report.
-  // Rationale: summarySnapshot may have been frozen before all CUKCUK bills were synced.
-  // cashCountTotal from snapshot is the immutable ground truth (what was physically counted).
+
+  // Closed shifts with snapshot: use it directly as the source of truth.
+  // The snapshot was frozen at close time with all correct data.
+  // DO NOT recalculate from live invoiceStore — that creates artificial discrepancy
+  // when CUKCUK data changes after closing while cashCountTotal stays frozen.
   if (shift.summarySnapshot && shift.status === 'closed') {
-    var snap = shift.summarySnapshot;
-    // Clone shift WITHOUT summarySnapshot to bypass stale CUKCUK cache in getShiftSummary
-    var shiftCopy = Object.assign({}, shift);
-    delete shiftCopy.summarySnapshot;
-    var live = getShiftSummary(shiftCopy);
-    // Preserve cashCountTotal from snapshot (immutable ground truth from cash counting)
-    var cashCountTotal = snap.cashCountTotal !== undefined ? snap.cashCountTotal : live.cashCountTotal;
-    live.cashCountTotal = cashCountTotal;
-    live.discrepancy = cashCountTotal - live.expectedCash;
-    return live;
+    var result = Object.assign({}, shift.summarySnapshot);
+
+    // Edge case: snapshot was frozen before cash counting was done (cashCountTotal=0)
+    // but the shift object itself has cashCount data (set by updateCashCount before close).
+    if ((!result.cashCountTotal || result.cashCountTotal === 0) && shift.cashCount) {
+      var cc = shift.cashCount;
+      var recalcTotal = 0;
+      for (var d in cc) {
+        if (cc.hasOwnProperty(d)) recalcTotal += Number(d) * Number(cc[d]);
+      }
+      if (recalcTotal > 0) {
+        result.cashCountTotal = recalcTotal;
+        result.discrepancy = recalcTotal - (result.expectedCash || 0);
+      }
+    }
+
+    return result;
   }
+
+  // Fallback for legacy shifts without snapshot
   return getShiftSummary(shift);
 }
 
