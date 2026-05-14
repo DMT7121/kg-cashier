@@ -14,9 +14,10 @@ let _activeTab = 'system';
 
 const _tabs = [
   { key: 'system',  icon: 'settings',     label: 'Hệ thống' },
+  { key: 'printer', icon: 'print',        label: 'Máy in POS' },
   { key: 'staff',   icon: 'group',        label: 'Nhân viên' },
   { key: 'audit',   icon: 'history_edu',  label: 'Nhật ký' },
-  { key: 'print',   icon: 'print',        label: 'Biểu mẫu in' },
+  { key: 'print',   icon: 'description',  label: 'Biểu mẫu in' },
 ];
 
 function _renderTabs() {
@@ -208,6 +209,232 @@ function _renderSystemTab() {
   `;
 }
 
+// ── Printer tab ────────────────────────────
+const PRINTER_KEY = 'kg-pos-printers';
+function _getPrinterCfg() {
+  try { var s = localStorage.getItem(PRINTER_KEY); if (s) return JSON.parse(s); } catch(e){}
+  return { kitchenIp:'', sashimiIp:'', barIp:'', useQzTray:false };
+}
+function _savePrinterCfg(cfg) { localStorage.setItem(PRINTER_KEY, JSON.stringify(cfg)); }
+
+function _renderPrinterTab() {
+  var cfg = _getPrinterCfg();
+  return `
+    <div class="card" style="margin-bottom:20px;border:1px solid rgba(249,115,22,.3);">
+      <div class="card-header" style="background:rgba(249,115,22,.08);color:#f97316;">
+        <h3>🖨️ Cấu hình Máy in POS</h3>
+        <span class="tag" style="background:rgba(249,115,22,.15);color:#f97316;font-size:11px;">Phase 2</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted" style="font-size:12px;margin-bottom:16px;">
+          Cấu hình máy in nhiệt K80 cho quầy thu ngân, bếp và bar.
+          <br>Mặc định sử dụng <strong>window.print()</strong> qua popup trình duyệt.
+          Nếu cài <a href="https://qz.io" target="_blank" style="color:var(--primary);">QZ Tray</a> trên máy thu ngân, bật chế độ QZ Tray để in tự động không cần popup.
+        </p>
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(249,115,22,.06);border-radius:8px;margin-bottom:16px;">
+          <label class="form-label" style="margin:0;flex:1;">
+            Sử dụng QZ Tray (in tự động qua LAN)
+            <span class="text-muted" style="font-size:11px;display:block;">Cần cài QZ Tray trên máy thu ngân. WebSocket: localhost:8182</span>
+          </label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="prUseQz" ${cfg.useQzTray ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;">
+          <div class="form-group">
+            <label class="form-label">🍳 IP / Tên Máy in Bếp</label>
+            <input type="text" id="prKitchenIp" class="form-input" value="${cfg.kitchenIp}" placeholder="VD: 192.168.1.100">
+            <p class="form-hint">Bếp chính (food)</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">🐟 IP / Tên Máy in Sashimi</label>
+            <input type="text" id="prSashimiIp" class="form-input" value="${cfg.sashimiIp || ''}" placeholder="VD: 192.168.1.102">
+            <p class="form-hint">Sashimi, Gỏi, Salad, Nướng</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">🍹 IP / Tên Máy in Bar</label>
+            <input type="text" id="prBarIp" class="form-input" value="${cfg.barIp}" placeholder="VD: 192.168.1.101">
+            <p class="form-hint">Đồ uống (drink)</p>
+          </div>
+        </div>
+        
+        <div id="qzPrinterSelector" style="display:none; margin-bottom:16px; padding:12px; background:rgba(14,165,233,.08); border:1px solid rgba(14,165,233,.3); border-radius:8px;">
+          <label class="form-label" style="color:#0ea5e9;margin-bottom:8px;">Danh sách máy in tìm thấy trên máy tính:</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="qzPrintersList" class="form-input" style="flex:1;min-width:200px;background:var(--bg-dark);"></select>
+            <button class="btn btn-outline btn-sm" id="btnAssignKitchen" style="border-color:#10b981;color:#10b981;">+ Gán Bếp</button>
+            <button class="btn btn-outline btn-sm" id="btnAssignSashimi" style="border-color:#f97316;color:#f97316;">+ Gán Sashimi</button>
+            <button class="btn btn-outline btn-sm" id="btnAssignBar" style="border-color:#6366f1;color:#6366f1;">+ Gán Bar</button>
+          </div>
+        </div>
+        
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" id="btnPrSave">
+            <span class="material-symbols-rounded">save</span> Lưu cấu hình
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnPrTestQz" style="color:#f97316;border-color:rgba(249,115,22,.4);">
+            <span class="material-symbols-rounded">wifi_find</span> Kiểm tra QZ
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnPrScan" style="color:#0ea5e9;border-color:rgba(14,165,233,.4);">
+            <span class="material-symbols-rounded">search</span> Dò máy in
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnPrTestKitchen" style="color:#10b981;border-color:rgba(16,185,129,.4);">
+            <span class="material-symbols-rounded">print</span> In thử Bếp
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnPrTestSashimi" style="color:#f97316;border-color:rgba(249,115,22,.4);">
+            <span class="material-symbols-rounded">print</span> In thử Sashimi
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnPrTestBar" style="color:#6366f1;border-color:rgba(99,102,241,.4);">
+            <span class="material-symbols-rounded">print</span> In thử Bar
+          </button>
+        </div>
+        <div id="prResult" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>📲 Hướng dẫn cài QZ Tray</h3></div>
+      <div class="card-body">
+        <ol style="font-size:13px;line-height:2;color:var(--text-muted);padding-left:18px;">
+          <li>Tải QZ Tray tại <a href="https://qz.io/download" target="_blank" style="color:var(--primary);">qz.io/download</a></li>
+          <li>Cài đặt và chạy QZ Tray trên máy thu ngân (Windows/Mac)</li>
+          <li>Bật toggle <strong>"Sử dụng QZ Tray"</strong> và nhập IP máy in</li>
+          <li>Khi bấm <strong>"⚡ Báo Bếp/Bar"</strong> trong POS, lệnh in sẽ đi thẳng qua mạng LAN</li>
+        </ol>
+        <div style="margin-top:12px;padding:12px;background:rgba(99,102,241,.06);border-radius:8px;border:1px solid rgba(99,102,241,.2);font-size:12px;">
+          <strong>💡 Phương án B — Local Proxy</strong><br>
+          Nếu không muốn cài QZ Tray, có thể chạy một server NodeJS nhỏ trên máy thu ngân
+          nhận lệnh qua <code>http://localhost:5000/print</code> và gửi ESC/POS qua socket TCP.
+          Liên hệ quản trị viên để cấu hình.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _initPrinterTab() {
+  document.getElementById('btnPrSave')?.addEventListener('click', function() {
+    var cfg = {
+      useQzTray: document.getElementById('prUseQz')?.checked || false,
+      kitchenIp: document.getElementById('prKitchenIp')?.value.trim() || '',
+      sashimiIp: document.getElementById('prSashimiIp')?.value.trim() || '',
+      barIp: document.getElementById('prBarIp')?.value.trim() || ''
+    };
+    _savePrinterCfg(cfg);
+    showToast('\u2705 Đã lưu cấu hình máy in', 'success');
+  });
+  document.getElementById('btnPrTestQz')?.addEventListener('click', async function() {
+    var el = document.getElementById('prResult');
+    try {
+      if (!window.qz) {
+        await new Promise((resolve, reject) => {
+          var script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.min.js';
+          script.onload = () => {
+            qz.security.setCertificatePromise((resolve, reject) => resolve());
+            qz.security.setSignaturePromise((toSign) => (resolve, reject) => resolve());
+            resolve();
+          };
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      
+      if (!qz.websocket.isActive()) {
+        await qz.websocket.connect({ retries: 1, delay: 1 });
+      }
+      
+      if (el) { el.style.display='block'; el.style.background='rgba(16,185,129,.1)'; el.style.border='1px solid rgba(16,185,129,.3)'; el.style.color='#34d399'; el.textContent='✅ Kết nối QZ Tray thành công!'; }
+      showToast('✅ QZ Tray hoạt động!', 'success');
+    } catch(e) { 
+      if (el) { el.style.display='block'; el.style.background='rgba(239,68,68,.1)'; el.style.border='1px solid rgba(239,68,68,.3)'; el.style.color='#f87171'; el.textContent='❌ Lỗi kết nối QZ Tray: ' + e.message; }
+      showToast('❌ Lỗi QZ Tray', 'error'); 
+    }
+  });
+
+  document.getElementById('btnPrScan')?.addEventListener('click', async function() {
+    var btn = document.getElementById('btnPrScan');
+    var el = document.getElementById('prResult');
+    var selector = document.getElementById('qzPrinterSelector');
+    var list = document.getElementById('qzPrintersList');
+    try {
+      btn.innerHTML = '<span class="material-symbols-rounded">hourglass_top</span> Đang dò...';
+      
+      if (!window.qz) {
+        await new Promise((resolve, reject) => {
+          var script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.min.js';
+          script.onload = () => {
+            qz.security.setCertificatePromise((resolve, reject) => resolve());
+            qz.security.setSignaturePromise((toSign) => (resolve, reject) => resolve());
+            resolve();
+          };
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      if (!qz.websocket.isActive()) {
+        await qz.websocket.connect({ retries: 1, delay: 1 });
+      }
+      
+      const printers = await qz.printers.find();
+      if (printers && printers.length > 0) {
+        list.innerHTML = printers.map(p => `<option value="${p}">${p}</option>`).join('');
+        selector.style.display = 'block';
+        if (el) el.style.display = 'none';
+        showToast('✅ Tìm thấy ' + printers.length + ' máy in', 'success');
+      } else {
+        throw new Error('Không tìm thấy máy in nào được cài đặt trên máy này.');
+      }
+    } catch(e) {
+      if (el) { el.style.display='block'; el.style.background='rgba(239,68,68,.1)'; el.style.border='1px solid rgba(239,68,68,.3)'; el.style.color='#f87171'; el.textContent='❌ Lỗi quét máy in: ' + e.message; }
+      showToast('❌ Không tìm thấy máy in', 'error');
+    } finally {
+      btn.innerHTML = '<span class="material-symbols-rounded">search</span> Dò máy in';
+    }
+  });
+
+  document.getElementById('btnAssignKitchen')?.addEventListener('click', function() {
+    var sel = document.getElementById('qzPrintersList').value;
+    if (sel) {
+      document.getElementById('prKitchenIp').value = sel;
+      showToast('Đã gán "' + sel + '" cho Bếp', 'success');
+    }
+  });
+  
+  document.getElementById('btnAssignSashimi')?.addEventListener('click', function() {
+    var sel = document.getElementById('qzPrintersList').value;
+    if (sel) {
+      document.getElementById('prSashimiIp').value = sel;
+      showToast('Đã gán "' + sel + '" cho Bếp Sashimi', 'success');
+    }
+  });
+  
+  document.getElementById('btnAssignBar')?.addEventListener('click', function() {
+    var sel = document.getElementById('qzPrintersList').value;
+    if (sel) {
+      document.getElementById('prBarIp').value = sel;
+      showToast('Đã gán "' + sel + '" cho Bar', 'success');
+    }
+  });
+
+  function _testPrint(dest) {
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;}body{font-family:"Courier New",monospace;font-size:14px;width:80mm;padding:6px;}@media print{@page{size:80mm auto;margin:0;}}h2{font-size:18px;text-align:center;margin-bottom:6px;}hr{border-top:1px dashed #000;margin:4px 0;}</style></head><body>' +
+      '<h2>⚡ TEST ' + dest.toUpperCase() + '</h2><hr>' +
+      '<div style="font-size:16px;font-weight:bold;padding:8px 0;">3 x Món kiểm tra</div>' +
+      '<div style="font-size:16px;font-weight:bold;padding:8px 0;">1 x Phương án in OK</div><hr>' +
+      '<div style="text-align:center;font-size:11px;">--- HẾT PHIẾU ---</div>' +
+      '<script>window.onload=function(){window.print();window.close();}<\/script></body></html>';
+    var w = window.open('', '_blank', 'width=380,height=400');
+    if (w) { w.document.write(html); w.document.close(); }
+    else showToast('Cho phép popup để in thử', 'warning');
+  }
+  document.getElementById('btnPrTestKitchen')?.addEventListener('click', function(){ _testPrint('Bếp'); });
+  document.getElementById('btnPrTestSashimi')?.addEventListener('click', function(){ _testPrint('Bếp Sashimi'); });
+  document.getElementById('btnPrTestBar')?.addEventListener('click', function(){ _testPrint('Bar'); });
+}
+
 const _defaultIncome = ['Doanh thu bán hàng', 'Doanh thu dịch vụ', 'Thu hồi nợ', 'Thu khác'];
 const _defaultExpense = ['Mua nguyên liệu', 'Vận chuyển', 'Sửa chữa', 'Tiền tip/bo', 'Trả nợ', 'Chi khác'];
 
@@ -295,6 +522,9 @@ function _switchTab(tabKey) {
   if (tabKey === 'system') {
     container.innerHTML = _renderSystemTab();
     _initSystemTab();
+  } else if (tabKey === 'printer') {
+    container.innerHTML = _renderPrinterTab();
+    _initPrinterTab();
   } else if (tabKey === 'staff') {
     container.innerHTML = staffModule.render();
     staffModule.init();

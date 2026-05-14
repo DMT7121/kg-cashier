@@ -36,6 +36,8 @@ import * as historyView from './views/history.js';
 import * as settingsView from './views/settings.js';
 import * as drinkInventoryView from './views/drinkInventory.js';
 import * as vatView from './views/vat.js';
+import * as posView from './views/pos.js';
+import * as barView from './views/bar.js';
 
 // ── View Registry ────────────────────────────
 var views = {
@@ -48,6 +50,8 @@ var views = {
   'settings':     { module: settingsView,     title: 'Cài đặt' },
   'drink-inventory': { module: drinkInventoryView, title: 'Kiểm kho đồ uống' },
   'vat':          { module: vatView,          title: 'Hóa đơn VAT' },
+  'pos':          { module: posView,          title: 'POS — Order & Thanh toán' },
+  'bar':          { module: barView,          title: 'Dashboard Bếp / Bar' },
 };
 
 var currentView = 'dashboard';
@@ -122,6 +126,17 @@ function renderCurrentView() {
     console.error('[Render Error]', currentView, e);
     container.innerHTML = '<div class="empty-state"><span class="material-symbols-rounded empty-icon">error</span><h2>Lỗi hiển thị</h2><p>' + e.message + '</p><button class="btn btn-primary" onclick="window.navigateTo(\'dashboard\')">Về trang chủ</button></div>';
   }
+}
+
+// ── Safe auto-render — bỏ qua nếu đang nhập liệu kiểm tiền ─────────
+// Dùng cho mọi auto-render từ background (60s poll, CUKCUK sync, startup).
+// Không chặn render do người dùng điều hướng thủ công.
+function _safeRenderView() {
+  if (currentView === 'cash-count' && window._cashCountDirty) {
+    console.log('[Main] Auto-render skipped: cash-count is active (user has unsaved input)');
+    return;
+  }
+  renderCurrentView();
 }
 
 // ── Global UI Updates ────────────────────────
@@ -373,16 +388,18 @@ function initApp() {
     var isDirty = false;
     try { isDirty = isShiftDirty(); } catch(e2) {}
     if (isDirty) return;
+    // Skip pull if user is actively counting cash (avoid wiping unsaved input)
+    if (currentView === 'cash-count') return;
     syncCurrentShiftWithCloud().then(function(changed) {
       if (changed) {
         console.log('[Main] Auto-sync: Data refreshed from cloud');
         clearShiftDirty();
-        renderCurrentView();
+        _safeRenderView();
       }
     });
     // Also sync history periodically (cross-device: see shifts closed on other devices)
     syncShiftHistory().then(function(changed) {
-      if (changed && window.location.hash === '#history') renderCurrentView();
+      if (changed && window.location.hash === '#history') _safeRenderView();
     });
   }, 60000));
 
@@ -406,7 +423,12 @@ function initApp() {
           if (result && result.success) {
             if (result.synced > 0) {
               console.log('[Main] CUKCUK auto-sync: Added ' + result.synced + ' invoices');
-              renderCurrentView();
+              if (currentView === 'cash-count') {
+                // Don't re-render — user is counting cash. Show a toast reminder instead.
+                showToast('🧾 ' + result.synced + ' bill mới — hãy lưu kiểm kê trước khi chuyển tab', 'info', 5000);
+              } else {
+                _safeRenderView();
+              }
             }
           }
         }).catch(function() { _cukcukSyncInFlight = false; });

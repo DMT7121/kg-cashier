@@ -1,5 +1,5 @@
 /* ── History View — Tabbed shift detail w/ snapshot data ── */
-import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory } from '../store.js';
+import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
 import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
 
@@ -17,6 +17,9 @@ export function render() {
         <p>Xem lại và tìm kiếm ca đã đóng</p>
       </div>
       <div class="btn-group">
+        <button class="btn btn-outline btn-sm" id="btnRebuildSnapshots" title="Cập nhật lại số liệu lịch sử từ dữ liệu CUKCUK mới nhất">
+          <span class="material-symbols-rounded">refresh</span> Làm mới lịch sử
+        </button>
         <button class="btn btn-outline btn-sm" id="btnSyncHistory">
           <span class="material-symbols-rounded">cloud_sync</span> Đồng bộ Cloud
         </button>
@@ -189,6 +192,17 @@ function _bindHistoryEvents() {
 
 export function init() {
   _bindHistoryEvents();
+
+  document.getElementById('btnRebuildSnapshots')?.addEventListener('click', function() {
+    var count = rebuildHistorySnapshots();
+    if (count > 0) {
+      showToast('\u2705 Đã cập nhật ' + count + ' ca từ dữ liệu CUKCUK mới nhất', 'success');
+      allHistory = getShiftHistory();
+      _filterHistory();
+    } else {
+      showToast('Không có ca nào cần cập nhật', 'info');
+    }
+  });
   document.getElementById('historySearch')?.addEventListener('input', _filterHistory);
   document.getElementById('historyFilter')?.addEventListener('change', _filterHistory);
 

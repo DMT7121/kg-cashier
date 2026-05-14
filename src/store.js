@@ -1,4 +1,4 @@
-/* ============================================
+﻿/* ============================================
    KG-CASHIER â€” Data Store (localStorage + Cloud Sync)
    COMPATIBLE: No optional chaining, no bare catch
    ============================================ */
@@ -358,24 +358,22 @@ export function updateStartingCash(newAmount) {
   var s = getState();
   if (!s.currentShift) throw new Error('ChÆ°a cÃ³ ca Ä‘ang má»Ÿ.');
 
-  // Fix 5: Block all sync during close
-  _closeInProgress = true;
-
-  // Fix 8: Integrity validation
-  if (!s.currentShift.id) { _closeInProgress = false; throw new Error('Ca thi\u1EBFu ID'); }
-  if (!s.currentShift.date) { _closeInProgress = false; throw new Error('Ca thi\u1EBFu ng\u00E0y'); }
-  if (!s.currentShift.cashierName) { _closeInProgress = false; throw new Error('Ca thi\u1EBFu t\u00EAn thu ng\u00E2n'); }
+  // Integrity validation
+  if (!s.currentShift.id) throw new Error('Ca thi\u1EBFu ID');
+  if (!s.currentShift.date) throw new Error('Ca thi\u1EBFu ng\u00E0y');
+  if (!s.currentShift.cashierName) throw new Error('Ca thi\u1EBFu t\u00EAn thu ng\u00E2n');
   var old = s.currentShift.startingCash || 0;
   s.currentShift.startingCash = Number(newAmount) || 0;
   save();
   addAudit('UPDATE_STARTING_CASH', 'Tiá»n Ä‘áº§u ca: ' + old.toLocaleString() + ' â†’ ' + s.currentShift.startingCash.toLocaleString());
+  _syncCurrentShift();
   return s.currentShift;
 }
 
 export async function closeShift(opts) {
   if (!opts) opts = {};
   var s = getState();
-  if (!s.currentShift) throw new Error('KhÃ´ng cÃ³ ca nÃ o Ä‘ang má»Ÿ');
+  if (!s.currentShift) throw new Error('Kh\u00F4ng c\u00F3 ca n\u00E0o \u0111ang m\u1EDF');
 
   s.currentShift.endTime = new Date().toISOString();
   s.currentShift.status = 'closed';
@@ -800,23 +798,79 @@ export function getShiftSummary(shift) {
  */
 export function getHistorySummary(shift) {
   if (!shift) return null;
+  // Always read fresh CUKCUK data from invoice store so history matches handover report.
+  // Rationale: summarySnapshot may have been frozen before all CUKCUK bills were synced.
+  // cashCountTotal from snapshot is the immutable ground truth (what was physically counted).
   if (shift.summarySnapshot && shift.status === 'closed') {
     var snap = shift.summarySnapshot;
-    return {
-      totalIncome: snap.totalIncome || 0, totalExpense: snap.totalExpense || 0,
-      cashIncome: snap.cashIncome || 0, cardIncome: snap.cardIncome || 0,
-      transferIncome: snap.transferIncome || 0, cashExpense: snap.cashExpense || 0,
-      cukcukRevenue: snap.cukcukRevenue || 0, cukcukBills: snap.cukcukBills || 0,
-      billCount: snap.billCount || 0, expectedCash: snap.expectedCash || 0,
-      cashCountTotal: snap.cashCountTotal || 0, discrepancy: snap.discrepancy || 0,
-      manualIncome: snap.manualIncome || 0, manualBills: snap.manualBills || 0,
-      otherIncome: snap.otherIncome || 0, otherExpense: snap.otherExpense || 0,
-      revenue: snap.revenue || snap.totalIncome || 0,
-      netTotal: snap.netTotal || snap.expectedCash || 0
-    };
+    // Clone shift WITHOUT summarySnapshot to bypass stale CUKCUK cache in getShiftSummary
+    var shiftCopy = Object.assign({}, shift);
+    delete shiftCopy.summarySnapshot;
+    var live = getShiftSummary(shiftCopy);
+    // Preserve cashCountTotal from snapshot (immutable ground truth from cash counting)
+    var cashCountTotal = snap.cashCountTotal !== undefined ? snap.cashCountTotal : live.cashCountTotal;
+    live.cashCountTotal = cashCountTotal;
+    live.discrepancy = cashCountTotal - live.expectedCash;
+    return live;
   }
   return getShiftSummary(shift);
 }
+
+// ── Rebuild snapshots from live CUKCUK data (matches handover report) ──────────
+// Iterates all closed shifts and re-freezes summarySnapshot using fresh invoice store data.
+// cashCountTotal is preserved from old snapshot (immutable ground truth from cash counting).
+export function rebuildHistorySnapshots() {
+  var s = getState();
+  var shifts = s.shifts || [];
+  var rebuilt = 0;
+
+  for (var i = 0; i < shifts.length; i++) {
+    var shift = shifts[i];
+    if (shift.status !== 'closed') continue;
+
+    // Calculate fresh summary without relying on stale snapshot
+    var shiftCopy = Object.assign({}, shift);
+    delete shiftCopy.summarySnapshot;
+
+    try {
+      var fresh = getShiftSummary(shiftCopy);
+      // Preserve cashCountTotal from old snapshot (immutable: what was physically counted)
+      var oldSnap = shift.summarySnapshot || {};
+      var cashCountTotal = oldSnap.cashCountTotal !== undefined ? oldSnap.cashCountTotal : fresh.cashCountTotal;
+
+      shifts[i].summarySnapshot = {
+        totalIncome: fresh.totalIncome,
+        totalExpense: fresh.totalExpense,
+        cashIncome: fresh.cashIncome,
+        cardIncome: fresh.cardIncome,
+        transferIncome: fresh.transferIncome,
+        cukcukRevenue: fresh.cukcukRevenue,
+        cukcukBills: fresh.cukcukBills,
+        billCount: fresh.billCount,
+        expectedCash: fresh.expectedCash,
+        cashCountTotal: cashCountTotal,
+        cashExpense: fresh.cashExpense,
+        discrepancy: cashCountTotal - fresh.expectedCash,
+        manualIncome: fresh.manualIncome,
+        manualBills: fresh.manualBills,
+        otherIncome: fresh.otherIncome,
+        otherExpense: fresh.otherExpense,
+        revenue: fresh.revenue,
+        netTotal: fresh.netTotal
+      };
+      rebuilt++;
+    } catch(e) {
+      console.warn('[Store] rebuildHistorySnapshots: error for shift', shift.id, e);
+    }
+  }
+
+  if (rebuilt > 0) {
+    s.shifts = shifts;
+    save();
+  }
+  return rebuilt;
+}
+
 
 export function getShiftHistory() {
   var shifts = getState().shifts || [];

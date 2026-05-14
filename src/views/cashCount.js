@@ -216,6 +216,9 @@ function _clearLongPress() {
 }
 
 export function init() {
+  // Signal to main.js that user is now on cash-count (not yet dirty)
+  window._cashCountDirty = false;
+
   // ± buttons with LONG-PRESS support
   document.querySelectorAll('[data-cc-btn]').forEach(function(btn) {
     var handleClick = function() {
@@ -229,6 +232,9 @@ export function init() {
       }
     };
 
+    // Mark dirty as soon as user interacts (before they save)
+    btn.addEventListener('mousedown', function() { window._cashCountDirty = true; });
+    btn.addEventListener('touchstart', function() { window._cashCountDirty = true; }, { passive: true });
     btn.addEventListener('click', handleClick);
 
     // Long-press: hold for 400ms → auto-increment every 120ms
@@ -259,7 +265,10 @@ export function init() {
 
   // Direct input change
   document.querySelectorAll('.cc-num-input').forEach(function(input) {
-    input.addEventListener('input', _recalc);
+    input.addEventListener('input', function() {
+      window._cashCountDirty = true;
+      _recalc();
+    });
   });
 
   // Reset
@@ -279,6 +288,7 @@ export function init() {
     _savePersistentPins(data.pins);
     try {
       updateCashCount(data.counts, data.pins, data.keeps, data.hands);
+      window._cashCountDirty = false; // Saved — safe to auto-refresh now
       showToast('✅ Đã lưu kiểm kê tiền mặt', 'success');
     } catch (e) { showToast(e.message, 'error'); }
   });
@@ -286,4 +296,5 @@ export function init() {
 
 export function destroy() {
   _clearLongPress();
+  window._cashCountDirty = false; // Clear flag when leaving the view
 }
