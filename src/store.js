@@ -893,25 +893,59 @@ export function rebuildHistorySnapshots() {
 export function getShiftHistory() {
   var s = getState();
   var shifts = s.shifts || [];
+  var dirty = false;
+
   // Fix: remove stale copies of the currently open shift from history
   var currentId = s.currentShift ? s.currentShift.id : null;
   if (currentId) {
     var beforeLen = shifts.length;
     shifts = shifts.filter(function(sh) { return sh.id !== currentId; });
     if (shifts.length < beforeLen) {
-      s.shifts = shifts;
-      save();
+      dirty = true;
       console.log('[Store] getShiftHistory: removed ' + (beforeLen - shifts.length) + ' stale copy of current shift');
     }
   }
-  // Fix 3A: Dedup by compound key
-  var seen = {};
-  return shifts.filter(function(sh) {
-    var key = (sh.date || '') + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '') + '_' + (sh.startTime || '').substring(0, 19);
-    if (seen[key]) return false;
-    seen[key] = true;
-    return true;
+
+  // Aggressive dedup: key = date + shiftNumber + cashierName (no startTime — format may differ)
+  // Keep the BEST version: closed > open, has summarySnapshot > not, more transactions > fewer
+  var bestByKey = {};
+  for (var i = 0; i < shifts.length; i++) {
+    var sh = shifts[i];
+    var key = (sh.date || '') + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '');
+    var existing = bestByKey[key];
+    if (!existing) {
+      bestByKey[key] = sh;
+    } else {
+      // Score: closed shift wins, snapshot wins, more transactions wins
+      var eScore = (existing.status === 'closed' ? 10000 : 0) + (existing.summarySnapshot ? 1000 : 0) + (existing.endTime ? 100 : 0) + ((existing.transactions || []).length);
+      var nScore = (sh.status === 'closed' ? 10000 : 0) + (sh.summarySnapshot ? 1000 : 0) + (sh.endTime ? 100 : 0) + ((sh.transactions || []).length);
+      if (nScore > eScore) {
+        bestByKey[key] = sh;
+      }
+      dirty = true; // found a duplicate — need to persist cleanup
+    }
+  }
+
+  var result = [];
+  for (var k in bestByKey) {
+    if (bestByKey.hasOwnProperty(k)) result.push(bestByKey[k]);
+  }
+
+  // Sort by date desc
+  result.sort(function(a, b) {
+    var da = (a.date || '') + (a.startTime || '');
+    var db = (b.date || '') + (b.startTime || '');
+    return da > db ? -1 : (da < db ? 1 : 0);
   });
+
+  // Persist cleanup to localStorage so duplicates don't come back
+  if (dirty) {
+    s.shifts = result;
+    save();
+    console.log('[Store] getShiftHistory: cleaned up duplicates, ' + shifts.length + ' → ' + result.length);
+  }
+
+  return result;
 }
 
 export function saveShiftToHistory(shift) {
