@@ -1,4 +1,4 @@
-﻿/* ============================================
+/* ============================================
    KG-CASHIER â€” Data Store (localStorage + Cloud Sync)
    COMPATIBLE: No optional chaining, no bare catch
    ============================================ */
@@ -1197,19 +1197,24 @@ export async function syncCurrentShiftWithCloud() {
       }
       
       // Case 2: Cloud has an open shift AND local also has an open shift with SAME ID
-      // â†’ Sync updates (transactions, cash count, etc.) from other devices
+      // → Sync updates (transactions, cash count, etc.) from other devices
       if (cloudShift && s.currentShift && s.currentShift.id === cloudShift.id) {
-        const localCompare = JSON.stringify(Object.assign({}, s.currentShift, { invoices: [] }));
-        const cloudCompare = JSON.stringify(Object.assign({}, cloudShift, { invoices: [] }));
+        var mergedTxs = _mergeTransactions(
+          s.currentShift.transactions, cloudShift.transactions
+        );
+        var mergedOtherTxs = _mergeTransactions(
+          s.currentShift.otherTransactions, cloudShift.otherTransactions
+        );
+        
+        var hasChanges = false;
+        if (mergedTxs.length !== (s.currentShift.transactions || []).length) hasChanges = true;
+        if (mergedOtherTxs.length !== (s.currentShift.otherTransactions || []).length) hasChanges = true;
+        if (cloudShift.startingCash !== s.currentShift.startingCash) hasChanges = true;
+        if (cloudShift.status !== s.currentShift.status) hasChanges = true;
+        if (cloudShift.notes !== s.currentShift.notes) hasChanges = true;
+        if (JSON.stringify(cloudShift.cashCount || {}) !== JSON.stringify(s.currentShift.cashCount || {})) hasChanges = true;
 
-        if (localCompare !== cloudCompare) {
-          // Same shift, different content → MERGE transactions by ID (union)
-          var mergedTxs = _mergeTransactions(
-            s.currentShift.transactions, cloudShift.transactions
-          );
-          var mergedOtherTxs = _mergeTransactions(
-            s.currentShift.otherTransactions, cloudShift.otherTransactions
-          );
+        if (hasChanges) {
           // Use cloud as base for non-array fields (cashCount, notes, etc.)
           cloudShift.transactions = mergedTxs;
           cloudShift.otherTransactions = mergedOtherTxs;
@@ -1219,6 +1224,8 @@ export async function syncCurrentShiftWithCloud() {
           s.currentShift = cloudShift;
           save();
           return true;
+        } else {
+          return false;
         }
       }
 

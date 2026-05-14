@@ -136,6 +136,17 @@ function _safeRenderView() {
     console.log('[Main] Auto-render skipped: cash-count is active (user has unsaved input)');
     return;
   }
+  // Skip if user is actively typing in an input/textarea
+  if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
+    console.log('[Main] Auto-render skipped: user is actively typing');
+    return;
+  }
+  // Skip if a modal is open
+  var modalOverlay = document.getElementById('modalOverlay');
+  if (modalOverlay && modalOverlay.style.display === 'flex') {
+    console.log('[Main] Auto-render skipped: a modal is currently open');
+    return;
+  }
   renderCurrentView();
 }
 
