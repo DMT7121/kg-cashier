@@ -799,8 +799,15 @@ export function getShiftSummary(shift) {
 export function getHistorySummary(shift) {
   if (!shift) return null;
 
+  // ── CRITICAL: if this entry matches the currently open shift,
+  // use the LIVE currentShift data (has latest cashCount, transactions, etc.)
+  // Cloud sync may have created a stale copy without cashCount in shifts[].
+  var s = getState();
+  if (s.currentShift && s.currentShift.id === shift.id) {
+    return getShiftSummary(s.currentShift);
+  }
+
   // Closed shifts with snapshot: use it directly as the source of truth.
-  // The snapshot was frozen at close time with all correct data.
   // DO NOT recalculate from live invoiceStore — that creates artificial discrepancy
   // when CUKCUK data changes after closing while cashCountTotal stays frozen.
   if (shift.summarySnapshot && shift.status === 'closed') {
@@ -823,7 +830,7 @@ export function getHistorySummary(shift) {
     return result;
   }
 
-  // Fallback for legacy shifts without snapshot
+  // Fallback for legacy/open shifts without snapshot
   return getShiftSummary(shift);
 }
 
