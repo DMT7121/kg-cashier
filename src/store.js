@@ -964,12 +964,17 @@ export async function syncShiftHistory() {
         }
       }
     } catch(tombErr) { /* ignore */ }
+    // Fix: skip cloud shifts that match the currently open shift
+    // (prevents stale copies without cashCount from appearing in history)
+    var currentShiftId = s.currentShift ? s.currentShift.id : null;
     var added = 0;
     for (var j = 0; j < cloudShifts.length; j++) {
       var cs = cloudShifts[j];
       if (!cs || !cs.id) continue;
       // Skip shifts that were explicitly deleted by user
       if (deletedIds.indexOf(cs.id) !== -1) continue;
+      // Skip the currently open shift — it belongs in currentShift, not history
+      if (cs.id === currentShiftId) continue;
       if (localIds[cs.id] === undefined) {
         // Cloud shift not in local â†’ add
         cs.invoices = cs.invoices || [];
@@ -987,6 +992,16 @@ export async function syncShiftHistory() {
           s.shifts[localIds[cs.id]] = cs;
           added++;
         }
+      }
+    }
+
+    // Fix: remove any stale copies of the currently open shift from history
+    if (currentShiftId) {
+      var beforeLen = s.shifts.length;
+      s.shifts = s.shifts.filter(function(sh) { return sh.id !== currentShiftId; });
+      if (s.shifts.length < beforeLen) {
+        console.log('[Store] Removed ' + (beforeLen - s.shifts.length) + ' stale copy(s) of current shift from history');
+        added++;
       }
     }
 

@@ -1,0 +1,318 @@
+/* ============================================
+   KG-STAFF — Mobile-First Staff Order Styles
+   Overlays on base style.css for standalone app
+   ============================================ */
+
+/* ── Staff App Shell ─────────────────────── */
+.staff-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ── Staff Header ────────────────────────── */
+.staff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.staff-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.staff-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
+  border: 1px solid rgba(232,168,56,.3);
+  box-shadow: 0 0 8px rgba(232,168,56,.25);
+}
+
+.staff-brand {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+.staff-role {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.staff-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.staff-clock {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-card);
+  padding: 4px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+/* ── Staff View Container ────────────────── */
+.staff-view {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px;
+}
+
+/* ── Hide elements not needed in staff mode ─ */
+.cb-fab,
+.cb-panel { display: none !important; }
+
+/* ══════════════════════════════════════════
+   MOBILE POS OVERRIDES
+   ══════════════════════════════════════════ */
+
+/* POS shell: fill available space */
+.staff-view .pos-shell {
+  height: auto;
+  min-height: calc(100dvh - 80px);
+}
+
+.staff-view .pos-order-shell {
+  height: auto;
+  min-height: calc(100dvh - 80px);
+}
+
+/* ── Table Map: compact grid for mobile ──── */
+.staff-view .pos-tables-grid {
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)) !important;
+  gap: 6px !important;
+}
+
+.staff-view .pos-table-card {
+  padding: 10px 6px !important;
+  border-radius: 10px;
+  min-height: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.staff-view .pos-table-icon { font-size: 16px !important; margin-bottom: 1px !important; }
+.staff-view .pos-table-name { font-size: 12px !important; }
+.staff-view .pos-table-zone-badge { font-size: 9px; }
+.staff-view .pos-table-amount { font-size: 11px; }
+.staff-view .pos-table-items { font-size: 9px; }
+.staff-view .pos-table-free-label { font-size: 9px; }
+
+/* Zone labels: sticky headers while scrolling */
+.staff-view .pos-zone-label {
+  font-size: 12px;
+  padding: 8px 0 6px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 5;
+}
+
+/* ── Order Screen: vertical stack on phone ── */
+.staff-view .pos-order-body {
+  flex-direction: column;
+  overflow: visible;
+}
+
+.staff-view .pos-catalog-panel {
+  flex: none;
+  max-height: none;
+  overflow: visible;
+}
+
+.staff-view .pos-cart-panel {
+  flex: none;
+  max-height: none;
+  overflow: visible;
+}
+
+/* Product grid: 3 columns on phone */
+.staff-view .pos-product-grid {
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 6px;
+  overflow-y: visible;
+  max-height: none;
+}
+
+.staff-view .pos-product-btn {
+  padding: 10px 6px;
+  min-height: 78px;
+}
+
+.staff-view .pos-product-emoji { font-size: 20px; }
+.staff-view .pos-product-name { font-size: 10px; line-height: 1.2; }
+.staff-view .pos-product-price { font-size: 10px; }
+
+/* Category tabs: horizontal scrollable */
+.staff-view .pos-cat-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.staff-view .pos-cat-tabs::-webkit-scrollbar { display: none; }
+
+.staff-view .pos-cat-tab {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+/* Cart rows: bigger touch targets */
+.staff-view .pos-cart-row {
+  padding: 10px;
+  gap: 10px;
+}
+
+.staff-view .pos-qty-btn {
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+}
+
+.staff-view .pos-cart-del {
+  font-size: 22px;
+  padding: 4px;
+}
+
+.staff-view .pos-cart-cancel,
+.staff-view .pos-cart-transfer-kitchen {
+  font-size: 18px;
+  padding: 4px;
+}
+
+/* Action buttons: bigger for finger taps */
+.staff-view .pos-action-row .btn {
+  padding: 14px;
+  font-size: 14px;
+}
+
+/* Order header: wrap on small screens */
+.staff-view .pos-order-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.staff-view .pos-header-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Search input: 16px prevents iOS auto-zoom */
+.staff-view .pos-search-input {
+  font-size: 16px;
+}
+
+/* ── Modal adjustments for mobile ────────── */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95% !important;
+    max-width: none !important;
+    max-height: 90vh !important;
+    padding: 16px !important;
+  }
+
+  .modal-title {
+    font-size: 15px;
+  }
+
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .modal-footer .btn {
+    flex: 1;
+    min-width: 100px;
+    justify-content: center;
+  }
+}
+
+/* ── Landscape phone / small tablet ────────── */
+@media (min-width: 640px) {
+  .staff-view .pos-order-body {
+    flex-direction: row;
+  }
+
+  .staff-view .pos-catalog-panel {
+    flex: 6;
+    overflow: hidden;
+  }
+
+  .staff-view .pos-cart-panel {
+    flex: 4;
+    overflow: hidden;
+    max-height: calc(100dvh - 140px);
+  }
+
+  .staff-view .pos-product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+    overflow-y: auto;
+  }
+}
+
+/* ── Tablet (iPad, etc.) ───────────────────── */
+@media (min-width: 768px) {
+  .staff-view {
+    padding: 16px;
+  }
+
+  .staff-view .pos-tables-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+  }
+
+  .staff-view .pos-product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
+  }
+
+  .staff-header {
+    padding: 12px 24px;
+  }
+
+  .staff-brand {
+    font-size: 16px;
+  }
+
+  .staff-clock {
+    font-size: 13px;
+  }
+}
+
+/* ── Large tablet / desktop preview ────────── */
+@media (min-width: 1024px) {
+  .staff-view .pos-tables-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .staff-view .pos-table-card {
+    min-height: 80px;
+  }
+}
