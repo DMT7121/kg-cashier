@@ -565,3 +565,10 @@ export function init() {
     }
   });
 }
+
+export function destroy() {
+  if (_timer) {
+    clearInterval(_timer);
+    _timer = null;
+  }
+}

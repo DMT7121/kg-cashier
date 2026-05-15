@@ -141,9 +141,9 @@ function _safeRenderView() {
     console.log('[Main] Auto-render skipped: user is actively typing');
     return;
   }
-  // Skip if a modal is open
+  // Skip if a modal is open (uses CSS class, not inline style)
   var modalOverlay = document.getElementById('modalOverlay');
-  if (modalOverlay && modalOverlay.style.display === 'flex') {
+  if (modalOverlay && modalOverlay.classList.contains('active')) {
     console.log('[Main] Auto-render skipped: a modal is currently open');
     return;
   }
@@ -200,7 +200,7 @@ function initApp() {
   console.log('[KG-CASHIER] Initializing...');
 
   updateClock();
-  setInterval(updateClock, 1000);
+  _globalIntervals.push(setInterval(updateClock, 1000));
 
   // Nav clicks
   var navItems = document.querySelectorAll('.nav-item[data-view]');
@@ -277,7 +277,12 @@ function initApp() {
 
   // Globals
   window.navigateTo = navigateTo;
-  window.refreshView = renderCurrentView;
+  // Debounced refreshView to prevent UI flicker storms from rapid calls
+  var _refreshTimer = null;
+  window.refreshView = function() {
+    clearTimeout(_refreshTimer);
+    _refreshTimer = setTimeout(renderCurrentView, 300);
+  };
   window.hideModal = hideModal;
 
   // Init global chatbot

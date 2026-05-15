@@ -386,6 +386,8 @@ export function updateStartingCash(newAmount) {
 
 export async function closeShift(opts) {
   if (!opts) opts = {};
+  _closeInProgress = true;
+  try {
   var s = getState();
   if (!s.currentShift) throw new Error('Kh\u00F4ng c\u00F3 ca n\u00E0o \u0111ang m\u1EDF');
 
@@ -506,7 +508,9 @@ export async function closeShift(opts) {
       }
     }
   }
-  _closeInProgress = false;
+  } finally {
+    _closeInProgress = false;
+  }
 }
 
 // â”€â”€ Transactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1312,6 +1316,14 @@ export async function syncCurrentShiftWithCloud() {
           cloudShift.transactions = mergedTxs;
           cloudShift.otherTransactions = mergedOtherTxs;
           cloudShift.invoices = s.currentShift.invoices;
+          // Preserve local cashCount data — user's manual input takes priority
+          var localCC = s.currentShift.cashCount || {};
+          if (Object.keys(localCC).length > 0) {
+            cloudShift.cashCount = localCC;
+            cloudShift.pinnedCash = s.currentShift.pinnedCash || cloudShift.pinnedCash;
+            cloudShift.keepCash = s.currentShift.keepCash || cloudShift.keepCash;
+            cloudShift.handoverCash = s.currentShift.handoverCash || cloudShift.handoverCash;
+          }
           // Preserve security fields from local
           cloudShift.shiftPassword = cloudShift.shiftPassword || s.currentShift.shiftPassword;
           s.currentShift = cloudShift;

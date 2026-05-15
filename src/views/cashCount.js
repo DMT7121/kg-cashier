@@ -4,6 +4,7 @@ import { formatCurrency, denominations, showToast } from '../utils.js';
 
 var PIN_KEY = 'kg_cashier_pinned_cash';
 var _longPressTimers = [];
+var _stopLongPress = null;
 
 /** Load persistent pins from localStorage (carry forward across shifts) */
 function _loadPersistentPins() {
@@ -258,10 +259,10 @@ export function init() {
   });
 
   // Stop long-press on mouseup/touchend (global)
-  var stopLongPress = function() { _clearLongPress(); };
-  document.addEventListener('mouseup', stopLongPress);
-  document.addEventListener('touchend', stopLongPress);
-  document.addEventListener('touchcancel', stopLongPress);
+  _stopLongPress = function() { _clearLongPress(); };
+  document.addEventListener('mouseup', _stopLongPress);
+  document.addEventListener('touchend', _stopLongPress);
+  document.addEventListener('touchcancel', _stopLongPress);
 
   // Direct input change
   document.querySelectorAll('.cc-num-input').forEach(function(input) {
@@ -296,5 +297,12 @@ export function init() {
 
 export function destroy() {
   _clearLongPress();
+  // Remove global listeners to prevent leaks
+  if (_stopLongPress) {
+    document.removeEventListener('mouseup', _stopLongPress);
+    document.removeEventListener('touchend', _stopLongPress);
+    document.removeEventListener('touchcancel', _stopLongPress);
+    _stopLongPress = null;
+  }
   window._cashCountDirty = false; // Clear flag when leaving the view
 }
