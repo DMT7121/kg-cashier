@@ -315,9 +315,23 @@ export async function openShift(opts) {
     try {
       var cloudCheck = await _cloudGetShift();
       if (cloudCheck.success && cloudCheck.shift && cloudCheck.shift.status !== 'closed') {
-        var cloudName = cloudCheck.shift.cashierName || 'unknown';
-        var cloudNum = cloudCheck.shift.shiftNumber || '?';
-        throw new Error('Thi\u1EBFt b\u1ECB kh\u00E1c \u0111ang m\u1EDF Ca ' + cloudNum + ' b\u1EDFi ' + cloudName + '. H\u00E3y \u0111\u00F3ng ca \u0111\u00F3 tr\u01B0\u1EDBc.');
+        var cloudShiftId = cloudCheck.shift.id;
+        // Check if this cloud shift was already closed/force-closed locally
+        var isRecentlyClosed = (s._recentlyClosedIds || []).indexOf(cloudShiftId) !== -1;
+        var isForceClosed = (s._forceClosedIds || []).indexOf(cloudShiftId) !== -1;
+        var isInHistory = (s.shifts || []).some(function(h) { return h.id === cloudShiftId; });
+
+        if (isRecentlyClosed || isForceClosed || isInHistory) {
+          // Stale cloud shift — clear it silently and proceed
+          console.log('[Store] openShift: clearing stale cloud shift:', cloudShiftId);
+          if (_cloudClose) {
+            try { _cloudClose(cloudCheck.shift).catch(function() {}); } catch (e2) { /* ignore */ }
+          }
+        } else {
+          var cloudName = cloudCheck.shift.cashierName || 'unknown';
+          var cloudNum = cloudCheck.shift.shiftNumber || '?';
+          throw new Error('Thi\u1EBFt b\u1ECB kh\u00E1c \u0111ang m\u1EDF Ca ' + cloudNum + ' b\u1EDFi ' + cloudName + '. H\u00E3y \u0111\u00F3ng ca \u0111\u00F3 tr\u01B0\u1EDBc.');
+        }
       }
     } catch (e) {
       if (e.message && e.message.indexOf('kh\u00E1c') > -1) throw e;
