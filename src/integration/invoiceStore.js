@@ -64,7 +64,15 @@ export function hasInvoice(refId) {
 export function upsertInvoice(invoice) {
   var store = _load();
   var key = String(invoice.refId);
-  var isNew = !store.invoices[key];
+  var existing = store.invoices[key];
+  var isNew = !existing;
+  
+  if (existing && existing.manualOverride) {
+    invoice.payments = existing.payments;
+    invoice.manualOverride = true;
+    if (existing.amount) invoice.amount = existing.amount; // Preserve amount if modified
+  }
+  
   store.invoices[key] = invoice;
   _save(store);
   return isNew;
@@ -76,7 +84,15 @@ export function bulkUpsert(invoices) {
   var newCount = 0;
   for (var i = 0; i < invoices.length; i++) {
     var key = String(invoices[i].refId);
-    if (!store.invoices[key]) newCount++;
+    var existing = store.invoices[key];
+    if (!existing) newCount++;
+    
+    if (existing && existing.manualOverride) {
+      invoices[i].payments = existing.payments;
+      invoices[i].manualOverride = true;
+      if (existing.amount) invoices[i].amount = existing.amount;
+    }
+    
     store.invoices[key] = invoices[i];
   }
   _save(store);

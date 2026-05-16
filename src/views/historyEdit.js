@@ -153,3 +153,91 @@ export function showEditInvoicePaymentModal(shiftId, inv, onDone) {
     });
   },100);
 }
+
+export function showEditDayInvoicePaymentModal(dateStr, inv, onDone) {
+  var fc = formatCurrency;
+  var payments = inv.payments || [];
+  var totalAmt = 0;
+  payments.forEach(function(p){ totalAmt += p.amount || 0; });
+  if (!totalAmt) totalAmt = inv.amount || 0;
+  var payRows = payments.length > 0 ? payments.map(function(p, idx) {
+    return '<tr><td><select class="form-input heInvPay" data-idx="'+idx+'" style="padding:4px 8px;"><option value="cash"'+(p.method==='cash'?' selected':'')+'>💵 TM</option><option value="card"'+(p.method==='card'?' selected':'')+'>💳 Thẻ</option><option value="transfer"'+(p.method==='transfer'?' selected':'')+'>🏦 CK</option></select></td><td class="text-right"><input type="number" class="form-input heInvAmt" data-idx="'+idx+'" value="'+(p.amount||0)+'" style="width:120px;text-align:right;padding:4px 8px;"></td></tr>';
+  }).join('') : '<tr><td><select class="form-input heInvPay" data-idx="0" style="padding:4px 8px;"><option value="cash">💵 TM</option><option value="card">💳 Thẻ</option><option value="transfer">🏦 CK</option></select></td><td class="text-right"><input type="number" class="form-input heInvAmt" data-idx="0" value="'+totalAmt+'" style="width:120px;text-align:right;padding:4px 8px;"></td></tr>';
+  showModal('<div class="modal-title"><span class="material-symbols-rounded" style="color:var(--primary);">credit_card</span> Sửa PTTT (Ngày) — Bill '+(inv.refNo||'?')+'</div>'+
+    '<p style="margin-bottom:8px;"><strong>Bàn:</strong> '+(inv.tableName||'—')+' — <strong>Tổng:</strong> '+fc(totalAmt)+'</p>'+
+    '<table class="report-table"><thead><tr style="background:var(--bg-secondary);"><th>Hình thức TT</th><th class="text-right">Số tiền</th></tr></thead><tbody id="heInvTbody">'+payRows+'</tbody></table>'+
+    '<div style="margin-top:8px;"><button class="btn btn-outline btn-sm" id="heInvAddPay"><span class="material-symbols-rounded">add</span> Thêm dòng</button></div>'+
+    '<div class="modal-footer"><button class="btn btn-outline" onclick="window.hideModal()">Hủy</button><button class="btn btn-primary" id="heInvSave"><span class="material-symbols-rounded">save</span> Lưu</button></div>');
+  setTimeout(function(){
+    var tbody=document.getElementById('heInvTbody');
+    document.getElementById('heInvAddPay')?.addEventListener('click',function(){
+      if(!tbody)return;var idx=tbody.querySelectorAll('tr').length;
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td><select class="form-input heInvPay" data-idx="'+idx+'" style="padding:4px 8px;"><option value="cash">💵 TM</option><option value="card">💳 Thẻ</option><option value="transfer">🏦 CK</option></select></td><td class="text-right"><input type="number" class="form-input heInvAmt" data-idx="'+idx+'" value="0" style="width:120px;text-align:right;padding:4px 8px;"></td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('heInvSave')?.addEventListener('click',function(){
+      var np=[];
+      document.querySelectorAll('.heInvPay').forEach(function(sel){
+        var idx=sel.dataset.idx;
+        var amtEl=document.querySelector('.heInvAmt[data-idx="'+idx+'"]');
+        var amt=amtEl?Number(amtEl.value)||0:0;
+        if(amt>0)np.push({method:sel.value,amount:amt});
+      });
+      if(np.length===0){showToast('Cần ít nhất 1 dòng thanh toán','warning');return;}
+      try{
+        import('../store.js').then(module => {
+          module.editDayInvoicePayment(dateStr, inv.refId, np);
+          window.hideModal();
+          showToast('✅ Đã cập nhật PTTT', 'success');
+          if(onDone) onDone();
+        });
+      }
+      catch(e){showToast(e.message,'error');}
+    });
+  },100);
+}
+
+export function showEditDrinkInventoryModal(shift, onDone) {
+  var dData = shift.drinksData || {};
+  var html = '<div class="modal-title"><span class="material-symbols-rounded" style="color:var(--primary);">inventory_2</span> Sửa kiểm kho nước — Ca '+(shift.shiftNumber||1)+'</div><div class="table-container" style="max-height:60vh;overflow-y:auto;"><table class="report-table"><thead><tr><th>Tên nhóm/Món</th><th class="text-center" style="width:60px;">TồnĐ</th><th class="text-center" style="width:60px;">Nhập</th><th class="text-center" style="width:60px;">Bán</th><th class="text-center" style="width:60px;">TồnC(T)</th><th class="text-center" style="width:70px;">ThựcTế</th></tr></thead><tbody id="heDrinksTbody">';
+  
+  window._kgMenu?.forEach(cat => {
+    var hasDrinks = cat.items.some(i => i.isDrink);
+    if (!hasDrinks) return;
+    html += '<tr style="background:var(--bg-secondary);font-weight:600;"><td colspan="6">'+cat.name+'</td></tr>';
+    cat.items.forEach(item => {
+      if (!item.isDrink) return;
+      var d = dData[item.id] || { open:0, import:0, sold:0, expected:0, actual:0 };
+      html += '<tr>'+
+        '<td>'+item.name+'</td>'+
+        '<td class="text-center">'+d.open+'</td>'+
+        '<td class="text-center">'+d.import+'</td>'+
+        '<td class="text-center">'+d.sold+'</td>'+
+        '<td class="text-center" style="color:var(--primary);font-weight:500;">'+d.expected+'</td>'+
+        '<td class="text-center"><input type="number" class="form-input heDrinkActual" data-id="'+item.id+'" value="'+(d.actual||0)+'" style="width:60px;text-align:center;padding:4px;"></td>'+
+      '</tr>';
+    });
+  });
+  html += '</tbody></table></div><div class="modal-footer"><button class="btn btn-outline" onclick="window.hideModal()">Hủy</button><button class="btn btn-primary" id="heDrinksSave"><span class="material-symbols-rounded">save</span> Lưu kiểm kho</button></div>';
+  showModal(html);
+
+  setTimeout(function(){
+    document.getElementById('heDrinksSave')?.addEventListener('click', function(){
+      var updates = {};
+      document.querySelectorAll('.heDrinkActual').forEach(function(inp){
+        updates[inp.dataset.id] = parseInt(inp.value, 10) || 0;
+      });
+      try {
+        import('../store.js').then(module => {
+          module.updateHistoryDrinkInventory(shift.id, updates);
+          window.hideModal();
+          showToast('✅ Đã cập nhật kiểm kho', 'success');
+          if(onDone) onDone();
+        });
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    });
+  }, 100);
+}

@@ -312,7 +312,11 @@ function _buildRevenueReport(rev, daily, unpushedCount) {
 
 // ── Build handover HTML (returns string) ──
 function _buildHandoverHTML(revSummary) {
-  // Use revSummary from invoiceStore (already filtered by selected date)
+  var fc = formatCurrency;
+  var now = new Date();
+  var settings = getSettings();
+  
+  // Base CUKCUK rev from the day's selected date (for Day mode or fallback)
   var cukcukRev = {
     total: revSummary ? revSummary.totalRevenue : 0,
     cash: revSummary ? revSummary.totalCash : 0,
@@ -321,28 +325,103 @@ function _buildHandoverHTML(revSummary) {
     bills: revSummary ? revSummary.totalBills : 0
   };
 
-  // Try to find shift for the selected date
   var selectedDateStr = _refDate ? _refDate.getFullYear() + '-' + String(_refDate.getMonth()+1).padStart(2,'0') + '-' + String(_refDate.getDate()).padStart(2,'0') : null;
-  var shift = getCurrentShift();
+  if(!selectedDateStr) {
+    var d = new Date();
+    selectedDateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  var shiftIdToPrint = (typeof window._setReportShiftId === 'function') ? window._setReportShiftId() : null;
+
+  var currentShift = getCurrentShift();
   var history = getShiftHistory();
   var target = null;
+  var printTitle = "PHIẾU BÀN GIAO CA";
+  var printSub = "";
+  var isAutoPrint = false;
+  var isSupplemental = false;
 
-  if (!selectedDateStr || (shift && shift.date === selectedDateStr)) {
-    // Today or current shift matches
-    target = shift || (history.length > 0 ? history[0] : null);
-  } else {
-    // Find shift for selected date in history
-    for (var hi = 0; hi < history.length; hi++) {
-      if (history[hi].date === selectedDateStr) { target = history[hi]; break; }
+  if (shiftIdToPrint) {
+    // SHIFT MODE
+    if (currentShift && currentShift.id === shiftIdToPrint) target = currentShift;
+    else target = history.find(function(s) { return s.id === shiftIdToPrint; });
+    
+    if (target) {
+      printSub = 'Ngày: ' + formatDate(target.date) + ' — Ca ' + target.shiftNumber;
+      if (target.summarySnapshot) {
+         cukcukRev.total = target.summarySnapshot.totalRevenue || 0;
+         cukcukRev.cash = target.summarySnapshot.totalCash || 0;
+         cukcukRev.card = target.summarySnapshot.totalCard || 0;
+         cukcukRev.transfer = target.summarySnapshot.totalTransfer || 0;
+         cukcukRev.bills = target.summarySnapshot.totalBills || 0;
+      }
+      isAutoPrint = !!target.endTime;
+      isSupplemental = target.audit && target.audit.length > 0;
     }
-    if (!target) target = shift; // fallback
+  } else {
+    // DAY MODE (Combined)
+    var dayShifts = history.filter(function(s) { return s.date === selectedDateStr; });
+    if (currentShift && currentShift.date === selectedDateStr && !dayShifts.find(function(s){ return s.id === currentShift.id; })) {
+      dayShifts.unshift(currentShift); // Current shift represents ongoing data
+    }
+    
+    printTitle = "BÁO CÁO TỔNG KẾT NGÀY";
+    printSub = 'Ngày làm việc: ' + formatDate(selectedDateStr);
+
+    if (dayShifts.length > 0) {
+      // Sort ascending by time
+      dayShifts.sort(function(a,b) { return a.startTime - b.startTime; });
+      var firstShift = dayShifts[0];
+      var lastShift = dayShifts[dayShifts.length - 1];
+
+      var allTxs = [];
+      var allOtherTxs = [];
+      dayShifts.forEach(function(s) {
+        if(s.transactions) allTxs = allTxs.concat(s.transactions);
+        if(s.otherTransactions) allOtherTxs = allOtherTxs.concat(s.otherTransactions);
+      });
+
+      var cNames = dayShifts.map(function(s){ return s.cashierName; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).join(', ');
+
+      target = {
+        date: selectedDateStr,
+        cashierName: cNames,
+        startTime: firstShift.startTime,
+        endTime: lastShift.endTime, // might be undefined if currentShift is still open
+        startingCash: firstShift.startingCash || 0, // start of day
+        transactions: allTxs,
+        otherTransactions: allOtherTxs,
+        cashCount: lastShift.cashCount || {},
+        pinnedCash: lastShift.pinnedCash || {},
+        keepCash: lastShift.keepCash || {},
+        handoverCash: lastShift.handoverCash || {},
+        audit: [] // No audit trail needed for combined report
+      };
+      isAutoPrint = !!lastShift.endTime;
+    } else {
+      // NO SHIFTS (POS ONLY)
+      target = {
+        date: selectedDateStr,
+        cashierName: 'Hệ thống (Không có ca)',
+        startTime: new Date(selectedDateStr + 'T12:00:00').getTime(),
+        endTime: new Date(selectedDateStr + 'T23:59:59').getTime(),
+        startingCash: 0,
+        transactions: [],
+        otherTransactions: [],
+        cashCount: {},
+        pinnedCash: {},
+        keepCash: {},
+        handoverCash: {},
+        audit: []
+      };
+      isAutoPrint = true;
+    }
   }
 
   if (!target) {
-    return '<div class="empty-state" style="padding:30px;"><span class="material-symbols-rounded empty-icon">summarize</span><h2>Chưa có dữ liệu ca</h2><p>Mở ca hoặc đóng ca để tạo phiếu bàn giao</p></div>';
+    return '<div class="empty-state" style="padding:30px;"><span class="material-symbols-rounded empty-icon">summarize</span><h2>Chưa có dữ liệu</h2><p>Không tìm thấy ca làm việc hoặc dữ liệu.</p></div>';
   }
 
-  var settings = getSettings();
   var txs = target.transactions || [];
   var otherTxs = target.otherTransactions || [];
   var manualIncomeTxs = txs.filter(function(t) { return t.type === 'income' && (!t.note || t.note.indexOf('[CUKCUK]') === -1); });
@@ -353,18 +432,18 @@ function _buildHandoverHTML(revSummary) {
   var manualCash = manualIncomeTxs.filter(function(t) { return (t.paymentMethod || 'cash') === 'cash'; }).reduce(function(s, t) { return s + t.amount; }, 0);
   var otherIncomeAmt = otherTxs.filter(function(t) { return t.type === 'income'; }).reduce(function(s, t) { return s + t.amount; }, 0);
   var otherExpenseAmt = otherTxs.filter(function(t) { return t.type === 'expense'; }).reduce(function(s, t) { return s + t.amount; }, 0);
+  
   var cc = target.cashCount || {};
   var cashCountTotal = denominations.reduce(function(s, d) { return s + (d.value * (cc[d.value] || 0)); }, 0);
+  
   var expectedCash = (target.startingCash || 0) + manualCash + cukcukRev.cash - totalExpenseAmt + otherIncomeAmt - otherExpenseAmt;
   var combinedIncome = cukcukRev.total + totalManualIncome;
   var billCount = cukcukRev.bills + manualIncomeTxs.length;
   var discrepancy = cashCountTotal - expectedCash;
-  var fc = formatCurrency;
-  var now = new Date();
 
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-size:16px;font-weight:700;color:var(--text);">📋 Phiếu bàn giao ca</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);">📋 ${printTitle}</div>
       <div class="btn-group">
         <button class="btn btn-outline btn-sm" id="btnPreviewA4">
           <span class="material-symbols-rounded">preview</span> Xem A4
@@ -383,16 +462,16 @@ function _buildHandoverHTML(revSummary) {
             <div class="a4-address">${settings.storeAddress || ''}</div>
           </div>
           <div class="a4-header-right">
-            <div class="a4-doc-title">PHIẾU BÀN GIAO CA${(target.audit && target.audit.length > 0) ? '<br><span style="font-size:12px;opacity:0.8;">(BẢN IN BỔ SUNG)</span>' : ''}</div>
-            <div class="a4-doc-sub">Ngày: ${formatDate(target.date)} — Ca ${target.shiftNumber}</div>
+            <div class="a4-doc-title">${printTitle}${isSupplemental ? '<br><span style="font-size:12px;opacity:0.8;">(BẢN IN BỔ SUNG)</span>' : ''}</div>
+            <div class="a4-doc-sub">${printSub}</div>
           </div>
         </div>
         <div class="a4-divider"></div>
         <div class="a4-info-grid">
           <div class="a4-info-row"><span class="a4-info-label">Thu ngân:</span><span class="a4-info-value">${target.cashierName}</span></div>
           <div class="a4-info-row"><span class="a4-info-label">Bắt đầu:</span><span class="a4-info-value">${formatTime(target.startTime)}</span></div>
-          <div class="a4-info-row"><span class="a4-info-label">Kết thúc:</span><span class="a4-info-value">${target.endTime ? formatTime(target.endTime) : '(đang mở)'}</span></div>
-          <div class="a4-info-row"><span class="a4-info-label">Tiền đầu ca:</span><span class="a4-info-value a4-bold">${fc(target.startingCash)}</span></div>
+          <div class="a4-info-row"><span class="a4-info-label">Kết thúc:</span><span class="a4-info-value">${target.endTime ? formatTime(target.endTime) : '(đang làm việc)'}</span></div>
+          <div class="a4-info-row"><span class="a4-info-label">Tiền đầu:</span><span class="a4-info-value a4-bold">${fc(target.startingCash)}</span></div>
         </div>
 
         <div class="a4-two-col">
@@ -471,7 +550,7 @@ function _buildHandoverHTML(revSummary) {
         </div>
         <div class="a4-footer">
           ${(target.audit && target.audit.length > 0) ? '<div style="text-align:left;font-size:10px;color:#666;margin-bottom:8px;padding-top:4px;border-top:1px dashed #ccc;">* Lịch sử chỉnh sửa:<br>' + target.audit.map(function(a){return ' - ' + formatTime(a.timestamp) + ' ' + formatDate(a.timestamp) + ': ' + a.action;}).join('<br>') + '</div>' : ''}
-          In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Phiếu bàn giao ${target.endTime ? (target.audit && target.audit.length > 0 ? 'bổ sung' : 'tự động') : 'tạm tính'}
+          In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Báo cáo ${isAutoPrint ? (isSupplemental ? 'bổ sung' : 'tự động') : 'tạm tính'}
         </div>
       </div>
     </div>

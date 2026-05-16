@@ -29,8 +29,8 @@ var SESSION_KEY = 'kg-cashier-session';
 var STAFF_CACHE_KEY = 'kg-cashier-staff';
 
 var defaultCategories = {
-  income: ['Doanh thu bÃ¡n hÃ ng', 'Doanh thu dá»‹ch vá»¥', 'Thu há»“i ná»£', 'Thu khÃ¡c'],
-  expense: ['Mua nguyÃªn liá»‡u', 'Váº­n chuyá»ƒn', 'Sá»­a chá»¯a', 'Tiá»n tip/bo', 'Tráº£ ná»£', 'Chi khÃ¡c']
+  income: ['Doanh thu bán hàng', 'Doanh thu dịch vụ', 'Thu hồi nợ', 'Thu khác'],
+  expense: ['Mua nguyên liệu', 'Vận chuyển', 'Sửa chữa', 'Tiền tip/bo', 'Trả nợ', 'Chi khác']
 };
 
 var state = null;
@@ -42,7 +42,7 @@ function getInitialPrintForms() {
   return {
     checklist: [
       { section: 'CHECKLIST PHá»¤C Vá»¤ â€” Äáº¦U CA', items: [
-        { cat: 'Vá»† SINH & SETUP', title: 'I. Vá»‡ sinh & setup khu trá»±c', list: [
+        { cat: 'VỆ SINH & SETUP', title: 'I. Vệ sinh & setup khu vực', list: [
           'Vá»‡ sinh sÃ n & Khu vá»±c chung: QuÃ©t vÃ  lau sáº¡ch tá»•ng thá»ƒ khu trá»±c, cá»•ng ra vÃ o.',
           'BÃ n gháº¿: Lau sáº¡ch bÃ n gháº¿, setup tiÃªu chuáº©n (ChÃ©n/ÄÅ©a/Ly...).',
           'Chuáº©n bá»‹ xÃ´ Ä‘Ã¡: Äáº£m báº£o sáº¡ch vÃ  Ä‘á»§ Ä‘Ã¡.',
@@ -107,10 +107,10 @@ function getInitialPrintForms() {
         ]
       },
       hangrau: {
-        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” HÃ€NG RAU 2',
-        subtitle: 'NHáº¬P HÃ€NG NGÃ€Y',
+        title: 'KI�M K�` HìNG H�A � HìNG RAU 2',
+        subtitle: 'NHẬP HìNG NGìY',
         items: [
-          'Tá»i cá»§:kg','HÃ nh tÃ¢y:kg','CÃ  rá»‘t:kg','ThÆ¡m lá»›n:kg','Táº¯c:kg','á»št sá»«ng:kg','Sáº£ cÃ¢y:kg','Tá»i xay:kg','Chanh:kg','Báº¯p Má»¹:kg','á»št xiÃªm xanh:kg','Äáº­u rá»“ng:kg','HÃ nh tÃ­m:kg','XoÃ i keo:kg','Cá»§ cáº£i tráº¯ng:kg','TiÃªu xanh:kg','Cá»§ sáº¥n:kg','Rau rÄƒm:kg','Äáº­u Ä‘Å©a:kg','LÃ¡ tÃ­a tÃ´:kg','HÃ nh lÃ¡:kg','Rau muá»‘ng:kg','SÃºp lÆ¡ xanh:kg','á»št chuÃ´ng:kg'
+          'Tá»i cá»§:kg','Hành tây:kg','Cà r�t:kg','Thơm l�:n:kg','Tắc:kg','�at sừng:kg','Sả cây:kg','Tá»i xay:kg','Chanh:kg','Bắp Mỹ:kg','�at xiêm xanh:kg','Äáº­u rá»“ng:kg','Hành tím:kg','Xoài keo:kg','Củ cải trắng:kg','Tiêu xanh:kg','Củ sấn:kg','Rau rĒm:kg','Äáº­u Ä‘Å©a:kg','Lá tía tô:kg','Hành lá:kg','Rau muá»‘ng:kg','Súp lơ xanh:kg','�at chuông:kg'
         ]
       }
     }
@@ -122,12 +122,12 @@ function defaults() {
     currentShift: null,
     shifts: [],
     categories: JSON.parse(JSON.stringify(defaultCategories)),
-    cashiers: ['Thu ngÃ¢n 1', 'Thu ngÃ¢n 2', 'Thu ngÃ¢n 3'],
+    cashiers: ['Thu ngân 1', 'Thu ngân 2', 'Thu ngân 3'],
     auditLog: [],
     notifications: [],
     settings: {
       storeName: "KING's GRILL",
-      storeAddress: '34, HoÃ ng VÄƒn Thá»¥, ChÃ¡nh NghÄ©a, TDM, BÃ¬nh DÆ°Æ¡ng',
+      storeAddress: '34, Hoàng VĒn Thụ, Chánh Nghĩa, TDM, Bình Dương',
       autoSync: true,
       discrepancyThreshold: 50000,
       shiftWarningHours: 10,
@@ -160,7 +160,7 @@ export function getState() {
       var saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         var parsed = JSON.parse(saved);
-        var def = defaults();
+        var def = defaults();
         // Merge manually for compatibility
         for (var key in def) {
           if (parsed[key] === undefined) parsed[key] = def[key];
@@ -168,6 +168,26 @@ export function getState() {
         state = parsed;
       } else {
         state = defaults();
+      }
+
+      // MIGRATION: Fix mojibake categories in memory
+      if (state && state.categories) {
+        const fixStr = (str) => {
+          if (!str) return str;
+          if (str.includes('Doanh thu b') && str.includes('n h')) return 'Doanh thu bán hàng';
+          if (str.includes('Doanh thu d') && str.includes('ch v')) return 'Doanh thu dịch vụ';
+          if (str.includes('Thu h') && str.includes('i n')) return 'Thu hồi nợ';
+          if (str.includes('Mua nguy') && str.includes('n li')) return 'Mua nguyên liệu';
+          if (str.includes('V') && str.includes('n chuy')) return 'Vận chuyển';
+          if (str.startsWith('S') && str.includes('a ch')) return 'Sửa chữa';
+          if (str.startsWith('Ti') && str.includes('n tip')) return 'Tiền tip/bo';
+          if (str.startsWith('Tr') && str.includes('n')) return 'Trả nợ';
+          if (str.startsWith('Thu kh')) return 'Thu khác';
+          if (str.startsWith('Chi kh')) return 'Chi khác';
+          return str;
+        };
+        if (state.categories.income) state.categories.income = state.categories.income.map(fixStr);
+        if (state.categories.expense) state.categories.expense = state.categories.expense.map(fixStr);
       }
     } catch (e) {
       console.error('[Store] Load error:', e);
@@ -490,7 +510,7 @@ export async function closeShift(opts) {
   if (s._recentlyClosedIds.length > 20) s._recentlyClosedIds.shift();
   s.currentShift = null;
   save();
-  addAudit('CLOSE_SHIFT', 'Ca ' + closedShift.shiftNumber + ' - Doanh thu: ' + summary.totalIncome.toLocaleString('vi-VN') + 'Ä‘');
+  addAudit('CLOSE_SHIFT', 'Ca ' + closedShift.shiftNumber + ' - Doanh thu: ' + summary.totalIncome.toLocaleString('vi-VN') + 'đ');
   addNotification('Ca ' + closedShift.shiftNumber + ' Ä‘Ã£ Ä‘Ã³ng - DT: ' + summary.totalIncome.toLocaleString('vi-VN') + 'Ä‘', 'info');
 
   // Fix 4: Retry cloud close up to 3 times
@@ -545,7 +565,7 @@ export function removeTransaction(id) {
   }
   s.currentShift.transactions = s.currentShift.transactions.filter(function(t) { return t.id !== id; });
   save();
-  if (tx) addAudit('REMOVE_TX', tx.category + ' - ' + tx.amount.toLocaleString('vi-VN') + 'Ä‘');
+  if (tx) addAudit('REMOVE_TX', tx.category + ' - ' + tx.amount.toLocaleString('vi-VN') + 'đ');
   _syncCurrentShift();
 }
 
@@ -562,7 +582,7 @@ export function editTransaction(id, updates) {
       if (updates.note !== undefined) tx.note = updates.note;
       if (updates.type !== undefined) tx.type = updates.type;
       save();
-      addAudit('EDIT_TX', tx.category + ': ' + oldAmt.toLocaleString('vi-VN') + ' â†’ ' + tx.amount.toLocaleString('vi-VN') + 'Ä‘');
+      addAudit('EDIT_TX', tx.category + ': ' + oldAmt.toLocaleString('vi-VN') + ' â†’ ' + tx.amount.toLocaleString('vi-VN') + 'đ');
       _syncCurrentShift();
       return tx;
     }
@@ -583,7 +603,7 @@ export function addOtherTransaction(opts) {
   };
   s.currentShift.otherTransactions.push(tx);
   save();
-  addAudit('ADD_OTHER_TX', opts.type + ': ' + opts.category + ' - ' + Number(opts.amount).toLocaleString('vi-VN') + 'Ä‘');
+  addAudit('ADD_OTHER_TX', opts.type + ': ' + opts.category + ' - ' + Number(opts.amount).toLocaleString('vi-VN') + 'đ');
   _syncCurrentShift();
   return tx;
 }
@@ -635,7 +655,7 @@ export function updateCashCount(counts, pinnedCash, keepCash, handoverCash) {
 
   save();
   var total = totalKet + totalGiao;
-  addAudit('UPDATE_CASH_COUNT', 'KÃ©t: ' + totalKet.toLocaleString('vi-VN') + ' | Giao: ' + totalGiao.toLocaleString('vi-VN') + ' | Tá»•ng: ' + total.toLocaleString('vi-VN') + 'Ä‘');
+  addAudit('UPDATE_CASH_COUNT', 'KÃ©t: ' + totalKet.toLocaleString('vi-VN') + ' | Giao: ' + totalGiao.toLocaleString('vi-VN') + ' | Tá»•ng: ' + total.toLocaleString('vi-VN') + 'đ');
   _syncCurrentShift();
 }
 
@@ -1200,6 +1220,16 @@ export function updateHistoryShiftField(shiftId, field, value) {
   addAudit('EDIT_HISTORY_FIELD', 'Ca ' + shift.date + ': ' + field + ' thay đổi');
 }
 
+export function updateHistoryDrinkInventory(shiftId, items) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  if (!shift.drinkInventorySnapshot) shift.drinkInventorySnapshot = { items: {} };
+  shift.drinkInventorySnapshot.items = items;
+  save();
+  addAudit('EDIT_HISTORY_DRINK_INV', 'Ca ' + shift.date + ': sửa kiểm kho');
+}
+
 export function editHistoryInvoicePayment(shiftId, refId, newPayments) {
   var found = _findHistoryShift(shiftId);
   if (!found) throw new Error('Không tìm thấy ca');
@@ -1438,9 +1468,36 @@ export async function pullCategoriesFromCloud() {
         var s = getState();
         // Cloud-wins: cloud is pushed on every add/remove, so it is always the latest
         // This ensures deletions propagate across devices
+        
+        // MIGRATION: Fix mojibake in cloud categories
+        const fixStr = (str) => {
+          if (!str) return str;
+          if (str.includes('Doanh thu b') && str.includes('n h')) return 'Doanh thu bán hàng';
+          if (str.includes('Doanh thu d') && str.includes('ch v')) return 'Doanh thu dịch vụ';
+          if (str.includes('Thu h') && str.includes('i n')) return 'Thu hồi nợ';
+          if (str.includes('Mua nguy') && str.includes('n li')) return 'Mua nguyên liệu';
+          if (str.includes('V') && str.includes('n chuy')) return 'Vận chuyển';
+          if (str.startsWith('S') && str.includes('a ch')) return 'Sửa chữa';
+          if (str.startsWith('Ti') && str.includes('n tip')) return 'Tiền tip/bo';
+          if (str.startsWith('Tr') && str.includes('n')) return 'Trả nợ';
+          if (str.startsWith('Thu kh')) return 'Thu khác';
+          if (str.startsWith('Chi kh')) return 'Chi khác';
+          return str;
+        };
+        
+        let oldStr = JSON.stringify(cloudCats);
+        if (cloudCats.income) cloudCats.income = cloudCats.income.map(fixStr);
+        if (cloudCats.expense) cloudCats.expense = cloudCats.expense.map(fixStr);
+        
+        let hasMojibake = oldStr !== JSON.stringify(cloudCats);
+
         s.categories = cloudCats;
         save();
-        console.log('[Store] â˜ï¸ Categories synced from cloud');
+        console.log('[Store] Cloud categories synced');
+        
+        if (hasMojibake) {
+           _syncCategoriesToCloud();
+        }
       }
     }
   } catch(e) {
