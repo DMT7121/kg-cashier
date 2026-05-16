@@ -1,7 +1,8 @@
 /* ── History View — Tabbed shift detail w/ snapshot data ── */
-import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots } from '../store.js';
+import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
 import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
+import * as histEdit from './historyEdit.js';
 
 let allHistory = [];
 let cloudHistory = [];
@@ -108,7 +109,7 @@ function _renderShiftDetailModal(sh, sm) {
   var invoices = sh.cukcukInvoicesSnapshot||[];
 
   function tabSummary() {
-    return '<table class="report-table" style="margin-bottom:12px;"><tr><td>Thời gian</td><td>'+formatTime(sh.startTime)+' → '+(sh.endTime?formatTime(sh.endTime):'(đang mở)')+'</td></tr><tr><td>Tiền đầu ca</td><td>'+fc(sh.startingCash)+'</td></tr></table>'+
+    return '<table class="report-table" style="margin-bottom:12px;"><tr><td>Thời gian</td><td>'+formatTime(sh.startTime)+' → '+(sh.endTime?formatTime(sh.endTime):'(đang mở)')+'</td></tr><tr><td>Tiền đầu ca <button class="btn-icon" id="btnHTabEditStartCash" title="Sửa"><span class="material-symbols-rounded" style="font-size:14px;color:var(--primary);">edit</span></button></td><td>'+fc(sh.startingCash)+'</td></tr></table>'+
     (sm.cukcukBills>0?'<h4 style="margin:12px 0 4px;color:#10b981;">🏪 CUKCUK ('+sm.cukcukBills+' bill) — '+fc(sm.cukcukRevenue)+'</h4><table class="report-table"><tr><td>💵 TM</td><td class="text-right">'+fc(sm.cashIncome)+'</td></tr><tr><td>💳 Thẻ</td><td class="text-right">'+fc(sm.cardIncome)+'</td></tr><tr><td>🏦 CK</td><td class="text-right">'+fc(sm.transferIncome)+'</td></tr></table>':'')+
     '<h4 style="margin:16px 0 4px;color:var(--primary);">📊 Tổng kết</h4><table class="report-table" style="background:rgba(99,102,241,.04);border-radius:8px;">'+
     '<tr><td><strong>TỔNG DOANH THU ('+sm.billCount+' bill)</strong></td><td class="text-right"><strong style="color:var(--success);font-size:15px;">'+fc(sm.totalIncome)+'</strong></td></tr>'+
@@ -119,25 +120,27 @@ function _renderShiftDetailModal(sh, sm) {
     (sh.notes?'<p style="margin-top:12px;padding:10px;background:var(--bg-secondary);border-radius:8px;font-size:13px;"><strong>📝</strong> '+sh.notes+'</p>':'');
   }
   function tabTransactions() {
-    var html='';
-    if(manualTxs.length>0) html+='<h4 style="color:#16a34a;margin-bottom:6px;">✍️ Thu ('+manualTxs.length+')</h4><table class="report-table">'+manualTxs.map(function(t){return '<tr><td>'+t.category+(t.note?' — '+t.note:'')+'</td><td class="text-right" style="color:#16a34a;">+'+fc(t.amount)+'</td></tr>';}).join('')+'</table>';
-    if(expTxs.length>0) html+='<h4 style="color:#dc2626;margin:12px 0 6px;">💸 Chi ('+expTxs.length+')</h4><table class="report-table">'+expTxs.map(function(t){return '<tr><td>'+t.category+(t.note?' — '+t.note:'')+'</td><td class="text-right" style="color:#dc2626;">−'+fc(t.amount)+'</td></tr>';}).join('')+'</table>';
-    if(otherTxs.length>0) html+='<h4 style="color:var(--warning);margin:12px 0 6px;">📝 Khác ('+otherTxs.length+')</h4><table class="report-table">'+otherTxs.map(function(t){return '<tr><td>'+t.category+'</td><td class="text-right" style="color:'+(t.type==='income'?'#16a34a':'#dc2626')+';">'+(t.type==='income'?'+':'−')+fc(t.amount)+'</td></tr>';}).join('')+'</table>';
-    return html||'<div class="empty-state" style="padding:20px;"><p>Không có giao dịch thu/chi</p></div>';
+    var html='<div style="display:flex;gap:6px;margin-bottom:10px;"><button class="btn btn-success btn-sm" id="btnHTabAddIncome"><span class="material-symbols-rounded">add</span> Thu</button><button class="btn btn-danger btn-sm" id="btnHTabAddExpense"><span class="material-symbols-rounded">remove</span> Chi</button><button class="btn btn-outline btn-sm" id="btnHTabAddOther"><span class="material-symbols-rounded">add</span> Khác</button></div>';
+    if(manualTxs.length>0) html+='<h4 style="color:#16a34a;margin-bottom:6px;">✍️ Thu ('+manualTxs.length+')</h4><table class="report-table">'+manualTxs.map(function(t){return '<tr><td>'+t.category+(t.note?' — '+t.note:'')+'</td><td class="text-right" style="color:#16a34a;">+'+fc(t.amount)+'</td><td style="width:50px;text-align:right;"><button class="btn-icon" data-he-edit-tx="'+t.id+'"><span class="material-symbols-rounded" style="font-size:15px;color:var(--primary);">edit</span></button><button class="btn-icon" data-he-del-tx="'+t.id+'"><span class="material-symbols-rounded" style="font-size:15px;color:var(--danger);">delete</span></button></td></tr>';}).join('')+'</table>';
+    if(expTxs.length>0) html+='<h4 style="color:#dc2626;margin:12px 0 6px;">💸 Chi ('+expTxs.length+')</h4><table class="report-table">'+expTxs.map(function(t){return '<tr><td>'+t.category+(t.note?' — '+t.note:'')+'</td><td class="text-right" style="color:#dc2626;">−'+fc(t.amount)+'</td><td style="width:50px;text-align:right;"><button class="btn-icon" data-he-edit-tx="'+t.id+'"><span class="material-symbols-rounded" style="font-size:15px;color:var(--primary);">edit</span></button><button class="btn-icon" data-he-del-tx="'+t.id+'"><span class="material-symbols-rounded" style="font-size:15px;color:var(--danger);">delete</span></button></td></tr>';}).join('')+'</table>';
+    if(otherTxs.length>0) html+='<h4 style="color:var(--warning);margin:12px 0 6px;">📝 Khác ('+otherTxs.length+')</h4><table class="report-table">'+otherTxs.map(function(t){return '<tr><td>'+t.category+'</td><td class="text-right" style="color:'+(t.type==='income'?'#16a34a':'#dc2626')+';">'+( t.type==='income'?'+':'−')+fc(t.amount)+'</td><td style="width:30px;text-align:right;"><button class="btn-icon" data-he-del-other="'+t.id+'"><span class="material-symbols-rounded" style="font-size:15px;color:var(--danger);">delete</span></button></td></tr>';}).join('')+'</table>';
+    if(manualTxs.length===0&&expTxs.length===0&&otherTxs.length===0) html+='<p class="text-muted" style="padding:16px;text-align:center;">Chưa có giao dịch thu/chi</p>';
+    return html;
   }
   function tabInvoices() {
     if(invoices.length===0) return '<div class="empty-state" style="padding:20px;"><p>Không có hóa đơn POS</p><small class="text-muted">Dữ liệu POS được snapshot từ các ca đóng sau bản cập nhật này</small></div>';
-    var total=0;var rows=invoices.map(function(inv){var amt=0;(inv.payments||[]).forEach(function(p){amt+=p.amount||0;});if(!amt)amt=inv.amount||0;total+=amt;var m=(inv.payments||[]).map(function(p){return p.method==='cash'?'💵':p.method==='card'?'💳':'🏦';}).join('');return '<tr><td>'+(inv.refNo||'—')+'</td><td>'+(inv.tableName||'—')+'</td><td>'+m+'</td><td class="text-right">'+fc(amt)+'</td></tr>';}).join('');
-    return '<p style="margin-bottom:8px;"><strong>'+invoices.length+'</strong> hóa đơn — Tổng: <strong style="color:var(--success);">'+fc(total)+'</strong></p><table class="report-table"><tr style="background:var(--bg-secondary);"><th>Bill</th><th>Bàn</th><th>PTTT</th><th class="text-right">Số tiền</th></tr>'+rows+'</table>';
+    var total=0;var rows=invoices.map(function(inv){var amt=0;(inv.payments||[]).forEach(function(p){amt+=p.amount||0;});if(!amt)amt=inv.amount||0;total+=amt;var m=(inv.payments||[]).map(function(p){return p.method==='cash'?'💵':p.method==='card'?'💳':'🏦';}).join('');return '<tr><td>'+(inv.refNo||'—')+'</td><td>'+(inv.tableName||'—')+'</td><td>'+m+'</td><td class="text-right">'+fc(amt)+'</td><td style="width:30px;"><button class="btn-icon" data-he-edit-inv="'+(inv.refId||'')+'" title="Sửa PTTT"><span class="material-symbols-rounded" style="font-size:15px;color:var(--primary);">edit</span></button></td></tr>';}).join('');
+    return '<p style="margin-bottom:8px;"><strong>'+invoices.length+'</strong> hóa đơn — Tổng: <strong style="color:var(--success);">'+fc(total)+'</strong></p><table class="report-table"><tr style="background:var(--bg-secondary);"><th>Bill</th><th>Bàn</th><th>PTTT</th><th class="text-right">Số tiền</th><th></th></tr>'+rows+'</table>';
   }
   function tabCashCount() {
     var cc=sh.cashCount||{};var keys=Object.keys(cc).filter(function(k){return cc[k]>0;});
-    if(keys.length===0) return '<div class="empty-state" style="padding:20px;"><p>Chưa kiểm kê tiền</p></div>';
+    var editBtn='<div style="margin-bottom:8px;"><button class="btn btn-outline btn-sm" id="btnHTabEditCash"><span class="material-symbols-rounded">edit</span> Chỉnh sửa kiểm kê</button></div>';
+    if(keys.length===0) return editBtn+'<div class="empty-state" style="padding:20px;"><p>Chưa kiểm kê tiền</p></div>';
     keys.sort(function(a,b){return Number(b)-Number(a);});var total=0;
     var rows=keys.map(function(k){var v=Number(k)*cc[k];total+=v;return '<tr><td>'+cc[k]+' x '+fc(Number(k))+'</td><td class="text-right">'+fc(v)+'</td></tr>';}).join('');
     var bk='';var pc=sh.pinnedCash||{},kc=sh.keepCash||{},hc=sh.handoverCash||{};
     if(Object.keys(pc).length||Object.keys(kc).length||Object.keys(hc).length){var ketT=0,handT=0;denominations.forEach(function(d){ketT+=d.value*((pc[d.value]||0)+(kc[d.value]||0));handT+=d.value*(hc[d.value]||0);});bk='<h4 style="margin:12px 0 4px;color:var(--primary);">📌 Két: '+fc(ketT)+' — 🤝 Giao: '+fc(handT)+'</h4>';}
-    return '<table class="report-table"><tr style="background:var(--bg-secondary);"><th>Mệnh giá</th><th class="text-right">Thành tiền</th></tr>'+rows+'<tr style="border-top:2px solid var(--border);"><td><strong>Tổng</strong></td><td class="text-right"><strong>'+fc(total)+'</strong></td></tr></table>'+bk;
+    return editBtn+'<table class="report-table"><tr style="background:var(--bg-secondary);"><th>Mệnh giá</th><th class="text-right">Thành tiền</th></tr>'+rows+'<tr style="border-top:2px solid var(--border);"><td><strong>Tổng</strong></td><td class="text-right"><strong>'+fc(total)+'</strong></td></tr></table>'+bk;
   }
   function tabDrinkInv() {
     var snap=sh.drinkInventorySnapshot;
@@ -152,13 +155,26 @@ function _renderShiftDetailModal(sh, sm) {
   showModal('<div class="modal-title" style="font-size:16px;"><span class="material-symbols-rounded" style="color:var(--primary);">summarize</span> Ca '+sh.shiftNumber+' — '+sh.cashierName+' — '+formatDate(sh.date)+'</div>'+
     '<div style="border-bottom:1px solid var(--border);margin:0 -20px;padding:0 20px;overflow-x:auto;white-space:nowrap;" id="histTabBar">'+tabBar+'</div>'+
     '<div style="max-height:55vh;overflow:auto;padding:8px 0;" id="histTabContent">'+tabSummary()+'</div>'+
-    '<div class="modal-footer" style="margin-top:12px;"><button class="btn btn-outline" onclick="window.hideModal()">Đóng</button><button class="btn btn-primary btn-sm" id="btnOpenHandoverReport" data-shift-date="'+sh.date+'"><span class="material-symbols-rounded">print</span> Phiếu bàn giao</button></div>');
+    '<div class="modal-footer" style="margin-top:12px;flex-wrap:wrap;gap:6px;"><button class="btn btn-outline" onclick="window.hideModal()">Đóng</button><button class="btn btn-primary btn-sm" id="btnOpenHandoverReport" data-shift-date="'+sh.date+'"><span class="material-symbols-rounded">print</span> Phiếu bàn giao</button></div>');
 
+  var _reopen = function(){ allHistory=getShiftHistory(); sh=allHistory.find(function(s){return s.id===sh.id;})||sh; sm=getHistorySummary(sh); manualTxs=(sh.transactions||[]).filter(function(t){return t.type==='income'&&(!t.note||t.note.indexOf('[CUKCUK]')===-1);}); expTxs=(sh.transactions||[]).filter(function(t){return t.type==='expense';}); otherTxs=sh.otherTransactions||[]; hideModal(); setTimeout(function(){_renderShiftDetailModal(sh,sm);_filterHistory();},200); };
+  function _bindInlineEdits(){
+    document.querySelectorAll('[data-he-edit-tx]').forEach(function(b){b.addEventListener('click',function(){var txId=b.dataset.heEditTx;var tx=null;(sh.transactions||[]).forEach(function(t){if(t.id===txId)tx=t;});if(tx){hideModal();histEdit.showEditTxModal(sh.id,tx.type,tx,_reopen);}});});
+    document.querySelectorAll('[data-he-del-tx]').forEach(function(b){b.addEventListener('click',async function(){var ok=await showConfirm('Xóa giao dịch?',{title:'Xóa',confirmText:'Xóa',type:'danger'});if(ok){removeHistoryTransaction(sh.id,b.dataset.heDelTx);_reopen();}});});
+    document.querySelectorAll('[data-he-del-other]').forEach(function(b){b.addEventListener('click',async function(){var ok=await showConfirm('Xóa?',{title:'Xóa',confirmText:'Xóa',type:'danger'});if(ok){removeHistoryOtherTransaction(sh.id,b.dataset.heDelOther);_reopen();}});});
+    document.getElementById('btnHTabAddIncome')?.addEventListener('click',function(){hideModal();histEdit.showEditTxModal(sh.id,'income',null,_reopen);});
+    document.getElementById('btnHTabAddExpense')?.addEventListener('click',function(){hideModal();histEdit.showEditTxModal(sh.id,'expense',null,_reopen);});
+    document.getElementById('btnHTabAddOther')?.addEventListener('click',function(){hideModal();histEdit.showEditOtherTxModal(sh.id,_reopen);});
+    document.getElementById('btnHTabEditStartCash')?.addEventListener('click',function(){hideModal();histEdit.showEditStartingCashModal(sh,_reopen);});
+    document.getElementById('btnHTabEditCash')?.addEventListener('click',function(){hideModal();histEdit.showEditCashCountModal(sh,_reopen);});
+    document.querySelectorAll('[data-he-edit-inv]').forEach(function(b){b.addEventListener('click',function(){var refId=b.dataset.heEditInv;var inv=null;(sh.cukcukInvoicesSnapshot||[]).forEach(function(i){if(i.refId===refId)inv=i;});if(inv){hideModal();histEdit.showEditInvoicePaymentModal(sh.id,inv,_reopen);}});});
+  }
   setTimeout(function() {
     var bar=document.getElementById('histTabBar');var content=document.getElementById('histTabContent');
-    if(bar) bar.addEventListener('click',function(e){var btn=e.target.closest('[data-htab]');if(!btn)return;bar.querySelectorAll('.hist-tab').forEach(function(b){b.classList.remove('active');b.style.borderBottomColor='transparent';b.style.color='var(--text-muted)';});btn.classList.add('active');btn.style.borderBottomColor='var(--primary)';btn.style.color='var(--text)';var tab=tabDefs.find(function(t){return t.id===btn.dataset.htab;});if(tab&&content)content.innerHTML=tab.fn();});
+    if(bar) bar.addEventListener('click',function(e){var btn=e.target.closest('[data-htab]');if(!btn)return;bar.querySelectorAll('.hist-tab').forEach(function(b){b.classList.remove('active');b.style.borderBottomColor='transparent';b.style.color='var(--text-muted)';});btn.classList.add('active');btn.style.borderBottomColor='var(--primary)';btn.style.color='var(--text)';var tab=tabDefs.find(function(t){return t.id===btn.dataset.htab;});if(tab&&content){content.innerHTML=tab.fn();_bindInlineEdits();}});
     var rbtn=document.getElementById('btnOpenHandoverReport');
     if(rbtn) rbtn.addEventListener('click',function(){hideModal();if(window._setReportDate)window._setReportDate(rbtn.dataset.shiftDate);window.navigateTo('report');});
+    _bindInlineEdits();
   },100);
 }
 

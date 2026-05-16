@@ -997,6 +997,230 @@ export function deleteShiftFromHistory(id) {
   }).catch(function() {});
 }
 
+// ── History Shift Editing (edit-in-place, no restore to currentShift) ──
+
+/** Find a shift in history by ID — returns { shift, index } or null */
+function _findHistoryShift(shiftId) {
+  var s = getState();
+  var shifts = s.shifts || [];
+  for (var i = 0; i < shifts.length; i++) {
+    if (shifts[i].id === shiftId) return { shift: shifts[i], index: i };
+  }
+  return null;
+}
+
+/** Rebuild summarySnapshot from shift data (preserves cashCountTotal from physical counting) */
+function _rebuildShiftSnapshot(shift) {
+  // Temporarily remove snapshot so getShiftSummary recalculates from raw data
+  var oldSnap = shift.summarySnapshot || {};
+  var savedCashCountTotal = oldSnap.cashCountTotal;
+
+  var copy = Object.assign({}, shift);
+  delete copy.summarySnapshot;
+  // Force open status so getShiftSummary reads live invoiceStore/transactions
+  copy.status = '_rebuilding';
+
+  var fresh = getShiftSummary(copy);
+
+  // cashCountTotal comes from the physical cash count data on the shift
+  var cc = shift.cashCount || {};
+  var actualCashCount = 0;
+  for (var d in cc) {
+    if (cc.hasOwnProperty(d)) actualCashCount += Number(d) * Number(cc[d]);
+  }
+  // Use actual count from shift.cashCount if available, else preserve old snapshot
+  var cashCountTotal = actualCashCount > 0 ? actualCashCount : (savedCashCountTotal || 0);
+
+  shift.summarySnapshot = {
+    totalIncome: fresh.totalIncome,
+    totalExpense: fresh.totalExpense,
+    cashIncome: fresh.cashIncome,
+    cardIncome: fresh.cardIncome,
+    transferIncome: fresh.transferIncome,
+    cukcukRevenue: fresh.cukcukRevenue,
+    cukcukBills: fresh.cukcukBills,
+    billCount: fresh.billCount,
+    expectedCash: fresh.expectedCash,
+    cashCountTotal: cashCountTotal,
+    cashExpense: fresh.cashExpense,
+    discrepancy: cashCountTotal - fresh.expectedCash,
+    manualIncome: fresh.manualIncome,
+    manualBills: fresh.manualBills,
+    otherIncome: fresh.otherIncome,
+    otherExpense: fresh.otherExpense,
+    revenue: fresh.revenue,
+    netTotal: fresh.netTotal
+  };
+}
+
+export function addHistoryTransaction(shiftId, txData) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  var tx = {
+    id: uid(),
+    type: txData.type,
+    category: txData.category,
+    amount: Number(txData.amount),
+    paymentMethod: txData.paymentMethod || 'cash',
+    note: txData.note || '',
+    timestamp: new Date().toISOString()
+  };
+  if (!shift.transactions) shift.transactions = [];
+  shift.transactions.push(tx);
+  _rebuildShiftSnapshot(shift);
+  save();
+  addAudit('EDIT_HISTORY_ADD_TX', 'Ca ' + shift.date + ' #' + shift.shiftNumber + ': ' + (txData.type === 'income' ? '+' : '-') + Number(txData.amount).toLocaleString('vi-VN') + 'đ');
+  return tx;
+}
+
+export function editHistoryTransaction(shiftId, txId, updates) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  var txs = shift.transactions || [];
+  for (var i = 0; i < txs.length; i++) {
+    if (txs[i].id === txId) {
+      var tx = txs[i];
+      var oldAmt = tx.amount;
+      if (updates.category !== undefined) tx.category = updates.category;
+      if (updates.amount !== undefined) tx.amount = Number(updates.amount);
+      if (updates.paymentMethod !== undefined) tx.paymentMethod = updates.paymentMethod;
+      if (updates.note !== undefined) tx.note = updates.note;
+      if (updates.type !== undefined) tx.type = updates.type;
+      _rebuildShiftSnapshot(shift);
+      save();
+      addAudit('EDIT_HISTORY_TX', 'Ca ' + shift.date + ': ' + tx.category + ' ' + oldAmt.toLocaleString('vi-VN') + ' → ' + tx.amount.toLocaleString('vi-VN') + 'đ');
+      return tx;
+    }
+  }
+  throw new Error('Không tìm thấy giao dịch');
+}
+
+export function removeHistoryTransaction(shiftId, txId) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  var tx = null;
+  for (var i = 0; i < (shift.transactions || []).length; i++) {
+    if (shift.transactions[i].id === txId) { tx = shift.transactions[i]; break; }
+  }
+  shift.transactions = (shift.transactions || []).filter(function(t) { return t.id !== txId; });
+  _rebuildShiftSnapshot(shift);
+  save();
+  if (tx) addAudit('EDIT_HISTORY_DEL_TX', 'Ca ' + shift.date + ': xóa ' + tx.category + ' ' + tx.amount.toLocaleString('vi-VN') + 'đ');
+}
+
+export function addHistoryOtherTransaction(shiftId, txData) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  var tx = {
+    id: uid(),
+    type: txData.type,
+    category: txData.category,
+    amount: Number(txData.amount),
+    note: txData.note || '',
+    timestamp: new Date().toISOString()
+  };
+  if (!shift.otherTransactions) shift.otherTransactions = [];
+  shift.otherTransactions.push(tx);
+  _rebuildShiftSnapshot(shift);
+  save();
+  addAudit('EDIT_HISTORY_ADD_OTHER', 'Ca ' + shift.date + ': ' + txData.type + ' ' + txData.category + ' ' + Number(txData.amount).toLocaleString('vi-VN') + 'đ');
+  return tx;
+}
+
+export function removeHistoryOtherTransaction(shiftId, txId) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  shift.otherTransactions = (shift.otherTransactions || []).filter(function(t) { return t.id !== txId; });
+  _rebuildShiftSnapshot(shift);
+  save();
+  addAudit('EDIT_HISTORY_DEL_OTHER', 'Ca ' + shift.date + ': xóa giao dịch khác');
+}
+
+export function updateHistoryCashCount(shiftId, counts, pinnedCash, keepCash, handoverCash) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+
+  var newCounts = {};
+  for (var key in counts) { newCounts[key] = counts[key]; }
+  shift.cashCount = newCounts;
+
+  if (pinnedCash) {
+    var newPins = {};
+    for (var pk in pinnedCash) { if (pinnedCash[pk] > 0) newPins[pk] = pinnedCash[pk]; }
+    shift.pinnedCash = newPins;
+  }
+  if (keepCash) {
+    var newKeep = {};
+    for (var kk in keepCash) { if (keepCash[kk] > 0) newKeep[kk] = keepCash[kk]; }
+    shift.keepCash = newKeep;
+  }
+  if (handoverCash) {
+    var newHand = {};
+    for (var hk in handoverCash) { if (handoverCash[hk] > 0) newHand[hk] = handoverCash[hk]; }
+    shift.handoverCash = newHand;
+  }
+
+  // Auto-calculate cashToKeep and cashToDeposit
+  var totalKet = 0, totalGiao = 0;
+  var pc = shift.pinnedCash || {};
+  var kc = shift.keepCash || {};
+  var hc = shift.handoverCash || {};
+  for (var d in newCounts) {
+    totalKet += Number(d) * ((pc[d] || 0) + (kc[d] || 0));
+    totalGiao += Number(d) * (hc[d] || 0);
+  }
+  shift.cashToKeep = totalKet;
+  shift.cashToDeposit = totalGiao;
+
+  _rebuildShiftSnapshot(shift);
+  save();
+  var total = totalKet + totalGiao;
+  addAudit('EDIT_HISTORY_CASH', 'Ca ' + shift.date + ': Két ' + totalKet.toLocaleString('vi-VN') + ' | Giao ' + totalGiao.toLocaleString('vi-VN') + ' | Tổng ' + total.toLocaleString('vi-VN') + 'đ');
+}
+
+export function updateHistoryShiftField(shiftId, field, value) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  var allowed = ['notes', 'startingCash', 'cashierName'];
+  if (allowed.indexOf(field) === -1) throw new Error('Trường không hợp lệ: ' + field);
+  var old = shift[field];
+  shift[field] = value;
+  if (field === 'startingCash') {
+    shift[field] = Number(value) || 0;
+    _rebuildShiftSnapshot(shift);
+  }
+  save();
+  addAudit('EDIT_HISTORY_FIELD', 'Ca ' + shift.date + ': ' + field + ' thay đổi');
+}
+
+export function editHistoryInvoicePayment(shiftId, refId, newPayments) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  var invoices = shift.cukcukInvoicesSnapshot || [];
+  for (var i = 0; i < invoices.length; i++) {
+    if (invoices[i].refId === refId) {
+      invoices[i].payments = newPayments;
+      // Recalc amount from payments
+      var total = 0;
+      for (var p = 0; p < newPayments.length; p++) total += newPayments[p].amount || 0;
+      if (total > 0) invoices[i].amount = total;
+      _rebuildShiftSnapshot(shift);
+      save();
+      addAudit('EDIT_HISTORY_INV_PAY', 'Ca ' + shift.date + ': sửa PTTT bill ' + (invoices[i].refNo || refId));
+      return invoices[i];
+    }
+  }
+  throw new Error('Không tìm thấy hóa đơn');
+}
+
 /**
  * Sync shift history with cloud â€” merge cloud shifts into local history.
  * Uses union merge: local shifts + cloud shifts not already in local.
