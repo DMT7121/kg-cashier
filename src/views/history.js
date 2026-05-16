@@ -1,8 +1,9 @@
 /* ── History View — Tabbed shift detail w/ snapshot data ── */
-import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction } from '../store.js';
+import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction, backfillHistoryInvoiceSnapshot } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
 import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
 import * as histEdit from './historyEdit.js';
+import { getInvoicesByDate } from '../integration/invoiceStore.js';
 
 let allHistory = [];
 let cloudHistory = [];
@@ -106,7 +107,18 @@ function _renderShiftDetailModal(sh, sm) {
   var manualTxs = (sh.transactions||[]).filter(function(t){return t.type==='income'&&(!t.note||t.note.indexOf('[CUKCUK]')===-1);});
   var expTxs = (sh.transactions||[]).filter(function(t){return t.type==='expense';});
   var otherTxs = sh.otherTransactions||[];
-  var invoices = sh.cukcukInvoicesSnapshot||[];
+  // Fallback: if snapshot is empty, query live invoiceStore by shift date
+  var invoices = sh.cukcukInvoicesSnapshot || [];
+  var invoicesFromLive = false;
+  if (invoices.length === 0 && sh.date) {
+    try {
+      var liveInvs = getInvoicesByDate(sh.date);
+      if (liveInvs.length > 0) {
+        invoices = liveInvs;
+        invoicesFromLive = true;
+      }
+    } catch(e) { /* ignore */ }
+  }
 
   function tabSummary() {
     return '<table class="report-table" style="margin-bottom:12px;"><tr><td>Thời gian</td><td>'+formatTime(sh.startTime)+' → '+(sh.endTime?formatTime(sh.endTime):'(đang mở)')+'</td></tr><tr><td>Tiền đầu ca <button class="btn-icon" id="btnHTabEditStartCash" title="Sửa"><span class="material-symbols-rounded" style="font-size:14px;color:var(--primary);">edit</span></button></td><td>'+fc(sh.startingCash)+'</td></tr></table>'+
@@ -128,9 +140,10 @@ function _renderShiftDetailModal(sh, sm) {
     return html;
   }
   function tabInvoices() {
-    if(invoices.length===0) return '<div class="empty-state" style="padding:20px;"><p>Không có hóa đơn POS</p><small class="text-muted">Dữ liệu POS được snapshot từ các ca đóng sau bản cập nhật này</small></div>';
+    if(invoices.length===0) return '<div class="empty-state" style="padding:20px;"><p>Không có hóa đơn POS</p><p class="text-muted" style="font-size:12px;">Dữ liệu POS chưa được lưu snapshot cho ca này</p><button class="btn btn-primary btn-sm" id="btnHSyncInvoices" style="margin-top:8px;"><span class="material-symbols-rounded">sync</span> Tải lại từ CUKCUK</button></div>';
+    var srcTag = invoicesFromLive ? '<span class="tag" style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;margin-left:6px;">⚡ Live data</span>' : '';
     var total=0;var rows=invoices.map(function(inv){var amt=0;(inv.payments||[]).forEach(function(p){amt+=p.amount||0;});if(!amt)amt=inv.amount||0;total+=amt;var m=(inv.payments||[]).map(function(p){return p.method==='cash'?'💵':p.method==='card'?'💳':'🏦';}).join('');return '<tr><td>'+(inv.refNo||'—')+'</td><td>'+(inv.tableName||'—')+'</td><td>'+m+'</td><td class="text-right">'+fc(amt)+'</td><td style="width:30px;"><button class="btn-icon" data-he-edit-inv="'+(inv.refId||'')+'" title="Sửa PTTT"><span class="material-symbols-rounded" style="font-size:15px;color:var(--primary);">edit</span></button></td></tr>';}).join('');
-    return '<p style="margin-bottom:8px;"><strong>'+invoices.length+'</strong> hóa đơn — Tổng: <strong style="color:var(--success);">'+fc(total)+'</strong></p><table class="report-table"><tr style="background:var(--bg-secondary);"><th>Bill</th><th>Bàn</th><th>PTTT</th><th class="text-right">Số tiền</th><th></th></tr>'+rows+'</table>';
+    return '<p style="margin-bottom:8px;"><strong>'+invoices.length+'</strong> hóa đơn — Tổng: <strong style="color:var(--success);">'+fc(total)+'</strong>'+srcTag+(invoicesFromLive?'<button class="btn btn-outline btn-sm" id="btnHSaveSnapshot" style="margin-left:8px;"><span class="material-symbols-rounded">save</span> Lưu snapshot</button>':'')+'</p><table class="report-table"><tr style="background:var(--bg-secondary);"><th>Bill</th><th>Bàn</th><th>PTTT</th><th class="text-right">Số tiền</th><th></th></tr>'+rows+'</table>';
   }
   function tabCashCount() {
     var cc=sh.cashCount||{};var keys=Object.keys(cc).filter(function(k){return cc[k]>0;});
@@ -167,7 +180,14 @@ function _renderShiftDetailModal(sh, sm) {
     document.getElementById('btnHTabAddOther')?.addEventListener('click',function(){hideModal();histEdit.showEditOtherTxModal(sh.id,_reopen);});
     document.getElementById('btnHTabEditStartCash')?.addEventListener('click',function(){hideModal();histEdit.showEditStartingCashModal(sh,_reopen);});
     document.getElementById('btnHTabEditCash')?.addEventListener('click',function(){hideModal();histEdit.showEditCashCountModal(sh,_reopen);});
-    document.querySelectorAll('[data-he-edit-inv]').forEach(function(b){b.addEventListener('click',function(){var refId=b.dataset.heEditInv;var inv=null;(sh.cukcukInvoicesSnapshot||[]).forEach(function(i){if(i.refId===refId)inv=i;});if(inv){hideModal();histEdit.showEditInvoicePaymentModal(sh.id,inv,_reopen);}});});
+    document.querySelectorAll('[data-he-edit-inv]').forEach(function(b){b.addEventListener('click',function(){var refId=b.dataset.heEditInv;var inv=null;invoices.forEach(function(i){if(i.refId===refId)inv=i;});if(inv){hideModal();histEdit.showEditInvoicePaymentModal(sh.id,inv,_reopen);}});});
+    document.getElementById('btnHSyncInvoices')?.addEventListener('click',function(){
+      if(!sh.date){showToast('Không xác định ngày ca','warning');return;}
+      try{var live=getInvoicesByDate(sh.date);if(live.length>0){backfillHistoryInvoiceSnapshot(sh.id,live);showToast('✅ Đã lưu '+live.length+' hóa đơn','success');_reopen();}else{showToast('Không tìm thấy hóa đơn cho ngày '+sh.date,'info');}}catch(e){showToast(e.message,'error');}
+    });
+    document.getElementById('btnHSaveSnapshot')?.addEventListener('click',function(){
+      try{backfillHistoryInvoiceSnapshot(sh.id,invoices);showToast('✅ Đã lưu snapshot '+invoices.length+' hóa đơn','success');_reopen();}catch(e){showToast(e.message,'error');}
+    });
   }
   setTimeout(function() {
     var bar=document.getElementById('histTabBar');var content=document.getElementById('histTabContent');

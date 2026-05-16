@@ -1221,6 +1221,23 @@ export function editHistoryInvoicePayment(shiftId, refId, newPayments) {
   throw new Error('Không tìm thấy hóa đơn');
 }
 
+export function backfillHistoryInvoiceSnapshot(shiftId, invoicesArray) {
+  var found = _findHistoryShift(shiftId);
+  if (!found) throw new Error('Không tìm thấy ca');
+  var shift = found.shift;
+  // Save compact snapshot (same format as closeShift creates)
+  shift.cukcukInvoicesSnapshot = invoicesArray.map(function(inv) {
+    return {
+      refId: inv.refId, refNo: inv.refNo, refDate: inv.refDate,
+      tableName: inv.tableName, amount: inv.amount, payments: inv.payments
+    };
+  });
+  _rebuildShiftSnapshot(shift);
+  save();
+  addAudit('BACKFILL_INV_SNAPSHOT', 'Ca ' + shift.date + ': lưu ' + invoicesArray.length + ' hóa đơn POS');
+  return invoicesArray.length;
+}
+
 /**
  * Sync shift history with cloud â€” merge cloud shifts into local history.
  * Uses union merge: local shifts + cloud shifts not already in local.
