@@ -305,67 +305,89 @@ function _tabInvoices() {
 
 function _tabCashCount() {
   if (currentShifts.length === 0) return '<div class="empty-state"><p>Chưa có ca nào</p></div>';
-  var lastShift = currentShifts[currentShifts.length - 1]; // Only show last shift's cash count
   var fc = formatCurrency;
+  var html = '';
   
-  var cc = lastShift.cashCount || {};
-  var keys = Object.keys(cc).filter(k => cc[k]>0).sort((a,b) => Number(b)-Number(a));
-  
-  var editBtn = `<div style="margin-bottom:12px;"><button class="btn btn-outline btn-sm" data-edit-cash="${lastShift.id}"><span class="material-symbols-rounded">edit</span> Chỉnh sửa kiểm kê (Ca cuối: ${lastShift.shiftNumber})</button></div>`;
-  
-  if (keys.length === 0) return editBtn + '<div class="empty-state"><p>Chưa kiểm kê tiền ca cuối</p></div>';
-  
-  var total = 0;
-  var rows = keys.map(k => {
-    var v = Number(k)*cc[k]; total+=v;
-    return `<tr><td>${cc[k]} x ${fc(Number(k))}</td><td class="text-right">${fc(v)}</td></tr>`;
-  }).join('');
-  
-  var bk = '';
-  var pc = lastShift.pinnedCash||{}, kc = lastShift.keepCash||{}, hc = lastShift.handoverCash||{};
-  if (Object.keys(pc).length || Object.keys(kc).length || Object.keys(hc).length) {
-    var ketT=0, handT=0;
-    denominations.forEach(d => {
-      ketT += d.value*((pc[d.value]||0)+(kc[d.value]||0));
-      handT += d.value*(hc[d.value]||0);
-    });
-    bk = `<h4 style="margin:16px 0 8px;color:var(--primary);">📌 Két: ${fc(ketT)} — 🤝 Giao: ${fc(handT)}</h4>`;
-  }
-  
-  return editBtn + `
-    <table class="report-table">
-      <tr style="background:var(--bg-secondary);"><th>Mệnh giá</th><th class="text-right">Thành tiền</th></tr>
-      ${rows}
-      <tr style="border-top:2px solid var(--border);"><td><strong>Tổng cộng</strong></td><td class="text-right"><strong style="color:var(--success);font-size:15px;">${fc(total)}</strong></td></tr>
-    </table>
-    ${bk}
-  `;
+  currentShifts.forEach(sh => {
+    var cc = sh.cashCount || {};
+    var keys = Object.keys(cc).filter(k => cc[k]>0).sort((a,b) => Number(b)-Number(a));
+    
+    html += `<div style="margin-bottom:24px;border:1px solid var(--border);border-radius:8px;padding:12px;background:white;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h4 style="margin:0;color:var(--primary);">Ca ${sh.shiftNumber} — ${sh.cashierName}</h4>
+        <button class="btn btn-outline btn-sm" data-edit-cash="${sh.id}"><span class="material-symbols-rounded">edit</span> Chỉnh sửa kiểm kê</button>
+      </div>`;
+      
+    if (keys.length === 0) {
+      html += '<p class="text-muted" style="text-align:center;margin:10px 0;">Chưa kiểm kê tiền</p></div>';
+      return;
+    }
+    
+    var total = 0;
+    var rows = keys.map(k => {
+      var v = Number(k)*cc[k]; total+=v;
+      return `<tr><td>${cc[k]} x ${fc(Number(k))}</td><td class="text-right">${fc(v)}</td></tr>`;
+    }).join('');
+    
+    var bk = '';
+    var pc = sh.pinnedCash||{}, kc = sh.keepCash||{}, hc = sh.handoverCash||{};
+    if (Object.keys(pc).length || Object.keys(kc).length || Object.keys(hc).length) {
+      var ketT=0, handT=0;
+      window.denominations?.forEach(d => {
+        ketT += d.value*((pc[d.value]||0)+(kc[d.value]||0));
+        handT += d.value*(hc[d.value]||0);
+      });
+      bk = `<h4 style="margin:16px 0 8px;color:var(--primary);">📌 Két: ${fc(ketT)} — 🤝 Giao: ${fc(handT)}</h4>`;
+    }
+    
+    html += `<table class="report-table">
+        <tr style="background:var(--bg-secondary);"><th>Mệnh giá</th><th class="text-right">Thành tiền</th></tr>
+        ${rows}
+        <tr style="border-top:2px solid var(--border);"><td><strong>Tổng cộng</strong></td><td class="text-right"><strong style="color:var(--success);font-size:15px;">${fc(total)}</strong></td></tr>
+      </table>
+      ${bk}
+    </div>`;
+  });
+  return html;
 }
 
 function _tabDrinkInv() {
   if (currentShifts.length === 0) return '<div class="empty-state"><p>Chưa có ca nào</p></div>';
-  var lastShift = currentShifts[currentShifts.length - 1]; // Lấy ca cuối
+  var html = '';
   
-  var snap = lastShift.drinkInventorySnapshot;
-  if (!snap || !snap.items) return `<div class="empty-state"><p>Không có dữ liệu kiểm kho cho ca cuối</p><div style="margin-top:12px;"><button class="btn btn-outline btn-sm" data-edit-inv-drinks="${lastShift.id}">Cập nhật kiểm kho</button></div></div>`;
-  
-  var rows = Object.keys(snap.items).map(id => {
-    var it = snap.items[id]; if (!it) return '';
-    return `<tr>
-      <td>${it.name||id}</td>
-      <td class="text-right">${it.start!=null?it.start:'—'}</td>
-      <td class="text-right">${it.end!=null?it.end:'—'}</td>
-      <td class="text-right">${it.sold!=null?it.sold:'—'}</td>
-    </tr>`;
-  }).join('');
-  
-  return `
-    <div style="margin-bottom:12px;"><button class="btn btn-outline btn-sm" data-edit-inv-drinks="${lastShift.id}"><span class="material-symbols-rounded">edit</span> Sửa kiểm kho</button></div>
-    <table class="report-table">
-      <tr style="background:var(--bg-secondary);"><th>Sản phẩm</th><th class="text-right">Đầu</th><th class="text-right">Cuối</th><th class="text-right">Bán</th></tr>
-      ${rows}
-    </table>
-  `;
+  currentShifts.forEach(sh => {
+    html += `<div style="margin-bottom:24px;border:1px solid var(--border);border-radius:8px;padding:12px;background:white;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h4 style="margin:0;color:var(--primary);">Ca ${sh.shiftNumber} — ${sh.cashierName}</h4>
+        <button class="btn btn-outline btn-sm" data-edit-inv-drinks="${sh.id}"><span class="material-symbols-rounded">edit</span> Sửa kiểm kho</button>
+      </div>`;
+      
+    var snap = sh.drinkInventorySnapshot;
+    if (!snap || !snap.items) {
+      html += '<p class="text-muted" style="text-align:center;margin:10px 0;">Không có dữ liệu kiểm kho</p></div>';
+      return;
+    }
+    
+    var rows = Object.keys(snap.items).map(id => {
+      var it = snap.items[id]; if (!it) return '';
+      return `<tr>
+        <td>${it.name||id}</td>
+        <td class="text-right">${it.start!=null?it.start:'—'}</td>
+        <td class="text-right">${it.end!=null?it.end:'—'}</td>
+        <td class="text-right">${it.sold!=null?it.sold:'—'}</td>
+      </tr>`;
+    }).join('');
+    
+    html += `<div class="table-container" style="max-height:400px;overflow-y:auto;">
+      <table class="report-table">
+        <tr style="background:var(--bg-secondary);">
+          <th>Sản phẩm</th><th class="text-right">Đầu</th><th class="text-right">Cuối</th><th class="text-right">Bán</th>
+        </tr>
+        ${rows}
+      </table>
+    </div></div>`;
+  });
+  return html;
 }
 
 function _tabPrint() {
