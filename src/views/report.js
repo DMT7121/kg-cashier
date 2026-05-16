@@ -383,7 +383,7 @@ function _buildHandoverHTML(revSummary) {
             <div class="a4-address">${settings.storeAddress || ''}</div>
           </div>
           <div class="a4-header-right">
-            <div class="a4-doc-title">PHIẾU BÀN GIAO CA</div>
+            <div class="a4-doc-title">PHIẾU BÀN GIAO CA${(target.audit && target.audit.length > 0) ? '<br><span style="font-size:12px;opacity:0.8;">(BẢN IN BỔ SUNG)</span>' : ''}</div>
             <div class="a4-doc-sub">Ngày: ${formatDate(target.date)} — Ca ${target.shiftNumber}</div>
           </div>
         </div>
@@ -469,7 +469,10 @@ function _buildHandoverHTML(revSummary) {
           <div class="a4-sig"><div class="a4-sig-title">Người nhận ca</div><div class="a4-sig-line"></div><div class="a4-sig-name">&nbsp;</div></div>
           <div class="a4-sig"><div class="a4-sig-title">Quản lý xác nhận</div><div class="a4-sig-line"></div><div class="a4-sig-name">&nbsp;</div></div>
         </div>
-        <div class="a4-footer">In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Phiếu bàn giao tự động</div>
+        <div class="a4-footer">
+          ${(target.audit && target.audit.length > 0) ? '<div style="text-align:left;font-size:10px;color:#666;margin-bottom:8px;padding-top:4px;border-top:1px dashed #ccc;">* Lịch sử chỉnh sửa:<br>' + target.audit.map(function(a){return ' - ' + formatTime(a.timestamp) + ' ' + formatDate(a.timestamp) + ': ' + a.action;}).join('<br>') + '</div>' : ''}
+          In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Phiếu bàn giao ${target.endTime ? (target.audit && target.audit.length > 0 ? 'bổ sung' : 'tự động') : 'tạm tính'}
+        </div>
       </div>
     </div>
   `;
