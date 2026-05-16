@@ -4,6 +4,7 @@ import { getShiftsFromCloud } from '../api.js';
 import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
 import * as histEdit from './historyEdit.js';
 import { getInvoicesByDate } from '../integration/invoiceStore.js';
+import { syncInvoicesForDate } from '../integration/cukcuk.js';
 
 let allHistory = [];
 let cloudHistory = [];
@@ -140,10 +141,11 @@ function _renderShiftDetailModal(sh, sm) {
     return html;
   }
   function tabInvoices() {
-    if(invoices.length===0) return '<div class="empty-state" style="padding:20px;"><p>Không có hóa đơn POS</p><p class="text-muted" style="font-size:12px;">Dữ liệu POS chưa được lưu snapshot cho ca này</p><button class="btn btn-primary btn-sm" id="btnHSyncInvoices" style="margin-top:8px;"><span class="material-symbols-rounded">sync</span> Tải lại từ CUKCUK</button></div>';
-    var srcTag = invoicesFromLive ? '<span class="tag" style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;margin-left:6px;">⚡ Live data</span>' : '';
+    var syncBtn='<button class="btn btn-outline btn-sm" id="btnHSyncCukcuk" style="margin-left:8px;"><span class="material-symbols-rounded">sync</span> Đồng bộ</button>';
+    if(invoices.length===0) return '<div class="empty-state" style="padding:20px;"><p>Không có hóa đơn POS</p><p class="text-muted" style="font-size:12px;">Bấm Đồng bộ để tải từ CUKCUK</p><div style="margin-top:10px;"><button class="btn btn-primary btn-sm" id="btnHSyncCukcuk"><span class="material-symbols-rounded">sync</span> Đồng bộ từ CUKCUK</button></div></div>';
+    var srcTag = invoicesFromLive ? '<span class="tag" style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;margin-left:6px;">⚡ Live</span>' : '';
     var total=0;var rows=invoices.map(function(inv){var amt=0;(inv.payments||[]).forEach(function(p){amt+=p.amount||0;});if(!amt)amt=inv.amount||0;total+=amt;var m=(inv.payments||[]).map(function(p){return p.method==='cash'?'💵':p.method==='card'?'💳':'🏦';}).join('');return '<tr><td>'+(inv.refNo||'—')+'</td><td>'+(inv.tableName||'—')+'</td><td>'+m+'</td><td class="text-right">'+fc(amt)+'</td><td style="width:30px;"><button class="btn-icon" data-he-edit-inv="'+(inv.refId||'')+'" title="Sửa PTTT"><span class="material-symbols-rounded" style="font-size:15px;color:var(--primary);">edit</span></button></td></tr>';}).join('');
-    return '<p style="margin-bottom:8px;"><strong>'+invoices.length+'</strong> hóa đơn — Tổng: <strong style="color:var(--success);">'+fc(total)+'</strong>'+srcTag+(invoicesFromLive?'<button class="btn btn-outline btn-sm" id="btnHSaveSnapshot" style="margin-left:8px;"><span class="material-symbols-rounded">save</span> Lưu snapshot</button>':'')+'</p><table class="report-table"><tr style="background:var(--bg-secondary);"><th>Bill</th><th>Bàn</th><th>PTTT</th><th class="text-right">Số tiền</th><th></th></tr>'+rows+'</table>';
+    return '<p style="margin-bottom:8px;"><strong>'+invoices.length+'</strong> hóa đơn — Tổng: <strong style="color:var(--success);">'+fc(total)+'</strong>'+srcTag+syncBtn+(invoicesFromLive?'<button class="btn btn-outline btn-sm" id="btnHSaveSnapshot" style="margin-left:4px;"><span class="material-symbols-rounded">save</span> Lưu</button>':'')+'</p><table class="report-table"><tr style="background:var(--bg-secondary);"><th>Bill</th><th>Bàn</th><th>PTTT</th><th class="text-right">Số tiền</th><th></th></tr>'+rows+'</table>';
   }
   function tabCashCount() {
     var cc=sh.cashCount||{};var keys=Object.keys(cc).filter(function(k){return cc[k]>0;});
@@ -181,9 +183,20 @@ function _renderShiftDetailModal(sh, sm) {
     document.getElementById('btnHTabEditStartCash')?.addEventListener('click',function(){hideModal();histEdit.showEditStartingCashModal(sh,_reopen);});
     document.getElementById('btnHTabEditCash')?.addEventListener('click',function(){hideModal();histEdit.showEditCashCountModal(sh,_reopen);});
     document.querySelectorAll('[data-he-edit-inv]').forEach(function(b){b.addEventListener('click',function(){var refId=b.dataset.heEditInv;var inv=null;invoices.forEach(function(i){if(i.refId===refId)inv=i;});if(inv){hideModal();histEdit.showEditInvoicePaymentModal(sh.id,inv,_reopen);}});});
-    document.getElementById('btnHSyncInvoices')?.addEventListener('click',function(){
+    document.getElementById('btnHSyncCukcuk')?.addEventListener('click',async function(){
       if(!sh.date){showToast('Không xác định ngày ca','warning');return;}
-      try{var live=getInvoicesByDate(sh.date);if(live.length>0){backfillHistoryInvoiceSnapshot(sh.id,live);showToast('✅ Đã lưu '+live.length+' hóa đơn','success');_reopen();}else{showToast('Không tìm thấy hóa đơn cho ngày '+sh.date,'info');}}catch(e){showToast(e.message,'error');}
+      this.disabled=true;this.innerHTML='<span class="material-symbols-rounded spin">sync</span> Đang tải...';
+      try{
+        var result=await syncInvoicesForDate(sh.date);
+        if(result.success && result.synced>0){
+          var live=getInvoicesByDate(sh.date);
+          if(live.length>0){backfillHistoryInvoiceSnapshot(sh.id,live);}
+          _reopen();
+        }else if(result.success){
+          var live2=getInvoicesByDate(sh.date);
+          if(live2.length>0){backfillHistoryInvoiceSnapshot(sh.id,live2);_reopen();}else{this.disabled=false;this.innerHTML='<span class="material-symbols-rounded">sync</span> Đồng bộ';}
+        }else{this.disabled=false;this.innerHTML='<span class="material-symbols-rounded">sync</span> Đồng bộ';}
+      }catch(e){showToast(e.message,'error');this.disabled=false;this.innerHTML='<span class="material-symbols-rounded">sync</span> Đồng bộ';}
     });
     document.getElementById('btnHSaveSnapshot')?.addEventListener('click',function(){
       try{backfillHistoryInvoiceSnapshot(sh.id,invoices);showToast('✅ Đã lưu snapshot '+invoices.length+' hóa đơn','success');_reopen();}catch(e){showToast(e.message,'error');}

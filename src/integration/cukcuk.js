@@ -1194,6 +1194,102 @@ export function getLastSyncInfo() {
   return null;
 }
 
+/**
+ * Sync CUKCUK invoices for a specific date (used by history view).
+ * Fetches all pages of invoices for the given working day, stores in invoiceStore.
+ * @param {string} dateStr - YYYY-MM-DD working day date
+ * @returns {Promise<{success, synced, total}>}
+ */
+export async function syncInvoicesForDate(dateStr) {
+  if (!dateStr) return { success: false, message: 'Chưa chỉ định ngày' };
+  var settings = getSettings();
+  var cukcuk = settings.cukcuk;
+  if (!cukcuk || !cukcuk.key) return { success: false, message: 'Chưa cấu hình CUKCUK' };
+
+  try {
+    var range = _getWorkingDayRange(dateStr);
+    showToast('🔄 Đang tải hóa đơn POS ngày ' + dateStr + '...', 'info');
+
+    // Fetch all pages
+    var allInvoices = [];
+    var page = 1;
+    while (page <= 50) {
+      var data = await _fetchInvoices(range.from, range.to, page);
+      if (data._authFailed) return { success: false, message: data.message };
+      if (!data.Success) throw new Error(data.ErrorMessage || 'Lỗi API');
+      var pageItems = _extractPageData(data);
+      if (pageItems.length === 0) break;
+      allInvoices = allInvoices.concat(pageItems);
+      if (pageItems.length < 100) break;
+      page++;
+    }
+
+    if (allInvoices.length === 0) {
+      showToast('ℹ️ Không tìm thấy hóa đơn POS cho ngày ' + dateStr, 'info');
+      return { success: true, synced: 0, total: 0 };
+    }
+
+    // Fetch details in batches of 5
+    var BATCH = 5;
+    var records = [];
+    for (var b = 0; b < allInvoices.length; b += BATCH) {
+      var batch = allInvoices.slice(b, b + BATCH);
+      var promises = batch.map(function(inv) {
+        var refId = String(inv.RefId || inv.RefID || '');
+        return _fetchInvoiceDetail(refId).then(function(detail) {
+          return { inv: inv, refId: refId, detail: detail };
+        });
+      });
+      var results = await Promise.all(promises);
+
+      for (var ri = 0; ri < results.length; ri++) {
+        var r = results[ri];
+        var inv = r.inv;
+        var refId = r.refId;
+        var detail = r.detail;
+        var detailAmount = (detail && detail.Amount) ? detail.Amount : (inv.Amount || 0);
+        var invoicePayments = [];
+        var pmts = (detail && detail.SAInvoicePayments) ? detail.SAInvoicePayments : [];
+
+        for (var p = 0; p < pmts.length; p++) {
+          var pmt = pmts[p];
+          if ((pmt.Amount || 0) <= 0) continue;
+          var mapped = _mapPayment(pmt);
+          invoicePayments.push({ method: mapped.method, amount: pmt.Amount, label: mapped.label });
+        }
+
+        var effAmt = 0;
+        invoicePayments.forEach(function(ip) { effAmt += ip.amount; });
+        if (!effAmt) effAmt = detailAmount;
+
+        records.push({
+          refId: refId, refNo: inv.RefNo || '', refDate: inv.RefDate || '', date: dateStr,
+          tableName: inv.TableName || '', employeeName: inv.EmployeeName || '',
+          amount: effAmt, payments: invoicePayments,
+          unpaid: invoicePayments.length === 0, confirmed: true,
+          syncedAt: new Date().toISOString(), pushedToSheets: false
+        });
+      }
+
+      if (b + BATCH < allInvoices.length) {
+        showToast('📥 ' + Math.min(b + BATCH, allInvoices.length) + '/' + allInvoices.length + ' hóa đơn...', 'info');
+      }
+    }
+
+    // Save to invoiceStore
+    var paidRecords = records.filter(function(r) { return !r.unpaid; });
+    if (records.length > 0) invoiceStore.bulkUpsert(records);
+
+    showToast('✅ Đồng bộ ' + paidRecords.length + '/' + allInvoices.length + ' hóa đơn POS ngày ' + dateStr, 'success');
+    return { success: true, synced: paidRecords.length, total: allInvoices.length, records: paidRecords };
+
+  } catch(e) {
+    console.error('[CUKCUK] syncInvoicesForDate error:', e);
+    showToast('❌ Lỗi: ' + e.message, 'error');
+    return { success: false, message: e.message };
+  }
+}
+
 // ── Export Invoice Store for direct access ──
 export { invoiceStore };
 
