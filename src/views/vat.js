@@ -4,8 +4,7 @@ let _activeTab = 'upload';
 const _tabs = [
   { key: 'upload', icon: 'cloud_upload', label: 'Upload Hóa Đơn' },
   { key: 'search', icon: 'search', label: 'Tra Cứu & Kho' },
-  { key: 'history', icon: 'history', label: 'Lịch Sử' },
-  { key: 'settings', icon: 'settings', label: 'Cấu hình & Admin' }
+  { key: 'history', icon: 'history', label: 'Lịch Sử' }
 ];
 
 // --- STATE ---
@@ -137,7 +136,6 @@ function _renderTabs() {
             <button class="settings-tab ${_activeTab === t.key ? 'active' : ''}" data-vattab="${t.key}">
                 <span class="material-symbols-rounded">${t.icon}</span>
                 <span>${t.label}</span>
-                ${t.key === 'settings' ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${hasKeys ? 'var(--success)' : 'var(--danger)'};margin-left:4px;"></span>` : ''}
             </button>
             `).join('')}
         </div>
@@ -272,68 +270,13 @@ function _renderHistory() {
     `;
 }
 
-function _renderSettings() {
-    return `
-    <div class="card animate-fade-in">
-        <div class="card-header" style="background:var(--bg-secondary);">
-            <h3><span class="material-symbols-rounded" style="vertical-align:middle; margin-right:8px;">admin_panel_settings</span> Cấu Hình API Keys</h3>
-            <button class="btn btn-primary btn-sm" id="vat-btn-save-settings">Lưu & Đồng Bộ</button>
-        </div>
-        <div class="card-body">
-            
-            <div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:var(--radius); padding:16px; margin-bottom:20px;">
-                <label class="form-label" style="color:#818cf8;"><span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">key</span> Admin Access (Lấy key tự động)</label>
-                <div style="display:flex; gap:8px; max-width:400px;">
-                    <input type="password" id="vat-admin-password" class="form-input" placeholder="Nhập mã truy cập admin...">
-                    <button class="btn" style="background:#4f46e5; color:#fff;" id="vat-btn-admin-login">Lấy Key</button>
-                </div>
-            </div>
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:16px;">
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Gemini</span> <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-gemini" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>DeepSeek</span> <a href="https://platform.deepseek.com/api_keys" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-deepseek" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Groq</span> <a href="https://console.groq.com/keys" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-groq" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>SambaNova</span> <a href="https://cloud.sambanova.ai/" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-sambanova" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Cerebras</span> <a href="https://cloud.cerebras.ai/" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-cerebras" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>HuggingFace</span> <a href="https://huggingface.co/settings/tokens" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-hf" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>Mistral AI</span> <a href="https://console.mistral.ai/api-keys/" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-mistral" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" style="display:flex; justify-content:space-between;"><span>NVIDIA</span> <a href="https://build.nvidia.com/explore/discover" target="_blank" style="font-size:10px;">Lấy Key</a></label>
-                    <textarea id="vat-key-nvidia" class="form-input" rows="2" style="font-size:11px; font-family:monospace;"></textarea>
-                </div>
-            </div>
-        </div>
-    </div>
-    `;
-}
 
 export function render() {
   var content = '';
   if (_activeTab === 'upload') content = _renderUpload();
   else if (_activeTab === 'search') content = _renderSearch();
   else if (_activeTab === 'history') content = _renderHistory();
-  else if (_activeTab === 'settings') content = _renderSettings();
 
   return `
     ${_renderTabs()}
@@ -357,19 +300,7 @@ function _bindEvents() {
         });
     });
 
-    if (_activeTab === 'settings') {
-        document.getElementById('vat-key-gemini').value = geminiKeys.join('\n');
-        document.getElementById('vat-key-deepseek').value = deepseekKeys.join('\n');
-        document.getElementById('vat-key-groq').value = groqKeys.join('\n');
-        document.getElementById('vat-key-sambanova').value = sambanovaKeys.join('\n');
-        document.getElementById('vat-key-cerebras').value = cerebrasKeys.join('\n');
-        document.getElementById('vat-key-hf').value = hfKeys.join('\n');
-        document.getElementById('vat-key-mistral').value = mistralKeys.join('\n');
-        document.getElementById('vat-key-nvidia').value = nvidiaKeys.join('\n');
 
-        document.getElementById('vat-btn-save-settings')?.addEventListener('click', saveSettings);
-        document.getElementById('vat-btn-admin-login')?.addEventListener('click', handleAdminLogin);
-    }
     
     if (_activeTab === 'upload') {
         const fileInput = document.getElementById('vat-file-input');
@@ -409,71 +340,11 @@ export function init() {
     _bindEvents();
 }
 
-// --- SETTINGS LOGIC ---
 
-function parseKeys(id) { 
-    const val = document.getElementById(id).value;
-    if(!val) return [];
-    return val.split('\n').map(k=>k.trim()).filter(k=>k.length>5); 
-}
-
-function saveSettings() {
-    geminiKeys = parseKeys('vat-key-gemini');
-    groqKeys = parseKeys('vat-key-groq');
-    hfKeys = parseKeys('vat-key-hf');
-    cerebrasKeys = parseKeys('vat-key-cerebras');
-    sambanovaKeys = parseKeys('vat-key-sambanova');
-    deepseekKeys = parseKeys('vat-key-deepseek');
-    mistralKeys = parseKeys('vat-key-mistral');
-    nvidiaKeys = parseKeys('vat-key-nvidia');
-
-    const settings = getSettings();
-    if (!settings.vatKeys || typeof settings.vatKeys !== 'object') settings.vatKeys = {};
-    settings.vatKeys.gemini = geminiKeys;
-    settings.vatKeys.groq = groqKeys;
-    settings.vatKeys.hf = hfKeys;
-    settings.vatKeys.cerebras = cerebrasKeys;
-    settings.vatKeys.sambanova = sambanovaKeys;
-    settings.vatKeys.deepseek = deepseekKeys;
-    settings.vatKeys.mistral = mistralKeys;
-    settings.vatKeys.nvidia = nvidiaKeys;
-    updateSettings(settings);
-    
-    determineInitialPersona();
-    callAPI({ action: 'save_system_keys', gemini: geminiKeys, groq: groqKeys, hf: hfKeys, cerebras: cerebrasKeys, sambanova: sambanovaKeys, deepseek: deepseekKeys, mistral: mistralKeys, nvidia: nvidiaKeys });
-    
-    alert("Đã lưu API Keys thành công!");
-    window.refreshView();
-}
-
-function handleAdminLogin() {
-    const pass = document.getElementById('vat-admin-password').value;
-    if (!pass) return alert('Vui lòng nhập mã truy cập!');
-    
-    const btn = document.getElementById('vat-btn-admin-login');
-    const oldText = btn.innerText;
-    btn.innerText = 'Đang tải...';
-    
-    callAPI({ action: 'get_system_keys', password: pass }).then(res => {
-        btn.innerText = oldText;
-        if (res.status === 'success') {
-            if(res.gemini) document.getElementById('vat-key-gemini').value = res.gemini.join('\n');
-            if(res.groq) document.getElementById('vat-key-groq').value = res.groq.join('\n');
-            if(res.hf) document.getElementById('vat-key-hf').value = res.hf.join('\n');
-            if(res.cerebras) document.getElementById('vat-key-cerebras').value = res.cerebras.join('\n');
-            if(res.sambanova) document.getElementById('vat-key-sambanova').value = res.sambanova.join('\n');
-            if(res.deepseek) document.getElementById('vat-key-deepseek').value = res.deepseek.join('\n');
-            if(res.mistral) document.getElementById('vat-key-mistral').value = res.mistral.join('\n');
-            if(res.nvidia) document.getElementById('vat-key-nvidia').value = res.nvidia.join('\n');
-            alert('Đã mượn được hàng nóng từ kho Admin!');
-        } else alert(res.message || 'Mã không đúng!');
-    });
-}
 
 function checkApiKey() {
     if (!availablePersonas.length) { 
-        alert("Hệ thống cần ít nhất 1 Key để hoạt động. Vui lòng cấu hình!");
-        _switchTab('settings');
+        alert("Hệ thống cần ít nhất 1 Key để hoạt động. Vui lòng vào mục Cài đặt -> Hệ thống để cấu hình API Keys!");
         return false; 
     }
     return true;

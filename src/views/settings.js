@@ -42,6 +42,9 @@ function _renderSystemTab() {
   const cukcukAppId = (s.cukcuk && s.cukcuk.appId) ? s.cukcuk.appId : 'CUKCUKOpenPlatform';
   const cukcukKey = (s.cukcuk && s.cukcuk.key) ? s.cukcuk.key : '';
 
+  const vk = s.vatKeys || {};
+  const _k = (arr) => (Array.isArray(arr) ? arr : []).join('\n');
+
   return `
     <!-- Connection Status -->
     <div class="stat-card ${online ? 'stat-success' : 'stat-danger'}" style="margin-bottom:20px;">
@@ -184,6 +187,34 @@ function _renderSystemTab() {
               <button class="btn btn-danger btn-sm" id="btnAddExpenseCat"><span class="material-symbols-rounded">add</span></button>
             </div>
           </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cấu hình API Keys -->
+    <div class="card mt-24">
+      <div class="card-header" style="background:var(--bg-secondary);">
+        <h3><span class="material-symbols-rounded" style="vertical-align:middle; margin-right:8px;">admin_panel_settings</span> Cấu Hình API Keys</h3>
+      </div>
+      <div class="card-body">
+        <div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:var(--radius); padding:16px; margin-bottom:20px;">
+          <label class="form-label" style="color:#818cf8;"><span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">key</span> Admin Access (Lấy key tự động)</label>
+          <div style="display:flex; gap:8px; max-width:400px;">
+            <input type="password" id="sett-vat-admin-password" class="form-input" placeholder="Nhập mã truy cập admin...">
+            <button class="btn" style="background:#4f46e5; color:#fff;" id="sett-vat-btn-admin-login">Lấy Key</button>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:16px;">
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>Gemini</span> <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-gemini" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.gemini)}</textarea></div>
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>DeepSeek</span> <a href="https://platform.deepseek.com/api_keys" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-deepseek" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.deepseek)}</textarea></div>
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>Groq</span> <a href="https://console.groq.com/keys" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-groq" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.groq)}</textarea></div>
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>SambaNova</span> <a href="https://cloud.sambanova.ai/" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-sambanova" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.sambanova)}</textarea></div>
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>Cerebras</span> <a href="https://cloud.cerebras.ai/" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-cerebras" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.cerebras)}</textarea></div>
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>HuggingFace</span> <a href="https://huggingface.co/settings/tokens" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-hf" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.hf)}</textarea></div>
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>Mistral AI</span> <a href="https://console.mistral.ai/api-keys/" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-mistral" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.mistral)}</textarea></div>
+          <div class="form-group"><label class="form-label" style="display:flex; justify-content:space-between;"><span>NVIDIA</span> <a href="https://build.nvidia.com/explore/discover" target="_blank" style="font-size:10px;">Lấy Key</a></label><textarea id="vat-key-nvidia" class="form-input" rows="2" style="font-size:11px; font-family:monospace;">${_k(vk.nvidia)}</textarea></div>
         </div>
       </div>
     </div>
@@ -641,7 +672,29 @@ function _initSystemTab() {
         autoSync: document.getElementById('cuk_autoSync').checked
       }
     };
+    const parseKeys = (id) => { const v = document.getElementById(id).value; return !v ? [] : v.split('\\n').map(k=>k.trim()).filter(k=>k.length>5); };
+    
+    if (document.getElementById('vat-key-gemini')) {
+      newSettings.vatKeys = {
+        gemini: parseKeys('vat-key-gemini'),
+        groq: parseKeys('vat-key-groq'),
+        hf: parseKeys('vat-key-hf'),
+        cerebras: parseKeys('vat-key-cerebras'),
+        sambanova: parseKeys('vat-key-sambanova'),
+        deepseek: parseKeys('vat-key-deepseek'),
+        mistral: parseKeys('vat-key-mistral'),
+        nvidia: parseKeys('vat-key-nvidia')
+      };
+    }
+    
     updateSettings(newSettings);
+    
+    if (newSettings.vatKeys) {
+        const VAT_API = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec";
+        const payload = Object.assign({ action: 'save_system_keys' }, newSettings.vatKeys);
+        fetch(VAT_API, {method:'POST',body:JSON.stringify(payload)}).catch(()=>{});
+    }
+    
     saveSettingsToCloud(getSettings()).catch(function() {});
     if (!silent) showToast('Đã lưu tất cả cài đặt', 'success');
   };
@@ -737,6 +790,37 @@ function _initSystemTab() {
       showToast('Đã xóa toàn bộ dữ liệu cục bộ', 'success');
       setTimeout(() => location.reload(), 1000);
     }
+  });
+
+  // VAT Admin Login
+  document.getElementById('sett-vat-btn-admin-login')?.addEventListener('click', () => {
+      const pass = document.getElementById('sett-vat-admin-password').value;
+      if (!pass) return showToast('Vui lòng nhập mã truy cập!', 'warning');
+      
+      const btn = document.getElementById('sett-vat-btn-admin-login');
+      const oldText = btn.innerText;
+      btn.innerText = 'Đang tải...';
+      const VAT_API = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec";
+      
+      fetch(VAT_API, {method:'POST',body:JSON.stringify({ action: 'get_system_keys', password: pass })})
+        .then(r=>r.json()).then(res => {
+          btn.innerText = oldText;
+          if (res.status === 'success') {
+              if(res.gemini) document.getElementById('vat-key-gemini').value = res.gemini.join('\\n');
+              if(res.groq) document.getElementById('vat-key-groq').value = res.groq.join('\\n');
+              if(res.hf) document.getElementById('vat-key-hf').value = res.hf.join('\\n');
+              if(res.cerebras) document.getElementById('vat-key-cerebras').value = res.cerebras.join('\\n');
+              if(res.sambanova) document.getElementById('vat-key-sambanova').value = res.sambanova.join('\\n');
+              if(res.deepseek) document.getElementById('vat-key-deepseek').value = res.deepseek.join('\\n');
+              if(res.mistral) document.getElementById('vat-key-mistral').value = res.mistral.join('\\n');
+              if(res.nvidia) document.getElementById('vat-key-nvidia').value = res.nvidia.join('\\n');
+              showToast('Đã mượn được hàng nóng từ kho Admin!', 'success');
+              performSave(true);
+          } else showToast(res.message || 'Mã không đúng!', 'error');
+        }).catch(e => {
+            btn.innerText = oldText;
+            showToast('Lỗi mạng', 'error');
+        });
   });
 }
 
