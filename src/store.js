@@ -184,6 +184,27 @@ export function getState() {
         for (var key in def) {
           if (parsed[key] === undefined) parsed[key] = def[key];
         }
+        
+        // RECOVERY: Auto-heal corrupted types from previous bugs
+        if (parsed.settings) {
+            if (!Array.isArray(parsed.settings.posTables)) parsed.settings.posTables = [];
+            if (!Array.isArray(parsed.settings.posCatalog)) parsed.settings.posCatalog = [];
+            
+            if (typeof parsed.settings.vatKeys !== 'object' || parsed.settings.vatKeys === null) {
+                parsed.settings.vatKeys = def.settings.vatKeys;
+            } else {
+                // Ensure all keys exist
+                for (var k in def.settings.vatKeys) {
+                    if (!Array.isArray(parsed.settings.vatKeys[k])) {
+                        parsed.settings.vatKeys[k] = def.settings.vatKeys[k];
+                    }
+                }
+            }
+        }
+        if (!parsed.categories || typeof parsed.categories !== 'object') {
+            parsed.categories = def.categories;
+        }
+
         state = parsed;
       } else {
         state = defaults();
@@ -325,11 +346,32 @@ export function getSettings() {
 export function updateSettings(newSettings) {
   var s = getState();
   if (!s.settings) s.settings = defaults().settings;
+  var defs = defaults().settings;
+  
   for (var key in newSettings) {
-    s.settings[key] = newSettings[key];
+    var val = newSettings[key];
+    
+    // Safety check against corrupted strings from Apps Script fallback
+    if (typeof val === 'string' && typeof defs[key] === 'object' && defs[key] !== null) {
+      try { val = JSON.parse(val); } catch(e) { continue; } // Skip if it can't be parsed
+    }
+    
+    // Ensure array types are preserved (e.g., posTables, posCatalog)
+    if (Array.isArray(defs[key]) && !Array.isArray(val)) {
+      continue;
+    }
+    
+    // Ensure object types are preserved (e.g., vatKeys)
+    if (typeof defs[key] === 'object' && defs[key] !== null && !Array.isArray(defs[key])) {
+      if (typeof val !== 'object' || Array.isArray(val) || val === null) {
+        continue; 
+      }
+    }
+    
+    s.settings[key] = val;
   }
   save();
-  addAudit('UPDATE_SETTINGS', JSON.stringify(newSettings));
+  addAudit('UPDATE_SETTINGS', 'Cập nhật cấu hình hệ thống');
 }
 
 // â”€â”€ Current shift â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

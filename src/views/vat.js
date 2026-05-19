@@ -26,7 +26,7 @@ import { getSettings, updateSettings } from '../store.js';
 
 function _getVatKeys() {
   const settings = getSettings();
-  if (!settings.vatKeys) {
+  if (!settings.vatKeys || typeof settings.vatKeys !== 'object') {
     settings.vatKeys = { gemini: [], groq: [], hf: [], cerebras: [], sambanova: [], deepseek: [], mistral: [], nvidia: [] };
   }
   return settings.vatKeys;
@@ -428,7 +428,7 @@ function saveSettings() {
     nvidiaKeys = parseKeys('vat-key-nvidia');
 
     const settings = getSettings();
-    if (!settings.vatKeys) settings.vatKeys = {};
+    if (!settings.vatKeys || typeof settings.vatKeys !== 'object') settings.vatKeys = {};
     settings.vatKeys.gemini = geminiKeys;
     settings.vatKeys.groq = groqKeys;
     settings.vatKeys.hf = hfKeys;

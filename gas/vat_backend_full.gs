@@ -30,7 +30,13 @@ const COL = {
 
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    let data = {};
+    if (e.postData && e.postData.contents) {
+      try { data = JSON.parse(e.postData.contents); } catch(ex) {}
+    }
+    if (!data.action && e.parameter && e.parameter.action) {
+      Object.assign(data, e.parameter);
+    }
     const action = data.action;
 
     if (action === 'upload') return handleUpload(data);
@@ -297,8 +303,13 @@ function handleSaveKeys(data) {
   
   // Dữ liệu từ Webapp gửi lên nằm thẳng ở data.gemini, data.groq...
   types.forEach(type => {
-    if (data[type] && Array.isArray(data[type])) {
-      data[type].forEach(key => {
+    let arr = data[type];
+    // Chống lỗi nếu dữ liệu bị ép kiểu thành chuỗi
+    if (typeof arr === 'string') {
+      try { arr = JSON.parse(arr); } catch(ex) { arr = arr.split(',').map(s => s.trim()); }
+    }
+    if (Array.isArray(arr)) {
+      arr.forEach(key => {
         if (key && key.trim()) {
           let label = type === 'hf' ? 'huggingface' : type;
           newRows.push([label, key.trim(), now]);
