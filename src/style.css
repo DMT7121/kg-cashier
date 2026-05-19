@@ -777,36 +777,46 @@
 
   /* ── Table ── */
   .di-table-wrap {
-    @apply mx-6 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm;
+    @apply mx-6 bg-white border border-slate-200 rounded-2xl shadow-sm;
+    /* Removed overflow-hidden to allow sticky headers to stick to .view-container */
   }
   .di-table {
     @apply w-full text-sm border-collapse;
   }
 
   /* Table header */
+  .di-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .di-table thead tr:first-child th:first-child { border-top-left-radius: 1rem; }
+  .di-table thead tr:first-child th:last-child { border-top-right-radius: 1rem; }
+  
   .di-thead-main th {
     @apply text-[10px] font-bold uppercase tracking-wider text-center py-2.5 px-2 border-b-0;
   }
   .di-th-product {
-    @apply text-left pl-4;
+    @apply text-left pl-4 bg-white;
   }
   .di-th-group {
     @apply border-b-2;
   }
-  .di-th-opening { @apply bg-blue-50/60 text-blue-600 border-b-blue-200; }
-  .di-th-closing { @apply bg-violet-50/60 text-violet-600 border-b-violet-200; }
-  .di-th-actual { @apply bg-orange-50/60 text-orange-600 border-b-orange-200; }
-  .di-th-cukcuk { @apply bg-teal-50/60 text-teal-600 border-b-teal-200; }
+  .di-th-opening { @apply bg-blue-50 text-blue-600 border-b-blue-200; }
+  .di-th-closing { @apply bg-violet-50 text-violet-600 border-b-violet-200; }
+  .di-th-actual { @apply bg-orange-50 text-orange-600 border-b-orange-200; }
+  .di-th-cukcuk { @apply bg-teal-50 text-teal-600 border-b-teal-200; }
   .di-th-diff { @apply bg-slate-50 text-slate-600 border-b-slate-300; }
 
   .di-thead-sub th {
-    @apply text-[9px] font-bold uppercase tracking-wider text-center py-1.5 px-2 text-slate-400;
+    @apply text-[9px] font-bold uppercase tracking-wider text-center py-1.5 px-2 text-slate-500 bg-white border-b border-slate-200;
   }
-  .di-sub-opening { @apply bg-blue-50/30; }
-  .di-sub-closing { @apply bg-violet-50/30; }
-  .di-sub-actual { @apply bg-orange-50/30; }
-  .di-sub-cukcuk { @apply bg-teal-50/30; }
-  .di-sub-diff { @apply bg-slate-50/50; }
+  .di-sub-opening { @apply bg-blue-50/50; }
+  .di-sub-closing { @apply bg-violet-50/50; }
+  .di-sub-actual { @apply bg-orange-50/50; }
+  .di-sub-cukcuk { @apply bg-teal-50/50; }
+  .di-sub-diff { @apply bg-slate-50/80; }
 
   /* Table rows */
   .di-row td {
