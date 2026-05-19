@@ -288,6 +288,12 @@ function handleSyncDB() {
 // ============ API KEYS STORE ============
 
 function handleSaveKeys(data) {
+  // Kiểm tra password từ UI
+  const ADMIN_PASSWORD = 'ADMINDMT';
+  if (data.password !== ADMIN_PASSWORD) {
+    return jsonRes({ status: 'error', message: 'Sai mật khẩu truy cập!' });
+  }
+
   const sheet = getSheet_(CONFIG.SHEET_KEYS);
   if (!sheet) return jsonRes({ status: 'error', message: 'Sheet API_Keys_Store not found' });
 
@@ -327,7 +333,7 @@ function handleSaveKeys(data) {
 
 function handleGetKeys(data) {
   // Kiểm tra password từ UI (Chặn tải lậu key)
-  const ADMIN_PASSWORD = '123';
+  const ADMIN_PASSWORD = 'ADMINDMT';
   if (data.password !== ADMIN_PASSWORD) {
     return jsonRes({ status: 'error', message: 'Sai mật khẩu truy cập!' });
   }

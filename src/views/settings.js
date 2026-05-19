@@ -690,8 +690,9 @@ function _initSystemTab() {
     updateSettings(newSettings);
     
     if (newSettings.vatKeys) {
+        const vatPass = document.getElementById('sett-vat-admin-password')?.value;
         const VAT_API = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec";
-        const payload = Object.assign({ action: 'save_system_keys' }, newSettings.vatKeys);
+        const payload = Object.assign({ action: 'save_system_keys', password: vatPass }, newSettings.vatKeys);
         fetch(VAT_API, {method:'POST',body:JSON.stringify(payload)}).catch(()=>{});
     }
     

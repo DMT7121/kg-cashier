@@ -10,7 +10,7 @@ const VAT_KEYS_SPREADSHEET_ID = '1Q9lkw5LMD1u8QC206sAnPL98TjAHoYCj274ZG6I5qAg';
  */
 function handleGetSystemKeys(password) {
   // Thay thế mật khẩu này bằng mật khẩu Admin thực tế của bạn
-  const ADMIN_PASSWORD = '123'; 
+  const ADMIN_PASSWORD = 'ADMINDMT'; 
   
   if (password !== ADMIN_PASSWORD) {
     return { status: 'error', message: 'Sai mật khẩu truy cập!' };
@@ -66,6 +66,10 @@ function handleGetSystemKeys(password) {
  * (Tùy chọn) Lưu API Key mới vào Spreadsheet
  */
 function handleSaveSystemKeys(data) {
+  const ADMIN_PASSWORD = 'ADMINDMT'; 
+  if (data.password !== ADMIN_PASSWORD) {
+    return { status: 'error', message: 'Sai mật khẩu truy cập!' };
+  }
   try {
     const ss = SpreadsheetApp.openById(VAT_KEYS_SPREADSHEET_ID);
     const sheet = ss.getSheets()[0];
