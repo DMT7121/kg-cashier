@@ -1337,62 +1337,70 @@ function _buildPrintReport(session, products, pMap, stats, dateFormatted) {
   var now = new Date();
   var shift = getCurrentShift();
   var cashierName = shift ? shift.cashierName : 'Quản lý';
+  var settings = {};
+  try { settings = JSON.parse(localStorage.getItem('kg-settings') || '{}'); } catch(e) {}
+  var storeName = settings.storeName || "KING's GRILL";
+  var storeAddr = settings.storeAddress || '34, Hoàng Văn Thụ, Chánh Nghĩa, TDM, Bình Dương';
 
   return `
-    <div id="diPrintReport" style="padding:28px 32px;font-family:'Inter',Arial,sans-serif;color:#1a1a1a;font-size:12px;line-height:1.5;">
+    <div id="diPrintReport" style="padding:20px 24px;font-family:'Be Vietnam Pro','Inter',Arial,sans-serif;color:#1a1a1a;font-size:11px;line-height:1.4;">
       <!-- Header -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a1a1a;padding-bottom:10px;margin-bottom:14px;">
-        <div>
-          <h1 style="font-size:20px;font-weight:800;color:#1a1a1a;margin:0;">KING's GRILL</h1>
-          <p style="font-size:10px;color:#666;margin:2px 0 0;">34, Hoàng Văn Thụ, Chánh Nghĩa, TDM, Bình Dương</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1e293b;padding-bottom:8px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <img src="/android-chrome-192x192.png" style="width:36px;height:36px;" alt="Logo">
+          <div>
+            <h1 style="font-size:16px;font-weight:800;color:#1e293b;margin:0;letter-spacing:0.5px;">${storeName}</h1>
+            <p style="font-size:9px;color:#64748b;margin:1px 0 0;">${storeAddr}</p>
+          </div>
         </div>
         <div style="text-align:right;">
-          <h2 style="font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin:0;">BÁO CÁO KIỂM KHO ĐỒ UỐNG</h2>
-          <p style="font-size:11px;color:#666;margin:3px 0 0;">${_currentShiftName} — ${dateFormatted}</p>
+          <h2 style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin:0;color:#1e293b;">BÁO CÁO BÀN GIAO KHO NƯỚC</h2>
+          <p style="font-size:10px;color:#64748b;margin:2px 0 0;">${_currentShiftName} · ${dateFormatted}</p>
         </div>
       </div>
 
-      <!-- Info grid -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:14px;padding:8px 0;border-bottom:1px solid #ddd;">
-        <div><span style="font-size:9px;color:#888;">Ca làm:</span><br><strong style="font-size:11px;">${_currentShiftName}</strong></div>
-        <div><span style="font-size:9px;color:#888;">Ngày:</span><br><strong style="font-size:11px;">${_currentDate}</strong></div>
-        <div><span style="font-size:9px;color:#888;">Người kiểm:</span><br><strong style="font-size:11px;">${cashierName}</strong></div>
-        <div><span style="font-size:9px;color:#888;">Ngày tạo:</span><br><strong style="font-size:11px;">${now.toLocaleString('vi-VN')}</strong></div>
+      <!-- Info row -->
+      <div style="display:flex;gap:24px;margin-bottom:10px;padding:6px 0;font-size:10px;color:#475569;">
+        <span>👤 <strong>${cashierName}</strong></span>
+        <span>📅 <strong>${_currentDate}</strong></span>
+        <span>⏰ <strong>${_currentShiftName}</strong></span>
+        <span style="margin-left:auto;">🖨️ In lúc: ${now.toLocaleString('vi-VN')}</span>
       </div>
 
-      <!-- Summary cards -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
-        <div style="border-left:4px solid #3b82f6;background:#eff6ff;padding:8px 12px;border-radius:4px;">
-          <div style="font-size:9px;color:#888;text-transform:uppercase;">Tổng sản phẩm</div>
-          <div style="font-size:22px;font-weight:800;color:#1a1a1a;">${stats.total}</div>
+      <!-- Summary strip -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;padding:6px 10px;text-align:center;border-left:3px solid #3b82f6;">
+          <div style="font-size:8px;color:#64748b;text-transform:uppercase;font-weight:700;">Tổng SP</div>
+          <div style="font-size:18px;font-weight:800;color:#1e293b;">${stats.total}</div>
         </div>
-        <div style="border-left:4px solid #22c55e;background:#f0fdf4;padding:8px 12px;border-radius:4px;">
-          <div style="font-size:9px;color:#888;text-transform:uppercase;">Khớp số</div>
-          <div style="font-size:22px;font-weight:800;color:#16a34a;">${stats.match}</div>
+        <div style="flex:1;background:#f0fdf4;border-radius:6px;padding:6px 10px;text-align:center;border-left:3px solid #22c55e;">
+          <div style="font-size:8px;color:#16a34a;text-transform:uppercase;font-weight:700;">Khớp ✓</div>
+          <div style="font-size:18px;font-weight:800;color:#16a34a;">${stats.match}</div>
         </div>
-        <div style="border-left:4px solid #eab308;background:#fefce8;padding:8px 12px;border-radius:4px;">
-          <div style="font-size:9px;color:#888;text-transform:uppercase;">Dư</div>
-          <div style="font-size:22px;font-weight:800;color:#ca8a04;">${stats.surplus}</div>
+        <div style="flex:1;background:#fefce8;border-radius:6px;padding:6px 10px;text-align:center;border-left:3px solid #eab308;">
+          <div style="font-size:8px;color:#ca8a04;text-transform:uppercase;font-weight:700;">Dư ▲</div>
+          <div style="font-size:18px;font-weight:800;color:#ca8a04;">${stats.surplus}</div>
         </div>
-        <div style="border-left:4px solid #ef4444;background:#fef2f2;padding:8px 12px;border-radius:4px;">
-          <div style="font-size:9px;color:#888;text-transform:uppercase;">Thiếu</div>
-          <div style="font-size:22px;font-weight:800;color:#dc2626;">${stats.shortage}</div>
+        <div style="flex:1;background:#fef2f2;border-radius:6px;padding:6px 10px;text-align:center;border-left:3px solid #ef4444;">
+          <div style="font-size:8px;color:#dc2626;text-transform:uppercase;font-weight:700;">Thiếu ▼</div>
+          <div style="font-size:18px;font-weight:800;color:#dc2626;">${stats.shortage}</div>
         </div>
       </div>
 
-      <!-- Main table -->
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:14px;">
+      <!-- Main table with images -->
+      <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:10px;">
         <thead>
-          <tr style="background:#1a1a1a;color:#fff;">
-            <th style="border:1px solid #333;padding:6px;text-align:left;width:4%;">STT</th>
-            <th style="border:1px solid #333;padding:6px;text-align:left;width:20%;">Sản phẩm</th>
-            <th style="border:1px solid #333;padding:6px;text-align:center;width:10%;">Tồn đầu</th>
-            <th style="border:1px solid #333;padding:6px;text-align:center;width:10%;">Nhập mới</th>
-            <th style="border:1px solid #333;padding:6px;text-align:center;width:10%;">Tổng có</th>
-            <th style="border:1px solid #333;padding:6px;text-align:center;width:10%;">Tồn cuối</th>
-            <th style="border:1px solid #333;padding:6px;text-align:center;width:10%;">Bán (TK)</th>
-            <th style="border:1px solid #333;padding:6px;text-align:center;width:10%;">Bán (App)</th>
-            <th style="border:1px solid #333;padding:6px;text-align:center;width:16%;">Chênh lệch</th>
+          <tr style="background:#1e293b;color:#fff;">
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:3%;">#</th>
+            <th style="border:1px solid #334155;padding:5px 6px;text-align:left;width:22%;">Sản phẩm</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:8%;background:#1e40af;">Tồn đầu</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:8%;background:#1e40af;">Nhập mới</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:8%;background:#1e40af;">Tổng có</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:8%;background:#6d28d9;">Tồn cuối</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:8%;background:#c2410c;">Bán (TK)</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:8%;background:#0f766e;">Bán (App)</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:12%;">Chênh lệch</th>
+            <th style="border:1px solid #334155;padding:5px 4px;text-align:center;width:15%;">Ghi chú</th>
           </tr>
         </thead>
         <tbody>
@@ -1400,93 +1408,51 @@ function _buildPrintReport(session, products, pMap, stats, dateFormatted) {
             var p = pMap[row.productId] || { name: '?', unit: '—', emoji: '🥤' };
             var isMatch = row.differenceType === 'MATCH';
             var isSurplus = row.differenceType === 'SURPLUS';
-            var bgColor = isMatch ? '#f0fdf4' : isSurplus ? '#fefce8' : '#fef2f2';
+            var rowBg = i % 2 === 0 ? '#fff' : '#f8fafc';
             var diffColor = isMatch ? '#16a34a' : isSurplus ? '#d97706' : '#dc2626';
-            var diffText = isMatch ? '✓ Khớp' : isSurplus ? ('▲ Dư ' + formatNum(Math.abs(row.difference))) : ('▼ Thiếu ' + formatNum(Math.abs(row.difference)));
-            return `
-              <tr style="background:${i % 2 === 0 ? bgColor : '#fff'};">
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;color:#888;">${i + 1}</td>
-                <td style="border:1px solid #ddd;padding:4px 6px;">
-                  <span>${p.emoji} </span><strong>${p.name}</strong>
-                  <span style="color:#888;font-size:9px;"> (${p.unit})</span>
-                </td>
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;">
-                  ${formatNum(row.openingStock)}
-                  ${row.openingFormula ? '<br><span style="color:#999;font-size:8px;font-family:monospace;">(' + row.openingFormula + ')</span>' : ''}
-                </td>
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;">
-                  ${formatNum(row.newImport)}
-                  ${row.newImportFormula ? '<br><span style="color:#999;font-size:8px;font-family:monospace;">(' + row.newImportFormula + ')</span>' : ''}
-                </td>
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;font-weight:700;">${formatNum(row.openingStock + row.newImport)}</td>
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;">
-                  ${formatNum(row.closingStock)}
-                  ${row.closingFormula ? '<br><span style="color:#999;font-size:8px;font-family:monospace;">(' + row.closingFormula + ')</span>' : ''}
-                </td>
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;font-weight:700;color:#ea580c;">${formatNum(row.actualSold)}</td>
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;font-weight:700;color:#0d9488;">${formatNum(row.cukcukSold)}</td>
-                <td style="border:1px solid #ddd;padding:4px 6px;text-align:center;font-weight:800;color:${diffColor};">${diffText}</td>
-              </tr>
-            `;
+            var diffBg = isMatch ? '#dcfce7' : isSurplus ? '#fef9c3' : '#fee2e2';
+            var diffText = isMatch ? '✓ Khớp' : isSurplus ? ('▲+' + formatNum(Math.abs(row.difference))) : ('▼−' + formatNum(Math.abs(row.difference)));
+            var imgHtml = p.image
+              ? '<img src="' + p.image + '" style="width:28px;height:28px;object-fit:contain;border-radius:3px;vertical-align:middle;margin-right:6px;">'
+              : '<span style="font-size:16px;vertical-align:middle;margin-right:4px;">' + (p.emoji || '🥤') + '</span>';
+            return '<tr style="background:' + rowBg + ';">' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;color:#94a3b8;font-size:9px;">' + (i + 1) + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 6px;">' + imgHtml + '<strong style="font-size:10px;">' + p.name + '</strong> <span style="color:#94a3b8;font-size:8px;">(' + p.unit + ')</span></td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;font-weight:600;">' + formatNum(row.openingStock) + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;font-weight:600;">' + formatNum(row.newImport) + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;font-weight:700;background:#eff6ff;">' + formatNum(row.openingStock + row.newImport) + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;font-weight:600;">' + formatNum(row.closingStock) + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;font-weight:700;color:#ea580c;">' + formatNum(row.actualSold) + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;font-weight:700;color:#0d9488;">' + formatNum(row.cukcukSold) + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;text-align:center;font-weight:800;color:' + diffColor + ';background:' + diffBg + ';border-radius:0;">' + diffText + '</td>' +
+              '<td style="border:1px solid #e2e8f0;padding:3px 4px;font-size:8px;color:#64748b;">' + (row.notes || '') + '</td>' +
+            '</tr>';
           }).join('')}
         </tbody>
         <tfoot>
-          <tr style="background:#f1f5f9;font-weight:700;">
-            <td colspan="6" style="border:1px solid #ccc;padding:6px;text-align:right;">Tổng cộng:</td>
-            <td style="border:1px solid #ccc;padding:6px;text-align:center;color:#ea580c;">${formatNum(stats.totalActual)}</td>
-            <td style="border:1px solid #ccc;padding:6px;text-align:center;color:#0d9488;">${formatNum(stats.totalCukcuk)}</td>
-            <td style="border:1px solid #ccc;padding:6px;text-align:center;">${formatNum(Math.abs(stats.totalActual - stats.totalCukcuk))}</td>
+          <tr style="background:#1e293b;color:#fff;font-weight:700;">
+            <td colspan="6" style="border:1px solid #334155;padding:5px 8px;text-align:right;font-size:10px;">TỔNG CỘNG</td>
+            <td style="border:1px solid #334155;padding:5px 4px;text-align:center;color:#fb923c;">${formatNum(stats.totalActual)}</td>
+            <td style="border:1px solid #334155;padding:5px 4px;text-align:center;color:#5eead4;">${formatNum(stats.totalCukcuk)}</td>
+            <td style="border:1px solid #334155;padding:5px 4px;text-align:center;">${formatNum(Math.abs(stats.totalActual - stats.totalCukcuk))}</td>
+            <td style="border:1px solid #334155;padding:5px 4px;"></td>
           </tr>
         </tfoot>
       </table>
 
       ${(stats.surplus > 0 || stats.shortage > 0) ? `
-        <!-- Difference details -->
-        <div style="margin-bottom:14px;">
-          <h3 style="font-size:12px;font-weight:800;margin-bottom:6px;">Chi tiết chênh lệch</h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            ${stats.surplus > 0 ? `
-              <div style="border:1px solid #fde68a;background:#fefce8;border-radius:6px;padding:10px;">
-                <div style="font-weight:700;color:#d97706;font-size:11px;margin-bottom:4px;">▲ DƯ (${stats.surplus} sản phẩm)</div>
-                ${rows.filter(function(r) { return r.differenceType === 'SURPLUS'; }).map(function(r) {
-                  var p = pMap[r.productId] || { name: '?', unit: '—' };
-                  return '<div style="font-size:10px;color:#333;">• ' + p.name + ': +' + formatNum(Math.abs(r.difference)) + ' ' + p.unit + '</div>';
-                }).join('')}
-              </div>
-            ` : ''}
-            ${stats.shortage > 0 ? `
-              <div style="border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;padding:10px;">
-                <div style="font-weight:700;color:#dc2626;font-size:11px;margin-bottom:4px;">▼ THIẾU (${stats.shortage} sản phẩm)</div>
-                ${rows.filter(function(r) { return r.differenceType === 'SHORTAGE'; }).map(function(r) {
-                  var p = pMap[r.productId] || { name: '?', unit: '—' };
-                  return '<div style="font-size:10px;color:#333;">• ' + p.name + ': -' + formatNum(Math.abs(r.difference)) + ' ' + p.unit + '</div>';
-                }).join('')}
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      ` : ''}
+      <div style="display:flex;gap:10px;margin-bottom:10px;">
+        ${stats.shortage > 0 ? '<div style="flex:1;border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;padding:8px;"><div style="font-weight:700;color:#dc2626;font-size:10px;margin-bottom:3px;">▼ THIẾU (' + stats.shortage + ' SP)</div>' + rows.filter(function(r) { return r.differenceType === 'SHORTAGE'; }).map(function(r) { var p = pMap[r.productId] || { name: '?', unit: '—' }; return '<div style="font-size:9px;color:#333;">• ' + p.name + ': −' + formatNum(Math.abs(r.difference)) + ' ' + p.unit + '</div>'; }).join('') + '</div>' : ''}
+        ${stats.surplus > 0 ? '<div style="flex:1;border:1px solid #fde68a;background:#fefce8;border-radius:6px;padding:8px;"><div style="font-weight:700;color:#d97706;font-size:10px;margin-bottom:3px;">▲ DƯ (' + stats.surplus + ' SP)</div>' + rows.filter(function(r) { return r.differenceType === 'SURPLUS'; }).map(function(r) { var p = pMap[r.productId] || { name: '?', unit: '—' }; return '<div style="font-size:9px;color:#333;">• ' + p.name + ': +' + formatNum(Math.abs(r.difference)) + ' ' + p.unit + '</div>'; }).join('') + '</div>' : ''}
+      </div>` : ''}
 
       <!-- Signatures -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:24px;text-align:center;">
-        <div>
-          <div style="height:50px;border-bottom:1px dotted #999;margin-bottom:4px;"></div>
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#888;">Người kiểm kho</div>
-        </div>
-        <div>
-          <div style="height:50px;border-bottom:1px dotted #999;margin-bottom:4px;"></div>
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#888;">Quản lý ca</div>
-        </div>
-        <div>
-          <div style="height:50px;border-bottom:1px dotted #999;margin-bottom:4px;"></div>
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#888;">Giám đốc / Quản lý</div>
-        </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:16px;text-align:center;">
+        <div><div style="height:40px;border-bottom:1px dotted #94a3b8;margin-bottom:3px;"></div><div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b;">Người kiểm kho</div><div style="font-size:9px;color:#1e293b;font-weight:600;margin-top:2px;">${cashierName}</div></div>
+        <div><div style="height:40px;border-bottom:1px dotted #94a3b8;margin-bottom:3px;"></div><div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b;">Quản lý ca</div></div>
+        <div><div style="height:40px;border-bottom:1px dotted #94a3b8;margin-bottom:3px;"></div><div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b;">Giám đốc</div></div>
       </div>
-
-      <!-- Footer -->
-      <div style="text-align:center;font-size:8px;color:#999;margin-top:12px;padding-top:8px;border-top:1px solid #eee;">
-        Báo cáo tạo tự động bởi KG-Cashier DrinkStock — ${now.toLocaleString('vi-VN')}
-      </div>
+      <div style="text-align:center;font-size:7px;color:#94a3b8;margin-top:8px;padding-top:4px;border-top:1px solid #e2e8f0;">KG-Cashier DrinkStock · ${now.toLocaleString('vi-VN')}</div>
     </div>
   `;
 }
@@ -1522,12 +1488,13 @@ function _handlePrintReport() {
     <!DOCTYPE html>
     <html><head><meta charset="UTF-8">
     <title>Báo cáo kiểm kho — ${_currentShiftName} — ${_currentDate}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-      @page { size: A4 portrait; margin: 10mm; }
+      @page { size: A4 landscape; margin: 8mm; }
       @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Inter', Arial, sans-serif; }
+      body { font-family: 'Be Vietnam Pro', Arial, sans-serif; }
+      img { max-width: 32px; max-height: 32px; }
     </style>
     </head><body onload="setTimeout(function(){window.print();},300);">
     ${reportHTML}
@@ -1561,4 +1528,8 @@ async function _handlePngExport() {
     console.error('PNG export error:', e);
     showToast('Lỗi xuất PNG: ' + e.message, 'error');
   }
+}
+
+export function destroy() {
+  // Clear any timeouts/intervals
 }

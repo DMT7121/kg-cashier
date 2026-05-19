@@ -3,7 +3,7 @@
    SAFE: All exports are safe - never throw
    ============================================ */
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyStvCPpvjlBVIUa4eLE5uZghbqT8Vfwrz9wk1GqLN94tHeI3K3TgITl1JBhTLV5o8Y/exec';
+const GAS_URL = import.meta.env.VITE_GAS_URL || '';
 
 let _online = true;
 const _queue = [];
@@ -47,14 +47,28 @@ function enqueue(action, data) {
 }
 
 async function _flushQueue() {
+  if (_queue.length === 0) return;
   try {
-    var items = _queue.slice();
-    _queue.length = 0;
-    for (var i = 0; i < items.length; i++) {
-      await apiCall(items[i].action, items[i].data, 1);
+    while (_queue.length > 0) {
+      var item = _queue[0];
+      var result = await apiCall(item.action, item.data, 1);
+      if (result && result.success) {
+        _queue.shift();
+        if (_queue.length > 0) {
+          localStorage.setItem('kg_api_queue', JSON.stringify(_queue));
+        } else {
+          localStorage.removeItem('kg_api_queue');
+        }
+      } else {
+        break; // Stop on failure, retry later
+      }
     }
-    localStorage.removeItem('kg_api_queue');
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    // Save remaining items for next attempt
+    if (_queue.length > 0) {
+      try { localStorage.setItem('kg_api_queue', JSON.stringify(_queue)); } catch(e2) { /* ignore */ }
+    }
+  }
 }
 
 // Restore queue on load

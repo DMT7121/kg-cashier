@@ -139,7 +139,7 @@ export function showEditInvoicePaymentModal(shiftId, inv, onDone) {
       tr.innerHTML='<td><select class="form-input heInvPay" data-idx="'+idx+'" style="padding:4px 8px;"><option value="cash">💵 TM</option><option value="card">💳 Thẻ</option><option value="transfer">🏦 CK</option></select></td><td class="text-right"><input type="number" class="form-input heInvAmt" data-idx="'+idx+'" value="0" style="width:120px;text-align:right;padding:4px 8px;"></td>';
       tbody.appendChild(tr);
     });
-    document.getElementById('heInvSave')?.addEventListener('click',function(){
+    document.getElementById('heInvSave')?.addEventListener('click',async function(){
       var np=[];
       document.querySelectorAll('.heInvPay').forEach(function(sel){
         var idx=sel.dataset.idx;
@@ -148,7 +148,7 @@ export function showEditInvoicePaymentModal(shiftId, inv, onDone) {
         if(amt>0)np.push({method:sel.value,amount:amt});
       });
       if(np.length===0){showToast('Cần ít nhất 1 dòng thanh toán','warning');return;}
-      try{editHistoryInvoicePayment(shiftId,inv.refId,np);hideModal();showToast('✅ Đã cập nhật PTTT','success');if(onDone)onDone();}
+      try{await editHistoryInvoicePayment(shiftId,inv.refId,np);hideModal();showToast('✅ Đã cập nhật PTTT','success');if(onDone)onDone();}
       catch(e){showToast(e.message,'error');}
     });
   },100);
@@ -186,8 +186,8 @@ export function showEditDayInvoicePaymentModal(dateStr, inv, onDone) {
       });
       if(np.length===0){showToast('Cần ít nhất 1 dòng thanh toán','warning');return;}
       try{
-        import('../store.js').then(module => {
-          module.editDayInvoicePayment(dateStr, inv.refId, np);
+        import('../integration/invoiceStore.js').then(module => {
+          module.editInvoicePayment(inv.refId, np);
           window.hideModal();
           showToast('✅ Đã cập nhật PTTT', 'success');
           if(onDone) onDone();

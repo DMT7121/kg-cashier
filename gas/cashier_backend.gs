@@ -534,7 +534,11 @@ function _getSettings() {
   _getSheet('KG_SETTINGS', headers);
   const rows = _getSheetData('KG_SETTINGS');
   const settings = {};
-  rows.forEach(r => { settings[r.key] = r.value; });
+  rows.forEach(r => { 
+    let val = r.value;
+    try { val = JSON.parse(val); } catch(e) {}
+    settings[r.key] = val; 
+  });
   return { success: true, settings: settings };
 }
 
@@ -543,6 +547,7 @@ function _saveSettings(data) {
   const sheet = _getSheet('KG_SETTINGS', headers);
 
   Object.entries(data.settings || {}).forEach(([key, value]) => {
+    const stringValue = typeof value === 'object' ? JSON.stringify(value) : value;
     // Find existing row
     const lastRow = sheet.getLastRow();
     let found = false;
@@ -550,14 +555,14 @@ function _saveSettings(data) {
       const keys = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
       for (let i = 0; i < keys.length; i++) {
         if (keys[i][0] === key) {
-          sheet.getRange(i + 2, 2).setValue(value);
+          sheet.getRange(i + 2, 2).setValue(stringValue);
           found = true;
           break;
         }
       }
     }
     if (!found) {
-      sheet.appendRow([key, value]);
+      sheet.appendRow([key, stringValue]);
     }
   });
 

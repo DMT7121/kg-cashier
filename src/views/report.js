@@ -6,6 +6,7 @@ import { formatCurrency, formatDate, formatTime, denominations, showToast } from
 
 var _activeTab = 'day'; // day | week | month | quarter
 var _refDate = null;    // null = today/now, or Date object for custom period
+var _fromHistory = false; // true when _refDate was set by history navigation
 
 // Global hook: allow other views (e.g. history) to set the report date before navigation.
 // Registered at module level so it's available before init() runs.
@@ -13,11 +14,18 @@ window._setReportDate = function(dateStr) {
   if (dateStr) {
     _activeTab = 'day';
     _refDate = new Date(dateStr + 'T12:00:00');
+    _fromHistory = true;
   }
 };
 
 // ── RENDER ──
 export function render() {
+  // If not navigating from history, reset to today (prevent stale date from previous history view)
+  if (!_fromHistory) {
+    _refDate = null;
+  }
+  _fromHistory = false; // consume the flag
+
   var settings = getSettings();
   var storeName = settings.storeName || "KING's GRILL";
 
@@ -203,7 +211,7 @@ function _renderTabContent() {
 
     // Tab "Ngày" → thêm Phiếu bàn giao ca (cho ngày được chọn)
     if (_activeTab === 'day') {
-      html += '<div class="rpt-handover-section">' + _buildHandoverHTML(rev) + '</div>';
+      html += '<div class="rpt-handover-section">' + _buildHandoverHTML(rev, store) + '</div>';
     }
 
     container.innerHTML = html;
@@ -311,7 +319,7 @@ function _buildRevenueReport(rev, daily, unpushedCount) {
 }
 
 // ── Build handover HTML (returns string) ──
-function _buildHandoverHTML(revSummary) {
+function _buildHandoverHTML(revSummary, store) {
   var fc = formatCurrency;
   var now = new Date();
   var settings = getSettings();
@@ -332,6 +340,8 @@ function _buildHandoverHTML(revSummary) {
   }
 
   var shiftIdToPrint = (typeof window._setReportShiftId === 'function') ? window._setReportShiftId() : null;
+  // CRITICAL: consume the flag immediately so it doesn't persist across navigations
+  window._setReportShiftId = null;
 
   var currentShift = getCurrentShift();
   var history = getShiftHistory();
@@ -348,21 +358,37 @@ function _buildHandoverHTML(revSummary) {
     
     if (target) {
       printSub = 'Ngày: ' + formatDate(target.date) + ' — Ca ' + target.shiftNumber;
-      if (target.summarySnapshot) {
-         cukcukRev.total = target.summarySnapshot.totalRevenue || 0;
-         cukcukRev.cash = target.summarySnapshot.totalCash || 0;
-         cukcukRev.card = target.summarySnapshot.totalCard || 0;
-         cukcukRev.transfer = target.summarySnapshot.totalTransfer || 0;
-         cukcukRev.bills = target.summarySnapshot.totalBills || 0;
-      }
+      
+      // Calculate POS exact revenue for THIS shift
+      var shiftInvoices = target.cukcukInvoicesSnapshot || store.getInvoicesByShiftTime(target.date, target.startTime, target.endTime);
+      cukcukRev.total = 0; cukcukRev.cash = 0; cukcukRev.card = 0; cukcukRev.transfer = 0; cukcukRev.bills = 0;
+      shiftInvoices.forEach(function(inv) {
+        if (inv.unpaid) return;
+        cukcukRev.bills++;
+        var hasPay = false;
+        (inv.payments || []).forEach(function(p) {
+          hasPay = true;
+          if (p.method === 'cash') cukcukRev.cash += p.amount;
+          else if (p.method === 'card') cukcukRev.card += p.amount;
+          else if (p.method === 'transfer') cukcukRev.transfer += p.amount;
+          cukcukRev.total += p.amount;
+        });
+        if (!hasPay) {
+          cukcukRev.total += inv.amount;
+          cukcukRev.cash += inv.amount; // default
+        }
+      });
+
       isAutoPrint = !!target.endTime;
-      isSupplemental = target.audit && target.audit.length > 0;
+      isSupplemental = !!target.originalSummarySnapshot;
     }
   } else {
     // DAY MODE (Combined)
+    var isHistoryMode = !!window._historyReportMode;
+    window._historyReportMode = false; // consume the flag
     var dayShifts = history.filter(function(s) { return s.date === selectedDateStr; });
-    if (currentShift && currentShift.date === selectedDateStr && !dayShifts.find(function(s){ return s.id === currentShift.id; })) {
-      dayShifts.unshift(currentShift); // Current shift represents ongoing data
+    if (!isHistoryMode && currentShift && currentShift.date === selectedDateStr && !dayShifts.find(function(s){ return s.id === currentShift.id; })) {
+      dayShifts.unshift(currentShift); // Only include ongoing shift when NOT viewing history
     }
     
     printTitle = "BÁO CÁO TỔNG KẾT NGÀY";
@@ -395,8 +421,29 @@ function _buildHandoverHTML(revSummary) {
         pinnedCash: lastShift.pinnedCash || {},
         keepCash: lastShift.keepCash || {},
         handoverCash: lastShift.handoverCash || {},
+        originalSummarySnapshot: null, // Day mode has no diff highlighting
         audit: [] // No audit trail needed for combined report
       };
+      
+      var dayInvoices = store.getInvoicesForPeriod('day', _refDate);
+      cukcukRev.total = 0; cukcukRev.cash = 0; cukcukRev.card = 0; cukcukRev.transfer = 0; cukcukRev.bills = 0;
+      dayInvoices.forEach(function(inv) {
+        if (inv.unpaid) return;
+        cukcukRev.bills++;
+        var hasPay = false;
+        (inv.payments || []).forEach(function(p) {
+          hasPay = true;
+          if (p.method === 'cash') cukcukRev.cash += p.amount;
+          else if (p.method === 'card') cukcukRev.card += p.amount;
+          else if (p.method === 'transfer') cukcukRev.transfer += p.amount;
+          cukcukRev.total += p.amount;
+        });
+        if (!hasPay) {
+          cukcukRev.total += inv.amount;
+          cukcukRev.cash += inv.amount;
+        }
+      });
+      
       isAutoPrint = !!lastShift.endTime;
     } else {
       // NO SHIFTS (POS ONLY)
@@ -436,15 +483,29 @@ function _buildHandoverHTML(revSummary) {
   var cc = target.cashCount || {};
   var cashCountTotal = denominations.reduce(function(s, d) { return s + (d.value * (cc[d.value] || 0)); }, 0);
   
+  // NOTE: expectedCash calculation uses manualCash + cukcukRev.cash 
+  // because cukcukRev.cash is strictly POS cash.
   var expectedCash = (target.startingCash || 0) + manualCash + cukcukRev.cash - totalExpenseAmt + otherIncomeAmt - otherExpenseAmt;
   var combinedIncome = cukcukRev.total + totalManualIncome;
   var billCount = cukcukRev.bills + manualIncomeTxs.length;
   var discrepancy = cashCountTotal - expectedCash;
 
+  function _val(curVal, origField, isMoney) {
+    if (!isSupplemental) return isMoney ? fc(curVal) : curVal;
+    var orig = (target.originalSummarySnapshot || {})[origField];
+    if (orig !== undefined && curVal !== orig) {
+      return '<span style="color:#d97706;font-weight:700;" title="Gốc: ' + (isMoney ? fc(orig) : orig) + '">' + (isMoney ? fc(curVal) : curVal) + ' *</span>';
+    }
+    return isMoney ? fc(curVal) : curVal;
+  }
+
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <div style="font-size:16px;font-weight:700;color:var(--text);">📋 ${printTitle}</div>
       <div class="btn-group">
+        <button class="btn btn-outline btn-sm" id="btnConfigReport">
+          <span class="material-symbols-rounded">tune</span> Cấu hình
+        </button>
         <button class="btn btn-outline btn-sm" id="btnPreviewA4">
           <span class="material-symbols-rounded">preview</span> Xem A4
         </button>
@@ -475,72 +536,93 @@ function _buildHandoverHTML(revSummary) {
         </div>
 
         <div class="a4-two-col">
-          <div class="a4-col">
-            ${cukcukRev.bills > 0 ? '<div class="a4-section-title a4-income-title">▌DOANH THU CUKCUK (' + cukcukRev.bills + ' bill)</div><table class="a4-table"><tbody><tr><td>Tiền mặt</td><td class="r">' + fc(cukcukRev.cash) + '</td></tr><tr><td>Quẹt thẻ</td><td class="r">' + fc(cukcukRev.card) + '</td></tr><tr><td>Chuyển khoản</td><td class="r">' + fc(cukcukRev.transfer) + '</td></tr></tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng CUKCUK</strong></td><td class="r"><strong>' + fc(cukcukRev.total) + '</strong></td></tr></tfoot></table>' : ''}
-            ${expenseTxs.length > 0 ? '<div class="a4-section-title" style="color:#dc2626;margin-top:10px;">▌CHI TRONG CA (' + expenseTxs.length + ')</div><table class="a4-table"><tbody>' + expenseTxs.map(function(t) { return '<tr><td style="color:#dc2626;">✗ ' + (t.note || 'Chi phí') + '</td><td class="r" style="color:#dc2626;">−' + fc(t.amount) + '</td></tr>'; }).join('') + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng chi</strong></td><td class="r" style="color:#dc2626;"><strong>−' + fc(totalExpenseAmt) + '</strong></td></tr></tfoot></table>' : ''}
-            ${manualIncomeTxs.length > 0 ? '<div class="a4-section-title" style="color:#16a34a;margin-top:10px;">▌THU NGOÀI POS (' + manualIncomeTxs.length + ')</div><table class="a4-table"><tbody>' + manualIncomeTxs.map(function(t) { return '<tr><td style="color:#16a34a;">✓ ' + (t.note || 'Thu nhập') + '</td><td class="r" style="color:#16a34a;">+' + fc(t.amount) + '</td></tr>'; }).join('') + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng thu ngoài</strong></td><td class="r" style="color:#16a34a;"><strong>+' + fc(totalManualIncome) + '</strong></td></tr></tfoot></table>' : ''}
-            ${billCount === 0 && expenseTxs.length === 0 ? '<div class="a4-empty-box">Không có giao dịch</div>' : ''}
-            <table class="a4-table" style="margin-top:4px;"><tfoot><tr class="a4-highlight-row"><td><strong>TỔNG DOANH THU (${billCount} bill)</strong></td><td class="r"><strong>${fc(combinedIncome)}</strong></td></tr></tfoot></table>
-          </div>
-          <div class="a4-col">
-            <div class="a4-section-title a4-summary-title">▌TỔNG KẾT</div>
-            <table class="a4-table a4-summary-table"><tbody>
-              ${cukcukRev.bills > 0 ? '<tr><td>DT CUKCUK (' + cukcukRev.bills + ' bill)</td><td class="r a4-income">' + fc(cukcukRev.total) + '</td></tr>' : ''}
-              <tr><td>Chi phí trong ca</td><td class="r a4-expense">−${fc(totalExpenseAmt)}</td></tr>
-              <tr><td>Tiền đầu ca</td><td class="r">${fc(target.startingCash)}</td></tr>
-            </tbody><tfoot>
-              <tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>${fc(expectedCash)}</strong></td></tr>
-              <tr><td>TM kiểm kê thực tế</td><td class="r">${fc(cashCountTotal)}</td></tr>
-              <tr class="a4-disc-row ${Math.abs(discrepancy) > 0 ? 'a4-disc-warn' : 'a4-disc-ok'}"><td><strong>CHÊNH LỆCH</strong></td><td class="r"><strong>${discrepancy === 0 ? '✓ 0 đ' : (discrepancy > 0 ? '+' : '') + fc(discrepancy)}</strong></td></tr>
-            </tfoot></table>
+          ${(function() {
+            var confStr = localStorage.getItem('kg-report-layout');
+            var conf = confStr ? JSON.parse(confStr) : {
+              order: ['cukcuk', 'expense', 'manual', 'summary', 'ket', 'handover', 'general'],
+              visible: { cukcuk: true, expense: true, manual: true, summary: true, ket: true, handover: true, general: true }
+            };
+            
+            var blocks = {};
+            
+            // 1. CUKCUK
+            blocks['cukcuk'] = cukcukRev.bills > 0 ? '<div class="a4-section-wrap"><div class="a4-section-title a4-income-title">▌DOANH THU CUKCUK (' + cukcukRev.bills + ' bill)</div><table class="a4-table"><tbody><tr><td>Tiền mặt</td><td class="r">' + _val(cukcukRev.cash, 'cashIncome', true) + '</td></tr><tr><td>Quẹt thẻ</td><td class="r">' + _val(cukcukRev.card, 'cardIncome', true) + '</td></tr><tr><td>Chuyển khoản</td><td class="r">' + _val(cukcukRev.transfer, 'transferIncome', true) + '</td></tr></tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng CUKCUK</strong></td><td class="r"><strong>' + _val(cukcukRev.total, 'cukcukRevenue', true) + '</strong></td></tr></tfoot></table></div>' : '';
+            
+            // 2. Chi phí
+            blocks['expense'] = expenseTxs.length > 0 ? '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#dc2626;">▌CHI TRONG CA (' + expenseTxs.length + ')</div><table class="a4-table"><tbody>' + expenseTxs.map(function(t) { return '<tr><td style="color:#dc2626;">✗ ' + (t.note || 'Chi phí') + '</td><td class="r" style="color:#dc2626;">−' + fc(t.amount) + '</td></tr>'; }).join('') + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng chi</strong></td><td class="r" style="color:#dc2626;"><strong>−' + _val(totalExpenseAmt, 'totalExpense', true) + '</strong></td></tr></tfoot></table></div>' : '';
+            
+            // 3. Thu ngoài
+            blocks['manual'] = manualIncomeTxs.length > 0 ? '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#16a34a;">▌THU NGOÀI POS (' + manualIncomeTxs.length + ')</div><table class="a4-table"><tbody>' + manualIncomeTxs.map(function(t) { return '<tr><td style="color:#16a34a;">✓ ' + (t.note || 'Thu nhập') + '</td><td class="r" style="color:#16a34a;">+' + fc(t.amount) + '</td></tr>'; }).join('') + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng thu ngoài</strong></td><td class="r" style="color:#16a34a;"><strong>+' + fc(totalManualIncome) + '</strong></td></tr></tfoot></table></div>' : '';
+            
+            // 4. Tổng kết
+            blocks['summary'] = '<div class="a4-section-wrap"><div class="a4-section-title a4-summary-title">▌TỔNG KẾT</div><table class="a4-table a4-summary-table"><tbody>' +
+              (cukcukRev.bills > 0 ? '<tr><td>DT CUKCUK (' + cukcukRev.bills + ' bill)</td><td class="r a4-income">' + _val(cukcukRev.total, 'cukcukRevenue', true) + '</td></tr>' : '') +
+              '<tr><td>Chi phí trong ca</td><td class="r a4-expense">−' + _val(totalExpenseAmt, 'totalExpense', true) + '</td></tr>' +
+              '<tr><td>Tiền đầu ca</td><td class="r">' + fc(target.startingCash) + '</td></tr>' +
+              '</tbody><tfoot><tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>' + _val(expectedCash, 'expectedCash', true) + '</strong></td></tr>' +
+              '<tr><td>TM kiểm kê thực tế</td><td class="r">' + _val(cashCountTotal, 'cashCountTotal', true) + '</td></tr>' +
+              '<tr class="a4-disc-row ' + (Math.abs(discrepancy) > 0 ? 'a4-disc-warn' : 'a4-disc-ok') + '"><td><strong>CHÊNH LỆCH</strong></td><td class="r"><strong>' + (discrepancy === 0 && !target.originalSummarySnapshot ? '✓ 0 đ' : (discrepancy > 0 ? '+' : '') + _val(discrepancy, 'discrepancy', true)) + '</strong></td></tr></tfoot></table></div>';
 
-            ${(function() {
-              var pc = target.pinnedCash || {};
-              var kc = target.keepCash || {};
-              var hc = target.handoverCash || {};
-              var hasData = Object.keys(pc).length > 0 || Object.keys(kc).length > 0 || Object.keys(hc).length > 0;
-              if (!hasData) return '';
+            // Cash denom logic
+            var pc = target.pinnedCash || {};
+            var kc = target.keepCash || {};
+            var hc = target.handoverCash || {};
+            var ccount = target.cashCount || {};
+            var ketRows = '', handRows = '', ketTotal = 0, handTotal = 0;
 
-              var ketRows = '';
-              var handRows = '';
-              var ketTotal = 0;
-              var handTotal = 0;
+            for (var di = 0; di < denominations.length; di++) {
+              var dv = denominations[di].value, dl = denominations[di].label;
+              var pinQty = pc[dv] || 0, keepQty = kc[dv] || 0, handQty = hc[dv] || 0;
+              var ketQty = pinQty + keepQty;
+              if (ketQty > 0) {
+                var detail = pinQty > 0 && keepQty > 0 ? ' (' + pinQty + ' ghim + ' + keepQty + ' giữ)' : (pinQty > 0 ? ' (ghim)' : ' (giữ)');
+                ketRows += '<tr><td>' + ketQty + ' x ' + dl + detail + '</td><td class="r">' + fc(dv * ketQty) + '</td></tr>';
+                ketTotal += dv * ketQty;
+              }
+              if (handQty > 0) {
+                handRows += '<tr><td>' + handQty + ' x ' + dl + '</td><td class="r">' + fc(dv * handQty) + '</td></tr>';
+                handTotal += dv * handQty;
+              }
+            }
 
-              for (var di = 0; di < denominations.length; di++) {
-                var dv = denominations[di].value;
-                var dl = denominations[di].label;
-                var pinQty = pc[dv] || 0;
-                var keepQty = kc[dv] || 0;
-                var handQty = hc[dv] || 0;
-                var ketQty = pinQty + keepQty;
-                if (ketQty > 0) {
-                  var detail = '';
-                  if (pinQty > 0 && keepQty > 0) detail = ' (' + pinQty + ' ghim + ' + keepQty + ' giữ)';
-                  else if (pinQty > 0) detail = ' (ghim)';
-                  else detail = ' (giữ)';
-                  ketRows += '<tr><td>' + ketQty + ' x ' + dl + detail + '</td><td class="r">' + fc(dv * ketQty) + '</td></tr>';
-                  ketTotal += dv * ketQty;
+            blocks['ket'] = ketRows ? '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#e8a838;">▌TIỀN GIỮ LẠI (KÉT)</div><table class="a4-table"><tbody>' + ketRows + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng két</strong></td><td class="r"><strong>' + fc(ketTotal) + '</strong></td></tr></tfoot></table></div>' : '';
+            blocks['handover'] = handRows ? '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#22c55e;">▌TIỀN BÀN GIAO</div><table class="a4-table"><tbody>' + handRows + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng bàn giao</strong></td><td class="r"><strong>' + fc(handTotal) + '</strong></td></tr></tfoot></table></div>' : '';
+            
+            blocks['general'] = '';
+            if (!ketRows && !handRows && Object.keys(ccount).length > 0) {
+              var generalRows = '', generalTotal = 0;
+              for (var di2 = 0; di2 < denominations.length; di2++) {
+                var dv2 = denominations[di2].value, dl2 = denominations[di2].label, qty2 = ccount[dv2] || 0;
+                if (qty2 > 0) {
+                  generalRows += '<tr><td>' + qty2 + ' x ' + dl2 + '</td><td class="r">' + fc(dv2 * qty2) + '</td></tr>';
+                  generalTotal += dv2 * qty2;
                 }
-                if (handQty > 0) {
-                  handRows += '<tr><td>' + handQty + ' x ' + dl + '</td><td class="r">' + fc(dv * handQty) + '</td></tr>';
-                  handTotal += dv * handQty;
+              }
+              if (generalRows) {
+                blocks['general'] = '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#0284c7;">▌CHI TIẾT KIỂM KÊ TIỀN</div><table class="a4-table"><tbody>' + generalRows + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng kiểm kê</strong></td><td class="r"><strong>' + fc(generalTotal) + '</strong></td></tr></tfoot></table></div>';
+              }
+            }
+
+            // Always add total income block at the start of CUKCUK or after manual if CUKCUK is hidden
+            var totalIncomeBlock = '<div class="a4-section-wrap"><table class="a4-table" style="margin-top:4px;"><tfoot><tr class="a4-highlight-row"><td><strong>TỔNG DOANH THU (' + billCount + ' bill)</strong></td><td class="r"><strong>' + _val(combinedIncome, 'totalIncome', true) + '</strong></td></tr></tfoot></table></div>';
+
+            // Build HTML
+            var html = '';
+            conf.order.forEach(function(key) {
+              if (conf.visible[key] && blocks[key]) {
+                html += blocks[key];
+                if (key === 'cukcuk' || (key === 'manual' && !conf.visible.cukcuk)) {
+                  // html += totalIncomeBlock; // Optional if they want it specifically here
                 }
               }
-
-              var html = '';
-              if (ketRows) {
-                html += '<div class="a4-section-title" style="color:#e8a838;margin-top:10px;">▌TIỀN GIỮ LẠI (KÉT)</div>';
-                html += '<table class="a4-table"><tbody>' + ketRows + '</tbody>';
-                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng két</strong></td><td class="r"><strong>' + fc(ketTotal) + '</strong></td></tr></tfoot></table>';
-              }
-              if (handRows) {
-                html += '<div class="a4-section-title" style="color:#22c55e;margin-top:10px;">▌TIỀN BÀN GIAO</div>';
-                html += '<table class="a4-table"><tbody>' + handRows + '</tbody>';
-                html += '<tfoot><tr class="a4-total-row"><td><strong>Tổng bàn giao</strong></td><td class="r"><strong>' + fc(handTotal) + '</strong></td></tr></tfoot></table>';
-              }
-              return html;
-            })()}
-          </div>
+            });
+            // We append total income explicitly if visible wasn't checked but we want it
+            if (conf.visible.cukcuk || conf.visible.manual) {
+               html += totalIncomeBlock;
+            }
+            
+            return html || '<div class="a4-empty-box" style="width:100%;grid-column:1/-1;">Không có dữ liệu báo cáo</div>';
+          })()}
         </div>
 
         <div class="a4-signatures">
@@ -549,7 +631,7 @@ function _buildHandoverHTML(revSummary) {
           <div class="a4-sig"><div class="a4-sig-title">Quản lý xác nhận</div><div class="a4-sig-line"></div><div class="a4-sig-name">&nbsp;</div></div>
         </div>
         <div class="a4-footer">
-          ${(target.audit && target.audit.length > 0) ? '<div style="text-align:left;font-size:10px;color:#666;margin-bottom:8px;padding-top:4px;border-top:1px dashed #ccc;">* Lịch sử chỉnh sửa:<br>' + target.audit.map(function(a){return ' - ' + formatTime(a.timestamp) + ' ' + formatDate(a.timestamp) + ': ' + a.action;}).join('<br>') + '</div>' : ''}
+          ${isSupplemental ? '<div style="text-align:center;font-size:11px;color:#d97706;margin-bottom:8px;padding-top:4px;border-top:1px dashed #ccc;">* BẢN IN NÀY CÓ CHỨA CÁC ĐIỀU CHỈNH SAU KHI ĐÓNG CA</div>' : ''}
           In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Báo cáo ${isAutoPrint ? (isSupplemental ? 'bổ sung' : 'tự động') : 'tạm tính'}
         </div>
       </div>
@@ -573,6 +655,125 @@ function _bindPrintButtons() {
   document.getElementById('btnPreviewA4')?.addEventListener('click', function() {
     var sheet = document.getElementById('a4Sheet');
     if (sheet) sheet.classList.toggle('a4-preview-mode');
+  });
+  // Config
+  document.getElementById('btnConfigReport')?.addEventListener('click', function() {
+    _showReportConfigModal();
+  });
+}
+
+function _showReportConfigModal() {
+  var confStr = localStorage.getItem('kg-report-layout');
+  var conf = confStr ? JSON.parse(confStr) : {
+    order: ['cukcuk', 'expense', 'manual', 'summary', 'ket', 'handover', 'general'],
+    visible: { cukcuk: true, expense: true, manual: true, summary: true, ket: true, handover: true, general: true }
+  };
+  
+  var labels = {
+    cukcuk: 'Doanh thu CUKCUK',
+    expense: 'Chi trong ca',
+    manual: 'Thu ngoài POS',
+    summary: 'Bảng tổng kết',
+    ket: 'Tiền giữ lại (Két)',
+    handover: 'Tiền bàn giao',
+    general: 'Chi tiết kiểm kê'
+  };
+
+  var m = document.createElement('div');
+  m.className = 'modal-backdrop';
+  
+  var html = '<div class="modal-surface" style="width:100%;max-width:400px;display:flex;flex-direction:column;max-height:90vh;">';
+  html += '<div class="modal-header"><h3>Cấu hình Báo cáo</h3><button class="modal-close" onclick="this.closest(\'.modal-backdrop\').remove()"><span class="material-symbols-rounded">close</span></button></div>';
+  html += '<div class="modal-body" style="overflow-y:auto;flex:1;padding:16px;">';
+  html += '<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Bật/tắt các thành phần trên phiếu bàn giao ca. (Có thể kéo thả để sắp xếp)</p>';
+  html += '<style>.drag-over { border-top: 2px solid var(--primary) !important; background: var(--bg-hover) !important; }</style>';
+  html += '<div style="display:flex;flex-direction:column;gap:8px;" id="rptConfigList">';
+  
+  conf.order.forEach(function(key) {
+    if (!labels[key]) return;
+    var checked = conf.visible[key] ? 'checked' : '';
+    html += '<label class="rpt-drag-item" draggable="true" data-key="' + key + '" style="display:flex;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:8px;cursor:grab;border:1px solid var(--border); transition:all 0.2s;">';
+    html += '<span class="material-symbols-rounded" style="color:var(--text-muted);cursor:grab;margin-right:8px;">drag_indicator</span>';
+    html += '<input type="checkbox" ' + checked + ' style="width:18px;height:18px;margin-right:12px;cursor:pointer;">';
+    html += '<span style="font-weight:600;font-size:14px;flex:1;">' + labels[key] + '</span>';
+    html += '</label>';
+  });
+  html += '</div>';
+
+  html += '</div>';
+  html += '<div class="modal-footer" style="padding:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">';
+  html += '<button class="btn btn-primary" id="btnSaveRptConfig">Lưu cấu hình</button>';
+  html += '</div></div>';
+  
+  m.innerHTML = html;
+  document.body.appendChild(m);
+
+  // Drag and Drop Logic
+  var list = m.querySelector('#rptConfigList');
+  var dragSrcEl = null;
+
+  list.querySelectorAll('.rpt-drag-item').forEach(function(item) {
+    item.addEventListener('dragstart', function(e) {
+      dragSrcEl = this;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', this.innerHTML);
+      this.style.opacity = '0.5';
+    });
+    item.addEventListener('dragover', function(e) {
+      if (e.preventDefault) e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    });
+    item.addEventListener('dragenter', function(e) {
+      if (this !== dragSrcEl) this.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave', function(e) {
+      this.classList.remove('drag-over');
+    });
+    item.addEventListener('drop', function(e) {
+      if (e.stopPropagation) e.stopPropagation();
+      this.classList.remove('drag-over');
+      if (dragSrcEl !== this) {
+        var rect = this.getBoundingClientRect();
+        var mid = rect.top + rect.height / 2;
+        if (e.clientY > mid) {
+          this.parentNode.insertBefore(dragSrcEl, this.nextSibling);
+        } else {
+          this.parentNode.insertBefore(dragSrcEl, this);
+        }
+      }
+      return false;
+    });
+    item.addEventListener('dragend', function(e) {
+      this.style.opacity = '1';
+      list.querySelectorAll('.rpt-drag-item').forEach(function(i) { i.classList.remove('drag-over'); });
+    });
+  });
+
+  // Save Logic
+  m.querySelector('#btnSaveRptConfig').addEventListener('click', function() {
+    var newOrder = [];
+    var newVisible = {};
+    m.querySelectorAll('.rpt-drag-item').forEach(function(el) {
+      var key = el.dataset.key;
+      var isChecked = el.querySelector('input[type="checkbox"]').checked;
+      newOrder.push(key);
+      newVisible[key] = isChecked;
+    });
+    
+    // Safety check - make sure all expected keys exist even if removed from DOM somehow
+    Object.keys(labels).forEach(function(k) {
+      if (newOrder.indexOf(k) === -1) {
+        newOrder.push(k);
+        newVisible[k] = false;
+      }
+    });
+
+    conf.order = newOrder;
+    conf.visible = newVisible;
+    localStorage.setItem('kg-report-layout', JSON.stringify(conf));
+    m.remove();
+    _renderTabContent(); // Redraw
   });
 }
 

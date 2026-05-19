@@ -2,24 +2,25 @@
    POS — Order, Tính tiền, In Bill
    Phase 1+2: Table map, Order cart, Kitchen/Bar routing, Catalog MGMT
    ═══════════════════════════════════════ */
-import { getCurrentShift, addTransaction } from '../store.js';
+import { getCurrentShift, addTransaction, getSettings } from '../store.js';
 import { showToast, showModal, hideModal, formatCurrency } from '../utils.js';
 
 // ── Storage keys ──────────────────────
 const CATALOG_KEY  = 'kg-pos-catalog';
-const TABLES_KEY   = 'kg-pos-tables';
 const ORDERS_KEY   = 'kg-pos-orders';
-const PRINTER_KEY  = 'kg-pos-printers';
 
 // ── Printer config helpers ────────────
 function getPrinterCfg() {
-  try { var s = localStorage.getItem(PRINTER_KEY); if (s) return JSON.parse(s); } catch(e){}
-  return { kitchenIp: '', sashimiIp: '', barIp: '', useQzTray: false };
+  var settings = getSettings();
+  return settings.printer || { kitchenIp: '', sashimiIp: '', barIp: '', useQzTray: false };
 }
-function savePrinterCfg(cfg) { localStorage.setItem(PRINTER_KEY, JSON.stringify(cfg)); }
 
 // ── Catalog CRUD helpers ──────────────
-function saveCatalog(catalog) { localStorage.setItem(CATALOG_KEY, JSON.stringify(catalog)); }
+function saveCatalog(catalog) {
+  var settings = getSettings();
+  settings.posCatalog = catalog;
+  import('../store.js').then(store => store.updateSettings(settings));
+}
 
 // ── Default catalog ───────────────────
 const DEFAULT_CATALOG = [
@@ -65,21 +66,37 @@ function _generateDefaultTables() {
 
 // ── Data helpers ──────────────────────
 function getCatalog() {
-  try { var s = localStorage.getItem(CATALOG_KEY); if (s) return JSON.parse(s); } catch(e){}
-  localStorage.setItem(CATALOG_KEY, JSON.stringify(DEFAULT_CATALOG));
-  return DEFAULT_CATALOG.slice();
-}
-function getTables() {
-  var storedVer = Number(localStorage.getItem(TABLES_VERSION_KEY)) || 0;
-  if (storedVer < TABLES_VERSION) {
-    var tables = _generateDefaultTables();
-    localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
-    localStorage.setItem(TABLES_VERSION_KEY, String(TABLES_VERSION));
-    return tables;
+  var settings = getSettings();
+  if (settings.posCatalog && settings.posCatalog.length > 0) {
+    return settings.posCatalog;
   }
-  try { var s = localStorage.getItem(TABLES_KEY); if (s) return JSON.parse(s); } catch(e){}
+  // Try migrating from old localStorage
+  try {
+    var old = localStorage.getItem(CATALOG_KEY);
+    if (old) {
+      var parsed = JSON.parse(old);
+      if (parsed && parsed.length > 0) {
+        settings.posCatalog = parsed;
+        import('../store.js').then(store => store.updateSettings(settings));
+        return parsed;
+      }
+    }
+  } catch(e) {}
+  
+  settings.posCatalog = DEFAULT_CATALOG.slice();
+  import('../store.js').then(store => store.updateSettings(settings));
+  return settings.posCatalog;
+}
+
+function getTables() {
+  var settings = getSettings();
+  if (settings.posTables && settings.posTables.length > 0) {
+    return settings.posTables;
+  }
+  // Initialize default
   var tables = _generateDefaultTables();
-  localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
+  settings.posTables = tables;
+  import('../store.js').then(store => store.updateSettings(settings));
   return tables;
 }
 function getOrders() {

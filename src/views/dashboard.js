@@ -81,30 +81,30 @@ function renderShiftDashboard(shift) {
         }
       } catch(e) {}
       return `
-    <div class="card" style="margin-bottom:16px;border:1px solid rgba(16,185,129,0.3);background:linear-gradient(135deg, rgba(16,185,129,0.05) 0%, rgba(16,185,129,0.01) 100%);">
-      <div class="card-header" style="border-bottom-color:rgba(16,185,129,0.15);">
-        <h3 style="color:#10b981;display:flex;align-items:center;gap:8px;margin:0;">
+    <div class="card mb-4 border-emerald-200 bg-emerald-50/30">
+      <div class="card-header border-emerald-100">
+        <h3 class="text-emerald-600 flex items-center gap-2 m-0 text-lg">
           <span class="material-symbols-rounded">point_of_sale</span> Doanh thu POS — ${new Date().toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric'})}
         </h3>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <button class="btn btn-success btn-sm" id="btnDashSyncCukcuk" style="white-space:nowrap;">
+        <div class="flex items-center gap-2">
+          <button class="btn btn-success btn-sm whitespace-nowrap" id="btnDashSyncCukcuk">
             <span class="material-symbols-rounded">sync</span> Đồng bộ
           </button>
         </div>
       </div>
       <!-- Sync Status Bar -->
       <div id="syncStatusBar" class="sync-status-bar"></div>
-      <div class="card-body" style="padding:16px 20px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div style="text-align:center;padding:12px;background:rgba(16,185,129,0.08);border-radius:10px;">
-            <div class="text-muted" style="font-size:11px;margin-bottom:6px;">💰 Doanh thu bán hàng (CUKCUK)</div>
-            <div style="font-size:28px;font-weight:800;color:#10b981;">${formatCurrency(cukRev.total)}</div>
-            <div style="font-size:12px;color:#10b981;margin-top:4px;">${cukRev.bills} bill thanh toán</div>
+      <div class="card-body p-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="text-center p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+            <div class="text-xs text-emerald-600/70 font-semibold uppercase tracking-wider mb-2">💰 Doanh thu bán hàng (CUKCUK)</div>
+            <div class="text-3xl font-bold text-emerald-600">${formatCurrency(cukRev.total)}</div>
+            <div class="text-xs text-emerald-600 mt-2">${cukRev.bills} bill thanh toán</div>
           </div>
-          <div style="text-align:center;padding:12px;background:rgba(59,130,246,0.08);border-radius:10px;">
-            <div class="text-muted" style="font-size:11px;margin-bottom:6px;">✍️ Thu nhập thủ công khác</div>
-            <div style="font-size:28px;font-weight:800;color:var(--info);">${formatCurrency(summary.manualIncome)}</div>
-            <div style="font-size:12px;color:var(--info);margin-top:4px;">${summary.manualBills} khoản</div>
+          <div class="text-center p-4 bg-blue-50 rounded-2xl border border-blue-100">
+            <div class="text-xs text-blue-600/70 font-semibold uppercase tracking-wider mb-2">✍️ Thu nhập thủ công khác</div>
+            <div class="text-3xl font-bold text-blue-600">${formatCurrency(summary.manualIncome)}</div>
+            <div class="text-xs text-blue-600 mt-2">${summary.manualBills} khoản</div>
           </div>
         </div>
       </div>
@@ -113,19 +113,19 @@ function renderShiftDashboard(shift) {
 
     <!-- ═══ DOANH THU CUKCUK THEO KỲ ═══ -->
     ${hasCukcuk ? `
-    <div class="card" style="margin-bottom:16px;border:1px solid rgba(99,102,241,0.25);background:linear-gradient(135deg, rgba(99,102,241,0.04) 0%, rgba(99,102,241,0.01) 100%);">
-      <div class="card-header" style="border-bottom-color:rgba(99,102,241,0.15);">
-        <h3 style="color:#6366f1;display:flex;align-items:center;gap:8px;margin:0;">
+    <div class="card mb-4 border-indigo-200 bg-indigo-50/30">
+      <div class="card-header border-indigo-100">
+        <h3 class="text-indigo-600 flex items-center gap-2 m-0 text-lg">
           <span class="material-symbols-rounded">bar_chart</span> Tổng doanh thu CUKCUK
         </h3>
-        <div style="display:flex;gap:4px;" id="revenuePeriodBtns">
+        <div class="flex gap-1" id="revenuePeriodBtns">
           <button class="btn btn-sm rev-period-btn ${_revenuePeriod === 'month' ? 'active' : ''}" data-period="month">Tháng</button>
           <button class="btn btn-sm rev-period-btn ${_revenuePeriod === 'quarter' ? 'active' : ''}" data-period="quarter">Quý</button>
           <button class="btn btn-sm rev-period-btn ${_revenuePeriod === 'year' ? 'active' : ''}" data-period="year">Năm</button>
         </div>
       </div>
-      <div class="card-body" id="revenuePeriodContent" style="padding:16px 20px;">
-        <div class="text-muted text-center" style="padding:20px;">⏳ Đang tải...</div>
+      <div class="card-body p-5" id="revenuePeriodContent">
+        <div class="text-slate-500 text-center p-5">⏳ Đang tải...</div>
       </div>
     </div>
     ` : ''}
@@ -189,47 +189,49 @@ function renderShiftDashboard(shift) {
         </div>
       </div>
 
-      <!-- Recent Transactions -->
+    <!-- Recent Transactions -->
       <div class="card">
         <div class="card-header"><h3>🕒 Giao dịch gần đây</h3></div>
-        <div class="card-body" style="max-height:240px;overflow-y:auto;">
+        <div class="card-body max-h-[240px] overflow-y-auto pr-2">
           ${(shift.transactions || []).slice(-8).reverse().map(tx => {
             const isCukcuk = tx.note && tx.note.indexOf('[CUKCUK]') !== -1;
             return `
-              <div class="tx-row">
-                <div class="tx-info">
-                  <span class="tx-type ${tx.type === 'income' ? 'type-income' : 'type-expense'}">${tx.type === 'income' ? '↑' : '↓'}</span>
+              <div class="flex items-center justify-between gap-3 p-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded-xl transition-colors">
+                <div class="flex items-center gap-3">
+                  <span class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}">
+                    <span class="material-symbols-rounded text-[18px]">${tx.type === 'income' ? 'arrow_downward' : 'arrow_upward'}</span>
+                  </span>
                   <div>
-                    <span class="tx-cat">${isCukcuk ? '🔗 ' : ''}${tx.category}</span>
-                    <span class="tx-note">${tx.note ? tx.note.substring(0, 50) : ''}</span>
+                    <span class="block text-sm font-semibold text-slate-800">${isCukcuk ? '🔗 ' : ''}${tx.category}</span>
+                    <span class="block text-xs text-slate-500">${tx.note ? tx.note.substring(0, 50) : ''}</span>
                   </div>
                 </div>
-                <span class="tx-amount ${tx.type === 'income' ? 'amount-in' : 'amount-out'}">${tx.type === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}</span>
+                <span class="font-bold tabular-nums ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}">${tx.type === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}</span>
               </div>
             `;
-          }).join('') || '<div class="text-muted text-center" style="padding:20px;">Chưa có giao dịch</div>'}
+          }).join('') || '<div class="text-slate-500 text-center p-5">Chưa có giao dịch</div>'}
         </div>
       </div>
     </div>
 
     <!-- ═══ RECENT SHIFTS ═══ -->
-    <div class="card" style="margin-top:10px;">
+    <div class="card mt-3">
       <div class="card-header"><h3>📋 Ca gần đây</h3></div>
-      <div class="card-body" style="max-height:200px;overflow-y:auto;">
+      <div class="card-body max-h-[200px] overflow-y-auto">
         ${(function() {
           const history = getShiftHistory().slice(0, 5);
-          if (history.length === 0) return '<div class="text-muted text-center" style="padding:20px;">Chưa có lịch sử ca</div>';
+          if (history.length === 0) return '<div class="text-slate-500 text-center p-5">Chưa có lịch sử ca</div>';
           return history.map(function(sh) {
             const sm = getHistorySummary(sh);
-            return '<div class="tx-row" style="cursor:pointer;" onclick="window.navigateTo(\'history\')">' +
-              '<div class="tx-info">' +
-                '<span class="tx-type type-income">Ca' + sh.shiftNumber + '</span>' +
+            return '<div class="flex items-center justify-between gap-3 p-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors" onclick="window.navigateTo(\'history\')">' +
+              '<div class="flex items-center gap-3">' +
+                '<span class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">Ca' + sh.shiftNumber + '</span>' +
                 '<div>' +
-                  '<span class="tx-cat">' + sh.cashierName + ' — ' + formatDate(sh.date) + '</span>' +
-                  '<span class="tx-note">' + formatTime(sh.startTime) + ' → ' + formatTime(sh.endTime) + '</span>' +
+                  '<span class="block text-sm font-semibold text-slate-800">' + sh.cashierName + ' — ' + formatDate(sh.date) + '</span>' +
+                  '<span class="block text-xs text-slate-500">' + formatTime(sh.startTime) + ' → ' + formatTime(sh.endTime) + '</span>' +
                 '</div>' +
               '</div>' +
-              '<span class="tx-amount amount-in">' + formatCurrency(sm.totalIncome) + '</span>' +
+              '<span class="font-bold text-emerald-600 tabular-nums">+' + formatCurrency(sm.totalIncome) + '</span>' +
             '</div>';
           }).join('');
         })()}
@@ -244,12 +246,12 @@ function _renderRevenuePeriod() {
   
   // Show skeleton loading while data loads
   container.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
-      <div class="skeleton skeleton-card" style="min-height:70px;"></div>
-      <div class="skeleton skeleton-card" style="min-height:70px;"></div>
-      <div class="skeleton skeleton-card" style="min-height:70px;"></div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+      <div class="skeleton skeleton-card min-h-[70px]"></div>
+      <div class="skeleton skeleton-card min-h-[70px]"></div>
+      <div class="skeleton skeleton-card min-h-[70px]"></div>
     </div>
-    <div class="skeleton skeleton-text" style="width:70%;margin:auto;"></div>
+    <div class="skeleton skeleton-text w-[70%] mx-auto"></div>
   `;
   
   import('../integration/invoiceStore.js').then(function(store) {
@@ -264,30 +266,30 @@ function _renderRevenuePeriod() {
     }
     
     container.innerHTML = `
-      <div style="text-align:center;margin-bottom:16px;">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">📊 ${periodLabel}</div>
-        <div style="font-size:36px;font-weight:900;color:#6366f1;letter-spacing:-1px;">${formatCurrency(rev.totalRevenue)}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
-          📅 ${dateRange} · ${rev.daysWithData} ngày có doanh thu
+      <div class="text-center mb-4">
+        <div class="text-[11px] text-slate-500 mb-1">📊 ${periodLabel}</div>
+        <div class="text-4xl font-extrabold text-indigo-600 tracking-tight">${formatCurrency(rev.totalRevenue)}</div>
+        <div class="text-xs text-slate-500 mt-1.5">
+          📅 ${dateRange} · <span class="font-semibold text-slate-700">${rev.daysWithData}</span> ngày có doanh thu
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-        <div style="text-align:center;padding:10px;background:rgba(16,185,129,0.08);border-radius:8px;">
-          <div style="font-size:10px;color:var(--text-muted);">💵 Tiền mặt</div>
-          <div style="font-size:16px;font-weight:700;color:#10b981;margin-top:4px;">${formatCurrency(rev.totalCash)}</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="text-center p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+          <div class="text-[10px] font-semibold uppercase text-emerald-600/70 mb-1">💵 Tiền mặt</div>
+          <div class="text-base font-bold text-emerald-600">${formatCurrency(rev.totalCash)}</div>
         </div>
-        <div style="text-align:center;padding:10px;background:rgba(59,130,246,0.08);border-radius:8px;">
-          <div style="font-size:10px;color:var(--text-muted);">💳 Thẻ</div>
-          <div style="font-size:16px;font-weight:700;color:#3b82f6;margin-top:4px;">${formatCurrency(rev.totalCard)}</div>
+        <div class="text-center p-3 bg-blue-50 rounded-xl border border-blue-100">
+          <div class="text-[10px] font-semibold uppercase text-blue-600/70 mb-1">💳 Thẻ</div>
+          <div class="text-base font-bold text-blue-600">${formatCurrency(rev.totalCard)}</div>
         </div>
-        <div style="text-align:center;padding:10px;background:rgba(168,85,247,0.08);border-radius:8px;">
-          <div style="font-size:10px;color:var(--text-muted);">🏦 Chuyển khoản</div>
-          <div style="font-size:16px;font-weight:700;color:#a855f7;margin-top:4px;">${formatCurrency(rev.totalTransfer)}</div>
+        <div class="text-center p-3 bg-purple-50 rounded-xl border border-purple-100">
+          <div class="text-[10px] font-semibold uppercase text-purple-600/70 mb-1">🏦 Chuyển khoản</div>
+          <div class="text-base font-bold text-purple-600">${formatCurrency(rev.totalTransfer)}</div>
         </div>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 12px;background:var(--bg-secondary);border-radius:8px;font-size:11px;">
-        <span>📋 ${rev.totalBills} bill tổng cộng</span>
-        <span>📊 TB/ngày: <strong style="color:#6366f1;">${formatCurrency(rev.avgDaily)}</strong></span>
+      <div class="flex justify-between items-center mt-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600">
+        <span>📋 <strong>${rev.totalBills}</strong> bill tổng cộng</span>
+        <span>📊 TB/ngày: <strong class="text-indigo-600 text-sm">${formatCurrency(rev.avgDaily)}</strong></span>
       </div>
     `;
   }).catch(function() {
@@ -408,4 +410,8 @@ async function _refreshSyncStatusBar() {
   } catch(e) {
     bar.innerHTML = '';
   }
+}
+
+export function destroy() {
+  // Cleanup — no persistent timers in dashboard currently
 }

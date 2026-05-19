@@ -11,8 +11,14 @@ var _pendingAction = null;
 var HISTORY_KEY = 'kg_chatbot_history';
 var MAX_MESSAGES = 200;
 
+import { getSettings } from '../store.js';
+
 // ── AI Keys (shared with VAT module) ──
-function _getKeys(p) { return JSON.parse(localStorage.getItem('vat_master_' + p + '_keys') || '[]'); }
+function _getKeys(p) { 
+  const settings = getSettings();
+  if (!settings.vatKeys) return [];
+  return settings.vatKeys[p] || [];
+}
 
 function _getProvider() {
   var ps = ['gemini','deepseek','groq','sambanova','cerebras','mistral','nvidia','hf'];
@@ -353,4 +359,8 @@ export function refreshChatbot() {
   if (!_isOpen || _isProcessing) return;
   var sub = document.querySelector('.cb-sub');
   if (sub) { var s = getCurrentShift(); sub.textContent = s ? '💼 Ca ' + s.shiftNumber + ' — ' + s.cashierName : '📄 Hỗ trợ hóa đơn'; }
+}
+
+export function destroy() {
+  // Clean up any loose event listeners if needed
 }

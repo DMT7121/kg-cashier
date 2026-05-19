@@ -421,6 +421,43 @@ export function getInvoicesByDate(dateStr) {
   });
 }
 
+/** Get invoices strictly within a shift's time window */
+export function getInvoicesByShiftTime(dateStr, startTime, endTime) {
+  var allForDate = getInvoicesByDate(dateStr);
+  if (!startTime) return allForDate;
+  var startT = new Date(startTime).getTime();
+  var endT = endTime ? new Date(endTime).getTime() : new Date().getTime();
+  
+  return allForDate.filter(function(inv) {
+    if (!inv.refDate) return false;
+    // Extract actual time from CUKCUK .NET date format or ISO string
+    var dt;
+    var match = String(inv.refDate).match(/\/Date\((\d+)\)\//);
+    if (match) dt = parseInt(match[1]);
+    else dt = new Date(inv.refDate).getTime();
+    
+    return dt >= startT && dt <= endT;
+  });
+}
+
+/** Edit payment methods on an invoice directly in the store */
+export function editInvoicePayment(refId, newPayments) {
+  var store = _load();
+  var key = String(refId);
+  var inv = store.invoices[key];
+  if (!inv) throw new Error('Không tìm thấy hóa đơn: ' + refId);
+  inv.payments = newPayments;
+  inv.manualOverride = true;
+  inv.unpaid = false;
+  var total = 0;
+  for (var i = 0; i < newPayments.length; i++) {
+    total += newPayments[i].amount || 0;
+  }
+  if (total > 0) inv.amount = total;
+  store.invoices[key] = inv;
+  _save(store);
+}
+
 // ── Google Sheets Tracking ──
 
 /** Mark invoices as pushed to Google Sheets */

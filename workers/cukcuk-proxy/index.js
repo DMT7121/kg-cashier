@@ -1,12 +1,26 @@
 // Cloudflare Worker — Standalone CUKCUK API CORS Proxy
 // Deployed as: cukcuk-proxy.dmt-kgwork.workers.dev
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, CompanyCode',
-  'Access-Control-Max-Age': '86400',
-};
+const ALLOWED_ORIGINS = [
+  'https://kg-cashier.pages.dev',
+  'https://kg-cashier.dmt-kgwork.pages.dev',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+];
+
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, CompanyCode',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  };
+}
 
 export default {
   async fetch(request) {
@@ -14,12 +28,20 @@ export default {
 
     // Health check endpoint
     if (url.pathname === '/ping') {
-      return new Response('pong', { status: 200, headers: CORS_HEADERS });
+      return new Response('pong', { status: 200, headers: getCorsHeaders(request) });
     }
+
+    // Reject requests from unauthorized origins
+    const origin = request.headers.get('Origin') || '';
+    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
+    const corsHeaders = getCorsHeaders(request);
 
     // Handle CORS preflight — return immediately, never touch upstream
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
+      return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     // Build target URL: /api/Account/Login → https://graphapi.cukcuk.vn/api/Account/Login
@@ -52,9 +74,9 @@ export default {
       // Always add CORS headers to upstream response
       const responseHeaders = new Headers();
       responseHeaders.set('Content-Type', resp.headers.get('Content-Type') || 'application/json');
-      responseHeaders.set('Access-Control-Allow-Origin', '*');
-      responseHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, CompanyCode');
+      for (const [k, v] of Object.entries(corsHeaders)) {
+        responseHeaders.set(k, v);
+      }
 
       return new Response(respBody, {
         status: resp.status,
@@ -68,7 +90,7 @@ export default {
         status: 502,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
         },
       });
     }

@@ -75,3 +75,10 @@ export function init() {
   else if (_activeTab === 'cukcuk') cukcukModule.init();
   else if (_activeTab === 'analytics') analyticsModule.init();
 }
+
+export function destroy() {
+  // Cleanup sub-modules safely (they may not export destroy)
+  try { reportModule.destroy?.(); } catch(e) { /* ignore */ }
+  try { cukcukModule.destroy?.(); } catch(e) { /* ignore */ }
+  try { analyticsModule.destroy?.(); } catch(e) { /* ignore */ }
+}

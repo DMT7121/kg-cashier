@@ -2,6 +2,8 @@ import { getPrintForms, updatePrintForms, resetPrintForms, getCurrentShift, getS
 
 let _activeEditor = null;
 let _activeTab = 'checklist';
+let _a4Timer = null;
+let _a4Observer = null;
 
 export function render() {
   return `
@@ -585,12 +587,14 @@ function _openVisualEditor(templateKey, initialHtml) {
       } catch(e) {}
     }
     // Monitor every 500ms
-    var _a4Timer = setInterval(_checkA4Fit, 500);
+    if (_a4Timer) clearInterval(_a4Timer);
+    _a4Timer = setInterval(_checkA4Fit, 500);
     // Stop when modal closes — observe overlay class change instead of overriding hideModal
     frame.addEventListener('load', function() { setTimeout(_checkA4Fit, 200); });
     var _modalOverlay = document.getElementById('modalOverlay');
     if (_modalOverlay) {
-      var _a4Observer = new MutationObserver(function(muts) {
+      if (_a4Observer) _a4Observer.disconnect();
+      _a4Observer = new MutationObserver(function(muts) {
         if (!_modalOverlay.classList.contains('active')) {
           clearInterval(_a4Timer);
           _a4Observer.disconnect();
@@ -1042,5 +1046,10 @@ export function init() {
       if (content) _openVisualEditor(_currentPreviewKey, content);
     }
   });
+}
+
+export function destroy() {
+  if (_a4Timer) { clearInterval(_a4Timer); _a4Timer = null; }
+  if (_a4Observer) { _a4Observer.disconnect(); _a4Observer = null; }
 }
 

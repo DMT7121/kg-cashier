@@ -59,21 +59,21 @@ export function render() {
   // ── CASE 1: Shift OPEN but not validated ──
   if (shift && !isValidated) {
     return `
-      <div class="empty-state" style="padding:60px 20px;">
-        <span class="material-symbols-rounded" style="font-size:64px;color:var(--warning);margin-bottom:20px;">lock</span>
-        <h2>Ca đang mở — Xác thực</h2>
-        <p>Nhân viên <b>${shift.cashierName}</b> đang mở Ca ${shift.shiftNumber}</p>
-        <p class="text-muted">Nhập mật khẩu ca để truy cập</p>
-        <div style="max-width:320px;margin:24px auto;">
+      <div class="empty-state py-16 px-5">
+        <span class="material-symbols-rounded text-[64px] text-orange-500 mb-5 block">lock</span>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">Ca đang mở — Xác thực</h2>
+        <p class="text-slate-600 mb-2">Nhân viên <b class="text-slate-900">${shift.cashierName}</b> đang mở Ca ${shift.shiftNumber}</p>
+        <p class="text-slate-500 mb-6">Nhập mật khẩu ca để truy cập</p>
+        <div class="max-w-[320px] mx-auto">
           <div class="form-group">
             <label class="form-label">🔒 Mật khẩu ca</label>
-            <input type="password" id="shiftUnlockPass" class="form-input" style="text-align:center;font-size:24px;letter-spacing:4px;" placeholder="••••" autofocus>
+            <input type="password" id="shiftUnlockPass" class="form-input text-center text-2xl tracking-[4px]" placeholder="••••" autofocus>
           </div>
-          <div id="unlockError" style="display:none;padding:8px 12px;margin-bottom:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;font-weight:600;"></div>
-          <button class="btn btn-primary" id="btnUnlockShift" style="width:100%;margin-top:8px;">Xác nhận</button>
-          <p class="text-muted" style="font-size:11px;margin-top:12px;">Mật khẩu do người mở ca thiết lập khi bắt đầu ca. Hoặc dùng mật khẩu quản lý.</p>
-          <button class="btn btn-outline btn-sm" id="btnForceCloseGhost" style="margin-top:16px;font-size:11px;color:var(--danger);border-color:var(--danger);">
-            <span class="material-symbols-rounded" style="font-size:14px;">close</span> Đóng ca cưỡng chế
+          <div id="unlockError" class="hidden p-3 mb-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm font-semibold"></div>
+          <button class="btn btn-primary w-full mt-2" id="btnUnlockShift">Xác nhận</button>
+          <p class="text-slate-500 text-[11px] mt-4 mb-5">Mật khẩu do người mở ca thiết lập khi bắt đầu ca. Hoặc dùng mật khẩu quản lý.</p>
+          <button class="btn btn-outline btn-sm text-rose-600 border-rose-200 hover:bg-rose-50" id="btnForceCloseGhost">
+            <span class="material-symbols-rounded text-[14px]">close</span> Đóng ca cưỡng chế
           </button>
         </div>
       </div>
@@ -87,25 +87,25 @@ export function render() {
       <div class="section-header">
         <div><h3>🟢 Ca đang mở</h3><p>Ca ${shift.shiftNumber} — ${shift.cashierName}</p></div>
       </div>
-      <div class="card active-shift-card">
+      <div class="card active-shift-card border-emerald-200 bg-emerald-50/20">
         <div class="card-body">
-          <div class="shift-details-grid">
-            <div><span class="text-muted">Thu ngân</span><strong>${shift.cashierName}</strong></div>
-            <div><span class="text-muted">Số ca</span><strong>Ca ${shift.shiftNumber}</strong></div>
-            <div><span class="text-muted">Ngày</span><strong>${formatDate(shift.date)}</strong></div>
-            <div><span class="text-muted">Bắt đầu</span><strong>${formatTime(shift.startTime)}</strong></div>
-            <div><span class="text-muted">Thời gian</span><strong id="shiftTimer">${formatDuration(shift.startTime)}</strong></div>
-            <div><span class="text-muted">Tiền đầu ca</span><strong>${formatCurrency(shift.startingCash)} <button class="btn btn-sm" id="btnEditStartingCash" title="Bổ sung tiền đầu ca" style="padding:2px 6px;font-size:11px;vertical-align:middle;background:transparent;border:1px dashed var(--border);color:var(--text-muted);cursor:pointer;">✏️</button></strong></div>
+          <div class="shift-details-grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div><span class="block text-[11px] text-slate-500 font-medium">Thu ngân</span><strong class="block text-[15px] text-slate-900">${shift.cashierName}</strong></div>
+            <div><span class="block text-[11px] text-slate-500 font-medium">Số ca</span><strong class="block text-[15px] text-slate-900">Ca ${shift.shiftNumber}</strong></div>
+            <div><span class="block text-[11px] text-slate-500 font-medium">Ngày</span><strong class="block text-[15px] text-slate-900">${formatDate(shift.date)}</strong></div>
+            <div><span class="block text-[11px] text-slate-500 font-medium">Bắt đầu</span><strong class="block text-[15px] text-slate-900">${formatTime(shift.startTime)}</strong></div>
+            <div><span class="block text-[11px] text-slate-500 font-medium">Thời gian</span><strong class="block text-[15px] text-emerald-600" id="shiftTimer">${formatDuration(shift.startTime)}</strong></div>
+            <div><span class="block text-[11px] text-slate-500 font-medium">Tiền đầu ca</span><strong class="block text-[15px] text-slate-900 flex items-center gap-2">${formatCurrency(shift.startingCash)} <button class="btn-icon w-6 h-6 p-0 border border-dashed border-slate-300 flex items-center justify-center text-xs" id="btnEditStartingCash" title="Bổ sung tiền đầu ca">✏️</button></strong></div>
           </div>
-          <div class="shift-quick-stats">
-            <div class="quick-stat"><span class="material-symbols-rounded" style="color:var(--success);">trending_up</span><div><small>Doanh thu</small><strong class="amount-in">${formatCurrency(sm.totalIncome)}</strong></div></div>
-            <div class="quick-stat"><span class="material-symbols-rounded" style="color:var(--danger);">trending_down</span><div><small>Chi phí</small><strong class="amount-out">${formatCurrency(sm.totalExpense)}</strong></div></div>
-            <div class="quick-stat"><span class="material-symbols-rounded" style="color:var(--info);">receipt</span><div><small>Bills</small><strong>${sm.billCount}</strong></div></div>
+          <div class="shift-quick-stats flex flex-wrap gap-6 pt-4 border-t border-slate-200">
+            <div class="quick-stat flex items-center gap-3"><span class="material-symbols-rounded w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">trending_up</span><div><small class="block text-xs text-slate-500 font-medium">Doanh thu</small><strong class="block text-lg text-emerald-600 font-bold">${formatCurrency(sm.totalIncome)}</strong></div></div>
+            <div class="quick-stat flex items-center gap-3"><span class="material-symbols-rounded w-10 h-10 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">trending_down</span><div><small class="block text-xs text-slate-500 font-medium">Chi phí</small><strong class="block text-lg text-rose-600 font-bold">${formatCurrency(sm.totalExpense)}</strong></div></div>
+            <div class="quick-stat flex items-center gap-3"><span class="material-symbols-rounded w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">receipt</span><div><small class="block text-xs text-slate-500 font-medium">Bills</small><strong class="block text-lg text-slate-900 font-bold">${sm.billCount}</strong></div></div>
           </div>
         </div>
       </div>
-      <button class="btn btn-danger" style="width:100%;margin-top:20px;" id="btnCloseShift"><span class="material-symbols-rounded">stop_circle</span> Đóng ca</button>
-      <button class="btn btn-outline" style="width:100%;margin-top:10px;" id="btnForceReset"><span class="material-symbols-rounded">restart_alt</span> Hủy ca (không lưu lịch sử)</button>
+      <button class="btn btn-danger w-full mt-6 py-3.5 text-base" id="btnCloseShift"><span class="material-symbols-rounded">stop_circle</span> Đóng ca</button>
+      <button class="btn btn-outline w-full mt-3 text-slate-500 border-slate-200" id="btnForceReset"><span class="material-symbols-rounded">restart_alt</span> Hủy ca (không lưu lịch sử)</button>
     `;
   }
 
@@ -120,39 +120,39 @@ export function render() {
         <h3>⚡ Mở ca nhanh</h3>
         <p>Chọn nhân viên để bắt đầu ca làm việc</p>
       </div>
-      <div class="btn-group">
-        <button class="btn btn-outline btn-sm" id="btnRefreshStaffList" title="Tải lại danh sách"><span class="material-symbols-rounded" style="font-size:18px;">refresh</span> Tải lại</button>
-        <button class="btn btn-outline btn-sm" id="btnManualName"><span class="material-symbols-rounded" style="font-size:18px;">edit</span> Thủ công</button>
+      <div class="flex gap-2">
+        <button class="btn btn-outline btn-sm" id="btnRefreshStaffList" title="Tải lại danh sách"><span class="material-symbols-rounded text-[18px]">refresh</span> Tải lại</button>
+        <button class="btn btn-outline btn-sm" id="btnManualName"><span class="material-symbols-rounded text-[18px]">edit</span> Thủ công</button>
       </div>
     </div>
 
-    <div id="shiftFormError" style="display:none;padding:10px 14px;margin-bottom:14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;font-weight:600;"></div>
+    <div id="shiftFormError" class="hidden p-3 mb-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm font-semibold"></div>
 
-    <p id="staffLoadStatus" style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">${cached.length > 0 ? '✅ ' + cached.length + ' nhân viên (cache)' : '⏳ Đang tải...'}</p>
+    <p id="staffLoadStatus" class="text-xs text-slate-500 mb-3">${cached.length > 0 ? '✅ ' + cached.length + ' nhân viên (cache)' : '⏳ Đang tải...'}</p>
 
     <div class="qo-staff-grid" id="staffGrid">
       ${_buildStaffCards(cached)}
     </div>
 
     <!-- Manual name input (hidden by default) -->
-    <div id="manualNameBox" style="display:none;margin-bottom:16px;">
-      <div class="card" style="border-color:rgba(245,158,11,.2);">
+    <div id="manualNameBox" class="hidden mb-4">
+      <div class="card border-orange-200 bg-orange-50/30">
         <div class="card-body">
           <label class="form-label">✏️ Nhập tên nhân viên</label>
-          <input type="text" id="manualStaffName" class="form-input" placeholder="Nhập tên nhân viên..." style="font-size:16px;">
-          <p class="form-hint" style="color:var(--warning);margin-top:4px;">⚡ Mở ca nhanh — không cần PIN</p>
+          <input type="text" id="manualStaffName" class="form-input text-base" placeholder="Nhập tên nhân viên...">
+          <p class="form-hint text-orange-600 mt-1">⚡ Mở ca nhanh — không cần PIN</p>
         </div>
       </div>
     </div>
 
     <!-- PIN + settings panel (shown after selecting staff) -->
-    <div id="pinPanel" style="display:none;"></div>
+    <div id="pinPanel" class="hidden"></div>
 
     <!-- Quick settings always visible -->
-    <div class="card" style="margin-bottom:16px;">
+    <div class="card mb-5">
       <div class="card-body">
         <div class="qo-settings-row">
-          <div class="form-group" style="margin-bottom:0;">
+          <div class="form-group mb-0">
             <label class="form-label"># Số ca</label>
             <select id="shiftNumber" class="form-input">
               <option value="1" ${autoShift === '1' ? 'selected' : ''}>Ca 1</option>
@@ -160,24 +160,24 @@ export function render() {
               <option value="3" ${autoShift === '3' ? 'selected' : ''}>Ca 3</option>
             </select>
           </div>
-          <div class="form-group" style="margin-bottom:0;">
+          <div class="form-group mb-0">
             <label class="form-label">📅 Ngày</label>
             <input type="date" id="shiftDate" class="form-input" value="${todayStr()}" required>
           </div>
-          <div class="form-group" style="margin-bottom:0;">
+          <div class="form-group mb-0">
             <label class="form-label">💰 Tiền đầu ca</label>
             <input type="text" id="startingCash" class="form-input" placeholder="0" value="0" autocomplete="off">
           </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">🔒 Mật khẩu ca <span style="color:var(--danger);">*</span></label>
+          <div class="form-group mb-0">
+            <label class="form-label">🔒 Mật khẩu ca <span class="text-rose-500">*</span></label>
             <input type="password" id="shiftPassword" class="form-input" placeholder="Nhập mật khẩu..." minlength="4" required>
-            <p class="form-hint" style="font-size:10px;color:var(--text-muted);margin-top:2px;">Tối thiểu 4 ký tự — dùng để xác thực trên mọi thiết bị</p>
+            <p class="form-hint text-[10px] mt-1">Tối thiểu 4 ký tự — dùng để xác thực trên mọi thiết bị</p>
           </div>
         </div>
       </div>
     </div>
 
-    <button class="btn btn-primary" style="width:100%;padding:16px 20px;font-size:16px;font-weight:700;" id="btnOpenShift" disabled>
+    <button class="btn btn-primary w-full py-4 text-base font-bold shadow-lg shadow-blue-500/30" id="btnOpenShift" disabled>
       <span class="material-symbols-rounded">play_arrow</span> Chọn nhân viên để mở ca
     </button>
   `;
@@ -301,7 +301,7 @@ export function init() {
     const input = document.getElementById('shiftUnlockPass');
     const btn = document.getElementById('btnUnlockShift');
     const errEl = document.getElementById('unlockError');
-    const adminPass = getSettings().adminPassword || '712121';
+    const adminPass = getSettings().adminPassword || '';
     const tryUnlock = async () => {
       if (!input.value) {
         if (errEl) { errEl.textContent = '⚠️ Vui lòng nhập mật khẩu'; errEl.style.display = 'block'; }
@@ -310,7 +310,7 @@ export function init() {
       }
       const pw = (input.value || '').trim();
       const shiftPw = (shift.shiftPassword || '').trim();
-      const match = (pw.length > 0) && (pw === shiftPw || pw === adminPass);
+      const match = (pw.length > 0) && (pw === shiftPw || (adminPass.length > 0 && pw === adminPass));
       if (match) {
         sessionStorage.setItem('shift_validated', shift.id);
         showToast('Xác thực thành công!', 'success');
@@ -333,9 +333,10 @@ export function init() {
         { title: 'Đóng ca cưỡng chế', confirmText: 'Xóa ca', type: 'danger' }
       );
       if (ok) {
-        const adminPass = getSettings().adminPassword || '712121';
+        const adminPass = getSettings().adminPassword || '';
+        if (!adminPass) { showToast('⚠️ Chưa đặt mật khẩu quản lý! Vào Cài đặt → Hệ thống để thiết lập.', 'error', 5000); hideModal(); return; }
         showModal(`
-          <div class="modal-title" style="color:var(--danger);"><span class="material-symbols-rounded">warning</span> Xác nhận quản lý</div>
+          <div class="modal-title text-rose-600"><span class="material-symbols-rounded">warning</span> Xác nhận quản lý</div>
           <div class="form-group"><label class="form-label">Mật khẩu quản lý</label><input type="password" id="forceClosePass" class="form-input" autofocus></div>
           <div class="modal-footer">
             <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
@@ -389,12 +390,12 @@ export function init() {
     // Close shift
     document.getElementById('btnCloseShift')?.addEventListener('click', () => {
       showModal(`
-        <div class="modal-title"><span class="material-symbols-rounded" style="color:var(--danger);">stop_circle</span> Đóng ca</div>
-        <p>Xác nhận đóng Ca ${shift.shiftNumber}?</p>
+        <div class="modal-title"><span class="material-symbols-rounded text-rose-600">stop_circle</span> Đóng ca</div>
+        <p class="mb-4 text-slate-700">Xác nhận đóng Ca ${shift.shiftNumber}?</p>
         <div class="form-group"><label class="form-label">Ghi chú (tùy chọn)</label><textarea id="closeNotes" class="form-input" rows="3" placeholder="Ghi chú bàn giao..."></textarea></div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="text" id="cashToKeep" class="form-input" value="${shift.cashToKeep || 0}" autocomplete="off"></div>
-          <div class="form-group"><label class="form-label">Tiền nộp</label><input type="text" id="cashToDeposit" class="form-input" value="${shift.cashToDeposit || 0}" autocomplete="off"></div>
+          <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="text" id="cashToKeep" class="form-input text-right font-bold" value="${shift.cashToKeep || 0}" autocomplete="off"></div>
+          <div class="form-group"><label class="form-label">Tiền nộp</label><input type="text" id="cashToDeposit" class="form-input text-right font-bold" value="${shift.cashToDeposit || 0}" autocomplete="off"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
@@ -436,9 +437,9 @@ export function init() {
     // Edit starting cash
     document.getElementById('btnEditStartingCash')?.addEventListener('click', () => {
       showModal(`
-        <div class="modal-title"><span class="material-symbols-rounded" style="color:var(--warning);">account_balance_wallet</span> Bổ sung tiền đầu ca</div>
-        <p style="margin-bottom:12px;color:var(--text-muted);">Hiện tại: <strong>${formatCurrency(shift.startingCash)}</strong></p>
-        <div class="form-group"><label class="form-label">Số tiền mới (tổng tiền đầu ca)</label><input type="text" id="newStartingCash" class="form-input" value="${shift.startingCash}" autocomplete="off" style="font-size:18px;font-weight:700;text-align:right;"></div>
+        <div class="modal-title"><span class="material-symbols-rounded text-orange-500">account_balance_wallet</span> Bổ sung tiền đầu ca</div>
+        <p class="mb-3 text-slate-500 text-sm">Hiện tại: <strong class="text-slate-900">${formatCurrency(shift.startingCash)}</strong></p>
+        <div class="form-group"><label class="form-label">Số tiền mới (tổng tiền đầu ca)</label><input type="text" id="newStartingCash" class="form-input text-lg font-bold text-right" value="${shift.startingCash}" autocomplete="off"></div>
         <div class="modal-footer">
           <button class="btn btn-outline" onclick="window.hideModal()">Hủy</button>
           <button class="btn btn-primary" id="btnConfirmStartingCash"><span class="material-symbols-rounded">check</span> Cập nhật</button>

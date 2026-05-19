@@ -22,15 +22,24 @@ let selectedInvoices = new Set();
 
 const API_URL = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec"; 
 
-// Keys
-let geminiKeys = JSON.parse(localStorage.getItem("vat_master_gemini_keys") || "[]");
-let groqKeys = JSON.parse(localStorage.getItem("vat_master_groq_keys") || "[]");
-let hfKeys = JSON.parse(localStorage.getItem("vat_master_hf_keys") || "[]");
-let cerebrasKeys = JSON.parse(localStorage.getItem("vat_master_cerebras_keys") || "[]");
-let sambanovaKeys = JSON.parse(localStorage.getItem("vat_master_sambanova_keys") || "[]");
-let deepseekKeys = JSON.parse(localStorage.getItem("vat_master_deepseek_keys") || "[]");
-let mistralKeys = JSON.parse(localStorage.getItem("vat_master_mistral_keys") || "[]");
-let nvidiaKeys = JSON.parse(localStorage.getItem("vat_master_nvidia_keys") || "[]");
+import { getSettings, updateSettings } from '../store.js';
+
+function _getVatKeys() {
+  const settings = getSettings();
+  if (!settings.vatKeys) {
+    settings.vatKeys = { gemini: [], groq: [], hf: [], cerebras: [], sambanova: [], deepseek: [], mistral: [], nvidia: [] };
+  }
+  return settings.vatKeys;
+}
+
+let geminiKeys = _getVatKeys().gemini;
+let groqKeys = _getVatKeys().groq;
+let hfKeys = _getVatKeys().hf;
+let cerebrasKeys = _getVatKeys().cerebras;
+let sambanovaKeys = _getVatKeys().sambanova;
+let deepseekKeys = _getVatKeys().deepseek;
+let mistralKeys = _getVatKeys().mistral;
+let nvidiaKeys = _getVatKeys().nvidia;
 
 let idx = { gemini: 0, groq: 0, hf: 0, cerebras: 0, sambanova: 0, deepseek: 0, mistral: 0, nvidia: 0 };
 let currentPersona = 'gemini'; 
@@ -418,14 +427,17 @@ function saveSettings() {
     mistralKeys = parseKeys('vat-key-mistral');
     nvidiaKeys = parseKeys('vat-key-nvidia');
 
-    localStorage.setItem("vat_master_gemini_keys", JSON.stringify(geminiKeys));
-    localStorage.setItem("vat_master_groq_keys", JSON.stringify(groqKeys));
-    localStorage.setItem("vat_master_hf_keys", JSON.stringify(hfKeys));
-    localStorage.setItem("vat_master_cerebras_keys", JSON.stringify(cerebrasKeys));
-    localStorage.setItem("vat_master_sambanova_keys", JSON.stringify(sambanovaKeys));
-    localStorage.setItem("vat_master_deepseek_keys", JSON.stringify(deepseekKeys));
-    localStorage.setItem("vat_master_mistral_keys", JSON.stringify(mistralKeys));
-    localStorage.setItem("vat_master_nvidia_keys", JSON.stringify(nvidiaKeys));
+    const settings = getSettings();
+    if (!settings.vatKeys) settings.vatKeys = {};
+    settings.vatKeys.gemini = geminiKeys;
+    settings.vatKeys.groq = groqKeys;
+    settings.vatKeys.hf = hfKeys;
+    settings.vatKeys.cerebras = cerebrasKeys;
+    settings.vatKeys.sambanova = sambanovaKeys;
+    settings.vatKeys.deepseek = deepseekKeys;
+    settings.vatKeys.mistral = mistralKeys;
+    settings.vatKeys.nvidia = nvidiaKeys;
+    updateSettings(settings);
     
     determineInitialPersona();
     callAPI({ action: 'save_system_keys', gemini: geminiKeys, groq: groqKeys, hf: hfKeys, cerebras: cerebrasKeys, sambanova: sambanovaKeys, deepseek: deepseekKeys, mistral: mistralKeys, nvidia: nvidiaKeys });
@@ -1436,4 +1448,8 @@ function updateBulkUI() {
             bulkBar.style.display = 'none';
         }
     }
+}
+
+export function destroy() {
+    // Implement destroy lifecycle
 }

@@ -41,76 +41,76 @@ var listeners = [];
 function getInitialPrintForms() {
   return {
     checklist: [
-      { section: 'CHECKLIST PHá»¤C Vá»¤ â€” Äáº¦U CA', items: [
+      { section: 'CHECKLIST PHỤC VỤ \u2013 ĐẦU CA', items: [
         { cat: 'VỆ SINH & SETUP', title: 'I. Vệ sinh & setup khu vực', list: [
-          'Vá»‡ sinh sÃ n & Khu vá»±c chung: QuÃ©t vÃ  lau sáº¡ch tá»•ng thá»ƒ khu trá»±c, cá»•ng ra vÃ o.',
-          'BÃ n gháº¿: Lau sáº¡ch bÃ n gháº¿, setup tiÃªu chuáº©n (ChÃ©n/ÄÅ©a/Ly...).',
-          'Chuáº©n bá»‹ xÃ´ Ä‘Ã¡: Äáº£m báº£o sáº¡ch vÃ  Ä‘á»§ Ä‘Ã¡.',
-          'Kiá»ƒm tra Menu: Sáº¯p xáº¿p ngay ngáº¯n, lau sáº¡ch bÃ¬a.'
+          'Vệ sinh sàn & Khu vực chung: Quét và lau sạch tổng thể khu trực, cổng ra vào.',
+          'Bàn ghế: Lau sạch bàn ghế, setup tiêu chuẩn (Chén/Đũa/Ly...).',
+          'Chuẩn bị xô đá: Đảm bảo sạch và đủ đá.',
+          'Kiểm tra Menu: Sắp xếp ngay ngắn, lau sạch bìa.'
         ]},
-        { cat: 'CA 15H', title: 'II. SETUP & Vá»† SINH (CA 15H)', list: [
-          'Bá»• sung váº­t tÆ° tiÃªu hao: TÄƒm, XiÃªn tre, á»ng hÃºt, Bao tay, DiÃªm, KhÄƒn giáº¥y, Há»™p mang vá»...',
-          'Sáº¯p xáº¿p: Gá»n gÃ ng tá»§ Ä‘á»“, bá»‘ trÃ­ cÃ¡c Tráº¡m Ä‘á»“ dÃ¹ng dá»± phÃ²ng.'
+        { cat: 'CA 15H', title: 'II. SETUP & VỆ SINH (CA 15H)', list: [
+          'Bổ sung vật tư tiêu hao: Tăm, Xiên tre, Ống hút, Bao tay, Diêm, Khăn giấy, Hộp mang về...',
+          'Sắp xếp: Gọn gàng tủ đồ, bố trí các Trạm đồ dùng dự phòng.'
         ]},
-        { cat: 'BÃ€N Äáº¶T', title: 'III. BÃ n Ä‘áº·t trÆ°á»›c', list: [
-          'Setup bÃ n Ä‘áº·t: ÄÃºng sá»‘ lÆ°á»£ng, mÃ u sáº¯c, nhu cáº§u tiá»‡c.',
-          'ÄÃ¡nh dáº¥u: Cáº¯m khÄƒn giáº¥y hoáº·c Ä‘áº·t báº£ng "BÃ n Ä‘áº·t trÆ°á»›c".'
+        { cat: 'BÀN ĐẶT', title: 'III. Bàn đặt trước', list: [
+          'Setup bàn đặt: Đúng số lượng, màu sắc, nhu cầu tiệc.',
+          'Đánh dấu: Cắm khăn giấy hoặc đặt bảng "Bàn đặt trước".'
         ]},
-        { cat: 'BÃ€N GIAO', title: 'IV. BÃ n giao Ä‘áº§u ca', list: [
-          'Náº¯m báº¯t thÃ´ng tin: KhÃ¡ch Ä‘áº·t, mÃ³n háº¿t, lÆ°u Ã½ Ä‘áº·c biá»‡t tá»« ca trÆ°á»›c.'
+        { cat: 'BÀN GIAO', title: 'IV. Bàn giao đầu ca', list: [
+          'Nắm bắt thông tin: Khách đặt, món hết, lưu ý đặc biệt từ ca trước.'
         ]},
-        { cat: 'TRONG CA', title: 'V. Kiá»ƒm tra chÃ©o & Bá»• sung (CÃ´ng viá»‡c trong ca)', list: [
-          'Kiá»ƒm tra vá»‡ sinh liÃªn tá»¥c, bá»• sung Ä‘Ã¡/dá»¥ng cá»¥.',
-          'Há»— trá»£ cÃ¡c bÃ n Ä‘Ã´ng khÃ¡ch.',
-          'Kiá»ƒm tra tá»“n kho váº­t tÆ° tiÃªu hao.'
+        { cat: 'TRONG CA', title: 'V. Kiểm tra chéo & Bổ sung (Công việc trong ca)', list: [
+          'Kiểm tra vệ sinh liên tục, bổ sung đá/dụng cụ.',
+          'Hỗ trợ các bàn đông khách.',
+          'Kiểm tra tồn kho vật tư tiêu hao.'
         ]}
       ]},
-      { section: 'CHECKLIST PHá»¤C Vá»¤ â€” CUá»I CA', items: [
-        { cat: 'XUá»NG CA', title: 'VI. Checklist Cuá»‘i ca & Xuá»‘ng ca', list: [
-          'Thu dá»n bÃ n, vá»‡ sinh gáº§m bÃ n.',
-          'Táº¯t cÃ¡c thiáº¿t bá»‹ Ä‘iá»‡n (MÃ¡y láº¡nh, ÄÃ¨n sáº£nh...).',
-          'Dá»n dáº¹p tá»•ng thá»ƒ vÃ  khÃ³a cá»­a an toÃ n.',
-          'BÃ n giao láº¡i thÃ´ng tin cho quáº£n lÃ½/ca sau.'
+      { section: 'CHECKLIST PHỤC VỤ \u2013 CUỐI CA', items: [
+        { cat: 'XUỐNG CA', title: 'VI. Checklist Cuối ca & Xuống ca', list: [
+          'Thu dọn bàn, vệ sinh gầm bàn.',
+          'Tắt các thiết bị điện (Máy lạnh, Đèn sảnh...).',
+          'Dọn dẹp tổng thể và khóa cửa an toàn.',
+          'Bàn giao lại thông tin cho quản lý/ca sau.'
         ]}
       ]}
     ],
     inventory: {
       ncc: {
-        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” NHÃ€ CUNG Cáº¤P (THá»ŠT / Háº¢I Sáº¢N)',
-        subtitle: 'CÃ”NG TY HOÃ€NG TRá»ŒNG / MM MARKET / THÃšY / Cáº¢NH',
+        title: 'KIỂM KÊ HÀNG HÓA \u2013 NHÀ CUNG CẤP (THỊT / HẢI SẢN)',
+        subtitle: 'CÔNG TY HOÀNG TRỌNG / MM MARKET / THỦY / CẢNH',
         items: [
-          {supplier:'C.THÃšY\nMM MARKET', items:['GÃ  (con)','Sá»¥n gÃ  (kg)','Trá»©ng muá»‘i','Thá»‹t bÃ² (kg)','GiÃ² heo (kg)','XÆ°Æ¡ng á»‘ng (kg)']},
-          {supplier:'HOÃ€NG TRá»ŒNG\n0947459191', items:['ChÃ¢n gÃ  (kg)','Thanh cua (kg)','BÃ o ngÆ° (kg)','Ba rá»i bÃ² (kg)','Ba rá»i heo (kg)','Náº¡c dÄƒm (kg)','XÆ°Æ¡ng á»‘ng (kg)','SÆ°á»n heo (kg)','CÃ¡nh gÃ  (kg)','áº¾ch (kg)','Má»±c trá»©ng (kg)']},
-          {supplier:'HUYá»€N Má»°C\nPHÆ¯á»šC THÃ€NH', items:['Má»±c Indo (kg)','TÃ´m SÃº size 30 (kg)','TÃ´m cÃ ng size 10 (kg)','á»c hÆ°Æ¡ng (kg)','Má»±c á»‘ng (kg)']}
+          {supplier:'C.THỦY\nMM MARKET', items:['Gà (con)','Sụn gà (kg)','Trứng muối','Thịt bò (kg)','Giò heo (kg)','Xương ống (kg)']},
+          {supplier:'HOÀNG TRỌNG\n0947459191', items:['Chân gà (kg)','Thanh cua (kg)','Bào ngư (kg)','Ba rọi bò (kg)','Ba rọi heo (kg)','Nạc dăm (kg)','Xương ống (kg)','Sườn heo (kg)','Cánh gà (kg)','Ếch (kg)','Mực trứng (kg)']},
+          {supplier:'HUYỀN MỰC\nPHƯỚC THÀNH', items:['Mực Indo (kg)','Tôm Sú size 30 (kg)','Tôm càng size 10 (kg)','Ốc hương (kg)','Mực ống (kg)']}
         ],
-        rightItems: ['KhÃ´ má»±c','BÃª','CÃ¡ chim','Báº¡ch tuá»™c','Má»±c 1 náº¯ng','CÃ¡ hokke','Khoai tÃ¢y','SÃ² Ä‘iá»‡p Nháº­t','NghÃªu','Ná»ng heo','BÆ¡ bÃ¡nh mÃ¬','CÃ¡ diÃªu há»“ng','Trá»©ng non','ThÃº Linh','Ba rá»i cÃ³ da','Phá»•i bÃ²','Tá»§y bÃ²','Pate','Khoai tÃ¢y cá»ng','Láº¡p xÆ°á»Ÿng xÃ´ng khÃ³i','SÃ² huyáº¿t','Ba rá»i xÃ´ng khÃ³i','TrÃ¢u gÃ¡c báº¿p','Báº¯p bÃ²','Bao tá»­','Da heo','Má»¡ heo','PhÃ´ mai sá»£i']
+        rightItems: ['Khô mực','Bê','Cá chim','Bạch tuộc','Mực 1 nắng','Cá hokke','Khoai tây','Sò điệp Nhật','Nghêu','Nông heo','Bơ bánh mì','Cá diêu hồng','Trứng non','Thú Linh','Ba rọi có da','Phổi bò','Tủy bò','Pate','Khoai tây cọng','Lạp xưởng xông khói','Sò huyết','Ba rọi xông khói','Trâu gác bếp','Bắp bò','Bao tử','Da heo','Mỡ heo','Phô mai sợi']
       },
       hangkho: {
-        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” HÃ€NG KHÃ” / GIA Vá»Š',
+        title: 'KIỂM KÊ HÀNG HÓA \u2013 HÀNG KHÔ / GIA VỊ',
         leftItems: [
-          'Bá»™t báº¯p','Bá»™t chanh','Bá»™t chiÃªn giÃ²n','Bá»™t gáº¡o','Bá»™t mÃ¬','Bá»™t nÄƒng','Bá»™t á»›t HQ','Bá»™t á»›t Viá»‡t','Bá»™t xÃ¹ tráº¯ng','Bá»™t náº¿p','Bá»™t nghá»‡','Bá»™t cÃ  ri','ÄÆ°á»ng cÃ¡t','ÄÆ°á»ng phÃ¨n','ÄÆ°á»ng thá»‘t ná»‘t','Muá»‘i há»™t','Muá»‘i bá»t','Muá»‘i TÃ¢y Ninh','TiÃªu Ä‘en','TiÃªu sá»','NgÅ© vá»‹ hÆ°Æ¡ng','Hoa há»“i','Quáº¿ cÃ¢y','Cá»‘m dáº¹p'
+          'Bột bắp','Bột chanh','Bột chiên giòn','Bột gạo','Bột mì','Bột năng','Bột ớt HQ','Bột ớt Việt','Bột xù trắng','Bột nếp','Bột nghệ','Bột cà ri','Đường cát','Đường phèn','Đường thốt nốt','Muối hột','Muối bọt','Muối Tây Ninh','Tiêu đen','Tiêu sọ','Ngũ vị hương','Hoa hồi','Quế cây','Cốm dẹp'
         ],
         rightItems: [
-          'Dáº§u Äƒn (can 25l)','Giáº¥m tÃ¡o','Dáº§u hÃ o','NÆ°á»›c máº¯m','NÆ°á»›c tÆ°Æ¡ng Nhá»‹ ca','NÆ°á»›c tÆ°Æ¡ng háº¥p cÃ¡ LKK','TÆ°Æ¡ng cÃ ','TÆ°Æ¡ng á»›t','TÆ°Æ¡ng xÃ­ muá»™i','TÆ°Æ¡ng ngá»t','Dáº§u mÃ¨','CÃ  ri dáº§u','RÆ°á»£u náº¿p','RÆ°á»£u hoa tiÃªu','Vang tráº¯ng','BÃ¡nh pÃ­a','Bá»™t ngá»t','Pate gan','PhÃ´ mai BÃ² cÆ°á»i','Sá»¯a Ä‘áº·c','Sá»¯a tÆ°Æ¡i ko Ä‘Æ°á»ng','Chao','Láº¡p xÆ°á»Ÿng','BÃ¡nh trÃ¡ng cuá»‘n'
+          'Dầu ăn (can 25l)','Giấm táo','Dầu hào','Nước mắm','Nước tương Nhị ca','Nước tương hấp cá LKK','Tương cà','Tương ớt','Tương xí muội','Tương ngọt','Dầu mè','Cà ri dầu','Rượu nếp','Rượu hoa tiêu','Vang trắng','Bánh pía','Bột ngọt','Pate gan','Phô mai Bò cười','Sữa đặc','Sữa tươi ko đường','Chao','Lạp xưởng','Bánh tráng cuốn'
         ],
-        extraLeft: ['MÃ¬ Miliket','MÃ¬ trá»©ng','MÃ¬ giÃ²n','Miáº¿n thÃ¡i','MÃ¹ táº¡t xanh','MÃ¹ táº¡t vÃ ng','NÆ°á»›c cá»‘t dá»«a','BÆ¡ Ä‘áº­u phá»™ng'],
-        extraRight: ['Ká»‰ tá»­','Náº¥m mÃ¨o','Náº¥m Ä‘Ã´ng cÃ´','LÃ¡ nguyá»‡t quáº¿','Máº¡ch nha','BÆ¡ TÆ°á»ng An','Sá»‘t Ä‘á»“ nÆ°á»›ng','Háº¯c xÃ¬ dáº§u'],
-        extraRightTitle: 'KHÃC'
+        extraLeft: ['Mì Miliket','Mì trứng','Mì giòn','Miến thái','Mù tạt xanh','Mù tạt vàng','Nước cốt dừa','Bơ đậu phộng'],
+        extraRight: ['Kỉ tử','Nấm mèo','Nấm đông cô','Lá nguyệt quế','Mạch nha','Bơ Tường An','Sốt đồ nướng','Hắc xì dầu'],
+        extraRightTitle: 'KHÁC'
       },
       hangrau1: {
-        title: 'KIá»‚M KÃŠ HÃ€NG HÃ“A â€” HÃ€NG RAU 1',
+        title: 'KIỂM KÊ HÀNG HÓA \u2013 HÀNG RAU 1',
         leftItems: [
-          'Báº¯p cáº£i tráº¯ng:trÃ¡i','Báº§u:kg','CÃ  chua bi:kg','CÃ  chua lá»›n:kg','CÃ  tÃ­m:kg','CÃ  phÃ¡o:kg','Cá»§ dá»n:kg','Cá»§ sen:kg','DÆ°a leo Nháº­t:kg','DÆ°a leo nhá»:kg','Äáº­u báº¯p:kg','Äu Ä‘á»§:kg','GiÃ¡:kg','Gá»«ng:kg','HÃ nh phi:kg','Háº¡t sen:kg','Háº¹:kg','HÃºng lá»§i:kg','Kháº¿:kg','Khoai lang:kg','Khoai má»¡:kg','Khoai tÃ¢y:kg','Khá»• qua:kg','LÃ¡ chanh:kg'
+          'Bắp cải trắng:trái','Bầu:kg','Cà chua bi:kg','Cà chua lớn:kg','Cà tím:kg','Cà pháo:kg','Củ dền:kg','Củ sen:kg','Dưa leo Nhật:kg','Dưa leo nhỏ:kg','Đậu bắp:kg','Đu đủ:kg','Giá:kg','Gừng:kg','Hành phi:kg','Hạt sen:kg','Hẹ:kg','Húng lủi:kg','Khế:kg','Khoai lang:kg','Khoai mỡ:kg','Khoai tây:kg','Khổ qua:kg','Lá chanh:kg'
         ],
         rightItems: [
-          'LÃ¡ dá»©a:kg','LÃ¡ lá»‘t:kg','LÃ¡ mÆ¡:kg','LÃ¡ á»›t:kg','LÃ¡ quáº¿:kg','MÄƒng chua:kg','MÄƒng le:kg','BÆ°á»Ÿi:kg','Táº£o xoÄƒn:kg','Salad thá»§y tinh:kg','Salad fries:kg','Cáº£i cáº§u vá»“ng:kg','MÄƒng tÃ¢y:kg','Me váº¯t:kg','MÃ­a cÃ¢y:kg','Má»“ng tÆ¡i:kg','MÆ°á»›p:kg','Náº¥m báº¡ch tuyáº¿t:kg','Náº¥m Ä‘Ã´ng cÃ´:kg','Náº¥m Ä‘Ã¹i gÃ :kg','Náº¥m kim chÃ¢m:kg','Nghá»‡:kg','NgÃ² gai:kg','NgÃ² rÃ­:kg'
+          'Lá dứa:kg','Lá lốt:kg','Lá mơ:kg','Lá ớt:kg','Lá quế:kg','Măng chua:kg','Măng le:kg','Bưởi:kg','Tảo xoắn:kg','Salad thủy tinh:kg','Salad fries:kg','Cải cầu vồng:kg','Măng tây:kg','Me vắt:kg','Mía cây:kg','Mồng tơi:kg','Mướp:kg','Nấm bạch tuyết:kg','Nấm đông cô:kg','Nấm đùi gà:kg','Nấm kim châm:kg','Nghệ:kg','Ngò gai:kg','Ngò rí:kg'
         ]
       },
       hangrau: {
-        title: 'KI�M K�` HìNG H�A � HìNG RAU 2',
-        subtitle: 'NHẬP HìNG NGìY',
+        title: 'KIỂM KÊ HÀNG HÓA \u2013 HÀNG RAU 2',
+        subtitle: 'NHẬP HÀNG NGÀY',
         items: [
-          'Tá»i cá»§:kg','Hành tây:kg','Cà r�t:kg','Thơm l�:n:kg','Tắc:kg','�at sừng:kg','Sả cây:kg','Tá»i xay:kg','Chanh:kg','Bắp Mỹ:kg','�at xiêm xanh:kg','Äáº­u rá»“ng:kg','Hành tím:kg','Xoài keo:kg','Củ cải trắng:kg','Tiêu xanh:kg','Củ sấn:kg','Rau rĒm:kg','Äáº­u Ä‘Å©a:kg','Lá tía tô:kg','Hành lá:kg','Rau muá»‘ng:kg','Súp lơ xanh:kg','�at chuông:kg'
+          'Tỏi củ:kg','Hành tây:kg','Cà rốt:kg','Thơm lớn:kg','Tắc:kg','Ớt sừng:kg','Sả cây:kg','Tỏi xay:kg','Chanh:kg','Bắp Mỹ:kg','Ớt xiêm xanh:kg','Đậu rồng:kg','Hành tím:kg','Xoài keo:kg','Củ cải trắng:kg','Tiêu xanh:kg','Củ sắn:kg','Rau răm:kg','Đậu đũa:kg','Lá tía tô:kg','Hành lá:kg','Rau muống:kg','Súp lơ xanh:kg','Ớt chuông:kg'
         ]
       }
     }
@@ -127,12 +127,30 @@ function defaults() {
     notifications: [],
     settings: {
       storeName: "KING's GRILL",
-      storeAddress: '34, Hoàng VĒn Thụ, Chánh Nghĩa, TDM, Bình Dương',
+      storeAddress: '34, Hoàng Văn Thụ, Chánh Nghĩa, TDM, Bình Dương',
       autoSync: true,
       discrepancyThreshold: 50000,
       shiftWarningHours: 10,
       requireLogin: true,
-      adminPassword: '712121'
+      adminPassword: '',
+      printer: {
+        kitchenIp: '',
+        sashimiIp: '',
+        barIp: '',
+        useQzTray: false
+      },
+      vatKeys: {
+        gemini: [],
+        groq: [],
+        hf: [],
+        cerebras: [],
+        sambanova: [],
+        deepseek: [],
+        mistral: [],
+        nvidia: []
+      },
+      posTables: [],
+      posCatalog: []
     },
     printForms: Object.assign(getInitialPrintForms(), {
       margins: { top: 8, bottom: 8, left: 8, right: 8 },
@@ -160,7 +178,8 @@ export function getState() {
       var saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         var parsed = JSON.parse(saved);
-        var def = defaults();
+
+        var def = defaults();
         // Merge manually for compatibility
         for (var key in def) {
           if (parsed[key] === undefined) parsed[key] = def[key];
@@ -503,6 +522,11 @@ export async function closeShift(opts) {
   }
 
   s.shifts.unshift(JSON.parse(JSON.stringify(s.currentShift)));
+  // M2: Enforce shift history quota limit (180 entries = 90 days)
+  if (s.shifts.length > 180) {
+    s.shifts = s.shifts.slice(0, 180);
+    console.warn('[Store] Shift history quota exceeded. Pruned to 180 entries.');
+  }
   var closedShift = s.currentShift;
   // Fix 1B: Track recently closed IDs to prevent cloud restore race condition
   if (!s._recentlyClosedIds) s._recentlyClosedIds = [];
@@ -1037,6 +1061,10 @@ function _rebuildShiftSnapshot(shift) {
 
   var copy = Object.assign({}, shift);
   delete copy.summarySnapshot;
+  if (!shift.originalSummarySnapshot && shift.summarySnapshot) {
+    shift.originalSummarySnapshot = Object.assign({}, shift.summarySnapshot);
+  }
+
   // Force open status so getShiftSummary reads live invoiceStore/transactions
   copy.status = '_rebuilding';
 

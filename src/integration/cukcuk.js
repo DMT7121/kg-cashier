@@ -71,7 +71,7 @@ function _getCachedToken() {
     return { token: _cachedToken, companyCode: _cachedCompanyCode };
   }
   try {
-    var saved = localStorage.getItem('cukcuk_token');
+    var saved = sessionStorage.getItem('cukcuk_token');
     if (saved) {
       var parsed = JSON.parse(saved);
       if (parsed.token && (Date.now() - parsed.time) < TOKEN_TTL) {
@@ -90,7 +90,7 @@ function _setCachedToken(token, companyCode) {
   _cachedCompanyCode = companyCode;
   _cachedTokenTime = Date.now();
   try {
-    localStorage.setItem('cukcuk_token', JSON.stringify({ 
+    sessionStorage.setItem('cukcuk_token', JSON.stringify({ 
       token: token, companyCode: companyCode, time: _cachedTokenTime 
     }));
   } catch(e) { /* ignore */ }
@@ -100,7 +100,7 @@ function _clearCachedToken() {
   _cachedToken = null;
   _cachedCompanyCode = null;
   _cachedTokenTime = 0;
-  try { localStorage.removeItem('cukcuk_token'); } catch(e) { /* ignore */ }
+  try { sessionStorage.removeItem('cukcuk_token'); } catch(e) { /* ignore */ }
 }
 
 // ── Centralized API Call with Auto-Retry on Auth Failure ──
@@ -225,6 +225,33 @@ function _getTodayStr() {
   var y = now.getFullYear();
   var m = String(now.getMonth() + 1).padStart(2, '0');
   var d = String(now.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+
+/**
+ * Derive working day (YYYY-MM-DD) from a CUKCUK RefDate string.
+ * If the invoice time is before 06:00, the working day is the previous calendar day.
+ * @param {string} refDate - e.g. "2026-05-13T23:15:00" or "/Date(1747148100000)/"
+ * @param {string} fallback - fallback date if parsing fails
+ */
+function _getWorkingDayFromRefDate(refDate, fallback) {
+  if (!refDate) return fallback;
+  var dt;
+  // Handle .NET "/Date(...)/" format
+  var match = String(refDate).match(/\/Date\((\d+)\)\//);
+  if (match) {
+    dt = new Date(parseInt(match[1]));
+  } else {
+    dt = new Date(refDate);
+  }
+  if (isNaN(dt.getTime())) return fallback;
+  // Before 6AM = previous working day
+  if (dt.getHours() < 6) {
+    dt.setDate(dt.getDate() - 1);
+  }
+  var y = dt.getFullYear();
+  var m = String(dt.getMonth() + 1).padStart(2, '0');
+  var d = String(dt.getDate()).padStart(2, '0');
   return y + '-' + m + '-' + d;
 }
 
@@ -923,7 +950,7 @@ export async function syncTransactions(force) {
           toProcess.push({ inv: inv, refId: refId, reason: 'new' });
           newOnThisPage++;
           console.log('[CUKCUK] ★ NEW: ' + (inv.RefNo || refId) + ' ' + apiAmount.toLocaleString() + 'đ');
-        } else if (existing.unpaid) {
+        } else if (existing.unpaid && !existing.manualOverride) {
           toProcess.push({ inv: inv, refId: refId, reason: 'unpaid-refresh' });
           newOnThisPage++;
         }
@@ -1057,7 +1084,7 @@ export async function syncTransactions(force) {
           console.log('[CUKCUK] Unpaid bill:', refId, refNo, '(' + detailAmount.toLocaleString() + 'đ)');
           // Save as unpaid — won't re-fetch, won't count as revenue
           invoiceRecords.push({
-            refId: refId, refNo: refNo, refDate: refDate, date: todayStr,
+            refId: refId, refNo: refNo, refDate: refDate, date: _getWorkingDayFromRefDate(refDate, todayStr),
             tableName: tableName, employeeName: employeeName,
             amount: detailAmount, payments: [],
             unpaid: true, confirmed: true,
@@ -1071,7 +1098,7 @@ export async function syncTransactions(force) {
         // (NEW invoice only — existing invoices are skipped at STEP 3)
         
         invoiceRecords.push({
-          refId: refId, refNo: refNo, refDate: refDate, date: todayStr,
+          refId: refId, refNo: refNo, refDate: refDate, date: _getWorkingDayFromRefDate(refDate, todayStr),
           tableName: tableName, employeeName: employeeName,
           amount: effectiveAmount, payments: invoicePayments,
           unpaid: false, confirmed: true,

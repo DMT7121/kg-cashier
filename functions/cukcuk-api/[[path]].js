@@ -1,19 +1,41 @@
 // Cloudflare Pages Function — CUKCUK API CORS Proxy
 // This handles ALL methods: GET, POST, PUT, DELETE, OPTIONS
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, CompanyCode',
-  'Access-Control-Max-Age': '86400',
-};
+const ALLOWED_ORIGINS = [
+  'https://kg-cashier.pages.dev',
+  'https://kg-cashier.dmt-kgwork.pages.dev',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+];
+
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, CompanyCode',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  };
+}
 
 async function handleProxy(context) {
   const { request, params } = context;
 
+  // Reject requests from unauthorized origins
+  const origin = request.headers.get('Origin') || '';
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    return new Response('Forbidden', { status: 403 });
+  }
+
+  const corsHeaders = getCorsHeaders(request);
+
   // Handle CORS preflight
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const pathSegments = params.path || [];
@@ -46,7 +68,7 @@ async function handleProxy(context) {
     return new Response(respBody, {
       status: resp.status,
       headers: {
-        ...CORS_HEADERS,
+        ...corsHeaders,
         'Content-Type': resp.headers.get('Content-Type') || 'application/json',
       },
     });
@@ -56,7 +78,7 @@ async function handleProxy(context) {
       ErrorMessage: 'Proxy error: ' + error.message
     }), {
       status: 502,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 }

@@ -286,11 +286,16 @@ export function render() {
 }
 
 export function init() {
-  // Load CUKCUK module if not loaded yet, then re-render
+  // Load CUKCUK module if not loaded yet, then update only the tab content (NOT refreshView — that causes infinite re-render)
   if (!_cukcukRevenue) {
     import('../integration/invoiceStore.js').then(function(mod) {
       _cukcukRevenue = mod;
-      window.refreshView && window.refreshView();
+      // Targeted DOM update instead of full refreshView to break the render loop
+      var container = document.getElementById('revTabContent');
+      if (container) {
+        container.innerHTML = render();
+        init(); // re-bind events on the new content
+      }
     }).catch(function() {});
   }
 

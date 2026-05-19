@@ -3,10 +3,10 @@
    Real-time ticket display for Bar or Kitchen stations
    ============================================ */
 import { showToast } from '../utils.js';
+import { getSettings } from '../store.js';
 
 // ── Config ────────────────────────────
 var ORDERS_KEY = 'kg-pos-orders';
-var TABLES_KEY = 'kg-pos-tables';
 var _refreshTimer = null;
 var _viewMode = 'bar'; // 'bar' | 'kitchen' | 'sashimi' | 'all'
 var _channel = null;
@@ -17,7 +17,10 @@ function getOrders() {
 }
 
 function getTables() {
-  try { var s = localStorage.getItem(TABLES_KEY); if (s) return JSON.parse(s); } catch(e){}
+  var settings = getSettings();
+  if (settings.posTables && settings.posTables.length > 0) {
+    return settings.posTables;
+  }
   return [];
 }
 

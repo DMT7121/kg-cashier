@@ -1,7 +1,7 @@
 /* ── Settings View — Consolidated Hub ──
    Tabs: Hệ thống | Nhân viên | Nhật ký | Biểu mẫu in
    ── */
-import { getSettings, updateSettings, getCategories, addCategory, removeCategory } from '../store.js';
+import { getSettings, updateSettings, getCategories, addCategory, removeCategory, getPrintForms } from '../store.js';
 import { showToast, showConfirm } from '../utils.js';
 import { saveSettingsToCloud, pingAPI, isOnline, getQueueSize } from '../api.js';
 
@@ -18,6 +18,7 @@ const _tabs = [
   { key: 'staff',   icon: 'group',        label: 'Nhân viên' },
   { key: 'audit',   icon: 'history_edu',  label: 'Nhật ký' },
   { key: 'print',   icon: 'description',  label: 'Biểu mẫu in' },
+  { key: 'inventory', icon: 'inventory_2', label: 'Kho & NCC' },
 ];
 
 function _renderTabs() {
@@ -38,7 +39,7 @@ function _renderSystemTab() {
   const queueSize = getQueueSize();
   const hasCukcuk = s.cukcuk && s.cukcuk.domain && s.cukcuk.appId && s.cukcuk.key;
   const cukcukDomain = (s.cukcuk && s.cukcuk.domain) ? s.cukcuk.domain : '';
-  const cukcukAppId = (s.cukcuk && s.cukcuk.appId) ? s.cukcuk.appId : '';
+  const cukcukAppId = (s.cukcuk && s.cukcuk.appId) ? s.cukcuk.appId : 'CUKCUKOpenPlatform';
   const cukcukKey = (s.cukcuk && s.cukcuk.key) ? s.cukcuk.key : '';
 
   return `
@@ -210,12 +211,18 @@ function _renderSystemTab() {
 }
 
 // ── Printer tab ────────────────────────────
-const PRINTER_KEY = 'kg-pos-printers';
 function _getPrinterCfg() {
-  try { var s = localStorage.getItem(PRINTER_KEY); if (s) return JSON.parse(s); } catch(e){}
-  return { kitchenIp:'', sashimiIp:'', barIp:'', useQzTray:false };
+  var settings = getSettings();
+  if (!settings.printer) {
+    settings.printer = { kitchenIp:'', sashimiIp:'', barIp:'', useQzTray:false };
+  }
+  return settings.printer;
 }
-function _savePrinterCfg(cfg) { localStorage.setItem(PRINTER_KEY, JSON.stringify(cfg)); }
+function _savePrinterCfg(cfg) { 
+  var settings = getSettings();
+  settings.printer = cfg;
+  import('../store.js').then(store => store.updateSettings(settings));
+}
 
 function _renderPrinterTab() {
   var cfg = _getPrinterCfg();
@@ -503,6 +510,42 @@ export function render() {
   `;
 }
 
+// ── Inventory tab ──
+function _renderInventoryTab() {
+  const store = getPrintForms();
+  const invData = store.inventory || {};
+  return `
+    <div class="card" style="margin-bottom:20px;border:1px solid rgba(16,185,129,.3);">
+      <div class="card-header" style="background:rgba(16,185,129,.08);color:#10b981;display:flex;justify-content:space-between;align-items:center;">
+        <h3>📦 Dữ liệu Kho & Nhà Cung Cấp</h3>
+        <button class="btn btn-primary btn-sm" id="btnSaveInventory">💾 Lưu thay đổi</button>
+      </div>
+      <div class="card-body">
+        <p class="text-muted" style="font-size:12px;margin-bottom:16px;">
+          Định dạng JSON. Dùng để thay đổi danh sách kiểm kê hiển thị trong mẫu in.
+        </p>
+        <textarea id="txtInventoryJson" style="width:100%;height:400px;font-family:monospace;font-size:12px;padding:12px;border:1px solid #ddd;border-radius:4px;resize:vertical;" spellcheck="false">${JSON.stringify(invData, null, 2)}</textarea>
+      </div>
+    </div>
+  `;
+}
+
+function _initInventoryTab() {
+  document.getElementById('btnSaveInventory')?.addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse(document.getElementById('txtInventoryJson').value);
+      import('../store.js').then(store => {
+        const pf = store.getPrintForms();
+        pf.inventory = parsed;
+        store.updatePrintForms(pf);
+        showToast('Đã lưu dữ liệu Kho & NCC', 'success');
+      });
+    } catch (e) {
+      showToast('Lỗi định dạng JSON!', 'error');
+    }
+  });
+}
+
 // ── SWITCH TAB ──
 function _switchTab(tabKey) {
   // Destroy previous sub-module if needed
@@ -525,6 +568,9 @@ function _switchTab(tabKey) {
   } else if (tabKey === 'printer') {
     container.innerHTML = _renderPrinterTab();
     _initPrinterTab();
+  } else if (tabKey === 'inventory') {
+    container.innerHTML = _renderInventoryTab();
+    _initInventoryTab();
   } else if (tabKey === 'staff') {
     container.innerHTML = staffModule.render();
     staffModule.init();
@@ -596,7 +642,7 @@ function _initSystemTab() {
       }
     };
     updateSettings(newSettings);
-    saveSettingsToCloud(newSettings).catch(function() {});
+    saveSettingsToCloud(getSettings()).catch(function() {});
     if (!silent) showToast('Đã lưu tất cả cài đặt', 'success');
   };
 
@@ -687,8 +733,8 @@ function _initSystemTab() {
       type: 'danger'
     });
     if (ok) {
-      localStorage.removeItem('kg-cashier-data');
-      showToast('Đã xóa dữ liệu cục bộ', 'success');
+      localStorage.clear();
+      showToast('Đã xóa toàn bộ dữ liệu cục bộ', 'success');
       setTimeout(() => location.reload(), 1000);
     }
   });

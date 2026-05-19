@@ -415,3 +415,7 @@ export function init() {
     _switchTab(_activeTab);
   }
 }
+
+export function destroy() {
+  // Cleanup — no persistent timers
+}

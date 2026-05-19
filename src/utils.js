@@ -2,6 +2,13 @@
    KG-CASHIER — Utility Functions
    ============================================ */
 
+/** Escape HTML special chars to prevent XSS when using innerHTML */
+export function escapeHtml(str) {
+  if (!str) return '';
+  var s = String(str);
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ── Currency & Date Formatting ───────────────
 export function formatCurrency(amount) {
   return Number(amount || 0).toLocaleString('vi-VN') + ' đ';
@@ -157,8 +164,36 @@ function _fmtDots(n) { return n.toLocaleString('vi-VN'); }
 function _safeEval(expr) {
   // Only allow digits, dots, commas, spaces, +, -, *, /
   var clean = expr.replace(/\./g, '').replace(/,/g, '.').replace(/\s/g, '');
-  if (!/^[\d.+\-*/()]+$/.test(clean)) return null;
-  try { return Function('"use strict"; return (' + clean + ')')(); } catch(e) { return null; }
+  if (!/^[\d.+\-*/]+$/.test(clean)) return null;
+  // Safe stack-based math parser — no Function()/eval()
+  try {
+    var tokens = clean.match(/(\d+\.?\d*|[+\-*/])/g);
+    if (!tokens || tokens.length === 0) return null;
+    // First pass: handle * and /
+    var stack = [parseFloat(tokens[0])];
+    if (isNaN(stack[0])) return null;
+    var ops = [];
+    for (var i = 1; i < tokens.length; i += 2) {
+      var op = tokens[i];
+      var next = parseFloat(tokens[i + 1]);
+      if (isNaN(next)) return null;
+      if (op === '*') { stack[stack.length - 1] *= next; }
+      else if (op === '/') {
+        if (next === 0) return null;
+        stack[stack.length - 1] /= next;
+      } else {
+        ops.push(op);
+        stack.push(next);
+      }
+    }
+    // Second pass: handle + and -
+    var result = stack[0];
+    for (var j = 0; j < ops.length; j++) {
+      if (ops[j] === '+') result += stack[j + 1];
+      else if (ops[j] === '-') result -= stack[j + 1];
+    }
+    return isFinite(result) ? result : null;
+  } catch(e) { return null; }
 }
 
 /**
