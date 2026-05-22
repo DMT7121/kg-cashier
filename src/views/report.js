@@ -843,3 +843,5 @@ function _fmtDateVN(dateStr) {
   if (parts.length === 3) return parts[2] + '/' + parts[1];
   return dateStr;
 }
+
+export function destroy() {}

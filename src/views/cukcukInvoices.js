@@ -527,3 +527,5 @@ function _filterInvoices(query) {
   var tableWrap = document.getElementById('invoiceTableWrap');
   if (tableWrap) tableWrap.innerHTML = _renderInvoiceTable(invoices);
 }
+
+export function destroy() {}

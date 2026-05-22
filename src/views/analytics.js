@@ -337,3 +337,5 @@ export function init() {
     URL.revokeObjectURL(url);
   });
 }
+
+export function destroy() {}
