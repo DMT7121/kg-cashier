@@ -157,7 +157,10 @@ function _renderCalcTab() {
             </div>
 
             <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2">Giá trị (VNĐ)</label>
+              <div class="flex justify-between items-center mb-2">
+                <label class="text-sm font-bold text-slate-700">Giá trị (VNĐ)</label>
+                <div id="ext-calc-formula" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md transition-all tracking-wide min-h-[22px]"></div>
+              </div>
               <input type="text" id="ext-input-1" class="form-control w-full text-right font-black text-2xl md:text-3xl h-16 bg-slate-50/80 border-slate-200 hover:border-blue-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-slate-800 placeholder:text-slate-300 transition-all tracking-tight shadow-sm" placeholder="0" autocomplete="off">
             </div>
 
@@ -692,6 +695,8 @@ export function init() {
       let clean = raw.replace(/[.,\s]/g, '');
       if (clean === '') {
         e.target.value = '';
+        const formulaEl = document.getElementById('ext-calc-formula');
+        if (formulaEl) formulaEl.innerText = '';
         updateCalc();
         return;
       }
@@ -709,6 +714,16 @@ export function init() {
         let newCaret = caret + (newLen - oldLen);
         if (newCaret < 0) newCaret = 0;
         e.target.setSelectionRange(newCaret, newCaret);
+      }
+      
+      // Live-render the formula above the input box (e.g. "1.500.000 + 150.000")
+      const formulaEl = document.getElementById('ext-calc-formula');
+      if (formulaEl) {
+        if (/[+\-*/]/.test(formatted)) {
+          formulaEl.innerText = formatted.replace(/\s*([+\-*/])\s*/g, ' $1 ');
+        } else {
+          formulaEl.innerText = '';
+        }
       }
       
       updateCalc();
@@ -747,7 +762,31 @@ export function init() {
     };
 
     input1.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') saveToHistory();
+      if (e.key === 'Enter') {
+        const raw = e.target.value;
+        const s = getSettings();
+        const sep = (s.extension && s.extension.numFormat === 'comma') ? ',' : '.';
+        
+        if (/[+\-*/]/.test(raw)) {
+          const result = parseCurrency(raw);
+          if (result > 0) {
+            // Update formula above to show calculated state (e.g., "1.500.000 + 150.000 =")
+            const formulaEl = document.getElementById('ext-calc-formula');
+            if (formulaEl) {
+              const formattedFormula = raw.replace(/\s*([+\-*/])\s*/g, ' $1 ');
+              formulaEl.innerText = formattedFormula + ' =';
+            }
+            
+            // Set input box value to evaluated result formatted neatly
+            const formattedResult = result.toString().replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+            e.target.value = formattedResult;
+            
+            // Trigger recalculation of VAT values
+            updateCalc();
+          }
+        }
+        saveToHistory();
+      }
     });
 
     document.getElementById('ext-copy-btn').addEventListener('click', () => {
