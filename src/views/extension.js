@@ -886,6 +886,10 @@ export function init() {
       st.extension.lastSelectedQr = item;
       updateSettings(st);
       
+      import('../api.js').then(api => {
+        if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+      });
+      
       btnGen.click();
     };
 
@@ -903,6 +907,10 @@ export function init() {
       
       updateSettings(st);
       renderQRHistory();
+
+      import('../api.js').then(api => {
+        if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+      });
     };
 
     renderQRHistory();
@@ -950,7 +958,7 @@ export function init() {
         <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-1">
           <div class="flex justify-between items-center">
             <span class="text-xs font-bold text-slate-400">SỐ TIỀN</span>
-            <span class="text-emerald-600 font-black text-lg">${formatCurrency(amount)} đ</span>
+            <span class="text-emerald-600 font-black text-lg">${formatCurrency(amount)}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-xs font-bold text-slate-400">NỘI DUNG</span>
@@ -973,6 +981,10 @@ export function init() {
       st.extension.qrTemplates = _qrTemplates;
       updateSettings(st);
       renderQRHistory();
+
+      import('../api.js').then(api => {
+        if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+      });
     });
 
     btnClear.addEventListener('click', () => {
