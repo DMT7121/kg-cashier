@@ -119,6 +119,8 @@ function _renderCalcTab() {
   const s = getSettings();
   const ext = s.extension || {};
   const defTax = ext.defaultTax || 8;
+  const numFormat = ext.numFormat || 'dot';
+  const type = ext.calcType || '1';
 
   return `
     <div class="max-w-4xl mx-auto">
@@ -142,13 +144,40 @@ function _renderCalcTab() {
             </div>
 
             <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2">Loại tính toán</label>
-              <select id="ext-calc-type" class="form-input w-full bg-slate-50/80 border-slate-200 hover:border-blue-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-bold text-slate-700 h-14 rounded-xl transition-all shadow-sm cursor-pointer">
-                <option value="1">Giá chưa thuế ➔ Giá đã thuế</option>
-                <option value="2">Giá đã thuế ➔ Giá chưa thuế</option>
-                <option value="3">Tiền thuế ➔ Giá chưa thuế</option>
-                <option value="4">Tiền thuế ➔ Giá đã thuế</option>
-              </select>
+              <label class="block text-sm font-bold text-slate-700 mb-2.5">Loại tính toán</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" id="ext-calc-type-group">
+                <button class="ext-type-btn text-left p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 focus:outline-none hover:bg-slate-50 ${type === '1' ? 'border-blue-500 bg-blue-50/40 text-blue-800 font-extrabold shadow-sm shadow-blue-500/5' : 'border-slate-200 bg-white text-slate-600'}" data-val="1">
+                  <div class="font-extrabold text-[13px] flex items-center gap-1.5 justify-between w-full">
+                    <span class="ext-type-title">Chưa thuế ➔ Đã thuế</span>
+                    ${type === '1' ? '<span class="material-symbols-rounded text-blue-600 text-base font-black">check_circle</span>' : ''}
+                  </div>
+                  <div class="text-[9px] font-semibold text-slate-400 uppercase tracking-tight leading-none">Cộng thêm thuế VAT</div>
+                </button>
+                
+                <button class="ext-type-btn text-left p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 focus:outline-none hover:bg-slate-50 ${type === '2' ? 'border-blue-500 bg-blue-50/40 text-blue-800 font-extrabold shadow-sm shadow-blue-500/5' : 'border-slate-200 bg-white text-slate-600'}" data-val="2">
+                  <div class="font-extrabold text-[13px] flex items-center gap-1.5 justify-between w-full">
+                    <span class="ext-type-title">Đã thuế ➔ Chưa thuế</span>
+                    ${type === '2' ? '<span class="material-symbols-rounded text-blue-600 text-base font-black">check_circle</span>' : ''}
+                  </div>
+                  <div class="text-[9px] font-semibold text-slate-400 uppercase tracking-tight leading-none">Tách thuế tìm giá gốc</div>
+                </button>
+                
+                <button class="ext-type-btn text-left p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 focus:outline-none hover:bg-slate-50 ${type === '3' ? 'border-blue-500 bg-blue-50/40 text-blue-800 font-extrabold shadow-sm shadow-blue-500/5' : 'border-slate-200 bg-white text-slate-600'}" data-val="3">
+                  <div class="font-extrabold text-[13px] flex items-center gap-1.5 justify-between w-full">
+                    <span class="ext-type-title">Tiền thuế ➔ Chưa thuế</span>
+                    ${type === '3' ? '<span class="material-symbols-rounded text-blue-600 text-base font-black">check_circle</span>' : ''}
+                  </div>
+                  <div class="text-[9px] font-semibold text-slate-400 uppercase tracking-tight leading-none">VAT ➔ Giá trước thuế</div>
+                </button>
+                
+                <button class="ext-type-btn text-left p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 focus:outline-none hover:bg-slate-50 ${type === '4' ? 'border-blue-500 bg-blue-50/40 text-blue-800 font-extrabold shadow-sm shadow-blue-500/5' : 'border-slate-200 bg-white text-slate-600'}" data-val="4">
+                  <div class="font-extrabold text-[13px] flex items-center gap-1.5 justify-between w-full">
+                    <span class="ext-type-title">Tiền thuế ➔ Đã thuế</span>
+                    ${type === '4' ? '<span class="material-symbols-rounded text-blue-600 text-base font-black">check_circle</span>' : ''}
+                  </div>
+                  <div class="text-[9px] font-semibold text-slate-400 uppercase tracking-tight leading-none">VAT ➔ Giá sau thuế</div>
+                </button>
+              </div>
             </div>
 
             <div>
@@ -157,30 +186,32 @@ function _renderCalcTab() {
                 <div id="ext-calc-formula" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md transition-all tracking-wide min-h-[22px]"></div>
               </div>
               <input type="text" id="ext-input-1" class="form-control w-full text-right font-black text-2xl md:text-3xl h-16 bg-slate-50/80 border-slate-200 hover:border-blue-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-slate-800 placeholder:text-slate-300 transition-all tracking-tight shadow-sm" placeholder="0" autocomplete="off">
+              
+              <!-- Clean modern formatting toggle switch -->
+              <div class="mt-3 flex items-center justify-between p-3.5 border border-slate-100 bg-slate-50/40 rounded-2xl select-none">
+                <span class="text-xs font-bold text-slate-600 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-base text-slate-400">tune</span>
+                  Phân cách số hàng nghìn:
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="ext-calc-numformat-toggle" ${numFormat === 'comma' ? 'checked' : ''} class="sr-only peer">
+                  <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <span class="ml-2.5 text-xs font-extrabold text-slate-700 min-w-[85px]">${numFormat === 'comma' ? 'Dấu phẩy (,)' : 'Dấu chấm (.)'}</span>
+                </label>
+              </div>
             </div>
 
             <div>
               <label class="block text-sm font-bold text-slate-700 mb-2">Thuế suất (%)</label>
-              <div class="flex gap-3">
-                <input type="number" id="ext-input-2" class="form-control w-24 text-center font-black text-xl bg-slate-50/80 border-slate-200 hover:border-blue-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl h-12 transition-all shadow-sm" value="${defTax}">
-                <div class="flex flex-1 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/60 shadow-inner">
-                  <button class="ext-preset-btn flex-1 rounded-lg text-sm font-bold transition-all ${defTax == 0 ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}" data-val="0">0%</button>
-                  <button class="ext-preset-btn flex-1 rounded-lg text-sm font-bold transition-all ${defTax == 5 ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}" data-val="5">5%</button>
-                  <button class="ext-preset-btn flex-1 rounded-lg text-sm font-bold transition-all ${defTax == 8 ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}" data-val="8">8%</button>
-                  <button class="ext-preset-btn flex-1 rounded-lg text-sm font-bold transition-all ${defTax == 10 ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}" data-val="10">10%</button>
+              <div class="flex items-center gap-3">
+                <input type="number" id="ext-input-2" class="form-control w-20 text-center font-black text-xl bg-slate-50/80 border-slate-200 hover:border-blue-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl h-12 transition-all shadow-sm" value="${defTax}">
+                <div class="flex flex-wrap gap-1.5 flex-1">
+                  <button class="ext-preset-btn px-3 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${defTax == 0 ? 'border-blue-500 bg-blue-50/40 text-blue-600 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50'}" data-val="0">0%</button>
+                  <button class="ext-preset-btn px-3 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${defTax == 5 ? 'border-blue-500 bg-blue-50/40 text-blue-600 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50'}" data-val="5">5%</button>
+                  <button class="ext-preset-btn px-3 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${defTax == 8 ? 'border-blue-500 bg-blue-50/40 text-blue-600 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50'}" data-val="8">8%</button>
+                  <button class="ext-preset-btn px-3 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${defTax == 10 ? 'border-blue-500 bg-blue-50/40 text-blue-600 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50'}" data-val="10">10%</button>
                 </div>
               </div>
-            </div>
-
-            <!-- Định dạng số tiền (Dấu phân cách hàng nghìn) -->
-            <div class="mt-4 flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200/60 shadow-sm">
-              <span class="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <span class="material-symbols-rounded text-base text-slate-400">payments</span> Định dạng số tiền
-              </span>
-              <label class="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" id="ext-calc-sep-toggle" ${ext.numFormat === 'comma' ? 'checked' : ''} class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
-                <span class="text-xs font-bold text-slate-700 hover:text-slate-900">Dùng dấu phẩy phân cách (100,000)</span>
-              </label>
             </div>
           </div>
 
@@ -467,28 +498,34 @@ function _renderTTSTab() {
           <div class="grid grid-cols-2 gap-4 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
             <div>
               <label class="block text-sm font-semibold text-slate-600 mb-1.5">Giọng đọc</label>
-              <select id="ext-tts-voice" class="form-input bg-white cursor-pointer pr-10">
-                <option value="nu-bac">Nữ miền Bắc</option>
-                <option value="nam-bac">Nam miền Bắc</option>
-                <option value="nu-nam">Nữ miền Nam</option>
-                <option value="nam-nam">Nam miền Nam</option>
-              </select>
+              <div class="relative">
+                <select id="ext-tts-voice" class="form-control bg-white appearance-none pr-8">
+                  <option value="nu-bac">Nữ miền Bắc</option>
+                  <option value="nam-bac">Nam miền Bắc</option>
+                  <option value="nu-nam">Nữ miền Nam</option>
+                  <option value="nam-nam">Nam miền Nam</option>
+                </select>
+                <span class="material-symbols-rounded absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">expand_more</span>
+              </div>
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-600 mb-1.5">Tốc độ</label>
-              <select id="ext-tts-speed" class="form-input bg-white cursor-pointer pr-10">
-                <option value="0.8">Chậm</option>
-                <option value="1.0" selected>Bình thường</option>
-                <option value="1.2">Nhanh</option>
-              </select>
+              <div class="relative">
+                <select id="ext-tts-speed" class="form-control bg-white appearance-none pr-8">
+                  <option value="0.8">Chậm</option>
+                  <option value="1.0" selected>Bình thường</option>
+                  <option value="1.2">Nhanh</option>
+                </select>
+                <span class="material-symbols-rounded absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">expand_more</span>
+              </div>
             </div>
           </div>
 
           <div class="flex gap-3">
-            <button id="ext-tts-play" class="btn btn-outline flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2">
+            <button id="ext-tts-play" class="btn-secondary flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
               <span class="material-symbols-rounded text-slate-500">volume_up</span> Đọc (Hệ thống)
             </button>
-            <button id="ext-tts-api-play" class="btn flex-[1.5] py-3 text-base font-bold flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white border-none shadow-md shadow-purple-200">
+            <button id="ext-tts-api-play" class="btn-primary flex-[1.5] py-3 text-base font-bold flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 border-none shadow-sm shadow-purple-200">
               <span class="material-symbols-rounded">graphic_eq</span> Dùng AI (Khuyên dùng)
             </button>
           </div>
@@ -505,17 +542,20 @@ function _renderTTSTab() {
         <div class="p-6 flex-1 flex flex-col">
           <div class="mb-4">
             <label class="block text-sm font-semibold text-slate-600 mb-1.5">Nhà cung cấp</label>
-            <select id="ext-tts-provider" class="form-input bg-white cursor-pointer pr-10 font-medium">
-              <option value="google" ${provider === 'google' ? 'selected' : ''}>Google Translate TTS (Miễn phí & Rất ổn định)</option>
-              <option value="fpt" ${provider === 'fpt' ? 'selected' : ''}>FPT AI TTS</option>
-              <option value="viettel" ${provider === 'viettel' ? 'selected' : ''}>Viettel AI</option>
-            </select>
+            <div class="relative">
+              <select id="ext-tts-provider" class="form-control bg-white appearance-none pr-8 font-medium">
+                <option value="google" ${provider === 'google' ? 'selected' : ''}>Google Translate TTS (Miễn phí & Rất ổn định)</option>
+                <option value="fpt" ${provider === 'fpt' ? 'selected' : ''}>FPT AI TTS</option>
+                <option value="viettel" ${provider === 'viettel' ? 'selected' : ''}>Viettel AI</option>
+              </select>
+              <span class="material-symbols-rounded absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">expand_more</span>
+            </div>
           </div>
           
           <div class="mb-6 flex-1 flex flex-col justify-between">
             <div id="ext-tts-key-container">
               <label class="block text-sm font-semibold text-slate-600 mb-1.5">API Key</label>
-              <input type="password" id="ext-tts-key" class="form-input bg-white" value="${ttsKey}" placeholder="Dùng key hệ thống mặc định">
+              <input type="password" id="ext-tts-key" class="form-control bg-white" value="${ttsKey}" placeholder="Dùng key hệ thống mặc định">
             </div>
             
             <div class="mt-4 bg-purple-50 text-purple-700 text-[11px] leading-relaxed p-3 rounded-lg border border-purple-100">
@@ -526,10 +566,10 @@ function _renderTTSTab() {
           </div>
           
           <div class="flex flex-col gap-2">
-            <button id="ext-tts-sync-cloud" class="btn btn-outline w-full py-2.5 font-bold flex items-center justify-center gap-2 border-dashed border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors">
+            <button id="ext-tts-sync-cloud" class="btn-outline w-full py-2.5 font-bold flex items-center justify-center gap-2 border-dashed border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors">
               <span class="material-symbols-rounded text-slate-500">sync</span> Đồng bộ cấu hình đám mây
             </button>
-            <button id="ext-tts-save-key" class="btn btn-outline w-full py-2.5 font-bold bg-slate-800 hover:bg-slate-900 text-white border-none shadow-md">Lưu cấu hình</button>
+            <button id="ext-tts-save-key" class="btn-secondary w-full py-2.5 font-bold">Lưu cấu hình</button>
           </div>
         </div>
       </div>
@@ -554,9 +594,9 @@ function _renderToolsTab() {
           <div class="flex gap-2 mb-4">
             <div class="relative flex-1">
               <span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-              <input type="text" id="ext-mst-input" class="form-input pl-10 bg-slate-50 focus:bg-white" placeholder="Nhập MST công ty...">
+              <input type="text" id="ext-mst-input" class="form-control pl-10 bg-slate-50 focus:bg-white" placeholder="Nhập MST công ty...">
             </div>
-            <button id="ext-mst-btn" class="btn btn-primary font-bold px-5 bg-orange-500 hover:bg-orange-600 border-none shadow-sm shadow-orange-200">Tra cứu</button>
+            <button id="ext-mst-btn" class="btn-primary font-bold px-5 bg-orange-500 hover:bg-orange-600 border-none shadow-sm shadow-orange-200">Tra cứu</button>
           </div>
           <div id="ext-mst-result" class="p-4 bg-slate-50/50 rounded-xl border border-slate-200 text-sm hidden flex-1"></div>
         </div>
@@ -572,12 +612,18 @@ function _renderToolsTab() {
         </div>
         <div class="p-6 flex-1 flex flex-col">
           <div class="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mb-5">
-            <select id="ext-cur-from" class="form-input bg-slate-50 cursor-pointer pr-10 font-bold text-center"><option value="USD">USD</option><option value="VND">VND</option><option value="EUR">EUR</option></select>
+            <div class="relative">
+              <select id="ext-cur-from" class="form-control bg-slate-50 appearance-none pr-8 font-bold text-center"><option value="USD">USD</option><option value="VND">VND</option><option value="EUR">EUR</option></select>
+              <span class="material-symbols-rounded absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">expand_more</span>
+            </div>
             <span class="material-symbols-rounded text-slate-300">arrow_forward</span>
-            <select id="ext-cur-to" class="form-input bg-slate-50 cursor-pointer pr-10 font-bold text-center"><option value="VND">VND</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
+            <div class="relative">
+              <select id="ext-cur-to" class="form-control bg-slate-50 appearance-none pr-8 font-bold text-center"><option value="VND">VND</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
+              <span class="material-symbols-rounded absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">expand_more</span>
+            </div>
           </div>
           
-          <input type="text" id="ext-cur-amount" class="form-input mb-5 text-center font-bold text-lg h-12 bg-slate-50 focus:bg-white" placeholder="Nhập số tiền...">
+          <input type="text" id="ext-cur-amount" class="form-control mb-5 text-center font-bold text-lg h-12 bg-slate-50 focus:bg-white" placeholder="Nhập số tiền...">
           
           <div class="text-center mt-auto p-4 rounded-xl bg-slate-50/50 border border-slate-100">
             <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kết quả</div>
@@ -593,7 +639,7 @@ function _renderToolsTab() {
   `;
 }
 
-// (Settings tab integrated directly into VAT Calculator)
+// Settings tab removed - separator settings integrated into Máy tính Thuế directly.
 
 // ── INITIALIZATION ───────────────────────────────────────
 export function init() {
@@ -614,10 +660,71 @@ export function init() {
   if (_activeTab === 'calc') {
     const input1 = document.getElementById('ext-input-1');
     const input2 = document.getElementById('ext-input-2');
-    const typeSel = document.getElementById('ext-calc-type');
     const presets = document.querySelectorAll('.ext-preset-btn');
     const historyContainer = document.getElementById('ext-calc-history');
     
+    // Load last persistent calculation type
+    const s = getSettings();
+    const ext = s.extension || {};
+    let selectedType = ext.calcType || '1';
+
+    const typeBtns = document.querySelectorAll('.ext-type-btn');
+    typeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        typeBtns.forEach(b => {
+          b.className = 'ext-type-btn text-left p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 focus:outline-none border-slate-200 bg-white text-slate-600 hover:bg-slate-50';
+          const badge = b.querySelector('.material-symbols-rounded');
+          if (badge) badge.remove();
+        });
+        
+        btn.className = 'ext-type-btn text-left p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 focus:outline-none border-blue-500 bg-blue-50/40 text-blue-800 font-extrabold shadow-sm shadow-blue-500/5';
+        
+        const titleEl = btn.querySelector('.ext-type-title');
+        titleEl.insertAdjacentHTML('afterend', '<span class="material-symbols-rounded text-blue-600 text-base font-black">check_circle</span>');
+        
+        selectedType = btn.getAttribute('data-val');
+        
+        // Persist type selection
+        const st = getSettings();
+        if (!st.extension) st.extension = {};
+        st.extension.calcType = selectedType;
+        updateSettings(st);
+        
+        import('../api.js').then(api => {
+          if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+        });
+        
+        updateCalc();
+      });
+    });
+
+    const formatToggle = document.getElementById('ext-calc-numformat-toggle');
+    formatToggle.addEventListener('change', (e) => {
+      const isComma = e.target.checked;
+      const labelText = e.target.nextElementSibling;
+      if (labelText) {
+        labelText.innerText = isComma ? 'Dấu phẩy (,)' : 'Dấu chấm (.)';
+      }
+      
+      const st = getSettings();
+      if (!st.extension) st.extension = {};
+      st.extension.numFormat = isComma ? 'comma' : 'dot';
+      updateSettings(st);
+      
+      import('../api.js').then(api => {
+        if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+      });
+      
+      // Update display separator immediately in the input box if contains value
+      if (input1.value) {
+        const val = parseCurrency(input1.value);
+        const sep = isComma ? ',' : '.';
+        input1.value = val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+      }
+      
+      updateCalc();
+    });
+
     const renderHistory = () => {
       if (!_history || _history.length === 0) {
         historyContainer.innerHTML = '<div class="text-center text-slate-400 py-4 italic text-sm">Chưa có lịch sử tính toán</div>';
@@ -647,7 +754,7 @@ export function init() {
     const updateCalc = () => {
       const v1 = parseCurrency(input1.value);
       const rate = parseFloat(input2.value) || 0;
-      const type = typeSel.value;
+      const type = selectedType;
       
       let resMain = 0;
       let resSub = 0;
@@ -723,58 +830,41 @@ export function init() {
       updateCalc();
     });
     input2.addEventListener('input', () => {
-      presets.forEach(p => p.className = 'ext-preset-btn flex-1 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700 hover:bg-slate-200/50');
+      presets.forEach(p => {
+        p.className = 'ext-preset-btn px-3 py-2.5 rounded-xl text-xs font-bold transition-all border-2 border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50';
+      });
       updateCalc();
     });
-    typeSel.addEventListener('change', updateCalc);
 
     presets.forEach(btn => {
       btn.addEventListener('click', () => {
-        presets.forEach(p => p.className = 'ext-preset-btn flex-1 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700 hover:bg-slate-200/50');
-        btn.className = 'ext-preset-btn flex-1 rounded-lg text-sm font-bold transition-all bg-white text-blue-600 shadow-sm';
+        presets.forEach(p => {
+          p.className = 'ext-preset-btn px-3 py-2.5 rounded-xl text-xs font-bold transition-all border-2 border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50';
+        });
+        btn.className = 'ext-preset-btn px-3 py-2.5 rounded-xl text-xs font-bold transition-all border-2 border-blue-500 bg-blue-50/40 text-blue-600 shadow-sm';
         input2.value = btn.getAttribute('data-val');
+        
+        // Save preset selection as default tax rate
+        const st = getSettings();
+        if (!st.extension) st.extension = {};
+        st.extension.defaultTax = parseInt(btn.getAttribute('data-val'), 10);
+        updateSettings(st);
+        import('../api.js').then(api => {
+          if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+        });
+        
         updateCalc();
       });
     });
-
-    // Bind numeric format separator toggle checkbox
-    const sepToggle = document.getElementById('ext-calc-sep-toggle');
-    if (sepToggle) {
-      sepToggle.addEventListener('change', (e) => {
-        const s = getSettings();
-        if (!s.extension) s.extension = {};
-        s.extension.numFormat = e.target.checked ? 'comma' : 'dot';
-        updateSettings(s);
-        
-        // Instantly format active input
-        const sep = e.target.checked ? ',' : '.';
-        const rawVal = input1.value;
-        if (rawVal) {
-          let clean = rawVal.replace(/[.,\s]/g, '');
-          let formatted = clean.replace(/\d+/g, function(match) {
-            return match.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
-          });
-          input1.value = formatted;
-        }
-        
-        // Update calculations & history instantly
-        updateCalc();
-        
-        // Sync settings to Google Sheets in background
-        import('../api.js').then(api => {
-          if (api.saveSettingsToCloud) api.saveSettingsToCloud(s).catch(() => {});
-        });
-        
-        showToast('Đã áp dụng định dạng số tiền mới!');
-      });
-    }
 
     const saveToHistory = () => {
       const v1 = parseCurrency(input1.value);
       if (v1 <= 0) return;
       
       const rate = parseFloat(input2.value) || 0;
-      const typeStr = typeSel.options[typeSel.selectedIndex].text;
+      
+      const activeBtn = document.querySelector('.ext-type-btn.active') || document.querySelector(`.ext-type-btn[data-val="${selectedType}"]`);
+      const typeStr = activeBtn ? activeBtn.querySelector('.ext-type-title').innerText : 'Tính thuế';
       
       _history.unshift({
         typeStr,
@@ -1319,7 +1409,7 @@ export function init() {
     curTo.addEventListener('change', calcCur);
   }
 
-
+  // Settings tab binding logic removed - separator settings integrated into Máy tính Thuế.
 }
 
 export function destroy() {

@@ -78,7 +78,7 @@ export function init() {
 
 export function destroy() {
   // Cleanup sub-modules safely (they may not export destroy)
-  try { if (typeof reportModule['destroy'] === 'function') reportModule['destroy'](); } catch(e) { /* ignore */ }
-  try { if (typeof cukcukModule['destroy'] === 'function') cukcukModule['destroy'](); } catch(e) { /* ignore */ }
-  try { if (typeof analyticsModule['destroy'] === 'function') analyticsModule['destroy'](); } catch(e) { /* ignore */ }
+  try { reportModule.destroy?.(); } catch(e) { /* ignore */ }
+  try { cukcukModule.destroy?.(); } catch(e) { /* ignore */ }
+  try { analyticsModule.destroy?.(); } catch(e) { /* ignore */ }
 }
