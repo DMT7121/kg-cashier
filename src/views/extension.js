@@ -411,7 +411,7 @@ function _renderTTSTab() {
   const s = getSettings();
   const ext = s.extension || {};
   const ttsKey = ext.ttsKey || '';
-  const provider = ext.ttsProvider || 'fpt';
+  const provider = ext.ttsProvider || 'google';
 
   return `
     <div class="grid grid-cols-1 md:grid-cols-5 gap-5">
@@ -424,9 +424,38 @@ function _renderTTSTab() {
         </div>
         
         <div class="p-6">
+          <!-- Predefined templates container -->
           <div class="mb-5">
-            <label class="block text-sm font-semibold text-slate-600 mb-1.5">Nội dung cần phát</label>
-            <textarea id="ext-tts-text" class="form-control resize-none bg-slate-50 focus:bg-white leading-relaxed" rows="4" placeholder="Ví dụ: Xin thông báo, quý khách có xe mang biển số 59-P1 123.45 vui lòng gặp bảo vệ để di dời xe. Xin cảm ơn!"></textarea>
+            <div class="flex justify-between items-center mb-2.5">
+              <label class="block text-sm font-bold text-slate-700">Mẫu thông báo nhanh</label>
+              <button id="ext-tts-add-tpl-btn" class="flex items-center gap-1 text-xs font-black text-purple-600 hover:text-purple-700 transition-colors">
+                <span class="material-symbols-rounded text-base">add_circle</span> Thêm mẫu mới
+              </button>
+            </div>
+            
+            <!-- Add new template inline form -->
+            <div id="ext-tts-new-tpl-form" class="hidden flex flex-col gap-3 p-4 bg-purple-50/50 rounded-xl border border-purple-100 mb-3 shadow-inner">
+              <div class="text-xs font-black text-purple-800 uppercase tracking-wide">Tạo mẫu thông báo mới</div>
+              <div class="grid grid-cols-1 gap-2.5">
+                <input type="text" id="new-tpl-name" class="form-control text-xs font-bold bg-white" placeholder="Tên gợi nhớ (Ví dụ: Dời xe 🚗)">
+                <input type="text" id="new-tpl-value" class="form-control text-xs bg-white" placeholder="Nội dung phát (Ví dụ: Xin mời bàn {ban} qua quầy thanh toán)">
+              </div>
+              <div class="flex justify-end gap-2 mt-1">
+                <button id="new-tpl-cancel" class="btn btn-outline py-1 px-3 text-xs">Hủy</button>
+                <button id="new-tpl-save" class="btn btn-primary py-1 px-3 text-xs bg-purple-600 hover:bg-purple-700 border-none text-white font-bold">Lưu mẫu</button>
+              </div>
+            </div>
+
+            <!-- Predefined templates list -->
+            <div class="flex flex-wrap gap-2 mb-3" id="ext-tts-tpl-list"></div>
+
+            <!-- Predefined template parameters input grid -->
+            <div id="ext-tts-params-container" class="hidden grid grid-cols-2 gap-3 bg-purple-50/30 p-3 rounded-xl border border-purple-100 shadow-inner mb-4"></div>
+          </div>
+
+          <div class="mb-5">
+            <label class="block text-sm font-bold text-slate-700 mb-1.5">Nội dung cần phát</label>
+            <textarea id="ext-tts-text" class="form-control resize-none bg-slate-50 focus:bg-white leading-relaxed font-semibold text-slate-800" rows="3" placeholder="Chọn một mẫu ở trên hoặc tự gõ nội dung cần phát thanh tại đây..."></textarea>
           </div>
 
           <div class="grid grid-cols-2 gap-4 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
@@ -470,7 +499,7 @@ function _renderTTSTab() {
         <div class="p-6 border-b border-slate-200 bg-white/50 backdrop-blur">
           <h3 class="font-bold text-slate-800 flex items-center gap-2 text-base">
             <span class="material-symbols-rounded text-slate-400">settings_applications</span>
-            Cấu hình API
+            Cấu hình API & Đám mây
           </h3>
         </div>
         <div class="p-6 flex-1 flex flex-col">
@@ -478,6 +507,7 @@ function _renderTTSTab() {
             <label class="block text-sm font-semibold text-slate-600 mb-1.5">Nhà cung cấp</label>
             <div class="relative">
               <select id="ext-tts-provider" class="form-control bg-white appearance-none pr-8 font-medium">
+                <option value="google" ${provider === 'google' ? 'selected' : ''}>Google Translate TTS (Miễn phí & Rất ổn định)</option>
                 <option value="fpt" ${provider === 'fpt' ? 'selected' : ''}>FPT AI TTS</option>
                 <option value="viettel" ${provider === 'viettel' ? 'selected' : ''}>Viettel AI</option>
               </select>
@@ -485,16 +515,25 @@ function _renderTTSTab() {
             </div>
           </div>
           
-          <div class="mb-6 flex-1">
-            <label class="block text-sm font-semibold text-slate-600 mb-1.5">API Key</label>
-            <input type="password" id="ext-tts-key" class="form-control bg-white" value="${ttsKey}" placeholder="Dùng key hệ thống mặc định">
-            <div class="mt-3 bg-purple-50 text-purple-700 text-[11px] leading-relaxed p-3 rounded-lg border border-purple-100">
-              <b class="block mb-1">💡 Mẹo:</b>
-              Dùng API AI (FPT/Viettel) sẽ mang lại chất giọng truyền cảm, tự nhiên, ngắt nghỉ câu chuẩn xác hơn rất nhiều so với giọng đọc mặc định của trình duyệt.
+          <div class="mb-6 flex-1 flex flex-col justify-between">
+            <div id="ext-tts-key-container">
+              <label class="block text-sm font-semibold text-slate-600 mb-1.5">API Key</label>
+              <input type="password" id="ext-tts-key" class="form-control bg-white" value="${ttsKey}" placeholder="Dùng key hệ thống mặc định">
+            </div>
+            
+            <div class="mt-4 bg-purple-50 text-purple-700 text-[11px] leading-relaxed p-3 rounded-lg border border-purple-100">
+              <b class="block mb-1">💡 Mẹo phát loa thông báo:</b>
+              - <b>Google TTS:</b> Hoàn toàn miễn phí, tốc độ phản hồi cực nhanh, giọng đọc chuẩn quốc tế, không giới hạn ký tự và hoàn toàn không cần cấu hình API key!<br>
+              - <b>FPT/Viettel AI:</b> Giọng điệu tự nhiên, ngắt nghỉ đúng chỗ, hỗ trợ đa vùng miền, cần cấu hình API key để sử dụng.
             </div>
           </div>
           
-          <button id="ext-tts-save-key" class="btn-secondary w-full py-2.5 font-bold">Lưu cấu hình</button>
+          <div class="flex flex-col gap-2">
+            <button id="ext-tts-sync-cloud" class="btn-outline w-full py-2.5 font-bold flex items-center justify-center gap-2 border-dashed border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors">
+              <span class="material-symbols-rounded text-slate-500">sync</span> Đồng bộ cấu hình đám mây
+            </button>
+            <button id="ext-tts-save-key" class="btn-secondary w-full py-2.5 font-bold">Lưu cấu hình</button>
+          </div>
         </div>
       </div>
     </div>
@@ -840,23 +879,37 @@ export function init() {
       document.getElementById('ext-qr-name').value = item.name;
       document.getElementById('ext-qr-amount').value = item.amount ? formatCurrency(item.amount) : '';
       document.getElementById('ext-qr-content').value = item.content || '';
+      
+      // Persist as last selected QR template
+      const st = getSettings();
+      if (!st.extension) st.extension = {};
+      st.extension.lastSelectedQr = item;
+      updateSettings(st);
+      
       btnGen.click();
     };
 
     window._deleteQRTemplate = (idx) => {
+      const item = _qrTemplates[idx];
       _qrTemplates.splice(idx, 1);
       const st = getSettings();
       if (!st.extension) st.extension = {};
       st.extension.qrTemplates = _qrTemplates;
+      
+      // Update last selected QR if it matches the deleted one
+      if (st.extension.lastSelectedQr && st.extension.lastSelectedQr.bank === item.bank && st.extension.lastSelectedQr.acc === item.acc) {
+        st.extension.lastSelectedQr = _qrTemplates[0] || null;
+      }
+      
       updateSettings(st);
       renderQRHistory();
     };
 
     renderQRHistory();
 
-    // Auto load the first template if exists
+    // Auto load the last selected or first template if exists
     if (_qrTemplates.length > 0) {
-      const first = _qrTemplates[0];
+      const first = (s.extension && s.extension.lastSelectedQr) || _qrTemplates[0];
       document.getElementById('ext-qr-bank').value = first.bank;
       document.getElementById('ext-qr-acc').value = first.acc;
       document.getElementById('ext-qr-name').value = first.name;
@@ -934,6 +987,141 @@ export function init() {
     const btnPlaySys = document.getElementById('ext-tts-play');
     const btnPlayApi = document.getElementById('ext-tts-api-play');
     const btnSaveKey = document.getElementById('ext-tts-save-key');
+    const btnSyncCloud = document.getElementById('ext-tts-sync-cloud');
+    const providerSel = document.getElementById('ext-tts-provider');
+    const keyContainer = document.getElementById('ext-tts-key-container');
+
+    const toggleKeyInput = () => {
+      if (providerSel.value === 'google') {
+        if (keyContainer) keyContainer.style.display = 'none';
+      } else {
+        if (keyContainer) keyContainer.style.display = 'block';
+      }
+    };
+    providerSel.addEventListener('change', toggleKeyInput);
+    toggleKeyInput();
+
+    const s = getSettings();
+    const ext = s.extension || {};
+    let _ttsTemplates = ext.ttsTemplates || [];
+
+    let activeTplValue = '';
+    window._applyTtsTemplate = function(idx) {
+      const item = _ttsTemplates[idx];
+      if (!item) return;
+      activeTplValue = item.value;
+
+      const matches = item.value.match(/\{[^}]+\}/g);
+      const variables = matches ? [...new Set(matches)].map(m => m.slice(1, -1)) : [];
+
+      const paramsContainer = document.getElementById('ext-tts-params-container');
+      if (variables.length > 0) {
+        paramsContainer.innerHTML = variables.map(v => `
+          <div>
+            <label class="block text-[10px] font-bold text-purple-700 uppercase mb-1">${v.replaceAll('_', ' ')}</label>
+            <input type="text" data-var="${v}" class="form-input text-xs font-semibold border-purple-200 focus:border-purple-500 rounded-lg h-8" placeholder="Nhập giá trị...">
+          </div>
+        `).join('');
+        paramsContainer.classList.remove('hidden');
+
+        const inputs = paramsContainer.querySelectorAll('input[data-var]');
+        const updateText = () => {
+          let text = activeTplValue;
+          inputs.forEach(input => {
+            const vName = input.getAttribute('data-var');
+            const val = input.value || `{${vName}}`;
+            text = text.replaceAll(`{${vName}}`, val);
+          });
+          document.getElementById('ext-tts-text').value = text;
+        };
+
+        inputs.forEach(input => {
+          input.addEventListener('input', updateText);
+        });
+        updateText();
+      } else {
+        paramsContainer.classList.add('hidden');
+        document.getElementById('ext-tts-text').value = activeTplValue;
+      }
+
+      document.querySelectorAll('.ext-tts-chip').forEach((chip, i) => {
+        if (i === idx) {
+          chip.classList.add('bg-purple-100', 'border-purple-400', 'text-purple-800');
+          chip.classList.remove('bg-slate-50', 'border-slate-200', 'text-slate-700');
+        } else {
+          chip.classList.remove('bg-purple-100', 'border-purple-400', 'text-purple-800');
+          chip.classList.add('bg-slate-50', 'border-slate-200', 'text-slate-700');
+        }
+      });
+    };
+
+    window._deleteTtsTemplate = function(idx) {
+      if (confirm('Bạn chắc chắn muốn xóa mẫu thông báo này?')) {
+        _ttsTemplates.splice(idx, 1);
+        saveTtsTemplates();
+      }
+    };
+
+    const renderTtsTemplates = () => {
+      const container = document.getElementById('ext-tts-tpl-list');
+      if (!container) return;
+
+      if (_ttsTemplates.length === 0) {
+        container.innerHTML = `<div class="text-xs text-slate-400 italic py-2">Chưa có mẫu nào. Nhấn "+ Thêm mẫu" để tạo!</div>`;
+        return;
+      }
+
+      container.innerHTML = _ttsTemplates.map((item, idx) => `
+        <div class="ext-tts-chip flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer bg-slate-50 border-slate-200 text-slate-700 hover:border-purple-300 hover:bg-purple-50/30 group" onclick="window._applyTtsTemplate(${idx})">
+          <span>${item.name}</span>
+          <button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 transition-opacity" onclick="event.stopPropagation(); window._deleteTtsTemplate(${idx})">
+            <span class="material-symbols-rounded text-[14px]">close</span>
+          </button>
+        </div>
+      `).join('');
+    };
+
+    const saveTtsTemplates = () => {
+      const st = getSettings();
+      if (!st.extension) st.extension = {};
+      st.extension.ttsTemplates = _ttsTemplates;
+      updateSettings(st);
+      renderTtsTemplates();
+      
+      import('../api.js').then(api => {
+        if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+      });
+    };
+
+    renderTtsTemplates();
+
+    const addBtn = document.getElementById('ext-tts-add-tpl-btn');
+    const form = document.getElementById('ext-tts-new-tpl-form');
+    const cancelBtn = document.getElementById('new-tpl-cancel');
+    const saveBtn = document.getElementById('new-tpl-save');
+
+    addBtn.addEventListener('click', () => {
+      form.classList.toggle('hidden');
+      document.getElementById('new-tpl-name').focus();
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      form.classList.add('hidden');
+      ['new-tpl-name', 'new-tpl-value'].forEach(id => document.getElementById(id).value = '');
+    });
+
+    saveBtn.addEventListener('click', () => {
+      const name = document.getElementById('new-tpl-name').value.trim();
+      const val = document.getElementById('new-tpl-value').value.trim();
+      if (!name || !val) return showToast('Vui lòng điền đủ tên mẫu và nội dung mẫu!', 'warning');
+
+      _ttsTemplates.push({ name, value: val });
+      saveTtsTemplates();
+
+      form.classList.add('hidden');
+      ['new-tpl-name', 'new-tpl-value'].forEach(id => document.getElementById(id).value = '');
+      showToast('Đã lưu mẫu thông báo mới!');
+    });
 
     const readSys = () => {
       const text = document.getElementById('ext-tts-text').value;
@@ -961,17 +1149,55 @@ export function init() {
       showToast('Đã lưu cấu hình API!');
     });
 
+    if (btnSyncCloud) {
+      btnSyncCloud.addEventListener('click', () => {
+        const originalText = btnSyncCloud.innerHTML;
+        btnSyncCloud.innerHTML = `<span class="material-symbols-rounded animate-spin">sync</span> Đang đồng bộ...`;
+        btnSyncCloud.disabled = true;
+
+        import('../api.js').then(api => {
+          if (!api.getSettingsFromCloud) {
+            showToast('Lỗi module api.js', 'error');
+            btnSyncCloud.innerHTML = originalText;
+            btnSyncCloud.disabled = false;
+            return;
+          }
+
+          api.getSettingsFromCloud().then(res => {
+            if (res && res.success && res.settings) {
+              const current = getSettings();
+              const merged = Object.assign({}, current, res.settings);
+              merged.requireLogin = current.requireLogin;
+              updateSettings(merged);
+
+              showToast('🎉 Đồng bộ dữ liệu cấu hình thành công!', 'success');
+              const root = document.getElementById('viewContainer');
+              if (root) {
+                root.innerHTML = render();
+                init();
+              }
+            } else {
+              showToast('Lỗi lấy dữ liệu cấu hình đám mây!', 'warning');
+              btnSyncCloud.innerHTML = originalText;
+              btnSyncCloud.disabled = false;
+            }
+          }).catch(e => {
+            console.error(e);
+            showToast('Lỗi kết nối đồng bộ!', 'error');
+            btnSyncCloud.innerHTML = originalText;
+            btnSyncCloud.disabled = false;
+          });
+        });
+      });
+    }
+
     btnPlayApi.addEventListener('click', async () => {
       const text = document.getElementById('ext-tts-text').value;
       const speed = document.getElementById('ext-tts-speed').value;
       const voice = document.getElementById('ext-tts-voice').value;
       const s = getSettings();
       const ext = s.extension || {};
-      const provider = ext.ttsProvider || 'fpt';
-      
-      const defaultFptKey = 'bIsflyFl1tWRW2AQRp1EEUqGUwJYZKK0';
-      const defaultViettelKey = '87c68db598f7e17f3bb058e31cc830a9';
-      const apiKey = ext.ttsKey || (provider === 'viettel' ? defaultViettelKey : defaultFptKey);
+      const provider = ext.ttsProvider || 'google';
 
       if (!text) return showToast('Vui lòng nhập nội dung!');
       
@@ -980,7 +1206,15 @@ export function init() {
       btnPlayApi.disabled = true;
 
       try {
-        if (provider === 'fpt') {
+        if (provider === 'google') {
+          showToast('Đang phát giọng đọc Google...');
+          const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=vi&client=tw-ob`;
+          const audio = new Audio(url);
+          audio.playbackRate = parseFloat(speed) || 1.0;
+          await audio.play();
+        } else if (provider === 'fpt') {
+          const defaultFptKey = 'bIsflyFl1tWRW2AQRp1EEUqGUwJYZKK0';
+          const apiKey = ext.ttsKey || defaultFptKey;
           const vMap = { 'nu-bac': 'banmai', 'nam-bac': 'leminh', 'nu-nam': 'lananh', 'nam-nam': 'giaihuy' };
           const res = await fetch('https://api.fpt.ai/hmi/tts/v5', {
             method: 'POST',
@@ -995,6 +1229,8 @@ export function init() {
             }, 2500);
           } else throw new Error(data.message || 'Lỗi FPT');
         } else {
+          const defaultViettelKey = '87c68db598f7e17f3bb058e31cc830a9';
+          const apiKey = ext.ttsKey || defaultViettelKey;
           const vMap = { 'nu-bac': 'hn-quynh-anh', 'nam-bac': 'hn-minh-quan', 'nu-nam': 'sg-phuong-thao', 'nam-nam': 'sg-minh-hoang' };
           const res = await fetch('https://viettelai.vn/tts/v1/rest/syn', {
             method: 'POST',

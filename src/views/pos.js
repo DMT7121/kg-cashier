@@ -945,6 +945,7 @@ function _showCheckoutModal(table, order) {
         '<button class="btn btn-outline pos-pay-method-btn" data-method="transfer">🏦 Chuyển khoản</button>' +
         '<button class="btn btn-outline pos-pay-method-btn" data-method="card">💳 Quẹt thẻ</button>' +
       '</div>' +
+      '<div id="posCheckoutQrContainer" style="display:none; text-align:center; margin-top:12px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; animation: fadeIn 0.2s ease;"></div>' +
     '</div>' +
     '<div class="form-group">' +
       '<label class="form-label">Ghi chú (tuỳ chọn)</label>' +
@@ -959,15 +960,59 @@ function _showCheckoutModal(table, order) {
 
   setTimeout(function() {
     var selectedMethod = 'cash';
+
+    function updateCheckoutQr() {
+      var qrContainer = document.getElementById('posCheckoutQrContainer');
+      if (!qrContainer) return;
+      if (selectedMethod === 'transfer') {
+        var settings = getSettings();
+        var lastSelected = settings.extension && settings.extension.lastSelectedQr;
+        var firstTpl = settings.extension && settings.extension.qrTemplates && settings.extension.qrTemplates[0];
+        var qrConfig = lastSelected || firstTpl;
+
+        if (qrConfig && qrConfig.bank && qrConfig.acc) {
+          var bank = qrConfig.bank;
+          var acc = qrConfig.acc;
+          var name = qrConfig.name || '';
+          var content = 'KG POS Ban ' + table.name;
+          var qrUrl = 'https://img.vietqr.io/image/' + bank + '-' + acc + '-compact2.png?amount=' + total + '&addInfo=' + encodeURIComponent(content) + '&accountName=' + encodeURIComponent(name);
+          
+          qrContainer.innerHTML = 
+            '<div style="font-weight:700;font-size:12px;color:#0ea5e9;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:4px;">' +
+              '<span class="material-symbols-rounded" style="font-size:16px;">qr_code_2</span> QUÉT MÃ VIETQR CHUYỂN KHOẢN' +
+            '</div>' +
+            '<div style="display:inline-block;background:white;padding:6px;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(0,0,0,0.05);margin:6px 0;">' +
+              '<img src="' + qrUrl + '" style="width:160px;height:160px;object-fit:cover;border-radius:8px;">' +
+            '</div>' +
+            '<div style="font-size:12px;font-weight:800;color:var(--text-main);">' + bank + ' - ' + acc + '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;">' + name + '</div>' +
+            '<div style="font-size:11px;color:#0ea5e9;font-weight:700;margin-top:2px;">Nội dung: ' + content + '</div>';
+          qrContainer.style.display = 'block';
+        } else {
+          qrContainer.innerHTML = 
+            '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">' +
+              '⚠️ Chưa cấu hình tài khoản nhận chuyển khoản.<br>' +
+              '<span style="font-size:11px;color:#a855f7;cursor:pointer;font-weight:700;" onclick="window.hideModal(); window.navigateTo(\'extension\')">Cấu hình ngay tại đây →</span>' +
+            '</div>';
+          qrContainer.style.display = 'block';
+        }
+      } else {
+        qrContainer.style.display = 'none';
+      }
+    }
+
     document.querySelectorAll('.pos-pay-method-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         selectedMethod = btn.dataset.method;
         document.querySelectorAll('.pos-pay-method-btn').forEach(function(b) {
           b.classList.remove('active');
-          if (!b.classList.contains('btn-primary')) b.classList.add('btn-outline');
+          b.classList.remove('btn-primary');
+          b.classList.add('btn-outline');
         });
         btn.classList.add('active');
         btn.classList.remove('btn-outline');
+        btn.classList.add('btn-primary');
+        updateCheckoutQr();
       });
     });
 

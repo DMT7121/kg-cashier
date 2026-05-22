@@ -152,9 +152,16 @@ function defaults() {
       posTables: [],
       posCatalog: [],
       extension: {
-        ttsProvider: 'fpt',
+        ttsProvider: 'google',
         ttsKey: '',
-        qrTemplates: []
+        qrTemplates: [],
+        lastSelectedQr: null,
+        ttsTemplates: [
+          { name: 'Di dời xe 🚗', value: 'Xin thông báo, quý khách có xe mang biển số {bien_so} vui lòng dời xe để thuận tiện đi lại. Xin cảm ơn!' },
+          { name: 'Mời nhận món 🍲', value: 'Bếp xin mời phục vụ nhận món cho bàn {ban}.' },
+          { name: 'Thanh toán 💳', value: 'Xin mời quý khách ở bàn {ban} vui lòng qua quầy thu ngân thanh toán.' },
+          { name: 'Phục vụ bàn 🙋', value: 'Xin thông báo phục vụ hỗ trợ khách hàng tại bàn {ban}.' }
+        ]
       }
     },
     printForms: Object.assign(getInitialPrintForms(), {
@@ -207,6 +214,12 @@ export function getState() {
             }
             if (typeof parsed.settings.extension !== 'object' || parsed.settings.extension === null) {
                 parsed.settings.extension = def.settings.extension;
+            } else {
+                if (parsed.settings.extension.ttsProvider === undefined) parsed.settings.extension.ttsProvider = def.settings.extension.ttsProvider;
+                if (parsed.settings.extension.ttsKey === undefined) parsed.settings.extension.ttsKey = def.settings.extension.ttsKey;
+                if (!Array.isArray(parsed.settings.extension.qrTemplates)) parsed.settings.extension.qrTemplates = [];
+                if (parsed.settings.extension.lastSelectedQr === undefined) parsed.settings.extension.lastSelectedQr = null;
+                if (!Array.isArray(parsed.settings.extension.ttsTemplates)) parsed.settings.extension.ttsTemplates = def.settings.extension.ttsTemplates;
             }
         }
         if (!parsed.categories || typeof parsed.categories !== 'object') {

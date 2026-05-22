@@ -89,10 +89,23 @@
         </a>
       </nav>
 
-      <div class="sidebar-footer">
+      <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 8px;">
         <div class="shift-indicator" id="shiftIndicator">
           <span class="shift-dot"></span>
           <span>Chưa mở ca</span>
+        </div>
+        <!-- Quick VietQR Widget -->
+        <div id="sidebarQrWidget" style="display: none; border-top: 1px solid #f1f5f9; padding-top: 8px; width: 100%;">
+          <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 6px 10px; border-radius: 10px; background: #ecfdf5; border: 1px solid #d1fae5; transition: all 0.2s;" id="sidebarQrHeader">
+            <span style="font-size: 11px; font-weight: 800; color: #065f46; display: flex; align-items: center; gap: 4px; letter-spacing: 0.5px;">
+              <span class="material-symbols-rounded" style="font-size: 16px; color: #059669;">qr_code_2</span>
+              VIETQR NHANH
+            </span>
+            <span class="material-symbols-rounded" id="sidebarQrChevron" style="font-size: 16px; color: #047857; transition: transform 0.2s;">expand_less</span>
+          </div>
+          <div id="sidebarQrBody" style="margin-top: 8px; text-align: center; overflow: hidden; transition: all 0.3s ease-in-out; max-height: 240px; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+            <!-- QR code contents -->
+          </div>
         </div>
       </div>
     </aside>

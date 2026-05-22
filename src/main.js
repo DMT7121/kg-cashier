@@ -299,8 +299,78 @@ function initApp() {
   // Init global chatbot
   initChatbot();
 
+  // Init sidebar QR widget
+  window.updateSidebarQr = function() {
+    const widget = document.getElementById('sidebarQrWidget');
+    const body = document.getElementById('sidebarQrBody');
+    if (!widget || !body) return;
+
+    import('./store.js').then(function(store) {
+      const s = store.getSettings();
+      const lastSelected = s.extension && s.extension.lastSelectedQr;
+      const firstTpl = s.extension && s.extension.qrTemplates && s.extension.qrTemplates[0];
+      const qrConfig = lastSelected || firstTpl;
+
+      if (qrConfig && qrConfig.bank && qrConfig.acc) {
+        const bank = qrConfig.bank;
+        const acc = qrConfig.acc;
+        const name = qrConfig.name || '';
+        const amount = Number(qrConfig.amount) || 0;
+        const content = qrConfig.content || 'Thanh toan';
+        
+        const formatCurrency = (val) => {
+          const sep = (s.extension && s.extension.numFormat === 'comma') ? ',' : '.';
+          return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+        };
+        
+        const qrUrl = `https://img.vietqr.io/image/${bank}-${acc}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(name)}`;
+        
+        body.innerHTML = `
+          <div style="background:white;padding:4px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">
+            <img src="${qrUrl}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;">
+          </div>
+          <div style="font-size:12px;font-weight:800;color:#1e293b;text-transform:uppercase;">${bank} - ${acc}</div>
+          <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+          ${amount > 0 ? `<div style="font-size:10px;font-weight:700;color:#059669;background:#ecfdf5;padding:2px 8px;border-radius:9999px;">${formatCurrency(amount)} đ</div>` : ''}
+        `;
+        widget.style.display = 'block';
+      } else {
+        widget.style.display = 'none';
+      }
+    }).catch(function(e) { console.error('[SidebarQR] Failed to load store:', e); });
+  };
+  
+  // Collapsible logic for sidebar QR
+  const sqHeader = document.getElementById('sidebarQrHeader');
+  const sqBody = document.getElementById('sidebarQrBody');
+  const sqChevron = document.getElementById('sidebarQrChevron');
+  if (sqHeader && sqBody && sqChevron) {
+    const collapsed = localStorage.getItem('kg_sidebar_qr_collapsed') === 'true';
+    if (collapsed) {
+      sqBody.style.maxHeight = '0px';
+      sqBody.style.marginTop = '0px';
+      sqChevron.style.transform = 'rotate(180deg)';
+    }
+    sqHeader.addEventListener('click', function() {
+      const isCollapsed = sqBody.style.maxHeight === '0px';
+      if (isCollapsed) {
+        sqBody.style.maxHeight = '240px';
+        sqBody.style.marginTop = '8px';
+        sqChevron.style.transform = 'rotate(0deg)';
+        localStorage.setItem('kg_sidebar_qr_collapsed', 'false');
+      } else {
+        sqBody.style.maxHeight = '0px';
+        sqBody.style.marginTop = '0px';
+        sqChevron.style.transform = 'rotate(180deg)';
+        localStorage.setItem('kg_sidebar_qr_collapsed', 'true');
+      }
+    });
+  }
+  
+  window.updateSidebarQr();
+
   // Subscribe
-  subscribe(function() { updateGlobalUI(); refreshChatbot(); });
+  subscribe(function() { updateGlobalUI(); refreshChatbot(); if (window.updateSidebarQr) window.updateSidebarQr(); });
 
   // Route
   var hash = location.hash.replace('#', '');
