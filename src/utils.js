@@ -216,10 +216,22 @@ export function moneyInput(el, opts) {
   }
 
   function formatDisplay() {
-    var raw = el.value.replace(/\./g, '');
-    // If contains math operators, show as expression
-    if (allowMath && /[+\-*/]/.test(raw)) {
-      var result = _safeEval(raw);
+    var raw = el.value;
+    var clean = raw.replace(/[.,\s]/g, '');
+    
+    var formatted = clean.replace(/\d+/g, function(match) {
+      return match.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    });
+
+    var oldCursor = el.selectionStart;
+    var oldLen = raw.length;
+    el.value = formatted;
+    var newLen = formatted.length;
+    var newCursor = oldCursor + (newLen - oldLen);
+    try { el.setSelectionRange(newCursor, newCursor); } catch(e) {}
+
+    if (allowMath && /[+\-*/]/.test(clean)) {
+      var result = _safeEval(clean);
       if (previewEl) {
         if (result != null && !isNaN(result)) {
           previewEl.textContent = '= ' + _fmtDots(Math.round(result)) + ' đ';
@@ -229,27 +241,18 @@ export function moneyInput(el, opts) {
           previewEl.style.color = 'var(--danger)';
         }
       }
-      return; // Don't auto-format while typing expression
+    } else {
+      if (previewEl) previewEl.textContent = '';
     }
-    // Plain number — auto-format with dots
-    var num = parseInt(raw.replace(/\D/g, ''), 10);
-    if (isNaN(num)) { el.value = ''; if (previewEl) previewEl.textContent = ''; return; }
-    var cursor = el.selectionStart;
-    var oldLen = el.value.length;
-    el.value = _fmtDots(num);
-    var newLen = el.value.length;
-    var newCursor = cursor + (newLen - oldLen);
-    el.setSelectionRange(newCursor, newCursor);
-    if (previewEl) previewEl.textContent = '';
   }
 
   function getValue() {
-    var raw = el.value.replace(/\./g, '');
+    var raw = el.value.replace(/[.,\s]/g, '');
     if (allowMath && /[+\-*/]/.test(raw)) {
       var result = _safeEval(raw);
       return (result != null && !isNaN(result)) ? Math.round(result) : 0;
     }
-    return parseInt(raw.replace(/\D/g, ''), 10) || 0;
+    return parseInt(raw, 10) || 0;
   }
 
   function getExpression() {

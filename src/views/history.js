@@ -125,7 +125,8 @@ function _renderShiftDetailModal(sh, sm, store) {
     return '<table class="report-table mb-3"><tr><td>Thời gian</td><td>'+formatTime(sh.startTime)+' → '+(sh.endTime?formatTime(sh.endTime):'(đang mở)')+'</td></tr><tr><td>Tiền đầu ca <button class="btn-icon w-6 h-6 p-0" id="btnHTabEditStartCash" title="Sửa"><span class="material-symbols-rounded text-[14px] text-blue-600">edit</span></button></td><td>'+fc(sh.startingCash)+'</td></tr></table>'+
     (sm.cukcukBills>0?'<h4 class="mt-3 mb-1 text-emerald-500 font-bold">🏪 CUKCUK ('+sm.cukcukBills+' bill) — '+fc(sm.cukcukRevenue)+'</h4><table class="report-table"><tr><td>💵 TM</td><td class="text-right">'+fc(sm.cashIncome)+'</td></tr><tr><td>💳 Thẻ</td><td class="text-right">'+fc(sm.cardIncome)+'</td></tr><tr><td>🏦 CK</td><td class="text-right">'+fc(sm.transferIncome)+'</td></tr></table>':'')+
     '<h4 class="mt-4 mb-1 text-blue-600 font-bold">📊 Tổng kết</h4><table class="report-table bg-indigo-50/30 rounded-xl overflow-hidden">'+
-    '<tr><td><strong>TỔNG DOANH THU ('+sm.billCount+' bill)</strong></td><td class="text-right"><strong class="text-emerald-500 text-[15px]">'+fc(sm.totalIncome)+'</strong></td></tr>'+
+    (sm.cukcukBills>0?'<tr><td>Tiền mặt CUKCUK ('+sm.cukcukBills+' bill)</td><td class="text-right text-emerald-600">'+fc(sm.cashIncome)+'</td></tr>':'')+
+    (manualTxs.length>0?'<tr><td>Thu ngoài POS</td><td class="text-right text-emerald-600">+'+fc(sm.totalIncome - sm.cukcukRevenue)+'</td></tr>':'')+
     '<tr><td>Chi phí</td><td class="text-right text-rose-600">−'+fc(sm.totalExpense)+'</td></tr>'+
     '<tr class="border-t-2 border-slate-200"><td><strong>TM kỳ vọng</strong></td><td class="text-right"><strong>'+fc(sm.expectedCash)+'</strong></td></tr>'+
     '<tr><td>TM kiểm kê</td><td class="text-right">'+fc(sm.cashCountTotal)+'</td></tr>'+

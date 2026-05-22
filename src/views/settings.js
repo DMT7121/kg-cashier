@@ -672,7 +672,7 @@ function _initSystemTab() {
         autoSync: document.getElementById('cuk_autoSync').checked
       }
     };
-    const parseKeys = (id) => { const v = document.getElementById(id).value; return !v ? [] : v.split('\\n').map(k=>k.trim()).filter(k=>k.length>5); };
+    const parseKeys = (id) => { const v = document.getElementById(id).value; return !v ? [] : v.split('\n').map(k=>k.trim()).filter(k=>k.length>5); };
     
     if (document.getElementById('vat-key-gemini')) {
       newSettings.vatKeys = {
@@ -807,14 +807,14 @@ function _initSystemTab() {
         .then(r=>r.json()).then(res => {
           btn.innerText = oldText;
           if (res.status === 'success') {
-              if(res.gemini) document.getElementById('vat-key-gemini').value = res.gemini.join('\\n');
-              if(res.groq) document.getElementById('vat-key-groq').value = res.groq.join('\\n');
-              if(res.hf) document.getElementById('vat-key-hf').value = res.hf.join('\\n');
-              if(res.cerebras) document.getElementById('vat-key-cerebras').value = res.cerebras.join('\\n');
-              if(res.sambanova) document.getElementById('vat-key-sambanova').value = res.sambanova.join('\\n');
-              if(res.deepseek) document.getElementById('vat-key-deepseek').value = res.deepseek.join('\\n');
-              if(res.mistral) document.getElementById('vat-key-mistral').value = res.mistral.join('\\n');
-              if(res.nvidia) document.getElementById('vat-key-nvidia').value = res.nvidia.join('\\n');
+              if(res.gemini) document.getElementById('vat-key-gemini').value = res.gemini.join('\n');
+              if(res.groq) document.getElementById('vat-key-groq').value = res.groq.join('\n');
+              if(res.hf) document.getElementById('vat-key-hf').value = res.hf.join('\n');
+              if(res.cerebras) document.getElementById('vat-key-cerebras').value = res.cerebras.join('\n');
+              if(res.sambanova) document.getElementById('vat-key-sambanova').value = res.sambanova.join('\n');
+              if(res.deepseek) document.getElementById('vat-key-deepseek').value = res.deepseek.join('\n');
+              if(res.mistral) document.getElementById('vat-key-mistral').value = res.mistral.join('\n');
+              if(res.nvidia) document.getElementById('vat-key-nvidia').value = res.nvidia.join('\n');
               showToast('Đã mượn được hàng nóng từ kho Admin!', 'success');
               performSave(true);
           } else showToast(res.message || 'Mã không đúng!', 'error');

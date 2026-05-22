@@ -90,7 +90,7 @@ export function showEditStartingCashModal(shift, onDone) {
     '<div class="modal-footer"><button class="btn btn-outline" onclick="window.hideModal()">Hủy</button><button class="btn btn-primary" id="heStartSave">Cập nhật</button></div>');
   setTimeout(function(){
     var inp=document.getElementById('heStartCash');
-    var mi=moneyInput(inp,{allowMath:false});
+    var mi=moneyInput(inp,{allowMath:true});
     inp?.focus();inp?.select();
     document.getElementById('heStartSave')?.addEventListener('click',function(){
       try{

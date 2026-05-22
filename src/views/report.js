@@ -500,7 +500,7 @@ function _buildHandoverHTML(revSummary, store) {
   }
 
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <div style="font-size:16px;font-weight:700;color:var(--text);">📋 ${printTitle}</div>
       <div class="btn-group">
         <button class="btn btn-outline btn-sm" id="btnConfigReport">
@@ -523,7 +523,7 @@ function _buildHandoverHTML(revSummary, store) {
             <div class="a4-address">${settings.storeAddress || ''}</div>
           </div>
           <div class="a4-header-right">
-            <div class="a4-doc-title">${printTitle}${isSupplemental ? '<br><span style="font-size:12px;opacity:0.8;">(BẢN IN BỔ SUNG)</span>' : ''}</div>
+            <div class="a4-doc-title">${isSupplemental ? '<span style="font-size:12px;opacity:0.8;">(BẢN IN BỔ SUNG)</span>' : ''}</div>
             <div class="a4-doc-sub">${printSub}</div>
           </div>
         </div>
@@ -546,7 +546,7 @@ function _buildHandoverHTML(revSummary, store) {
             var blocks = {};
             
             // 1. CUKCUK
-            blocks['cukcuk'] = cukcukRev.bills > 0 ? '<div class="a4-section-wrap"><div class="a4-section-title a4-income-title">▌DOANH THU CUKCUK (' + cukcukRev.bills + ' bill)</div><table class="a4-table"><tbody><tr><td>Tiền mặt</td><td class="r">' + _val(cukcukRev.cash, 'cashIncome', true) + '</td></tr><tr><td>Quẹt thẻ</td><td class="r">' + _val(cukcukRev.card, 'cardIncome', true) + '</td></tr><tr><td>Chuyển khoản</td><td class="r">' + _val(cukcukRev.transfer, 'transferIncome', true) + '</td></tr></tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng CUKCUK</strong></td><td class="r"><strong>' + _val(cukcukRev.total, 'cukcukRevenue', true) + '</strong></td></tr></tfoot></table></div>' : '';
+            blocks['cukcuk'] = cukcukRev.bills > 0 ? '<div class="a4-section-wrap"><div class="a4-section-title a4-income-title">▌DOANH THU CUKCUK (' + cukcukRev.bills + ' bill)</div><table class="a4-table"><tbody><tr><td>Tiền mặt</td><td class="r">' + _val(cukcukRev.cash, 'cashIncome', true) + '</td></tr><tr><td>Quẹt thẻ</td><td class="r">' + _val(cukcukRev.card, 'cardIncome', true) + '</td></tr><tr><td>Chuyển khoản</td><td class="r">' + _val(cukcukRev.transfer, 'transferIncome', true) + '</td></tr></tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng CUKCUK (' + cukcukRev.bills + ' bill)</strong></td><td class="r"><strong>' + _val(cukcukRev.total, 'cukcukRevenue', true) + '</strong></td></tr></tfoot></table></div>' : '';
             
             // 2. Chi phí
             blocks['expense'] = expenseTxs.length > 0 ? '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#dc2626;">▌CHI TRONG CA (' + expenseTxs.length + ')</div><table class="a4-table"><tbody>' + expenseTxs.map(function(t) { return '<tr><td style="color:#dc2626;">✗ ' + (t.note || 'Chi phí') + '</td><td class="r" style="color:#dc2626;">−' + fc(t.amount) + '</td></tr>'; }).join('') + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng chi</strong></td><td class="r" style="color:#dc2626;"><strong>−' + _val(totalExpenseAmt, 'totalExpense', true) + '</strong></td></tr></tfoot></table></div>' : '';
@@ -556,7 +556,8 @@ function _buildHandoverHTML(revSummary, store) {
             
             // 4. Tổng kết
             blocks['summary'] = '<div class="a4-section-wrap"><div class="a4-section-title a4-summary-title">▌TỔNG KẾT</div><table class="a4-table a4-summary-table"><tbody>' +
-              (cukcukRev.bills > 0 ? '<tr><td>DT CUKCUK (' + cukcukRev.bills + ' bill)</td><td class="r a4-income">' + _val(cukcukRev.total, 'cukcukRevenue', true) + '</td></tr>' : '') +
+              (cukcukRev.bills > 0 ? '<tr><td>Tiền mặt CUKCUK (' + cukcukRev.bills + ' bill)</td><td class="r a4-income">' + _val(cukcukRev.cash, 'cashIncome', true) + '</td></tr>' : '') +
+              (manualIncomeTxs.length > 0 ? '<tr><td>Thu ngoài POS</td><td class="r a4-income">+' + fc(totalManualIncome) + '</td></tr>' : '') +
               '<tr><td>Chi phí trong ca</td><td class="r a4-expense">−' + _val(totalExpenseAmt, 'totalExpense', true) + '</td></tr>' +
               '<tr><td>Tiền đầu ca</td><td class="r">' + fc(target.startingCash) + '</td></tr>' +
               '</tbody><tfoot><tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>' + _val(expectedCash, 'expectedCash', true) + '</strong></td></tr>' +
@@ -603,24 +604,15 @@ function _buildHandoverHTML(revSummary, store) {
               }
             }
 
-            // Always add total income block at the start of CUKCUK or after manual if CUKCUK is hidden
-            var totalIncomeBlock = '<div class="a4-section-wrap"><table class="a4-table" style="margin-top:4px;"><tfoot><tr class="a4-highlight-row"><td><strong>TỔNG DOANH THU (' + billCount + ' bill)</strong></td><td class="r"><strong>' + _val(combinedIncome, 'totalIncome', true) + '</strong></td></tr></tfoot></table></div>';
-
             // Build HTML
             var html = '';
             conf.order.forEach(function(key) {
               if (conf.visible[key] && blocks[key]) {
                 html += blocks[key];
-                if (key === 'cukcuk' || (key === 'manual' && !conf.visible.cukcuk)) {
-                  // html += totalIncomeBlock; // Optional if they want it specifically here
-                }
               }
             });
-            // We append total income explicitly if visible wasn't checked but we want it
-            if (conf.visible.cukcuk || conf.visible.manual) {
-               html += totalIncomeBlock;
-            }
             
+
             return html || '<div class="a4-empty-box" style="width:100%;grid-column:1/-1;">Không có dữ liệu báo cáo</div>';
           })()}
         </div>

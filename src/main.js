@@ -38,6 +38,8 @@ import * as drinkInventoryView from './views/drinkInventory.js';
 import * as vatView from './views/vat.js';
 import * as posView from './views/pos.js';
 import * as barView from './views/bar.js';
+import * as extensionView from './views/extension.js';
+import * as guideView from './views/guide.js';
 
 // ── View Registry ────────────────────────────
 var views = {
@@ -52,6 +54,8 @@ var views = {
   'vat':          { module: vatView,          title: 'Hóa đơn VAT' },
   'pos':          { module: posView,          title: 'POS — Order & Thanh toán' },
   'bar':          { module: barView,          title: 'Dashboard Bếp / Bar' },
+  'extension':    { module: extensionView,    title: 'Tiện ích & Mở rộng' },
+  'guide':        { module: guideView,        title: 'Hướng dẫn sử dụng' },
 };
 
 var currentView = 'dashboard';
@@ -132,6 +136,13 @@ function renderCurrentView() {
 // Dùng cho mọi auto-render từ background (60s poll, CUKCUK sync, startup).
 // Không chặn render do người dùng điều hướng thủ công.
 function _safeRenderView() {
+  // Skip if active view is highly interactive to prevent losing user state or disrupting inputs/scrolling
+  const interactiveViews = ['pos', 'cash-count', 'drink-inventory', 'transactions', 'vat', 'extension', 'settings', 'bar'];
+  if (interactiveViews.indexOf(currentView) !== -1) {
+    console.log('[Main] Auto-render skipped: active view is interactive (' + currentView + ') to prevent disrupting operation');
+    return;
+  }
+
   if (currentView === 'cash-count' && window._cashCountDirty) {
     console.log('[Main] Auto-render skipped: cash-count is active (user has unsaved input)');
     return;

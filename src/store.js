@@ -150,7 +150,12 @@ function defaults() {
         nvidia: []
       },
       posTables: [],
-      posCatalog: []
+      posCatalog: [],
+      extension: {
+        ttsProvider: 'fpt',
+        ttsKey: '',
+        qrTemplates: []
+      }
     },
     printForms: Object.assign(getInitialPrintForms(), {
       margins: { top: 8, bottom: 8, left: 8, right: 8 },
@@ -199,6 +204,9 @@ export function getState() {
                         parsed.settings.vatKeys[k] = def.settings.vatKeys[k];
                     }
                 }
+            }
+            if (typeof parsed.settings.extension !== 'object' || parsed.settings.extension === null) {
+                parsed.settings.extension = def.settings.extension;
             }
         }
         if (!parsed.categories || typeof parsed.categories !== 'object') {
@@ -785,12 +793,10 @@ export function getShiftSummary(shift) {
       if (storeData) {
         var parsed = JSON.parse(storeData);
         if (parsed && parsed.invoices) {
-          var shiftStart = shift.startTime ? new Date(shift.startTime) : null;
-          var shiftEnd = shift.endTime ? new Date(shift.endTime) : new Date();
-          if (!shiftStart || isNaN(shiftStart.getTime())) {
-            var dp = shift.date.split('-');
-            shiftStart = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 0, 0, 0);
-          }
+          var dp = shift.date.split('-');
+          // Luôn dùng chuẩn Working Day (12:00 PM hôm nay -> 06:00 AM hôm sau) để đồng bộ hoàn toàn với Báo Cáo Ngày
+          var shiftStart = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0);
+          var shiftEnd = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]) + 1, 6, 0, 0);
           for (var k in parsed.invoices) {
             if (!parsed.invoices.hasOwnProperty(k)) continue;
             var inv = parsed.invoices[k];

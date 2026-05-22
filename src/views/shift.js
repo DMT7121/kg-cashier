@@ -403,8 +403,8 @@ export function init() {
         </div>
       `);
       setTimeout(() => {
-        var keepMoney = moneyInput(document.getElementById('cashToKeep'), { allowMath: false });
-        var depositMoney = moneyInput(document.getElementById('cashToDeposit'), { allowMath: false });
+        var keepMoney = moneyInput(document.getElementById('cashToKeep'), { allowMath: true });
+        var depositMoney = moneyInput(document.getElementById('cashToDeposit'), { allowMath: true });
         document.getElementById('btnConfirmClose')?.addEventListener('click', async () => {
           try {
             await closeShift({
@@ -447,7 +447,7 @@ export function init() {
       `);
       setTimeout(() => {
         const input = document.getElementById('newStartingCash');
-        var cashMoney = moneyInput(input, { allowMath: false });
+        var cashMoney = moneyInput(input, { allowMath: true });
         input?.focus(); input?.select();
         document.getElementById('btnConfirmStartingCash')?.addEventListener('click', () => {
           try {
@@ -473,7 +473,7 @@ export function init() {
   _bindCardClicks();
 
   // Bind moneyInput to startingCash
-  window._startingCashMoney = moneyInput(document.getElementById('startingCash'), { allowMath: false });
+  window._startingCashMoney = moneyInput(document.getElementById('startingCash'), { allowMath: true });
 
   // Background cloud refresh
   _loadStaffFromCloud(false);

@@ -421,12 +421,14 @@ export function getInvoicesByDate(dateStr) {
   });
 }
 
-/** Get invoices strictly within a shift's time window */
+/** Get invoices strictly within a shift's time window (Aligned to Working Day: 12 PM - 6 AM) */
 export function getInvoicesByShiftTime(dateStr, startTime, endTime) {
   var allForDate = getInvoicesByDate(dateStr);
-  if (!startTime) return allForDate;
-  var startT = new Date(startTime).getTime();
-  var endT = endTime ? new Date(endTime).getTime() : new Date().getTime();
+  var dp = dateStr.split('-');
+  
+  // Đồng bộ hoàn toàn với Báo Cáo Ngày (12:00 PM hôm nay -> 06:00 AM hôm sau)
+  var startT = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0).getTime();
+  var endT = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]) + 1, 6, 0, 0).getTime();
   
   return allForDate.filter(function(inv) {
     if (!inv.refDate) return false;

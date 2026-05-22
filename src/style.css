@@ -1272,7 +1272,8 @@
     body.printing-a4 .settings-tabs,
     body.printing-a4 .section-header,
     body.printing-a4 .rpt-revenue-section,
-    body.printing-a4 #rptDatePicker {
+    body.printing-a4 #rptDatePicker,
+    .no-print {
       display: none !important;
     }
     body.printing-a4 .main-content {
