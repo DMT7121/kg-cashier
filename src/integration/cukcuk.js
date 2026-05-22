@@ -34,6 +34,9 @@ var _cachedCompanyCode = null;
 var _cachedTokenTime = 0;
 var TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours (official CUKCUK TTL)
 
+// ── Active Login Lock ──
+var _activeLoginPromise = null;
+
 // ── Sync Cooldown ──
 // Minimum time between API calls when auto-sync finds no new data
 var SYNC_COOLDOWN = 2 * 60 * 1000; // 2 minutes
@@ -270,88 +273,100 @@ export async function loginAndGetToken() {
     return { success: true, token: cached.token, companyCode: cached.companyCode };
   }
 
-  try {
-    var loginTime = new Date().toISOString().split('.')[0] + 'Z';
-    var cleanDomain = _getCleanDomain(cukcuk.domain);
-    var appId = cukcuk.appId.trim();
-    var secretKey = cukcuk.key.trim();
+  // If already logging in, wait for the ongoing request
+  if (_activeLoginPromise) {
+    console.log('[CUKCUK] Login request already in progress, queuing onto current promise...');
+    return _activeLoginPromise;
+  }
 
-    var payloadStr = JSON.stringify({
-      AppID: appId,
-      Domain: cleanDomain,
-      LoginTime: loginTime
-    });
+  _activeLoginPromise = (async () => {
+    try {
+      var loginTime = new Date().toISOString().split('.')[0] + 'Z';
+      var cleanDomain = _getCleanDomain(cukcuk.domain);
+      var appId = cukcuk.appId.trim();
+      var secretKey = cukcuk.key.trim();
 
-    var signature = await _generateSignature(payloadStr, secretKey);
-
-    console.log('[CUKCUK] Login attempt:', { appId: appId, domain: cleanDomain, loginTime: loginTime });
-
-    var response = await fetch(CUKCUK_API_BASE + '/api/Account/Login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      var payloadStr = JSON.stringify({
         AppID: appId,
         Domain: cleanDomain,
-        LoginTime: loginTime,
-        SignatureInfo: signature
-      })
-    });
+        LoginTime: loginTime
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        console.warn('[CUKCUK] Rate limited (429)');
-        return { success: false, message: '⏳ API đang bị giới hạn tốc độ. Thử lại sau 1 phút.' };
-      }
-      if (response.status === 405) {
-        var body405 = '';
-        try { body405 = await response.text(); } catch(e) {}
-        console.warn('[CUKCUK] Login 405:', body405);
-        return { success: false, message: '❌ CUKCUK API từ chối (405). Kiểm tra App ID và Domain trong Cài đặt.' };
-      }
-      throw new Error('HTTP ' + response.status);
-    }
+      var signature = await _generateSignature(payloadStr, secretKey);
 
-    var data = await response.json();
-    
-    if (data.Success && data.Data) {
-      // Data is an object: { AccessToken, CompanyCode, Domain, AppID }
-      var accessToken = data.Data.AccessToken || data.Data;
-      var companyCode = data.Data.CompanyCode || cleanDomain;
-      
-      _setCachedToken(accessToken, companyCode);
-      console.log('[CUKCUK] Login successful! CompanyCode:', companyCode);
-      return { success: true, token: accessToken, companyCode: companyCode };
-    } else {
-      _clearCachedToken();
-      var errMsg = data.ErrorMessage || data.Message || 'Lỗi không xác định';
-      var errLower = errMsg.toLowerCase();
-      
-      if (errLower.indexOf('invalid signature') !== -1 || errLower.indexOf('chữ ký') !== -1) {
-        errMsg = '🔑 Secret Key đã hết hạn hoặc không hợp lệ!\n\n' +
-          'Cách fix:\n' +
-          '1) Vào https://' + cleanDomain + '.cukcuk.vn\n' +
-          '2) Thiết lập → Ứng dụng → API\n' +
-          '3) Bấm "TẠO MÃ KẾT NỐI" → Copy Secret Key mới\n' +
-          '4) Dán vào Cài đặt → CUKCUK → Lưu';
-      } else if (errLower.indexOf('authorization') !== -1 || errLower.indexOf('denied') !== -1) {
-        errMsg = '🔒 Xác thực bị từ chối!\n\n' +
-          'Token có thể đã hết hạn. Vui lòng:\n' +
-          '1) Kiểm tra Secret Key trong Cài đặt → CUKCUK\n' +
-          '2) Nếu vẫn lỗi, vào https://' + cleanDomain + '.cukcuk.vn\n' +
-          '   → Thiết lập → Ứng dụng → API\n' +
-          '3) Bấm "TẠO MÃ KẾT NỐI" → lấy Secret Key mới';
+      console.log('[CUKCUK] Login attempt:', { appId: appId, domain: cleanDomain, loginTime: loginTime });
+
+      var response = await fetch(CUKCUK_API_BASE + '/api/Account/Login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          AppID: appId,
+          Domain: cleanDomain,
+          LoginTime: loginTime,
+          SignatureInfo: signature
+        })
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn('[CUKCUK] Rate limited (429)');
+          return { success: false, message: '⏳ API đang bị giới hạn tốc độ. Thử lại sau 1 phút.' };
+        }
+        if (response.status === 405) {
+          var body405 = '';
+          try { body405 = await response.text(); } catch(e) {}
+          console.warn('[CUKCUK] Login 405:', body405);
+          return { success: false, message: '❌ CUKCUK API từ chối (405). Kiểm tra App ID và Domain trong Cài đặt.' };
+        }
+        throw new Error('HTTP ' + response.status);
       }
+
+      var data = await response.json();
       
-      console.warn('[CUKCUK] Login failed:', data);
-      return { success: false, message: errMsg };
+      if (data.Success && data.Data) {
+        // Data is an object: { AccessToken, CompanyCode, Domain, AppID }
+        var accessToken = data.Data.AccessToken || data.Data;
+        var companyCode = data.Data.CompanyCode || cleanDomain;
+        
+        _setCachedToken(accessToken, companyCode);
+        console.log('[CUKCUK] Login successful! CompanyCode:', companyCode);
+        return { success: true, token: accessToken, companyCode: companyCode };
+      } else {
+        _clearCachedToken();
+        var errMsg = data.ErrorMessage || data.Message || 'Lỗi không xác định';
+        var errLower = errMsg.toLowerCase();
+        
+        if (errLower.indexOf('invalid signature') !== -1 || errLower.indexOf('chữ ký') !== -1) {
+          errMsg = '🔑 Secret Key đã hết hạn hoặc không hợp lệ!\n\n' +
+            'Cách fix:\n' +
+            '1) Vào https://' + cleanDomain + '.cukcuk.vn\n' +
+            '2) Thiết lập → Ứng dụng → API\n' +
+            '3) Bấm "TẠO MÃ KẾT NỐI" → Copy Secret Key mới\n' +
+            '4) Dán vào Cài đặt → CUKCUK → Lưu';
+        } else if (errLower.indexOf('authorization') !== -1 || errLower.indexOf('denied') !== -1) {
+          errMsg = '🔒 Xác thực bị từ chối!\n\n' +
+            'Token có thể đã hết hạn. Vui lòng:\n' +
+            '1) Kiểm tra Secret Key trong Cài đặt → CUKCUK\n' +
+            '2) Nếu vẫn lỗi, vào https://' + cleanDomain + '.cukcuk.vn\n' +
+            '   → Thiết lập → Ứng dụng → API\n' +
+            '3) Bấm "TẠO MÃ KẾT NỐI" → lấy Secret Key mới';
+        }
+        
+        console.warn('[CUKCUK] Login failed:', data);
+        return { success: false, message: errMsg };
+      }
+    } catch (e) {
+      console.error('[CUKCUK] Connection error:', e);
+      if (e.message && e.message.indexOf('Failed to fetch') !== -1) {
+        return { success: false, message: 'Không thể kết nối CUKCUK API. Kiểm tra Internet hoặc dùng localhost.' };
+      }
+      return { success: false, message: 'Lỗi kết nối: ' + e.message };
+    } finally {
+      _activeLoginPromise = null; // ALWAYS clear when finished
     }
-  } catch (e) {
-    console.error('[CUKCUK] Connection error:', e);
-    if (e.message && e.message.indexOf('Failed to fetch') !== -1) {
-      return { success: false, message: 'Không thể kết nối CUKCUK API. Kiểm tra Internet hoặc dùng localhost.' };
-    }
-    return { success: false, message: 'Lỗi kết nối: ' + e.message };
-  }
+  })();
+
+  return _activeLoginPromise;
 }
 
 // ── Test Connection ──
