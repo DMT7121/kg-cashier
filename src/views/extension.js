@@ -877,7 +877,7 @@ export function init() {
       document.getElementById('ext-qr-bank').value = item.bank;
       document.getElementById('ext-qr-acc').value = item.acc;
       document.getElementById('ext-qr-name').value = item.name;
-      document.getElementById('ext-qr-amount').value = item.amount ? formatCurrency(item.amount) : '';
+      document.getElementById('ext-qr-amount').value = item.amount ? extFmt(item.amount) : '';
       document.getElementById('ext-qr-content').value = item.content || '';
       
       // Persist as last selected QR template
@@ -921,14 +921,14 @@ export function init() {
       document.getElementById('ext-qr-bank').value = first.bank;
       document.getElementById('ext-qr-acc').value = first.acc;
       document.getElementById('ext-qr-name').value = first.name;
-      document.getElementById('ext-qr-amount').value = first.amount ? formatCurrency(first.amount) : '';
+      document.getElementById('ext-qr-amount').value = first.amount ? extFmt(first.amount) : '';
       document.getElementById('ext-qr-content').value = first.content || '';
       btnGen.click();
     }
     
     amtInput.addEventListener('input', (e) => {
       const val = parseCurrency(e.target.value);
-      e.target.value = val === 0 ? '' : formatCurrency(val);
+      e.target.value = val === 0 ? '' : extFmt(val);
     });
 
     btnGen.addEventListener('click', () => {
@@ -1318,14 +1318,14 @@ export function init() {
         const rf = rates[curFrom.value];
         const rt = rates[curTo.value];
         if (rf && rt) {
-          curRes.innerText = formatCurrency((amt / rf) * rt) + " " + curTo.value;
+          curRes.innerText = extFmt((amt / rf) * rt) + " " + curTo.value;
         }
       }
     };
 
     curAmt.addEventListener('input', (e) => {
       const val = parseCurrency(e.target.value);
-      e.target.value = val === 0 ? '' : formatCurrency(val);
+      e.target.value = val === 0 ? '' : extFmt(val);
       calcCur();
     });
     curFrom.addEventListener('change', calcCur);
