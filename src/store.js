@@ -758,9 +758,8 @@ export async function reopenShiftById(shiftId) {
   shiftToReopen.status = 'open';
   shiftToReopen.endTime = null;
   
-  // Clear the frozen closing snapshots so that the shift dynamically calculates transactions, expected cash, etc.
-  delete shiftToReopen.summarySnapshot;
-  delete shiftToReopen.cukcukInvoicesSnapshot;
+  // Preserve original closing snapshots so we don't lose CUKCUK invoices backup, expected cash, etc.
+  // We keep them so that they can be used for calculations on different devices or offline.
 
   // Restore drink inventory session to local storage if present, so the user can see and adjust their counts
   if (shiftToReopen.drinkInventorySnapshot) {
@@ -970,11 +969,30 @@ export function getShiftSummary(shift) {
   var cukcukRevenue = 0, cukcukBills = 0;
   var manualIncome = 0, manualBills = 0;
 
-  // Step 1: CUKCUK invoices — use shift actual time window
-  // CLOSED shifts: frozen summarySnapshot (immutable)
-  // OPEN shifts: filter by startTime→now
+  // Step 1: CUKCUK invoices — use shift actual time window or snapshot if available
   var hasInvoiceStoreData = false;
-  if (shift.status === 'closed' && shift.summarySnapshot && shift.summarySnapshot.cukcukRevenue !== undefined) {
+  if (shift.cukcukInvoicesSnapshot && shift.cukcukInvoicesSnapshot.length > 0) {
+    // Reopened shift or active shift with preset snapshot invoices
+    var snapInvs = shift.cukcukInvoicesSnapshot;
+    cukcukBills = snapInvs.length;
+    billCount += cukcukBills;
+    for (var k = 0; k < snapInvs.length; k++) {
+      var inv = snapInvs[k];
+      hasInvoiceStoreData = true;
+      var invTotal = 0;
+      var payments = inv.payments || [];
+      for (var p = 0; p < payments.length; p++) {
+        var amt = payments[p].amount || 0;
+        invTotal += amt;
+        if (payments[p].method === 'cash') { cashIncome += amt; }
+        else if (payments[p].method === 'card') { cardIncome += amt; }
+        else if (payments[p].method === 'transfer') { transferIncome += amt; }
+      }
+      var effectiveAmt = invTotal > 0 ? invTotal : (inv.amount || 0);
+      cukcukRevenue += effectiveAmt;
+      totalIncome += effectiveAmt;
+    }
+  } else if (shift.status === 'closed' && shift.summarySnapshot && shift.summarySnapshot.cukcukRevenue !== undefined) {
     cukcukRevenue = shift.summarySnapshot.cukcukRevenue || 0;
     cukcukBills = shift.summarySnapshot.cukcukBills || 0;
     totalIncome += cukcukRevenue;
@@ -2191,20 +2209,35 @@ export async function syncCurrentShiftWithCloud() {
         return true;
       }
       
-      // Fix 1A: Check if this shift was already closed and saved to history
+      // Fix 1A & 1B: Check if this shift is already closed locally or recently closed
       if (cloudShift && !s.currentShift) {
-        var _alreadyClosed = (s.shifts || []).some(function(h) { return h.id === cloudShift.id; });
-        if (_alreadyClosed) {
-          console.log('[Store] Skipping cloud shift (already in history):', cloudShift.id);
-          if (_cloudClose) { try { _cloudClose(cloudShift).catch(function(){}); } catch(e) {} }
-          return false;
-        }
-        // Fix 1B: Check recently closed IDs (race condition protection)
+        var localClosedIndex = (s.shifts || []).findIndex(function(h) { return h.id === cloudShift.id; });
         var _recentlyClosed = (s._recentlyClosedIds || []).indexOf(cloudShift.id) !== -1;
-        if (_recentlyClosed) {
-          console.log('[Store] Skipping cloud shift (recently closed):', cloudShift.id);
-          if (_cloudClose) { try { _cloudClose(cloudShift).catch(function(){}); } catch(e) {} }
-          return false;
+        
+        if (cloudShift.status === 'open') {
+          if (localClosedIndex !== -1) {
+            console.log('[Store] Cloud shift has been reopened on another device. Adopting as current open shift:', cloudShift.id);
+            s.shifts.splice(localClosedIndex, 1);
+            s.currentShift = cloudShift;
+            save();
+            return true;
+          } else if (_recentlyClosed) {
+            console.log('[Store] Cloud shift has been reopened after recent close. Adopting as current open shift:', cloudShift.id);
+            s._recentlyClosedIds = (s._recentlyClosedIds || []).filter(function(id) { return id !== cloudShift.id; });
+            s.currentShift = cloudShift;
+            save();
+            return true;
+          }
+        } else {
+          if (localClosedIndex !== -1) {
+            console.log('[Store] Skipping cloud shift (already in history):', cloudShift.id);
+            return false;
+          }
+          if (_recentlyClosed) {
+            console.log('[Store] Skipping cloud shift (recently closed):', cloudShift.id);
+            if (_cloudClose) { try { _cloudClose(cloudShift).catch(function(){}); } catch(e) {} }
+            return false;
+          }
         }
       }
 

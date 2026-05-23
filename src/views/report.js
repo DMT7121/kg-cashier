@@ -398,8 +398,10 @@ function _buildHandoverHTML(revSummary, store) {
     printSub = 'Ngày làm việc: ' + formatDate(selectedDateStr);
 
     if (dayShifts.length > 0) {
-      // Sort ascending by time
-      dayShifts.sort(function(a,b) { return a.startTime - b.startTime; });
+      // Sort ascending by time (safe for ISO strings)
+      dayShifts.sort(function(a,b) {
+        return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+      });
       var firstShift = dayShifts[0];
       var lastShift = dayShifts[dayShifts.length - 1];
 
