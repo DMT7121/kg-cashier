@@ -720,6 +720,7 @@ export async function closeShift(opts) {
       }
     }
   }
+  return closedShift;
   } finally {
     _closeInProgress = false;
   }
@@ -785,10 +786,20 @@ export async function reopenShiftById(shiftId) {
   // Remove from shifts history array (since it is active again)
   s.shifts.splice(closedShiftIndex, 1);
 
-  // Sync to Cloud as 'open'
+  // Sync to Cloud as 'open' immediately to prevent race conditions
   save();
   addAudit('REOPEN_SHIFT', 'Mở lại ca ' + s.currentShift.shiftNumber + ' - ' + s.currentShift.cashierName);
-  _syncCurrentShift();
+  syncCurrentShiftImmediate();
+
+  // Background-sync CUKCUK invoices for the reopened shift's date
+  // to ensure local cache is fully populated with POS invoices.
+  try {
+    import('./integration/cukcuk.js').then(function(cukcuk) {
+      cukcuk.syncInvoicesForDate(s.currentShift.date).catch(function(e) {
+        console.warn('[Store] syncInvoicesForDate error:', e);
+      });
+    });
+  } catch(e) { /* ignore */ }
 
   return s.currentShift;
 }
@@ -2112,6 +2123,27 @@ function _syncCurrentShift() {
   }, 1500); // 1.5s debounce for near real-time sync
 }
 
+export function syncCurrentShiftImmediate() {
+  clearTimeout(_syncTimer);
+  _syncTimer = null;
+  var shift = getCurrentShift();
+  if (shift && _cloudSync) {
+    var cleanShift = JSON.parse(JSON.stringify(shift));
+    if (cleanShift.invoices) {
+      for (var i = 0; i < cleanShift.invoices.length; i++) {
+        delete cleanShift.invoices[i].data;
+      }
+    }
+    _shiftDirty = true;
+    return _cloudSync(cleanShift).then(function() {
+      _shiftDirty = false;
+      _lastCloudPushTime = Date.now();
+      console.log('[Store] Immediate cloud sync success');
+    }).catch(function() {});
+  }
+  return Promise.resolve();
+}
+
 /** Check if shift data has local changes not yet pushed to cloud */
 export function isShiftDirty() { return _shiftDirty; }
 
@@ -2151,6 +2183,14 @@ export async function syncCurrentShiftWithCloud() {
       // Case 2: Cloud has an open shift AND local also has an open shift with SAME ID
       // → Sync updates (transactions, cash count, etc.) from other devices
       if (cloudShift && s.currentShift && s.currentShift.id === cloudShift.id) {
+        // Fix: If local is 'open' (reopened) but cloud is still registered as 'closed'
+        if (s.currentShift.status === 'open' && cloudShift.status === 'closed') {
+          console.log('[Store] Reopen conflict: local is open, cloud is closed. Keeping local open state and syncing immediately.');
+          cloudShift.status = 'open';
+          cloudShift.endTime = null;
+          syncCurrentShiftImmediate();
+        }
+
         var mergedTxs = _mergeTransactions(
           s.currentShift.transactions, cloudShift.transactions
         );

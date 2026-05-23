@@ -499,7 +499,7 @@ export function init() {
         var depositMoney = moneyInput(document.getElementById('cashToDeposit'), { allowMath: true });
         document.getElementById('btnConfirmClose')?.addEventListener('click', async () => {
           try {
-            await closeShift({
+            var closedShift = await closeShift({
               notes: document.getElementById('closeNotes')?.value || '',
               cashToKeep: keepMoney.getValue(),
               cashToDeposit: depositMoney.getValue()
@@ -508,7 +508,12 @@ export function init() {
             hideModal();
             clearInterval(_timer);
             showToast('Đã đóng ca thành công!', 'success');
-            window.refreshView?.();
+            if (closedShift && closedShift.id) {
+              window._setReportShiftId = function() { return closedShift.id; };
+              window.navigateTo?.('report');
+            } else {
+              window.refreshView?.();
+            }
           } catch (e) { showToast(e.message, 'error'); }
         });
       }, 100);
