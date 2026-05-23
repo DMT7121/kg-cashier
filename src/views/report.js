@@ -390,8 +390,8 @@ function _buildHandoverHTML(revSummary, store) {
     var isHistoryMode = !!window._historyReportMode;
     window._historyReportMode = false; // consume the flag
     var dayShifts = history.filter(function(s) { return s.date === selectedDateStr; });
-    if (!isHistoryMode && currentShift && currentShift.date === selectedDateStr && !dayShifts.find(function(s){ return s.id === currentShift.id; })) {
-      dayShifts.unshift(currentShift); // Only include ongoing shift when NOT viewing history
+    if (currentShift && currentShift.date === selectedDateStr && !dayShifts.find(function(s){ return s.id === currentShift.id; })) {
+      dayShifts.unshift(currentShift); // Include current shift if it matches selected date (even when viewing history)
     }
     
     printTitle = "BÁO CÁO TỔNG KẾT NGÀY";
