@@ -182,7 +182,7 @@ function _renderShiftDetailModal(sh, sm, store) {
   showModal('<div class="modal-title text-base"><span class="material-symbols-rounded text-blue-600">summarize</span> Ca '+sh.shiftNumber+' — '+sh.cashierName+' — '+formatDate(sh.date)+'</div>'+
     '<div class="border-b border-slate-200 -mx-5 px-5 overflow-x-auto whitespace-nowrap flex" id="histTabBar">'+tabBar+'</div>'+
     '<div class="max-h-[55vh] overflow-auto py-3" id="histTabContent">'+tabSummary()+'</div>'+
-    '<div class="modal-footer mt-3 flex-wrap gap-2"><button class="btn btn-outline" onclick="window.hideModal()">Đóng</button><button class="btn btn-primary btn-sm" id="btnOpenHandoverReport" data-shift-date="'+sh.date+'" data-print-shift="'+sh.id+'"><span class="material-symbols-rounded">print</span> Phiếu bàn giao</button></div>');
+    '<div class="modal-footer mt-3 flex-wrap gap-2"><button class="btn btn-outline" onclick="window.hideModal()">Đóng</button><button class="btn btn-outline btn-sm text-blue-600 border-blue-200" id="btnReopenThisHistoryShift" data-shift-id="'+sh.id+'"><span class="material-symbols-rounded">lock_open</span> Mở lại ca</button><button class="btn btn-primary btn-sm" id="btnOpenHandoverReport" data-shift-date="'+sh.date+'" data-print-shift="'+sh.id+'"><span class="material-symbols-rounded">print</span> Phiếu bàn giao</button></div>');
 
   var _reopen = function(){ allHistory=getShiftHistory(); sh=allHistory.find(function(s){return s.id===sh.id;})||sh; sm=getHistorySummary(sh); manualTxs=(sh.transactions||[]).filter(function(t){return t.type==='income'&&(!t.note||t.note.indexOf('[CUKCUK]')===-1);}); expTxs=(sh.transactions||[]).filter(function(t){return t.type==='expense';}); otherTxs=sh.otherTransactions||[]; hideModal(); setTimeout(function(){_renderShiftDetailModal(sh,sm,store);_filterHistory();},200); };
   function _bindInlineEdits(){
@@ -225,6 +225,23 @@ function _renderShiftDetailModal(sh, sm, store) {
       window._historyReportMode = true;
       window.navigateTo('report');
     });
+    var rpbtn=document.getElementById('btnReopenThisHistoryShift');
+    if(rpbtn) {
+      rpbtn.addEventListener('click', async function(){
+        var ok = await showConfirm('Bạn có muốn mở lại ca này không? Ca hiện tại (nếu có) phải được đóng trước.', { title: 'Mở lại ca', confirmText: 'Mở lại', type: 'info' });
+        if(ok) {
+          hideModal();
+          try {
+            const { reopenShiftById } = await import('../store.js');
+            await reopenShiftById(rpbtn.dataset.shiftId);
+            showToast('Đã mở lại ca thành công!', 'success');
+            window.navigateTo('dashboard');
+          } catch(e) {
+            showToast(e.message, 'error');
+          }
+        }
+      });
+    }
     _bindInlineEdits();
   },100);
 }

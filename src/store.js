@@ -725,7 +725,7 @@ export async function closeShift(opts) {
   }
 }
 
-export async function reopenLastClosedShift() {
+export async function reopenShiftById(shiftId) {
   var s = getState();
   if (s.currentShift) {
     throw new Error('Đang có ca mở. Hãy đóng ca hiện tại trước khi mở lại ca khác.');
@@ -734,17 +734,17 @@ export async function reopenLastClosedShift() {
     throw new Error('Không có ca đã đóng nào trong lịch sử.');
   }
 
-  // Find the first shift with status === 'closed'
+  // Find the shift with the specified ID
   var closedShiftIndex = -1;
   for (var i = 0; i < s.shifts.length; i++) {
-    if (s.shifts[i].status === 'closed') {
+    if (s.shifts[i].id === shiftId) {
       closedShiftIndex = i;
       break;
     }
   }
 
   if (closedShiftIndex === -1) {
-    throw new Error('Không tìm thấy ca đã đóng nào.');
+    throw new Error('Không tìm thấy ca tương ứng trong lịch sử.');
   }
 
   var shiftToReopen = s.shifts[closedShiftIndex];
@@ -792,6 +792,16 @@ export async function reopenLastClosedShift() {
   _syncCurrentShift();
 
   return s.currentShift;
+}
+
+export async function reopenLastClosedShift() {
+  var s = getState();
+  if (!s.shifts || s.shifts.length === 0) {
+    throw new Error('Không có ca đã đóng nào trong lịch sử.');
+  }
+  var last = s.shifts.find(function(sh) { return sh.status === 'closed'; });
+  if (!last) throw new Error('Không tìm thấy ca đã đóng nào.');
+  return reopenShiftById(last.id);
 }
 
 // â”€â”€ Transactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

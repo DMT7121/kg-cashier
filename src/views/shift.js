@@ -1,4 +1,4 @@
-import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff, updateStartingCash, getShiftHistory, reopenLastClosedShift } from '../store.js';
+import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff, updateStartingCash, getShiftHistory, reopenLastClosedShift, reopenShiftById } from '../store.js';
 import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDuration, formatTime, formatDate, todayStr, moneyInput } from '../utils.js';
 import { getStaffFromCloud, getConfigFromCloud, getCurrentShiftFromCloud } from '../api.js';
 
@@ -116,7 +116,7 @@ export function render() {
   var autoShift = _autoShiftNumber();
   
   var historyShifts = getShiftHistory() || [];
-  var lastClosedShift = historyShifts.find(function(h) { return h.status === 'closed'; });
+  var closedShifts = historyShifts.filter(function(h) { return h.status === 'closed'; }).slice(0, 5);
 
   return `
     <div class="section-header">
@@ -132,21 +132,28 @@ export function render() {
 
     <div id="shiftFormError" class="hidden p-3 mb-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm font-semibold"></div>
 
-    <!-- Reopen recently closed shift banner (Premium feature for physical reconciliation) -->
-    ${lastClosedShift ? `
-    <div class="mb-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 shadow-sm" style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
-      <div style="display:flex;gap:12px;align-items:center;flex:1;">
+    <!-- Reopen recently closed shift selection banner (Physical reconciliation) -->
+    ${closedShifts.length > 0 ? `
+    <div class="mb-4 p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 shadow-sm">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
         <span class="material-symbols-rounded text-blue-600 shrink-0" style="font-size:28px;">restore</span>
         <div>
-          <h4 class="font-bold text-blue-900 text-sm" style="margin:0;">🔓 Tiếp tục ca làm việc trước đó?</h4>
+          <h4 class="font-bold text-blue-900 text-sm" style="margin:0;">🔓 Mở lại ca đã đóng để chỉnh sửa</h4>
           <p class="text-xs text-blue-700 mt-1" style="margin:2px 0 0 0;line-height:1.4;">
-            Bạn có thể mở lại <strong>Ca ${lastClosedShift.shiftNumber}</strong> của <strong>${lastClosedShift.cashierName}</strong> (Ngày ${formatDate(lastClosedShift.date)}) để tiếp tục cập nhật giao dịch, sửa đổi kiểm kê tiền hoặc hoàn tất lại báo cáo bàn giao.
+            Bạn có thể chọn một ca đã đóng gần đây để mở lại và chỉnh sửa tiền kiểm kê, thêm bớt giao dịch thu chi hoặc in lại báo cáo bàn giao.
           </p>
         </div>
       </div>
-      <button class="btn btn-primary btn-sm shrink-0" id="btnReopenLastShift" style="background:#2563eb;color:white;box-shadow:none;border:none;font-weight:bold;padding:8px 16px;border-radius:10px;display:flex;align-items:center;gap:6px;">
-        <span class="material-symbols-rounded text-[14px]">lock_open</span> Mở lại ca
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="reopenShiftSelect" class="form-input text-sm" style="flex:1;min-width:240px;background:white;padding:8px 12px;border-radius:10px;border:1px solid #cbd5e1;height:38px;font-weight:600;">
+          ${closedShifts.map(function(cs) {
+            return `<option value="${cs.id}">Ngày ${formatDate(cs.date)} — Ca ${cs.shiftNumber} (${cs.cashierName})</option>`;
+          }).join('')}
+        </select>
+        <button class="btn btn-primary btn-sm shrink-0" id="btnReopenSelectedShift" style="background:#2563eb;color:white;box-shadow:none;border:none;font-weight:bold;padding:8px 16px;border-radius:10px;display:flex;align-items:center;gap:6px;height:38px;">
+          <span class="material-symbols-rounded text-[14px]">lock_open</span> Mở lại ca
+        </button>
+      </div>
     </div>
     ` : ''}
 
@@ -554,11 +561,22 @@ export function init() {
   _selectedStaff = null;
   var _isManualMode = false;
 
-  // Reopen last closed shift click event
-  document.getElementById('btnReopenLastShift')?.addEventListener('click', async function() {
-    showToast('🔄 Đang mở lại ca làm việc gần nhất...', 'info');
+  // Reopen selected shift click event
+  document.getElementById('btnReopenSelectedShift')?.addEventListener('click', async function() {
+    var selectEl = document.getElementById('reopenShiftSelect');
+    if (!selectEl || !selectEl.value) {
+      showToast('⚠️ Vui lòng chọn ca cần mở lại', 'warning');
+      return;
+    }
+    var shiftId = selectEl.value;
+    var selectText = selectEl.options[selectEl.selectedIndex].text;
+    
+    var ok = await showConfirm('Bạn có muốn mở lại ca này không?\n(' + selectText + ')', { title: 'Mở lại ca', confirmText: 'Mở lại', type: 'info' });
+    if (!ok) return;
+
+    showToast('🔄 Đang mở lại ca làm việc...', 'info');
     try {
-      await reopenLastClosedShift();
+      await reopenShiftById(shiftId);
       showToast('✅ Ca đã được mở lại thành công! 🎉', 'success');
       window.refreshView?.();
     } catch(err) {
