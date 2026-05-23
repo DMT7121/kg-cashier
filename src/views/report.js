@@ -675,29 +675,44 @@ function _showReportConfigModal() {
   };
 
   var m = document.createElement('div');
-  m.className = 'modal-backdrop';
+  m.className = 'modal-overlay active';
+  // Allow clicking outside the modal content to close it quickly
+  m.addEventListener('click', function(e) {
+    if (e.target === m) {
+      m.remove();
+    }
+  });
   
-  var html = '<div class="modal-surface" style="width:100%;max-width:400px;display:flex;flex-direction:column;max-height:90vh;">';
-  html += '<div class="modal-header"><h3>Cấu hình Báo cáo</h3><button class="modal-close" onclick="this.closest(\'.modal-backdrop\').remove()"><span class="material-symbols-rounded">close</span></button></div>';
-  html += '<div class="modal-body" style="overflow-y:auto;flex:1;padding:16px;">';
-  html += '<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Bật/tắt các thành phần trên phiếu bàn giao ca. (Có thể kéo thả để sắp xếp)</p>';
-  html += '<style>.drag-over { border-top: 2px solid var(--primary) !important; background: var(--bg-hover) !important; }</style>';
-  html += '<div style="display:flex;flex-direction:column;gap:8px;" id="rptConfigList">';
+  var html = '<div class="modal-content" style="max-width:420px; display:flex; flex-direction:column; max-height:80vh; padding: 24px; border-radius: 24px;">';
+  
+  // Modal Header
+  html += '<div class="modal-title" style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border);">';
+  html += '<h3 style="font-size:16px; font-weight:700; color:var(--text); margin:0;">⚙️ Cấu hình Báo cáo</h3>';
+  html += '<button class="modal-close" style="background:none; border:none; cursor:pointer; color:var(--text-muted); display:flex; align-items:center;" onclick="this.closest(\'.modal-overlay\').remove()"><span class="material-symbols-rounded">close</span></button>';
+  html += '</div>';
+  
+  // Modal Body
+  html += '<div class="modal-body" style="overflow-y:auto; flex:1; padding-right:4px; margin-bottom:16px;">';
+  html += '<p style="font-size:12px; color:var(--text-muted); margin-bottom:16px; line-height:1.5;">Bật/tắt hoặc kéo thả các thành phần dưới đây để sắp xếp thứ tự hiển thị trên phiếu bàn giao ca.</p>';
+  html += '<style>.drag-over { border-top: 2px solid var(--primary) !important; background: var(--bg-secondary) !important; }</style>';
+  html += '<div style="display:flex; flex-direction:column; gap:8px;" id="rptConfigList">';
   
   conf.order.forEach(function(key) {
     if (!labels[key]) return;
     var checked = conf.visible[key] ? 'checked' : '';
-    html += '<label class="rpt-drag-item" draggable="true" data-key="' + key + '" style="display:flex;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:8px;cursor:grab;border:1px solid var(--border); transition:all 0.2s;">';
-    html += '<span class="material-symbols-rounded" style="color:var(--text-muted);cursor:grab;margin-right:8px;">drag_indicator</span>';
-    html += '<input type="checkbox" ' + checked + ' style="width:18px;height:18px;margin-right:12px;cursor:pointer;">';
-    html += '<span style="font-weight:600;font-size:14px;flex:1;">' + labels[key] + '</span>';
+    html += '<label class="rpt-drag-item" draggable="true" data-key="' + key + '" style="display:flex; align-items:center; padding:12px; background:var(--bg-secondary); border-radius:12px; cursor:grab; border:1px solid var(--border); transition:all 0.2s;">';
+    html += '<span class="material-symbols-rounded" style="color:var(--text-muted); cursor:grab; margin-right:8px; font-size:18px;">drag_indicator</span>';
+    html += '<input type="checkbox" ' + checked + ' style="width:16px; height:16px; margin-right:12px; cursor:pointer; accent-color:var(--primary);">';
+    html += '<span style="font-weight:600; font-size:13px; color:var(--text); flex:1; user-select:none;">' + labels[key] + '</span>';
     html += '</label>';
   });
   html += '</div>';
-
   html += '</div>';
-  html += '<div class="modal-footer" style="padding:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">';
-  html += '<button class="btn btn-primary" id="btnSaveRptConfig">Lưu cấu hình</button>';
+  
+  // Modal Footer
+  html += '<div class="modal-footer" style="padding-top:12px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; margin-top:0;">';
+  html += '<button class="btn btn-outline" style="border-radius:12px; padding:6px 16px; font-size:13px;" onclick="this.closest(\'.modal-overlay\').remove()">Đóng</button>';
+  html += '<button class="btn btn-primary" id="btnSaveRptConfig" style="border-radius:12px; padding:6px 16px; font-size:13px;">Lưu cấu hình</button>';
   html += '</div></div>';
   
   m.innerHTML = html;
