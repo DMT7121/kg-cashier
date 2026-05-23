@@ -183,6 +183,90 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 }
 
+function _normalizeDateStr(dStr) {
+  if (!dStr) return '';
+  if (dStr.indexOf('/') > -1) {
+    var parts = dStr.split('/');
+    if (parts.length === 3) {
+      return parts[2] + '-' + ('0' + parts[1]).slice(-2) + '-' + ('0' + parts[0]).slice(-2);
+    }
+  }
+  return dStr;
+}
+
+function _getSummaryFromInvoicesSnapshot(shift, invoicesSnapshot) {
+  var txs = shift.transactions || [];
+  var otherTxs = shift.otherTransactions || [];
+
+  var totalIncome = 0, totalExpense = 0, cashIncome = 0, cardIncome = 0, transferIncome = 0, cashExpense = 0, otherIncome = 0, otherExpense = 0, billCount = 0;
+  var cukcukRevenue = 0, cukcukBills = 0;
+  var manualIncome = 0, manualBills = 0;
+
+  // Calculate CUKCUK revenue directly from frozen snapshot
+  for (var i = 0; i < invoicesSnapshot.length; i++) {
+    var inv = invoicesSnapshot[i];
+    cukcukBills++;
+    billCount++;
+    var invTotal = 0;
+    var payments = inv.payments || [];
+    for (var p = 0; p < payments.length; p++) {
+      var amt = payments[p].amount || 0;
+      invTotal += amt;
+      if (payments[p].method === 'cash') { cashIncome += amt; }
+      else if (payments[p].method === 'card') { cardIncome += amt; }
+      else if (payments[p].method === 'transfer') { transferIncome += amt; }
+    }
+    var effectiveAmt = invTotal > 0 ? invTotal : (inv.amount || 0);
+    cukcukRevenue += effectiveAmt;
+    totalIncome += effectiveAmt;
+  }
+
+  // Calculate other transactions
+  for (var i = 0; i < txs.length; i++) {
+    var t = txs[i];
+    var isCukcuk = t.note && t.note.indexOf('[CUKCUK]') !== -1;
+    if (t.type === 'income') {
+      if (isCukcuk) continue; // Skip to prevent double counting
+      totalIncome += t.amount;
+      billCount++;
+      if (t.paymentMethod === 'cash') cashIncome += t.amount;
+      else if (t.paymentMethod === 'card') cardIncome += t.amount;
+      else if (t.paymentMethod === 'transfer') transferIncome += t.amount;
+      manualIncome += t.amount;
+      manualBills++;
+    } else {
+      totalExpense += t.amount;
+      if (t.paymentMethod === 'cash') cashExpense += t.amount;
+    }
+  }
+
+  for (var j = 0; j < otherTxs.length; j++) {
+    if (otherTxs[j].type === 'income') otherIncome += otherTxs[j].amount;
+    else otherExpense += otherTxs[j].amount;
+  }
+
+  var expectedCash = shift.startingCash + cashIncome - cashExpense + otherIncome - otherExpense;
+
+  return {
+    totalIncome: totalIncome,
+    totalExpense: totalExpense,
+    cashIncome: cashIncome,
+    cardIncome: cardIncome,
+    transferIncome: transferIncome,
+    cashExpense: cashExpense,
+    otherIncome: otherIncome,
+    otherExpense: otherExpense,
+    cukcukRevenue: cukcukRevenue,
+    cukcukBills: cukcukBills,
+    billCount: billCount,
+    expectedCash: expectedCash,
+    manualIncome: manualIncome,
+    manualBills: manualBills,
+    revenue: totalIncome,
+    netTotal: expectedCash
+  };
+}
+
 // â”€â”€ Load / Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getState() {
   if (!state) {
@@ -255,7 +339,16 @@ export function getState() {
       state = defaults();
     }
   }
-  // Migration v2 removed — summarySnapshot is now preserved as frozen data for history
+  // Safe Auto-Data Healing for legacy shifts
+  if (state && !state._healed) {
+    try {
+      setTimeout(function() {
+        try { healPastShiftsData(); } catch(he) { console.warn('[Store] healPastShiftsData async error:', he); }
+      }, 50);
+    } catch(e) {
+      console.warn('[Store] healPastShiftsData launch failed:', e);
+    }
+  }
   return state;
 }
 
@@ -413,7 +506,7 @@ export async function openShift(opts) {
   }
 
   // Pre-check: is there an active shift on cloud from another device?
-  if (_cloudGetShift) {
+  if (_cloudGetShift && opts.bypassCloudCheck !== true) {
     try {
       var cloudCheck = await _cloudGetShift();
       if (cloudCheck.success && cloudCheck.shift && cloudCheck.shift.status !== 'closed') {
@@ -441,11 +534,23 @@ export async function openShift(opts) {
     }
   }
 
+  // Standardize date format to yyyy-MM-dd
+  var stdDate = date;
+  if (date && date.indexOf('/') > -1) {
+    var parts = date.split('/');
+    if (parts.length === 3) {
+      stdDate = parts[2] + '-' + ('0' + parts[1]).slice(-2) + '-' + ('0' + parts[0]).slice(-2);
+    }
+  }
+  if (!stdDate) {
+    stdDate = new Date().toISOString().split('T')[0];
+  }
+
   s.currentShift = {
-    id: uid(),
+    id: 'shift_' + stdDate + '_' + shiftNumber,
     cashierName: cashierName,
     shiftNumber: shiftNumber,
-    date: date,
+    date: stdDate,
     startTime: new Date().toISOString(),
     endTime: null,
     startingCash: Number(startingCash) || 0,
@@ -1013,6 +1118,206 @@ export function rebuildHistorySnapshots() {
 }
 
 
+export function healPastShiftsData() {
+  var s = getState();
+  if (!s || !s.shifts) return 0;
+  var shifts = s.shifts;
+  var healedCount = 0;
+
+  console.log('[Store] healPastShiftsData: starting auto-healing for ' + shifts.length + ' shifts');
+
+  // Step 1: Normalize date formats and assign deterministic IDs to all legacy shifts
+  for (var i = 0; i < shifts.length; i++) {
+    var sh = shifts[i];
+    if (sh.date) {
+      sh.date = _normalizeDateStr(sh.date);
+    } else {
+      sh.date = new Date(sh.startTime || Date.now()).toISOString().split('T')[0];
+    }
+    // Update to deterministic ID format
+    var detId = 'shift_' + sh.date + '_' + sh.shiftNumber;
+    if (sh.id !== detId) {
+      console.log('[Store] healPastShiftsData: updating ID ' + sh.id + ' → ' + detId);
+      sh.id = detId;
+      healedCount++;
+    }
+  }
+
+  // Step 2: Aggressive deduplication by the new deterministic ID
+  var bestById = {};
+  for (var i = 0; i < shifts.length; i++) {
+    var sh = shifts[i];
+    var existing = bestById[sh.id];
+    if (!existing) {
+      bestById[sh.id] = sh;
+    } else {
+      // closed wins, snapshot wins, more transactions wins
+      var eScore = (existing.status === 'closed' ? 10000 : 0) + (existing.summarySnapshot ? 1000 : 0) + (existing.endTime ? 100 : 0) + ((existing.transactions || []).length);
+      var nScore = (sh.status === 'closed' ? 10000 : 0) + (sh.summarySnapshot ? 1000 : 0) + (sh.endTime ? 100 : 0) + ((sh.transactions || []).length);
+      if (nScore > eScore) {
+        bestById[sh.id] = sh;
+      }
+      healedCount++;
+    }
+  }
+
+  var dedupedShifts = [];
+  for (var k in bestById) {
+    if (bestById.hasOwnProperty(k)) dedupedShifts.push(bestById[k]);
+  }
+
+  // Sort by date/startTime desc
+  dedupedShifts.sort(function(a, b) {
+    var da = (a.date || '') + (a.startTime || '');
+    var db = (b.date || '') + (b.startTime || '');
+    return da > db ? -1 : (da < db ? 1 : 0);
+  });
+
+  // Step 3: Backfill missing CUKCUK invoices snapshots for closed shifts by scanning active store using actual shift hours
+  var invoiceData = localStorage.getItem('cukcuk_invoice_store');
+  var invStore = null;
+  try { if (invoiceData) invStore = JSON.parse(invoiceData); } catch (e) {}
+
+  for (var i = 0; i < dedupedShifts.length; i++) {
+    var sh = dedupedShifts[i];
+    if (sh.status !== 'closed') continue;
+
+    // Check if snapshot is missing
+    var needsInvs = !sh.cukcukInvoicesSnapshot || sh.cukcukInvoicesSnapshot.length === 0;
+    
+    if (needsInvs && invStore && invStore.invoices) {
+      // Define exact bounds based on startTime and endTime
+      var boundsStart, boundsEnd;
+      if (sh.startTime) {
+        boundsStart = new Date(sh.startTime);
+      } else {
+        var dp = sh.date.split('-');
+        boundsStart = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0);
+      }
+      if (sh.endTime) {
+        boundsEnd = new Date(sh.endTime);
+      } else {
+        // Fallback to 8 hours duration
+        boundsEnd = new Date(boundsStart.getTime() + 8 * 3600 * 1000);
+      }
+
+      var matchedInvoices = [];
+      for (var k in invStore.invoices) {
+        if (!invStore.invoices.hasOwnProperty(k)) continue;
+        var inv = invStore.invoices[k];
+        if (inv.unpaid) continue;
+        var match = false;
+        if (inv.refDate) {
+          var rd = new Date(inv.refDate);
+          if (isNaN(rd.getTime()) && typeof inv.refDate === 'string') {
+            var netM = inv.refDate.match(/\/Date\((\d+)\)\//);
+            if (netM) rd = new Date(parseInt(netM[1]));
+          }
+          if (!isNaN(rd.getTime())) {
+            match = rd >= boundsStart && rd < boundsEnd;
+          }
+        }
+        if (!match && !inv.refDate) {
+          match = inv.date === sh.date;
+        }
+        if (match) {
+          matchedInvoices.push({
+            refId: inv.refId, refNo: inv.refNo, refDate: inv.refDate,
+            tableName: inv.tableName, amount: inv.amount, payments: inv.payments
+          });
+        }
+      }
+
+      if (matchedInvoices.length > 0) {
+        sh.cukcukInvoicesSnapshot = matchedInvoices;
+        console.log('[Store] healPastShiftsData: backfilled ' + matchedInvoices.length + ' invoices for shift ' + sh.id);
+        healedCount++;
+      }
+    }
+
+    // Rebuild the summarySnapshot statically to heal discrepancy and dynamic bleed
+    var oldSummary = sh.summarySnapshot || {};
+    var savedCashCountTotal = oldSummary.cashCountTotal;
+
+    var copy = Object.assign({}, sh);
+    delete copy.summarySnapshot;
+    copy.status = '_rebuilding';
+
+    var fresh;
+    if (sh.cukcukInvoicesSnapshot && sh.cukcukInvoicesSnapshot.length > 0) {
+      fresh = _getSummaryFromInvoicesSnapshot(copy, sh.cukcukInvoicesSnapshot);
+    } else {
+      fresh = getShiftSummary(copy);
+    }
+
+    var cc = sh.cashCount || {};
+    var actualCashCount = 0;
+    for (var d in cc) {
+      if (cc.hasOwnProperty(d)) actualCashCount += Number(d) * Number(cc[d]);
+    }
+    var cashCountTotal = actualCashCount > 0 ? actualCashCount : (savedCashCountTotal || 0);
+
+    // Apply strict healing of expected cash to eliminate artificial accumulated discrepancies!
+    sh.summarySnapshot = {
+      totalIncome: fresh.totalIncome,
+      totalExpense: fresh.totalExpense,
+      cashIncome: fresh.cashIncome,
+      cardIncome: fresh.cardIncome,
+      transferIncome: fresh.transferIncome,
+      cukcukRevenue: fresh.cukcukRevenue,
+      cukcukBills: fresh.cukcukBills,
+      billCount: fresh.billCount,
+      expectedCash: fresh.expectedCash,
+      cashCountTotal: cashCountTotal,
+      cashExpense: fresh.cashExpense,
+      discrepancy: cashCountTotal - fresh.expectedCash,
+      manualIncome: fresh.manualIncome,
+      manualBills: fresh.manualBills,
+      otherIncome: fresh.otherIncome,
+      otherExpense: fresh.otherExpense,
+      revenue: fresh.revenue,
+      netTotal: fresh.netTotal
+    };
+    healedCount++;
+  }
+
+  // Save healed shifts
+  s.shifts = dedupedShifts;
+  s._healed = true;
+  save();
+
+  console.log('[Store] healPastShiftsData: complete. Healed and optimized ' + healedCount + ' shift entities.');
+
+  // Push healed shifts back to Google Sheets database in background
+  try {
+    import('./api.js').then(function(api) {
+      if (api.closeShiftOnCloud) {
+        console.log('[Store] healPastShiftsData: syncing healed shifts to cloud...');
+        var syncNext = function(idx) {
+          if (idx >= dedupedShifts.length) {
+            console.log('[Store] healPastShiftsData: cloud database synchronization fully complete.');
+            return;
+          }
+          var cleanShift = JSON.parse(JSON.stringify(dedupedShifts[idx]));
+          if (cleanShift.invoices) {
+            for (var j = 0; j < cleanShift.invoices.length; j++) {
+              delete cleanShift.invoices[j].data;
+            }
+          }
+          api.closeShiftOnCloud(cleanShift).then(function() {
+            setTimeout(function() { syncNext(idx + 1); }, 150);
+          }).catch(function() {
+            setTimeout(function() { syncNext(idx + 1); }, 150);
+          });
+        };
+        syncNext(0);
+      }
+    });
+  } catch(e) {}
+
+  return healedCount;
+}
+
 export function getShiftHistory() {
   var s = getState();
   var shifts = s.shifts || [];
@@ -1034,7 +1339,8 @@ export function getShiftHistory() {
   var bestByKey = {};
   for (var i = 0; i < shifts.length; i++) {
     var sh = shifts[i];
-    var key = (sh.date || '') + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '');
+    var normDate = _normalizeDateStr(sh.date);
+    var key = normDate + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '');
     var existing = bestByKey[key];
     if (!existing) {
       bestByKey[key] = sh;
@@ -1075,11 +1381,26 @@ export function saveShiftToHistory(shift) {
   if (!shift || !shift.id) return;
   var s = getState();
   if (!s.shifts) s.shifts = [];
-  // Avoid duplicates
-  for (var i = 0; i < s.shifts.length; i++) {
-    if (s.shifts[i].id === shift.id) return;
+
+  // Normalize date format
+  if (shift.date) {
+    shift.date = _normalizeDateStr(shift.date);
   }
-  s.shifts.push(shift);
+
+  // Upsert pattern
+  var foundIdx = -1;
+  for (var i = 0; i < s.shifts.length; i++) {
+    var shDate = _normalizeDateStr(s.shifts[i].date);
+    if (s.shifts[i].id === shift.id || (shDate === shift.date && s.shifts[i].shiftNumber === shift.shiftNumber)) {
+      foundIdx = i;
+      break;
+    }
+  }
+  if (foundIdx > -1) {
+    s.shifts[foundIdx] = Object.assign(s.shifts[foundIdx], shift);
+  } else {
+    s.shifts.push(shift);
+  }
   save();
 }
 
@@ -1103,6 +1424,25 @@ export function deleteShiftFromHistory(id) {
 }
 
 // ── History Shift Editing (edit-in-place, no restore to currentShift) ──
+
+/** Push edited history shift to cloud as closedShift */
+function _syncHistoryShiftToCloud(shift) {
+  try {
+    import('./api.js').then(function(api) {
+      if (api.closeShiftOnCloud) {
+        var cleanShift = JSON.parse(JSON.stringify(shift));
+        if (cleanShift.invoices) {
+          for (var i = 0; i < cleanShift.invoices.length; i++) {
+            delete cleanShift.invoices[i].data;
+          }
+        }
+        api.closeShiftOnCloud(cleanShift).catch(function(e) {
+          console.warn('[Store] History shift cloud push failed:', e.message);
+        });
+      }
+    });
+  } catch(e) { /* ignore */ }
+}
 
 /** Find a shift in history by ID — returns { shift, index } or null */
 function _findHistoryShift(shiftId) {
@@ -1129,7 +1469,12 @@ function _rebuildShiftSnapshot(shift) {
   // Force open status so getShiftSummary reads live invoiceStore/transactions
   copy.status = '_rebuilding';
 
-  var fresh = getShiftSummary(copy);
+  var fresh;
+  if (shift.cukcukInvoicesSnapshot && shift.cukcukInvoicesSnapshot.length > 0) {
+    fresh = _getSummaryFromInvoicesSnapshot(copy, shift.cukcukInvoicesSnapshot);
+  } else {
+    fresh = getShiftSummary(copy);
+  }
 
   // cashCountTotal comes from the physical cash count data on the shift
   var cc = shift.cashCount || {};
@@ -1179,6 +1524,7 @@ export function addHistoryTransaction(shiftId, txData) {
   shift.transactions.push(tx);
   _rebuildShiftSnapshot(shift);
   save();
+  _syncHistoryShiftToCloud(shift);
   addAudit('EDIT_HISTORY_ADD_TX', 'Ca ' + shift.date + ' #' + shift.shiftNumber + ': ' + (txData.type === 'income' ? '+' : '-') + Number(txData.amount).toLocaleString('vi-VN') + 'đ');
   return tx;
 }
@@ -1199,6 +1545,7 @@ export function editHistoryTransaction(shiftId, txId, updates) {
       if (updates.type !== undefined) tx.type = updates.type;
       _rebuildShiftSnapshot(shift);
       save();
+      _syncHistoryShiftToCloud(shift);
       addAudit('EDIT_HISTORY_TX', 'Ca ' + shift.date + ': ' + tx.category + ' ' + oldAmt.toLocaleString('vi-VN') + ' → ' + tx.amount.toLocaleString('vi-VN') + 'đ');
       return tx;
     }
@@ -1217,6 +1564,7 @@ export function removeHistoryTransaction(shiftId, txId) {
   shift.transactions = (shift.transactions || []).filter(function(t) { return t.id !== txId; });
   _rebuildShiftSnapshot(shift);
   save();
+  _syncHistoryShiftToCloud(shift);
   if (tx) addAudit('EDIT_HISTORY_DEL_TX', 'Ca ' + shift.date + ': xóa ' + tx.category + ' ' + tx.amount.toLocaleString('vi-VN') + 'đ');
 }
 
@@ -1236,6 +1584,7 @@ export function addHistoryOtherTransaction(shiftId, txData) {
   shift.otherTransactions.push(tx);
   _rebuildShiftSnapshot(shift);
   save();
+  _syncHistoryShiftToCloud(shift);
   addAudit('EDIT_HISTORY_ADD_OTHER', 'Ca ' + shift.date + ': ' + txData.type + ' ' + txData.category + ' ' + Number(txData.amount).toLocaleString('vi-VN') + 'đ');
   return tx;
 }
@@ -1247,6 +1596,7 @@ export function removeHistoryOtherTransaction(shiftId, txId) {
   shift.otherTransactions = (shift.otherTransactions || []).filter(function(t) { return t.id !== txId; });
   _rebuildShiftSnapshot(shift);
   save();
+  _syncHistoryShiftToCloud(shift);
   addAudit('EDIT_HISTORY_DEL_OTHER', 'Ca ' + shift.date + ': xóa giao dịch khác');
 }
 
@@ -1289,6 +1639,7 @@ export function updateHistoryCashCount(shiftId, counts, pinnedCash, keepCash, ha
 
   _rebuildShiftSnapshot(shift);
   save();
+  _syncHistoryShiftToCloud(shift);
   var total = totalKet + totalGiao;
   addAudit('EDIT_HISTORY_CASH', 'Ca ' + shift.date + ': Két ' + totalKet.toLocaleString('vi-VN') + ' | Giao ' + totalGiao.toLocaleString('vi-VN') + ' | Tổng ' + total.toLocaleString('vi-VN') + 'đ');
 }
@@ -1306,6 +1657,7 @@ export function updateHistoryShiftField(shiftId, field, value) {
     _rebuildShiftSnapshot(shift);
   }
   save();
+  _syncHistoryShiftToCloud(shift);
   addAudit('EDIT_HISTORY_FIELD', 'Ca ' + shift.date + ': ' + field + ' thay đổi');
 }
 
@@ -1316,6 +1668,7 @@ export function updateHistoryDrinkInventory(shiftId, items) {
   if (!shift.drinkInventorySnapshot) shift.drinkInventorySnapshot = { items: {} };
   shift.drinkInventorySnapshot.items = items;
   save();
+  _syncHistoryShiftToCloud(shift);
   addAudit('EDIT_HISTORY_DRINK_INV', 'Ca ' + shift.date + ': sửa kiểm kho');
 }
 
@@ -1333,6 +1686,7 @@ export function editHistoryInvoicePayment(shiftId, refId, newPayments) {
       if (total > 0) invoices[i].amount = total;
       _rebuildShiftSnapshot(shift);
       save();
+      _syncHistoryShiftToCloud(shift);
       addAudit('EDIT_HISTORY_INV_PAY', 'Ca ' + shift.date + ': sửa PTTT bill ' + (invoices[i].refNo || refId));
       return invoices[i];
     }
@@ -1353,6 +1707,7 @@ export function backfillHistoryInvoiceSnapshot(shiftId, invoicesArray) {
   });
   _rebuildShiftSnapshot(shift);
   save();
+  _syncHistoryShiftToCloud(shift);
   addAudit('BACKFILL_INV_SNAPSHOT', 'Ca ' + shift.date + ': lưu ' + invoicesArray.length + ' hóa đơn POS');
   return invoicesArray.length;
 }
@@ -1423,14 +1778,31 @@ export async function syncShiftHistory() {
         s.shifts.push(cs);
         added++;
       } else {
-        // Shift exists locally — closed shifts are IMMUTABLE (final data)
+        // Shift exists locally — sync content if different (e.g. edits made on another device)
         var localShift = s.shifts[localIds[cs.id]];
-        if (localShift.status === 'closed') continue;
-        // Only update open shifts if cloud has more data
-        var localTxCount = (localShift.transactions || []).length;
-        var cloudTxCount = (cs.transactions || []).length;
-        if (cloudTxCount > localTxCount) {
-          cs.invoices = localShift.invoices || [];
+        
+        var localStr = JSON.stringify({
+          startingCash: localShift.startingCash,
+          notes: localShift.notes || '',
+          transactions: localShift.transactions || [],
+          otherTransactions: localShift.otherTransactions || [],
+          cashCount: localShift.cashCount || {},
+          summarySnapshot: localShift.summarySnapshot || {}
+        });
+        
+        var cloudStr = JSON.stringify({
+          startingCash: cs.startingCash,
+          notes: cs.notes || '',
+          transactions: cs.transactions || [],
+          otherTransactions: cs.otherTransactions || [],
+          cashCount: cs.cashCount || {},
+          summarySnapshot: cs.summarySnapshot || {}
+        });
+        
+        if (localStr !== cloudStr) {
+          console.log('[Store] History shift out of sync, updating local:', cs.id);
+          // Preserve local invoices if available
+          cs.invoices = localShift.invoices || cs.invoices || [];
           s.shifts[localIds[cs.id]] = cs;
           added++;
         }
@@ -1732,24 +2104,13 @@ export async function syncCurrentShiftWithCloud() {
       }
 
       // Case 3: Both local and cloud have open shifts but DIFFERENT IDs
-      // â†’ Keep the NEWER shift (by startTime), push it to cloud
+      // → Cloud shift always takes priority as the established master shift.
       if (cloudShift && s.currentShift && s.currentShift.id !== cloudShift.id) {
-        var localStart = new Date(s.currentShift.startTime || 0).getTime();
-        var cloudStart = new Date(cloudShift.startTime || 0).getTime();
-        if (localStart >= cloudStart) {
-          // Local is newer â€” push local to cloud, ignore stale cloud shift
-          console.log('[Store] Local shift is newer than cloud, pushing local to cloud');
-          _syncCurrentShift();
-          return false;
-        } else {
-          // Cloud is newer â€” apply cloud shift
-          console.log('[Store] Cloud shift is newer, applying:', cloudShift.id);
-          cloudShift.shiftPassword = cloudShift.shiftPassword || s.currentShift.shiftPassword;
-          s.currentShift = cloudShift;
-          s.currentShift.invoices = s.currentShift.invoices || [];
-          save();
-          return true;
-        }
+        console.log('[Store] Cloud shift is the established master, adopting cloud shift:', cloudShift.id);
+        s.currentShift = cloudShift;
+        s.currentShift.invoices = s.currentShift.invoices || [];
+        save();
+        return true;
       }
       
       // Fix 1A: Check if this shift was already closed and saved to history

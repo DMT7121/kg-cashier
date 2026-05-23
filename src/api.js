@@ -103,8 +103,51 @@ export async function getCurrentShiftFromCloud() {
   return apiCall('getCurrentShift');
 }
 
-// ── Staff API ────────────────────────────────
 export async function getStaffFromCloud() {
+  try {
+    // ⚡ Try ultra-fast direct Spreadsheet read first (CORS-friendly via gviz/tq)
+    const ssId = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
+    const url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_STAFF`;
+    
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 1800); // 1.8s timeout
+    
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    
+    if (response.ok) {
+      const text = await response.text();
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1) {
+        const json = JSON.parse(text.substring(start, end + 1));
+        if (json && json.status === 'ok' && json.table && json.table.rows) {
+          const colMapping = ['id', 'name', 'pin', 'role', 'status', 'createdAt'];
+          const headers = json.table.cols.map((c, idx) => c.label || colMapping[idx] || '');
+          const staff = json.table.rows.map(r => {
+            const obj = {};
+            r.c.forEach((cell, idx) => {
+              const header = headers[idx];
+              if (header) {
+                var val = cell ? (cell.v !== null ? cell.v : '') : '';
+                obj[header] = String(val).trim();
+              }
+            });
+            return obj;
+          }).filter(s => s.id && s.name);
+          
+          if (staff.length > 0) {
+            console.log('[API] Ultra-fast staff direct load success:', staff.length);
+            return { success: true, staff: staff, direct: true };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[API] Direct spreadsheet fetch failed/timeout, falling back to GAS:', e.message);
+  }
+  
+  // Fallback to Apps Script if direct fetch fails
   return apiCall('getStaff');
 }
 

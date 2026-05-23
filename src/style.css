@@ -1405,4 +1405,27 @@
   .cc-total-bg {
     @apply bg-blue-50 border-blue-200 text-blue-800;
   }
+
+  /* Staff Grid & Cards in Admin Settings */
+  .staff-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5;
+  }
+  .staff-card {
+    @apply flex items-center gap-4 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+  .staff-avatar {
+    @apply w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm text-lg;
+  }
+  .staff-info {
+    @apply flex-1 min-w-0 flex flex-col gap-1;
+  }
+  .staff-info h4 {
+    @apply font-bold text-[15px] text-slate-800 tracking-tight truncate m-0;
+  }
+  .staff-info .tag {
+    @apply w-fit font-bold py-0.5 px-2 rounded-lg text-[10px] tracking-wide;
+  }
+  .staff-actions {
+    @apply flex gap-1 items-center shrink-0;
+  }
 }

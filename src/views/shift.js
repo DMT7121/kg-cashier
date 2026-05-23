@@ -1,10 +1,11 @@
 import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff, updateStartingCash } from '../store.js';
 import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDuration, formatTime, formatDate, todayStr, moneyInput } from '../utils.js';
-import { getStaffFromCloud, getConfigFromCloud } from '../api.js';
+import { getStaffFromCloud, getConfigFromCloud, getCurrentShiftFromCloud } from '../api.js';
 
 let _staffList = [];
 let _selectedStaff = null;
 let _timer = null;
+let _prefetchedCloudShift = null;
 
 
 
@@ -128,6 +129,22 @@ export function render() {
 
     <div id="shiftFormError" class="hidden p-3 mb-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm font-semibold"></div>
 
+    <!-- Active Cloud Shift Warning Banner (Multi-device conflict check) -->
+    <div id="cloudConflictWarning" class="hidden mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <span class="material-symbols-rounded text-amber-600 shrink-0" style="font-size:24px;">warning</span>
+        <div>
+          <h4 class="font-bold text-amber-800 text-sm" style="margin:0;">⚠️ Thiết bị khác đang mở ca trên Cloud</h4>
+          <p class="text-xs text-amber-700 mt-1" id="cloudConflictText" style="margin:4px 0 0 0;line-height:1.4;"></p>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-warning btn-sm" id="btnSyncFromCloud" style="background:#d97706;color:white;box-shadow:none;border:none;">
+              <span class="material-symbols-rounded" style="font-size:16px;">cloud_download</span> Đồng bộ & Đăng nhập ca này
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <p id="staffLoadStatus" class="text-xs text-slate-500 mb-3">${cached.length > 0 ? '✅ ' + cached.length + ' nhân viên (cache)' : '⏳ Đang tải...'}</p>
 
     <div class="qo-staff-grid" id="staffGrid">
@@ -144,9 +161,6 @@ export function render() {
         </div>
       </div>
     </div>
-
-    <!-- PIN + settings panel (shown after selecting staff) -->
-    <div id="pinPanel" class="hidden"></div>
 
     <!-- Quick settings always visible -->
     <div class="card mb-5">
@@ -208,32 +222,20 @@ function _selectStaff(staffId) {
     else cards[j].classList.remove('selected');
   }
 
-  // Show PIN panel
-  var panel = document.getElementById('pinPanel');
-  if (panel) {
-    var hasPin = _selectedStaff.pin && _selectedStaff.pin !== '****' && _selectedStaff.pin !== '';
-    panel.style.display = 'block';
-    panel.innerHTML = '<div class="qo-pin-panel">' +
-      '<div class="qo-pin-header"><span class="material-symbols-rounded" style="color:var(--primary);">person</span> <span class="qo-sel-name">' + _selectedStaff.name + '</span></div>' +
-      (hasPin ? '<div class="form-group" style="margin-bottom:0;"><label class="form-label">🔑 Mã PIN cá nhân</label><input type="password" id="staffPin" class="form-input" placeholder="••••" maxlength="6" inputmode="numeric" autofocus style="font-size:20px;text-align:center;letter-spacing:4px;"></div>' : '<p style="font-size:12px;color:var(--success);"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">check_circle</span> Không yêu cầu PIN</p>') +
-    '</div>';
-
-    // Auto-focus PIN
-    setTimeout(function() {
-      var pinInput = document.getElementById('staffPin');
-      if (pinInput) {
-        pinInput.focus();
-        pinInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('btnOpenShift').click(); });
-      }
-    }, 50);
-  }
-
   // Enable open button
   var btn = document.getElementById('btnOpenShift');
   if (btn) {
     btn.disabled = false;
     btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Mở ca — ' + _selectedStaff.name;
   }
+
+  // Auto-focus Shift Password immediately
+  setTimeout(function() {
+    var passInput = document.getElementById('shiftPassword');
+    if (passInput) {
+      passInput.focus();
+    }
+  }, 50);
 }
 
 function _loadStaffFromCloud(isManual) {
@@ -290,6 +292,38 @@ function _bindCardClicks() {
     (function(card) {
       card.addEventListener('click', function() { _selectStaff(card.dataset.staffId); });
     })(cards[i]);
+  }
+}
+
+function _showCloudConflict(cloudShift) {
+  const warnBox = document.getElementById('cloudConflictWarning');
+  const textEl = document.getElementById('cloudConflictText');
+  const syncBtn = document.getElementById('btnSyncFromCloud');
+
+  if (warnBox && textEl) {
+    textEl.innerHTML = 'Nhân viên <b>' + cloudShift.cashierName + '</b> đã mở <b>Ca ' + cloudShift.shiftNumber + '</b> trên cloud lúc <b>' + formatTime(cloudShift.startTime) + ' (' + formatDate(cloudShift.date) + ')</b>.<br>Vui lòng đóng ca đó trước hoặc đồng bộ để làm việc chung ca.';
+    warnBox.classList.remove('hidden');
+    warnBox.style.display = 'block';
+
+    syncBtn?.addEventListener('click', async function() {
+      showToast('🔄 Đang đồng bộ ca từ Cloud...', 'info');
+      try {
+        const { getState, setLoggedInUser } = await import('../store.js');
+        const s = getState();
+        s.currentShift = cloudShift;
+        localStorage.setItem('kg-cashier-data', JSON.stringify(s));
+        sessionStorage.setItem('shift_validated', cloudShift.id);
+        
+        // Try to match employee
+        const staff = _staffList.find(st => st.name === cloudShift.cashierName);
+        if (staff) setLoggedInUser(staff);
+
+        showToast('✅ Đồng bộ ca thành công! 🎉', 'success');
+        window.refreshView?.();
+      } catch(err) {
+        showToast('❌ Không thể đồng bộ: ' + err.message, 'error');
+      }
+    });
   }
 }
 
@@ -478,6 +512,24 @@ export function init() {
   // Background cloud refresh
   _loadStaffFromCloud(false);
 
+  // ⚡ Prefetch active cloud shift in background to prevent conflicts without blocking opening
+  _prefetchedCloudShift = null;
+  getCurrentShiftFromCloud().then(function(res) {
+    if (res.success && res.shift && res.shift.status !== 'closed') {
+      _prefetchedCloudShift = res.shift;
+      // If we don't have this shift active locally, warn the user
+      const localShift = getCurrentShift();
+      if (!localShift || localShift.id !== _prefetchedCloudShift.id) {
+        _showCloudConflict(_prefetchedCloudShift);
+      }
+    } else {
+      _prefetchedCloudShift = 'none';
+    }
+  }).catch(function(e) {
+    console.warn('[Shift] Prefetch cloud shift failed:', e);
+    _prefetchedCloudShift = 'none';
+  });
+
   // Manual refresh
   document.getElementById('btnRefreshStaffList')?.addEventListener('click', function() {
     _loadStaffFromCloud(true);
@@ -489,13 +541,11 @@ export function init() {
     _isManualMode = !_isManualMode;
     var box = document.getElementById('manualNameBox');
     var grid = document.getElementById('staffGrid');
-    var panel = document.getElementById('pinPanel');
     var btn = document.getElementById('btnOpenShift');
 
     if (_isManualMode) {
       if (box) box.style.display = 'block';
       if (grid) grid.style.display = 'none';
-      if (panel) panel.style.display = 'none';
       _selectedStaff = null;
       // Deselect cards
       var cards = document.querySelectorAll('.qo-staff-card');
@@ -528,15 +578,6 @@ export function init() {
       staffId = 'manual-' + Date.now();
     } else {
       if (!_selectedStaff) { _showFormError('Vui lòng chọn nhân viên'); return; }
-      // PIN verification
-      var pin = (document.getElementById('staffPin')?.value || '').trim();
-      var staffPin = String(_selectedStaff.pin || '');
-      if (staffPin && staffPin !== '****' && staffPin !== pin) {
-        _showFormError('Mã PIN không chính xác!');
-        var pinEl = document.getElementById('staffPin');
-        if (pinEl) { pinEl.style.borderColor = 'var(--danger)'; pinEl.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)'; pinEl.focus(); pinEl.value = ''; setTimeout(function() { pinEl.style.borderColor = ''; pinEl.style.boxShadow = ''; }, 3000); }
-        return;
-      }
       staffName = _selectedStaff.name;
       staffId = _selectedStaff.id;
     }
@@ -555,7 +596,7 @@ export function init() {
     }
 
     try {
-      const result = await openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass });
+      const result = await openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass, bypassCloudCheck: true });
       sessionStorage.setItem('shift_validated', result.id);
       if (!_isManualMode && _selectedStaff) setLoggedInUser(_selectedStaff);
       showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');

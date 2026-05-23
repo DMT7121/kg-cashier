@@ -187,17 +187,30 @@ function _renderCalcTab() {
               </div>
               <input type="text" id="ext-input-1" class="form-control w-full text-right font-black text-2xl md:text-3xl h-16 bg-slate-50/80 border-slate-200 hover:border-blue-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-slate-800 placeholder:text-slate-300 transition-all tracking-tight shadow-sm" placeholder="0" autocomplete="off">
               
-              <!-- Clean modern formatting toggle switch -->
+              <!-- Clean modern formatting radio group -->
               <div class="mt-3 flex items-center justify-between p-3.5 border border-slate-100 bg-slate-50/40 rounded-2xl select-none">
                 <span class="text-xs font-bold text-slate-600 flex items-center gap-2">
                   <span class="material-symbols-rounded text-base text-slate-400">tune</span>
-                  Phân cách số hàng nghìn:
+                  Phân cách hàng nghìn:
                 </span>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" id="ext-calc-numformat-toggle" ${numFormat === 'comma' ? 'checked' : ''} class="sr-only peer">
-                  <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  <span class="ml-2.5 text-xs font-extrabold text-slate-700 min-w-[85px]">${numFormat === 'comma' ? 'Dấu phẩy (,)' : 'Dấu chấm (.)'}</span>
-                </label>
+                
+                <div class="flex items-center gap-1 p-1 rounded-xl" style="background-color: #f1f5f9; border: 1px solid #e2e8f0;">
+                  <!-- Radio 1: Dấu chấm -->
+                  <label class="relative cursor-pointer m-0">
+                    <input type="radio" name="numformat" value="dot" ${numFormat !== 'comma' ? 'checked' : ''} class="peer" style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;">
+                    <div class="px-4 py-1.5 rounded-lg text-xs font-extrabold text-slate-500 transition-all select-none hover:text-slate-800 peer-checked:bg-white peer-checked:text-blue-600 peer-checked:shadow-sm whitespace-nowrap">
+                      Dấu chấm (.)
+                    </div>
+                  </label>
+                  
+                  <!-- Radio 2: Dấu phẩy -->
+                  <label class="relative cursor-pointer m-0">
+                    <input type="radio" name="numformat" value="comma" ${numFormat === 'comma' ? 'checked' : ''} class="peer" style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;">
+                    <div class="px-4 py-1.5 rounded-lg text-xs font-extrabold text-slate-500 transition-all select-none hover:text-slate-800 peer-checked:bg-white peer-checked:text-blue-600 peer-checked:shadow-sm whitespace-nowrap">
+                      Dấu phẩy (,)
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -491,42 +504,44 @@ function _renderTTSTab() {
           </div>
 
           <div class="mb-5">
-            <label class="block text-sm font-bold text-slate-700 mb-1.5">Nội dung cần phát</label>
-            <textarea id="ext-tts-text" class="form-control resize-none bg-slate-50 focus:bg-white leading-relaxed font-semibold text-slate-800" rows="3" placeholder="Chọn một mẫu ở trên hoặc tự gõ nội dung cần phát thanh tại đây..."></textarea>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Nội dung cần phát</label>
+            <textarea id="ext-tts-text" class="form-control w-full resize-none bg-slate-50/60 hover:bg-slate-50/80 focus:bg-white leading-relaxed font-semibold text-slate-800 border-2 border-slate-100 hover:border-purple-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 rounded-2xl p-4 transition-all placeholder:text-slate-400" rows="3" placeholder="Chọn một mẫu ở trên hoặc tự gõ nội dung cần phát thanh tại đây..."></textarea>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 bg-slate-50/40 p-4 rounded-2xl border border-slate-100">
             <div>
-              <label class="block text-sm font-semibold text-slate-600 mb-1.5">Giọng đọc</label>
+              <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Giọng đọc</label>
               <div class="relative">
-                <select id="ext-tts-voice" class="form-control bg-white appearance-none pr-8">
+                <select id="ext-tts-voice" class="form-control w-full bg-white border-2 border-slate-100 hover:border-purple-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 appearance-none pr-10 font-bold text-slate-700 h-12 rounded-xl transition-all shadow-sm">
                   <option value="nu-bac">Nữ miền Bắc</option>
                   <option value="nam-bac">Nam miền Bắc</option>
                   <option value="nu-nam">Nữ miền Nam</option>
                   <option value="nam-nam">Nam miền Nam</option>
                 </select>
-                <span class="material-symbols-rounded absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">expand_more</span>
+                <span class="material-symbols-rounded absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-base">expand_more</span>
               </div>
             </div>
             <div>
-              <label class="block text-sm font-semibold text-slate-600 mb-1.5">Tốc độ</label>
+              <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Tốc độ</label>
               <div class="relative">
-                <select id="ext-tts-speed" class="form-control bg-white appearance-none pr-8">
+                <select id="ext-tts-speed" class="form-control w-full bg-white border-2 border-slate-100 hover:border-purple-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 appearance-none pr-10 font-bold text-slate-700 h-12 rounded-xl transition-all shadow-sm">
                   <option value="0.8">Chậm</option>
                   <option value="1.0" selected>Bình thường</option>
                   <option value="1.2">Nhanh</option>
                 </select>
-                <span class="material-symbols-rounded absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">expand_more</span>
+                <span class="material-symbols-rounded absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-base">expand_more</span>
               </div>
             </div>
           </div>
 
           <div class="flex gap-3">
-            <button id="ext-tts-play" class="btn-secondary flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
-              <span class="material-symbols-rounded text-slate-500">volume_up</span> Đọc (Hệ thống)
+            <button id="ext-tts-play" class="flex-1 h-12 rounded-2xl border-2 border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-extrabold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm cursor-pointer">
+              <span class="material-symbols-rounded text-slate-500 text-lg">volume_up</span>
+              <span>Đọc (Hệ thống)</span>
             </button>
-            <button id="ext-tts-api-play" class="btn-primary flex-[1.5] py-3 text-base font-bold flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 border-none shadow-sm shadow-purple-200">
-              <span class="material-symbols-rounded">graphic_eq</span> Dùng AI (Khuyên dùng)
+            <button id="ext-tts-api-play" class="flex-[1.2] h-12 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-purple-600/10 border-none cursor-pointer">
+              <span class="material-symbols-rounded text-white text-lg animate-pulse">graphic_eq</span>
+              <span>Dùng AI (Khuyên dùng)</span>
             </button>
           </div>
         </div>
@@ -541,21 +556,21 @@ function _renderTTSTab() {
         </div>
         <div class="p-6 flex-1 flex flex-col">
           <div class="mb-4">
-            <label class="block text-sm font-semibold text-slate-600 mb-1.5">Nhà cung cấp</label>
+            <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Nhà cung cấp</label>
             <div class="relative">
-              <select id="ext-tts-provider" class="form-control bg-white appearance-none pr-8 font-medium">
-                <option value="google" ${provider === 'google' ? 'selected' : ''}>Google Translate TTS (Miễn phí & Rất ổn định)</option>
+              <select id="ext-tts-provider" class="form-control w-full bg-white border-2 border-slate-100 hover:border-purple-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 appearance-none pr-10 font-bold text-slate-700 h-12 rounded-xl transition-all shadow-sm">
+                <option value="google" ${provider === 'google' ? 'selected' : ''}>Google Translate TTS (Miễn phí & Ổn định)</option>
                 <option value="fpt" ${provider === 'fpt' ? 'selected' : ''}>FPT AI TTS</option>
                 <option value="viettel" ${provider === 'viettel' ? 'selected' : ''}>Viettel AI</option>
               </select>
-              <span class="material-symbols-rounded absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">expand_more</span>
+              <span class="material-symbols-rounded absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-base">expand_more</span>
             </div>
           </div>
           
           <div class="mb-6 flex-1 flex flex-col justify-between">
             <div id="ext-tts-key-container">
-              <label class="block text-sm font-semibold text-slate-600 mb-1.5">API Key</label>
-              <input type="password" id="ext-tts-key" class="form-control bg-white" value="${ttsKey}" placeholder="Dùng key hệ thống mặc định">
+              <label class="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">API Key</label>
+              <input type="password" id="ext-tts-key" class="form-control w-full bg-white border-2 border-slate-100 hover:border-purple-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 font-bold text-slate-700 h-12 rounded-xl transition-all shadow-sm px-4" value="${ttsKey}" placeholder="Dùng key hệ thống mặc định">
             </div>
             
             <div class="mt-4 bg-purple-50 text-purple-700 text-[11px] leading-relaxed p-3 rounded-lg border border-purple-100">
@@ -566,10 +581,10 @@ function _renderTTSTab() {
           </div>
           
           <div class="flex flex-col gap-2">
-            <button id="ext-tts-sync-cloud" class="btn-outline w-full py-2.5 font-bold flex items-center justify-center gap-2 border-dashed border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors">
+            <button id="ext-tts-sync-cloud" class="w-full h-11 rounded-xl border-2 border-dashed border-purple-200 bg-white hover:bg-purple-50/30 text-purple-600 hover:text-purple-700 font-extrabold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer">
               <span class="material-symbols-rounded text-slate-500">sync</span> Đồng bộ cấu hình đám mây
             </button>
-            <button id="ext-tts-save-key" class="btn-secondary w-full py-2.5 font-bold">Lưu cấu hình</button>
+            <button id="ext-tts-save-key" class="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98] border-none shadow-sm cursor-pointer">Lưu cấu hình</button>
           </div>
         </div>
       </div>
@@ -698,31 +713,31 @@ export function init() {
       });
     });
 
-    const formatToggle = document.getElementById('ext-calc-numformat-toggle');
-    formatToggle.addEventListener('change', (e) => {
-      const isComma = e.target.checked;
-      const labelText = e.target.nextElementSibling;
-      if (labelText) {
-        labelText.innerText = isComma ? 'Dấu phẩy (,)' : 'Dấu chấm (.)';
-      }
-      
-      const st = getSettings();
-      if (!st.extension) st.extension = {};
-      st.extension.numFormat = isComma ? 'comma' : 'dot';
-      updateSettings(st);
-      
-      import('../api.js').then(api => {
-        if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+    const formatRadios = document.querySelectorAll('input[name="numformat"]');
+    formatRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        if (!e.target.checked) return;
+        const fmt = e.target.value; // 'dot' or 'comma'
+        const isComma = (fmt === 'comma');
+        
+        const st = getSettings();
+        if (!st.extension) st.extension = {};
+        st.extension.numFormat = fmt;
+        updateSettings(st);
+        
+        import('../api.js').then(api => {
+          if (api.saveSettingsToCloud) api.saveSettingsToCloud(st).catch(() => {});
+        });
+        
+        // Update display separator immediately in the input box if contains value
+        if (input1.value) {
+          const val = parseCurrency(input1.value);
+          const sep = isComma ? ',' : '.';
+          input1.value = val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+        }
+        
+        updateCalc();
       });
-      
-      // Update display separator immediately in the input box if contains value
-      if (input1.value) {
-        const val = parseCurrency(input1.value);
-        const sep = isComma ? ',' : '.';
-        input1.value = val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, sep);
-      }
-      
-      updateCalc();
     });
 
     const renderHistory = () => {

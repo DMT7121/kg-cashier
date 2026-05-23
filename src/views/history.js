@@ -1,5 +1,5 @@
 /* ── History View — Tabbed shift detail w/ snapshot data ── */
-import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction, backfillHistoryInvoiceSnapshot } from '../store.js';
+import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction, backfillHistoryInvoiceSnapshot, healPastShiftsData } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
 import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
 import * as histEdit from './historyEdit.js';
@@ -58,8 +58,19 @@ function _renderHistoryCards(shifts) {
 
   // Fix 3B: Dedup by compound key before rendering (no startTime — clones differ by seconds)
   var seen = {};
+  var normalizeDate = function(dStr) {
+    if (!dStr) return '';
+    if (dStr.indexOf('/') > -1) {
+      var parts = dStr.split('/');
+      if (parts.length === 3) {
+        return parts[2] + '-' + ('0' + parts[1]).slice(-2) + '-' + ('0' + parts[0]).slice(-2);
+      }
+    }
+    return dStr;
+  };
   shifts = shifts.filter(function(sh) {
-    var key = (sh.date || '') + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '');
+    var normDate = normalizeDate(sh.date);
+    var key = normDate + '_' + (sh.shiftNumber || '') + '_' + (sh.cashierName || '');
     if (seen[key]) return false;
     seen[key] = true;
     return true;
@@ -250,13 +261,18 @@ export function init() {
   _bindHistoryEvents();
 
   document.getElementById('btnRebuildSnapshots')?.addEventListener('click', function() {
-    var count = rebuildHistorySnapshots();
-    if (count > 0) {
-      showToast('\u2705 Đã cập nhật ' + count + ' ca từ dữ liệu CUKCUK mới nhất', 'success');
-      allHistory = getShiftHistory();
-      _filterHistory();
-    } else {
-      showToast('Không có ca nào cần cập nhật', 'info');
+    showToast('Đang quét tự phục hồi và tối ưu hóa số liệu lịch sử...', 'info');
+    try {
+      var count = healPastShiftsData();
+      if (count > 0) {
+        showToast('✅ Đã tự động phục hồi và tối ưu hóa số liệu ' + count + ' ca thành công!', 'success');
+        allHistory = getShiftHistory();
+        _filterHistory();
+      } else {
+        showToast('Số liệu lịch sử đã ở trạng thái tối ưu, không cần phục hồi.', 'info');
+      }
+    } catch(e) {
+      showToast('Lỗi phục hồi dữ liệu: ' + e.message, 'error');
     }
   });
   document.getElementById('historySearch')?.addEventListener('input', _filterHistory);

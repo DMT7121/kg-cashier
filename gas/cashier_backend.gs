@@ -180,6 +180,12 @@ function _syncShift(data) {
     transactions: data.transactions || [],
     otherTransactions: data.otherTransactions || [],
     cashCount: data.cashCount || {},
+    summarySnapshot: data.summarySnapshot || null,
+    cukcukInvoicesSnapshot: data.cukcukInvoicesSnapshot || [],
+    drinkInventorySnapshot: data.drinkInventorySnapshot || null,
+    pinnedCash: data.pinnedCash || {},
+    keepCash: data.keepCash || {},
+    handoverCash: data.handoverCash || {},
     invoices: (data.invoices || []).map(inv => ({ ...inv, data: undefined })) // Don't store base64 in sheets
   });
 
@@ -232,6 +238,12 @@ function _getShifts(params) {
       transactions: extra.transactions || [],
       otherTransactions: extra.otherTransactions || [],
       cashCount: extra.cashCount || {},
+      summarySnapshot: extra.summarySnapshot || null,
+      cukcukInvoicesSnapshot: extra.cukcukInvoicesSnapshot || [],
+      drinkInventorySnapshot: extra.drinkInventorySnapshot || null,
+      pinnedCash: extra.pinnedCash || {},
+      keepCash: extra.keepCash || {},
+      handoverCash: extra.handoverCash || {},
       invoices: extra.invoices || []
     };
   });
@@ -261,6 +273,12 @@ function _getCurrentShift() {
       transactions: extra.transactions || [],
       otherTransactions: extra.otherTransactions || [],
       cashCount: extra.cashCount || {},
+      summarySnapshot: extra.summarySnapshot || null,
+      cukcukInvoicesSnapshot: extra.cukcukInvoicesSnapshot || [],
+      drinkInventorySnapshot: extra.drinkInventorySnapshot || null,
+      pinnedCash: extra.pinnedCash || {},
+      keepCash: extra.keepCash || {},
+      handoverCash: extra.handoverCash || {},
       invoices: extra.invoices || []
     }
   };
