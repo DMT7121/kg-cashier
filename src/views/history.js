@@ -1,5 +1,5 @@
 /* ── History View — Tabbed shift detail w/ snapshot data ── */
-import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction, backfillHistoryInvoiceSnapshot, healPastShiftsData } from '../store.js';
+import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction, backfillHistoryInvoiceSnapshot, healPastShiftsData, reopenShiftById } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
 import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
 import * as histEdit from './historyEdit.js';
@@ -232,7 +232,6 @@ function _renderShiftDetailModal(sh, sm, store) {
         if(ok) {
           hideModal();
           try {
-            const { reopenShiftById } = await import('../store.js');
             await reopenShiftById(rpbtn.dataset.shiftId);
             showToast('Đã mở lại ca thành công!', 'success');
             window.navigateTo('dashboard');
