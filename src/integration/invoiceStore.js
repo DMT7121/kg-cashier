@@ -67,9 +67,10 @@ export function upsertInvoice(invoice) {
   var existing = store.invoices[key];
   var isNew = !existing;
   
-  if (existing && existing.manualOverride) {
+  if (existing && (existing.manualOverride || existing.isManuallyEdited)) {
     invoice.payments = existing.payments;
     invoice.manualOverride = true;
+    invoice.isManuallyEdited = true;
     if (existing.amount) invoice.amount = existing.amount; // Preserve amount if modified
   }
   
@@ -87,9 +88,10 @@ export function bulkUpsert(invoices) {
     var existing = store.invoices[key];
     if (!existing) newCount++;
     
-    if (existing && existing.manualOverride) {
+    if (existing && (existing.manualOverride || existing.isManuallyEdited)) {
       invoices[i].payments = existing.payments;
       invoices[i].manualOverride = true;
+      invoices[i].isManuallyEdited = true;
       if (existing.amount) invoices[i].amount = existing.amount;
     }
     
@@ -421,14 +423,13 @@ export function getInvoicesByDate(dateStr) {
   });
 }
 
-/** Get invoices strictly within a shift's time window (Aligned to Working Day: 12 PM - 6 AM) */
+/** Get invoices strictly within a shift's time window (Respects startTime/endTime if available) */
 export function getInvoicesByShiftTime(dateStr, startTime, endTime) {
   var allForDate = getInvoicesByDate(dateStr);
   var dp = dateStr.split('-');
   
-  // Đồng bộ hoàn toàn với Báo Cáo Ngày (12:00 PM hôm nay -> 06:00 AM hôm sau)
-  var startT = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0).getTime();
-  var endT = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]) + 1, 6, 0, 0).getTime();
+  var startT = startTime ? new Date(startTime).getTime() : new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0).getTime();
+  var endT = endTime ? new Date(endTime).getTime() : new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]) + 1, 6, 0, 0).getTime();
   
   return allForDate.filter(function(inv) {
     if (!inv.refDate) return false;
@@ -450,6 +451,7 @@ export function editInvoicePayment(refId, newPayments) {
   if (!inv) throw new Error('Không tìm thấy hóa đơn: ' + refId);
   inv.payments = newPayments;
   inv.manualOverride = true;
+  inv.isManuallyEdited = true;
   inv.unpaid = false;
   var total = 0;
   for (var i = 0; i < newPayments.length; i++) {

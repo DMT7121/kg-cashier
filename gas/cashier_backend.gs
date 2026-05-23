@@ -186,7 +186,8 @@ function _syncShift(data) {
     pinnedCash: data.pinnedCash || {},
     keepCash: data.keepCash || {},
     handoverCash: data.handoverCash || {},
-    invoices: (data.invoices || []).map(inv => ({ ...inv, data: undefined })) // Don't store base64 in sheets
+    invoices: (data.invoices || []).map(inv => ({ ...inv, data: undefined })), // Don't store base64 in sheets
+    shiftPassword: data.shiftPassword || ''
   });
 
   const row = [
@@ -244,7 +245,8 @@ function _getShifts(params) {
       pinnedCash: extra.pinnedCash || {},
       keepCash: extra.keepCash || {},
       handoverCash: extra.handoverCash || {},
-      invoices: extra.invoices || []
+      invoices: extra.invoices || [],
+      shiftPassword: extra.shiftPassword || ''
     };
   });
 
@@ -279,7 +281,8 @@ function _getCurrentShift() {
       pinnedCash: extra.pinnedCash || {},
       keepCash: extra.keepCash || {},
       handoverCash: extra.handoverCash || {},
-      invoices: extra.invoices || []
+      invoices: extra.invoices || [],
+      shiftPassword: extra.shiftPassword || ''
     }
   };
 }

@@ -336,6 +336,9 @@ function _buildHandoverHTML(revSummary, store) {
   var selectedDateStr = _refDate ? _refDate.getFullYear() + '-' + String(_refDate.getMonth()+1).padStart(2,'0') + '-' + String(_refDate.getDate()).padStart(2,'0') : null;
   if(!selectedDateStr) {
     var d = new Date();
+    if (d.getHours() < 6) {
+      d.setDate(d.getDate() - 1);
+    }
     selectedDateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
 

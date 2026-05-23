@@ -725,6 +725,75 @@ export async function closeShift(opts) {
   }
 }
 
+export async function reopenLastClosedShift() {
+  var s = getState();
+  if (s.currentShift) {
+    throw new Error('Đang có ca mở. Hãy đóng ca hiện tại trước khi mở lại ca khác.');
+  }
+  if (!s.shifts || s.shifts.length === 0) {
+    throw new Error('Không có ca đã đóng nào trong lịch sử.');
+  }
+
+  // Find the first shift with status === 'closed'
+  var closedShiftIndex = -1;
+  for (var i = 0; i < s.shifts.length; i++) {
+    if (s.shifts[i].status === 'closed') {
+      closedShiftIndex = i;
+      break;
+    }
+  }
+
+  if (closedShiftIndex === -1) {
+    throw new Error('Không tìm thấy ca đã đóng nào.');
+  }
+
+  var shiftToReopen = s.shifts[closedShiftIndex];
+
+  // Save the original summary snapshot at first closing to enable highlight comparisons on reports
+  if (!shiftToReopen.originalSummarySnapshot && shiftToReopen.summarySnapshot) {
+    shiftToReopen.originalSummarySnapshot = Object.assign({}, shiftToReopen.summarySnapshot);
+  }
+
+  // Modify shift status back to 'open'
+  shiftToReopen.status = 'open';
+  shiftToReopen.endTime = null;
+  
+  // Clear the frozen closing snapshots so that the shift dynamically calculates transactions, expected cash, etc.
+  delete shiftToReopen.summarySnapshot;
+  delete shiftToReopen.cukcukInvoicesSnapshot;
+
+  // Restore drink inventory session to local storage if present, so the user can see and adjust their counts
+  if (shiftToReopen.drinkInventorySnapshot) {
+    try {
+      var invData = localStorage.getItem('kg-drink-inventory');
+      var parsed = invData ? JSON.parse(invData) : { sessions: {} };
+      if (!parsed.sessions) parsed.sessions = {};
+      var sessionKey = shiftToReopen.date + '_Ca ' + shiftToReopen.shiftNumber;
+      parsed.sessions[sessionKey] = shiftToReopen.drinkInventorySnapshot;
+      localStorage.setItem('kg-drink-inventory', JSON.stringify(parsed));
+      console.log('[Store] Restored drink inventory session for:', sessionKey);
+    } catch (e) { /* ignore */ }
+  }
+
+  // Set as current shift in active memory
+  s.currentShift = JSON.parse(JSON.stringify(shiftToReopen));
+
+  // Auto-validate session so user bypasses the login lock screen immediately
+  try {
+    sessionStorage.setItem('shift_validated', s.currentShift.id);
+  } catch (e) { /* ignore */ }
+
+  // Remove from shifts history array (since it is active again)
+  s.shifts.splice(closedShiftIndex, 1);
+
+  // Sync to Cloud as 'open'
+  save();
+  addAudit('REOPEN_SHIFT', 'Mở lại ca ' + s.currentShift.shiftNumber + ' - ' + s.currentShift.cashierName);
+  _syncCurrentShift();
+
+  return s.currentShift;
+}
+
 // â”€â”€ Transactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function addTransaction(opts) {
   var s = getState();
@@ -912,9 +981,8 @@ export function getShiftSummary(shift) {
         var parsed = JSON.parse(storeData);
         if (parsed && parsed.invoices) {
           var dp = shift.date.split('-');
-          // Luôn dùng chuẩn Working Day (12:00 PM hôm nay -> 06:00 AM hôm sau) để đồng bộ hoàn toàn với Báo Cáo Ngày
-          var shiftStart = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0);
-          var shiftEnd = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]) + 1, 6, 0, 0);
+          var shiftStart = shift.startTime ? new Date(shift.startTime) : new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0);
+          var shiftEnd = shift.endTime ? new Date(shift.endTime) : (shift.status === 'closed' ? new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]) + 1, 6, 0, 0) : new Date());
           for (var k in parsed.invoices) {
             if (!parsed.invoices.hasOwnProperty(k)) continue;
             var inv = parsed.invoices[k];
@@ -1018,7 +1086,7 @@ export function getShiftSummary(shift) {
 }
 
 
-// â”€â”€ History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── History ──â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /**
  * Get shift summary for HISTORY display.
  * Uses frozen summarySnapshot for closed shifts (immutable data at close time).
@@ -1182,8 +1250,8 @@ export function healPastShiftsData() {
     var sh = dedupedShifts[i];
     if (sh.status !== 'closed') continue;
 
-    // Check if snapshot is missing
-    var needsInvs = !sh.cukcukInvoicesSnapshot || sh.cukcukInvoicesSnapshot.length === 0;
+    // Check if snapshot is missing OR if we need to heal/re-segment date 2026-05-21
+    var needsInvs = !sh.cukcukInvoicesSnapshot || sh.cukcukInvoicesSnapshot.length === 0 || sh.date === '2026-05-21';
     
     if (needsInvs && invStore && invStore.invoices) {
       // Define exact bounds based on startTime and endTime

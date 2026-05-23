@@ -55,6 +55,10 @@ export function showEditCashCountModal(shift, onDone) {
   var cc=shift.cashCount||{};var pc=shift.pinnedCash||{};var kc=shift.keepCash||{};var hc=shift.handoverCash||{};
   var rows=denominations.map(function(d){
     var pin=pc[d.value]||0,keep=kc[d.value]||0,hand=hc[d.value]||0;
+    // Fallback if detail breakdown is not set but cashCount exists (matches cashCount.js behavior)
+    if (!shift.handoverCash && cc[d.value] > 0) {
+      hand = Math.max(0, (cc[d.value] || 0) - pin - keep);
+    }
     return '<tr><td style="font-weight:600;">'+d.label+'</td>'+
       '<td><input type="number" class="form-input heCc" data-he-type="pin" data-he-d="'+d.value+'" value="'+pin+'" min="0" style="width:60px;text-align:center;padding:4px;"></td>'+
       '<td><input type="number" class="form-input heCc" data-he-type="keep" data-he-d="'+d.value+'" value="'+keep+'" min="0" style="width:60px;text-align:center;padding:4px;"></td>'+
