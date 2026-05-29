@@ -81,75 +81,109 @@ var CACHE_VERSION = 4; // Bump: force re-sync to fetch SAInvoiceDetails (drink i
   } catch(e) { /* ignore */ }
 })();
 
-function _getCachedToken() {
-  if (_cachedToken && (Date.now() - _cachedTokenTime) < TOKEN_TTL) {
-    return { token: _cachedToken, companyCode: _cachedCompanyCode };
-  }
+// ── Get Token Health Status from Proxy ──
+export async function loginAndGetToken() {
   try {
-    var saved = sessionStorage.getItem('cukcuk_token');
-    if (saved) {
-      var parsed = JSON.parse(saved);
-      if (parsed.token && (Date.now() - parsed.time) < TOKEN_TTL) {
-        _cachedToken = parsed.token;
-        _cachedCompanyCode = parsed.companyCode;
-        _cachedTokenTime = parsed.time;
-        return { token: _cachedToken, companyCode: _cachedCompanyCode };
-      }
+    var reqHeaders = {};
+    var gasUrl = import.meta.env.VITE_GAS_URL || '';
+    if (gasUrl) reqHeaders['X-Gas-Url'] = gasUrl;
+    var settings = getSettings();
+    if (settings && settings.adminPassword) {
+      reqHeaders['X-Admin-Password'] = settings.adminPassword;
     }
-  } catch(e) { /* ignore */ }
-  return null;
-}
+    reqHeaders['X-Cukcuk-Pin'] = '712121';
 
-function _setCachedToken(token, companyCode) {
-  _cachedToken = token;
-  _cachedCompanyCode = companyCode;
-  _cachedTokenTime = Date.now();
-  try {
-    sessionStorage.setItem('cukcuk_token', JSON.stringify({ 
-      token: token, companyCode: companyCode, time: _cachedTokenTime 
-    }));
-  } catch(e) { /* ignore */ }
-}
+    var response = await fetch(CUKCUK_API_BASE + '/health', {
+      headers: reqHeaders
+    });
 
-function _clearCachedToken() {
-  _cachedToken = null;
-  _cachedCompanyCode = null;
-  _cachedTokenTime = 0;
-  try { sessionStorage.removeItem('cukcuk_token'); } catch(e) { /* ignore */ }
-}
+    if (!response.ok) {
+      return { success: false, message: 'Lỗi HTTP ' + response.status + ' khi gọi proxy' };
+    }
 
-// ── Centralized API Call with Auto-Retry on Auth Failure ──
-// Official pattern: https://graphapi.cukcuk.vn/document/articles/using_authen.html
-// CUKCUK may return auth errors as:
-//   (A) HTTP 401 status
-//   (B) HTTP 200 + JSON { Success: false, ErrorMessage: "Authorization has been denied..." }
-// Both cases → clear token → re-login → retry once
-async function _cukcukApiCall(url, options, _isRetry) {
-  // Ensure we have a valid token
-  var auth = await loginAndGetToken();
-  if (!auth.success) {
-    return { _authFailed: true, message: auth.message };
+    var data = await response.json();
+    if (data && data.success && data.status === 'connected') {
+      return { 
+        success: true, 
+        message: 'Kết nối CUKCUK thành công!', 
+        authInfo: data.auth 
+      };
+    } else {
+      return { 
+        success: false, 
+        message: (data && data.message) || 'Không thể xác thực kết nối CUKCUK' 
+      };
+    }
+  } catch(e) {
+    return { success: false, message: 'Lỗi kết nối proxy: ' + e.message };
   }
-  
-  // Set auth headers — clone options to avoid mutating on retry
+}
+
+// ── Test Connection (Forces token refresh) ──
+export async function testConnection() {
+  try {
+    var reqHeaders = {};
+    var gasUrl = import.meta.env.VITE_GAS_URL || '';
+    if (gasUrl) reqHeaders['X-Gas-Url'] = gasUrl;
+    var settings = getSettings();
+    if (settings && settings.adminPassword) {
+      reqHeaders['X-Admin-Password'] = settings.adminPassword;
+    }
+    reqHeaders['X-Cukcuk-Pin'] = '712121';
+
+    var response = await fetch(CUKCUK_API_BASE + '/auth/refresh', {
+      method: 'POST',
+      headers: reqHeaders
+    });
+
+    if (!response.ok) {
+      return { success: false, message: 'Lỗi HTTP ' + response.status + ' khi gọi proxy' };
+    }
+
+    var data = await response.json();
+    if (data && data.success) {
+      return { 
+        success: true, 
+        message: data.message || 'Lấy lại token kết nối thành công!', 
+        authInfo: data.auth 
+      };
+    } else {
+      return { 
+        success: false, 
+        message: (data && data.message) || 'Làm mới token kết nối thất bại' 
+      };
+    }
+  } catch(e) {
+    return { success: false, message: 'Lỗi kết nối proxy: ' + e.message };
+  }
+}
+
+// ── Centralized API Call (Proxy handles token attachment & auto-retry) ──
+async function _cukcukApiCall(url, options) {
   var reqHeaders = {};
   if (options.headers) {
     for (var hk in options.headers) reqHeaders[hk] = options.headers[hk];
   }
-  reqHeaders['Authorization'] = 'Bearer ' + auth.token;
-  reqHeaders['CompanyCode'] = auth.companyCode;
+
+  // Attach GAS routing instructions for the CF proxy fallback
+  var gasUrl = import.meta.env.VITE_GAS_URL || '';
+  if (gasUrl) {
+    reqHeaders['X-Gas-Url'] = gasUrl;
+  }
   
-  var fetchOpts = { method: options.method || 'GET', headers: reqHeaders };
+  var settings = getSettings();
+  if (settings && settings.adminPassword) {
+    reqHeaders['X-Admin-Password'] = settings.adminPassword;
+  }
+  reqHeaders['X-Cukcuk-Pin'] = '712121';
+
+  var fetchOpts = { 
+    method: options.method || 'GET', 
+    headers: reqHeaders 
+  };
   if (options.body) fetchOpts.body = options.body;
   
   var response = await fetch(CUKCUK_API_BASE + url, fetchOpts);
-  
-  // Case A: HTTP 401 status
-  if (response.status === 401 && !_isRetry) {
-    console.log('[CUKCUK] HTTP 401, refreshing token...');
-    _clearCachedToken();
-    return _cukcukApiCall(url, options, true);
-  }
   
   if (!response.ok) {
     throw new Error('HTTP ' + response.status + ' from ' + url);
@@ -157,234 +191,12 @@ async function _cukcukApiCall(url, options, _isRetry) {
   
   var data = await response.json();
   
-  // Case B: HTTP 200 but auth error in body
-  if (!_isRetry && data && !data.Success) {
-    var errMsg = (data.ErrorMessage || data.Message || '').toLowerCase();
-    if (errMsg.indexOf('authorization') !== -1 || errMsg.indexOf('denied') !== -1 || 
-        errMsg.indexOf('token') !== -1 || errMsg.indexOf('expired') !== -1 ||
-        errMsg.indexOf('hết hạn') !== -1) {
-      console.log('[CUKCUK] Auth error in body:', data.ErrorMessage || data.Message, '→ refreshing token...');
-      _clearCachedToken();
-      return _cukcukApiCall(url, options, true);
-    }
+  // If proxy returned a JSON success = false wrapping an error, handle it
+  if (data && data.success === false && data.error) {
+    throw new Error(data.error.message || 'Proxy error');
   }
-  
+
   return data;
-}
-
-// ── HMAC-SHA256 Signature (Web Crypto API) ──
-async function _generateSignature(message, secret) {
-  var encoder = new TextEncoder();
-  var keyData = encoder.encode(secret);
-  var messageData = encoder.encode(message);
-
-  var cryptoKey = await crypto.subtle.importKey(
-    'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-
-  var signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
-  var array = new Uint8Array(signature);
-  var hex = '';
-  for (var i = 0; i < array.length; i++) {
-    hex += array[i].toString(16).padStart(2, '0');
-  }
-  return hex;
-}
-
-// ── Get Clean Domain ──
-function _getCleanDomain(rawDomain) {
-  var d = (rawDomain || '').trim().toLowerCase();
-  d = d.replace(/^https?:\/\//, '');
-  d = d.replace(/\.cukcuk\.vn\/?$/, '');
-  d = d.replace(/\/$/, '');
-  return d;
-}
-
-// ── Working Day Logic ──
-// Ngày làm việc: 12:00 trưa → 06:00 sáng hôm sau
-// VD: Ca ngày 16/04 = 16/04 12:00:00 → 17/04 05:59:59
-function _getWorkingDayStr() {
-  var now = new Date();
-  // If before 6:00 AM, the working day is YESTERDAY
-  if (now.getHours() < 6) {
-    now.setDate(now.getDate() - 1);
-  }
-  var y = now.getFullYear();
-  var m = String(now.getMonth() + 1).padStart(2, '0');
-  var d = String(now.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + d;
-}
-
-/**
- * Get the CUKCUK API date range for a given shift date.
- * Working day: shiftDate 12:00:00 → shiftDate+1 05:59:59
- * @param {string} shiftDate - YYYY-MM-DD of the shift
- */
-function _getWorkingDayRange(shiftDate) {
-  if (!shiftDate) shiftDate = _getWorkingDayStr();
-  // Start: shiftDate at 12:00:00 (noon)
-  var from = shiftDate + 'T12:00:00';
-  // End: next day at 05:59:59
-  var d = new Date(shiftDate + 'T12:00:00');
-  d.setDate(d.getDate() + 1);
-  var nextY = d.getFullYear();
-  var nextM = String(d.getMonth() + 1).padStart(2, '0');
-  var nextD = String(d.getDate()).padStart(2, '0');
-  var to = nextY + '-' + nextM + '-' + nextD + 'T05:59:59';
-  return { from: from, to: to, date: shiftDate };
-}
-
-// Keep simple today helper for cache keys
-function _getTodayStr() {
-  var now = new Date();
-  var y = now.getFullYear();
-  var m = String(now.getMonth() + 1).padStart(2, '0');
-  var d = String(now.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + d;
-}
-
-/**
- * Derive working day (YYYY-MM-DD) from a CUKCUK RefDate string.
- * If the invoice time is before 06:00, the working day is the previous calendar day.
- * @param {string} refDate - e.g. "2026-05-13T23:15:00" or "/Date(1747148100000)/"
- * @param {string} fallback - fallback date if parsing fails
- */
-function _getWorkingDayFromRefDate(refDate, fallback) {
-  if (!refDate) return fallback;
-  var dt;
-  // Handle .NET "/Date(...)/" format
-  var match = String(refDate).match(/\/Date\((\d+)\)\//);
-  if (match) {
-    dt = new Date(parseInt(match[1]));
-  } else {
-    dt = new Date(refDate);
-  }
-  if (isNaN(dt.getTime())) return fallback;
-  // Before 6AM = previous working day
-  if (dt.getHours() < 6) {
-    dt.setDate(dt.getDate() - 1);
-  }
-  var y = dt.getFullYear();
-  var m = String(dt.getMonth() + 1).padStart(2, '0');
-  var d = String(dt.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + d;
-}
-
-// ── Login & Get Token ──
-export async function loginAndGetToken() {
-  var settings = getSettings();
-  var cukcuk = settings.cukcuk;
-  if (!cukcuk || !cukcuk.domain || !cukcuk.appId || !cukcuk.key) {
-    return { success: false, message: 'Chưa cấu hình CUKCUK. Vào Cài đặt → CUKCUK để nhập Domain, App ID và Secret Key.' };
-  }
-
-  // Check cache first
-  var cached = _getCachedToken();
-  if (cached) {
-    console.log('[CUKCUK] Using cached token');
-    return { success: true, token: cached.token, companyCode: cached.companyCode };
-  }
-
-  // If already logging in, wait for the ongoing request
-  if (_activeLoginPromise) {
-    console.log('[CUKCUK] Login request already in progress, queuing onto current promise...');
-    return _activeLoginPromise;
-  }
-
-  _activeLoginPromise = (async () => {
-    try {
-      var loginTime = new Date().toISOString().split('.')[0] + 'Z';
-      var cleanDomain = _getCleanDomain(cukcuk.domain);
-      var appId = cukcuk.appId.trim();
-      var secretKey = cukcuk.key.trim();
-
-      var payloadStr = JSON.stringify({
-        AppID: appId,
-        Domain: cleanDomain,
-        LoginTime: loginTime
-      });
-
-      var signature = await _generateSignature(payloadStr, secretKey);
-
-      console.log('[CUKCUK] Login attempt:', { appId: appId, domain: cleanDomain, loginTime: loginTime });
-
-      var response = await fetch(CUKCUK_API_BASE + '/api/Account/Login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          AppID: appId,
-          Domain: cleanDomain,
-          LoginTime: loginTime,
-          SignatureInfo: signature
-        })
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.warn('[CUKCUK] Rate limited (429)');
-          return { success: false, message: '⏳ API đang bị giới hạn tốc độ. Thử lại sau 1 phút.' };
-        }
-        if (response.status === 405) {
-          var body405 = '';
-          try { body405 = await response.text(); } catch(e) {}
-          console.warn('[CUKCUK] Login 405:', body405);
-          return { success: false, message: '❌ CUKCUK API từ chối (405). Kiểm tra App ID và Domain trong Cài đặt.' };
-        }
-        throw new Error('HTTP ' + response.status);
-      }
-
-      var data = await response.json();
-      
-      if (data.Success && data.Data) {
-        // Data is an object: { AccessToken, CompanyCode, Domain, AppID }
-        var accessToken = data.Data.AccessToken || data.Data;
-        var companyCode = data.Data.CompanyCode || cleanDomain;
-        
-        _setCachedToken(accessToken, companyCode);
-        console.log('[CUKCUK] Login successful! CompanyCode:', companyCode);
-        return { success: true, token: accessToken, companyCode: companyCode };
-      } else {
-        _clearCachedToken();
-        var errMsg = data.ErrorMessage || data.Message || 'Lỗi không xác định';
-        var errLower = errMsg.toLowerCase();
-        
-        if (errLower.indexOf('invalid signature') !== -1 || errLower.indexOf('chữ ký') !== -1) {
-          errMsg = '🔑 Secret Key đã hết hạn hoặc không hợp lệ!\n\n' +
-            'Cách fix:\n' +
-            '1) Vào https://' + cleanDomain + '.cukcuk.vn\n' +
-            '2) Thiết lập → Ứng dụng → API\n' +
-            '3) Bấm "TẠO MÃ KẾT NỐI" → Copy Secret Key mới\n' +
-            '4) Dán vào Cài đặt → CUKCUK → Lưu';
-        } else if (errLower.indexOf('authorization') !== -1 || errLower.indexOf('denied') !== -1) {
-          errMsg = '🔒 Xác thực bị từ chối!\n\n' +
-            'Token có thể đã hết hạn. Vui lòng:\n' +
-            '1) Kiểm tra Secret Key trong Cài đặt → CUKCUK\n' +
-            '2) Nếu vẫn lỗi, vào https://' + cleanDomain + '.cukcuk.vn\n' +
-            '   → Thiết lập → Ứng dụng → API\n' +
-            '3) Bấm "TẠO MÃ KẾT NỐI" → lấy Secret Key mới';
-        }
-        
-        console.warn('[CUKCUK] Login failed:', data);
-        return { success: false, message: errMsg };
-      }
-    } catch (e) {
-      console.error('[CUKCUK] Connection error:', e);
-      if (e.message && e.message.indexOf('Failed to fetch') !== -1) {
-        return { success: false, message: 'Không thể kết nối CUKCUK API. Kiểm tra Internet hoặc dùng localhost.' };
-      }
-      return { success: false, message: 'Lỗi kết nối: ' + e.message };
-    } finally {
-      _activeLoginPromise = null; // ALWAYS clear when finished
-    }
-  })();
-
-  return _activeLoginPromise;
-}
-
-// ── Test Connection ──
-export async function testConnection() {
-  _clearCachedToken();
-  return loginAndGetToken();
 }
 
 // ── Extract invoice array from API response Data field ──

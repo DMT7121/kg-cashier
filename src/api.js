@@ -4,6 +4,7 @@
    ============================================ */
 
 import { safeJsonParse } from './utils.js';
+import { isCurrentHostCanonical } from './config/env.js';
 
 const GAS_URL = import.meta.env.VITE_GAS_URL || '';
 
@@ -75,6 +76,9 @@ export function setSandboxMode(enabled) {
 }
 
 export function validateProductionWrite(action) {
+  if (!isCurrentHostCanonical()) {
+    throw new Error('Cấu hình production không hợp lệ. Hệ thống phải chạy tại https://kg-cashier.pages.dev/ và không được dùng alias/preview URL để ghi dữ liệu thật.');
+  }
   if (isLocalhostOrigin() && isSandboxMode()) {
     throw new Error('Chặn ghi dữ liệu lên Production database từ localhost (Sandbox Mode đang BẬT).');
   }
@@ -88,13 +92,22 @@ export function getMetadata() {
 
 // ── Core fetch wrapper (NEVER throws) ────────
 async function apiCall(action, data = null, retries = 2) {
+  const writeActions = [
+    'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
+    'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
+    'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts'
+  ];
+
+  if (writeActions.indexOf(action) !== -1) {
+    try {
+      validateProductionWrite(action);
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+
   // Sandbox mode interception for writes & simulated reads
   if (isSandboxMode()) {
-    const writeActions = [
-      'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
-      'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
-      'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts'
-    ];
 
     const readActions = [
       'getShiftRegistry', 'getCurrentShift'

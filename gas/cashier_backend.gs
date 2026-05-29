@@ -161,6 +161,7 @@ function _handleCashierRequest(e) {
       // Settings
       case 'getSettings':     result = _getSettings(); break;
       case 'saveSettings':    result = _saveSettings(data); break;
+      case 'getCukcukConfigSecure': result = _getCukcukConfigSecure(data); break;
       
       // Config (fast-load staff + store settings)
       case 'getConfig':       result = _getConfig(); break;
@@ -1099,12 +1100,79 @@ function _getSettings() {
     try { val = JSON.parse(val); } catch(e) {}
     settings[r.key] = val; 
   });
+
+  // Auto-migrate legacy plain text CUKCUK secrets to ScriptProperties
+  if (settings.cukcuk) {
+    const props = PropertiesService.getScriptProperties();
+    let mutated = false;
+    
+    // If domain is in sheet, cache in props if not present
+    if (settings.cukcuk.domain && !props.getProperty('CUKCUK_DOMAIN')) {
+      props.setProperty('CUKCUK_DOMAIN', settings.cukcuk.domain);
+      mutated = true;
+    }
+    // If appId is in sheet, cache in props if not present
+    if (settings.cukcuk.appId && !props.getProperty('CUKCUK_APP_ID')) {
+      props.setProperty('CUKCUK_APP_ID', settings.cukcuk.appId);
+      mutated = true;
+    }
+    // If key is in sheet (plain text), migrate to props and remove from settings
+    if (settings.cukcuk.key && 
+        settings.cukcuk.key.indexOf('***') === -1 && 
+        settings.cukcuk.key.indexOf('•') === -1 && 
+        settings.cukcuk.key.indexOf('*') === -1) {
+      props.setProperty('CUKCUK_SECRET_KEY', settings.cukcuk.key);
+      delete settings.cukcuk.key;
+      mutated = true;
+    }
+
+    // Replace key with boolean flag
+    settings.cukcuk.hasKey = !!props.getProperty('CUKCUK_SECRET_KEY');
+    if (settings.cukcuk.key) {
+      delete settings.cukcuk.key;
+    }
+
+    if (mutated) {
+      // Save back scrubbed settings to sheet
+      _saveSettings({ settings: { cukcuk: settings.cukcuk } });
+    }
+  }
+
   return { success: true, settings: settings };
 }
 
 function _saveSettings(data) {
   const headers = ['key','value'];
   const sheet = _getSheet('KG_SETTINGS', headers);
+
+  if (data.settings && data.settings.cukcuk) {
+    const props = PropertiesService.getScriptProperties();
+    const incomingCukcuk = data.settings.cukcuk;
+    
+    if (incomingCukcuk.domain) {
+      props.setProperty('CUKCUK_DOMAIN', incomingCukcuk.domain);
+    }
+    if (incomingCukcuk.appId) {
+      props.setProperty('CUKCUK_APP_ID', incomingCukcuk.appId);
+    }
+    // If a new key is sent (not masked and not empty)
+    if (incomingCukcuk.key && 
+        incomingCukcuk.key.indexOf('***') === -1 && 
+        incomingCukcuk.key.indexOf('•') === -1 && 
+        incomingCukcuk.key.indexOf('*') === -1 && 
+        incomingCukcuk.key.trim() !== '') {
+      props.setProperty('CUKCUK_SECRET_KEY', incomingCukcuk.key.trim());
+    }
+
+    // Always scrub the key before storing in the sheet
+    const scrubbedCukcuk = {
+      domain: incomingCukcuk.domain || '',
+      appId: incomingCukcuk.appId || '',
+      autoSync: incomingCukcuk.autoSync || false,
+      hasKey: !!props.getProperty('CUKCUK_SECRET_KEY')
+    };
+    data.settings.cukcuk = scrubbedCukcuk;
+  }
 
   Object.entries(data.settings || {}).forEach(([key, value]) => {
     const stringValue = typeof value === 'object' ? JSON.stringify(value) : value;
@@ -1127,6 +1195,22 @@ function _saveSettings(data) {
   });
 
   return { success: true, message: 'Đã lưu cài đặt' };
+}
+
+function _getCukcukConfigSecure(data) {
+  if (!data) data = {};
+  // Validate admin password or PIN (master pin 712121)
+  const adminPass = String(_getSettings().settings.adminPassword || '712121').trim();
+  if (String(data.adminPassword || '').trim() !== adminPass && String(data.pin || '').trim() !== '712121') {
+    return { success: false, message: 'Chưa xác thực quyền quản trị' };
+  }
+  const props = PropertiesService.getScriptProperties();
+  return {
+    success: true,
+    domain: props.getProperty('CUKCUK_DOMAIN') || '',
+    appId: props.getProperty('CUKCUK_APP_ID') || '',
+    secretKey: props.getProperty('CUKCUK_SECRET_KEY') || ''
+  };
 }
 
 // ── Init sheets function (run once) ──────────

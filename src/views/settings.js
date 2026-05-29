@@ -38,10 +38,10 @@ function _renderSystemTab() {
   const s = getSettings();
   const online = isOnline();
   const queueSize = getQueueSize();
-  const hasCukcuk = s.cukcuk && s.cukcuk.domain && s.cukcuk.appId && s.cukcuk.key;
+  const hasCukcuk = s.cukcuk && s.cukcuk.domain && s.cukcuk.appId && (s.cukcuk.key || s.cukcuk.hasKey);
   const cukcukDomain = (s.cukcuk && s.cukcuk.domain) ? s.cukcuk.domain : '';
   const cukcukAppId = (s.cukcuk && s.cukcuk.appId) ? s.cukcuk.appId : 'CUKCUKOpenPlatform';
-  const cukcukKey = (s.cukcuk && s.cukcuk.key) ? s.cukcuk.key : '';
+  const cukcukKey = (s.cukcuk && s.cukcuk.hasKey) ? '••••••••••••••••' : ((s.cukcuk && s.cukcuk.key) ? s.cukcuk.key : '');
 
   const vk = s.vatKeys || {};
   const _k = (arr) => (Array.isArray(arr) ? arr : []).join('\n');
@@ -1200,6 +1200,10 @@ function _initSystemTab() {
   // Save settings
   const performSave = (silent) => {
     if (silent === undefined) silent = false;
+    const incomingKey = document.getElementById('cuk_key').value;
+    const isMasked = incomingKey === '••••••••••••••••' || incomingKey.indexOf('•') !== -1;
+    const finalKey = isMasked ? '***MASKED***' : incomingKey;
+
     const newSettings = {
       storeName: document.getElementById('settStoreName').value,
       storeAddress: document.getElementById('settStoreAddress').value,
@@ -1210,7 +1214,7 @@ function _initSystemTab() {
       cukcuk: {
         domain: document.getElementById('cuk_domain').value,
         appId: document.getElementById('cuk_appId').value,
-        key: document.getElementById('cuk_key').value,
+        key: finalKey,
         autoSync: document.getElementById('cuk_autoSync').checked
       }
     };
