@@ -1,5 +1,5 @@
 import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff, updateStartingCash, getShiftHistory, reopenLastClosedShift, reopenShiftById } from '../store.js';
-import { showToast, showModal, hideModal, showConfirm, formatCurrency, formatDuration, formatTime, formatDate, todayStr, moneyInput } from '../utils.js';
+import { showToast, showModal, hideModal, showConfirm, showPasswordPrompt, formatCurrency, formatDuration, formatTime, formatDate, todayStr, moneyInput } from '../utils.js';
 import { getStaffFromCloud, getConfigFromCloud, getCurrentShiftFromCloud } from '../api.js';
 
 let _staffList = [];
@@ -84,11 +84,49 @@ export function render() {
   // ── CASE 2: Shift OPEN and validated ──
   if (shift) {
     const sm = getShiftSummary(shift);
+    const isReopened = !!shift.reopenedAt || !!shift.originalSummarySnapshot;
+    const txs = shift.transactions || [];
+    const otherTxs = shift.otherTransactions || [];
+    const cc = shift.cashCount || {};
+    const incomeTxs = txs.filter(t => t.type === 'income' && (!t.note || t.note.indexOf('[CUKCUK]') === -1));
+    const expenseTxs = txs.filter(t => t.type === 'expense');
+    const cukcukSnap = shift.cukcukInvoicesSnapshot || [];
+    
+    // Calculate cash count total
+    let ccTotal = 0;
+    for (const d in cc) { if (cc.hasOwnProperty(d)) ccTotal += Number(d) * Number(cc[d]); }
+
     return `
       <div class="section-header">
-        <div><h3>🟢 Ca đang mở</h3><p>Ca ${shift.shiftNumber} — ${shift.cashierName}</p></div>
+        <div><h3>${isReopened ? '🔄 Ca mở lại — Đang chỉnh sửa' : '🟢 Ca đang mở'}</h3><p>Ca ${shift.shiftNumber} — ${shift.cashierName}</p></div>
       </div>
-      <div class="card active-shift-card border-emerald-200 bg-emerald-50/20">
+
+      ${isReopened ? `
+      <div class="mb-4 p-4 rounded-2xl bg-amber-50/80 border border-amber-200 shadow-sm">
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <span class="material-symbols-rounded text-amber-600 shrink-0" style="font-size:28px;">edit_note</span>
+          <div>
+            <h4 class="font-bold text-amber-900 text-sm" style="margin:0;">Ca này đã được mở lại để chỉnh sửa</h4>
+            <p class="text-xs text-amber-700 mt-1" style="margin:2px 0 0;line-height:1.5;">
+              Bạn có thể chỉnh sửa kiểm kê tiền, giao dịch thu chi, hóa đơn POS. Khi đóng lại, báo cáo sẽ được cập nhật phiên bản mới nhất.
+            </p>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button class="btn btn-outline btn-sm" onclick="window.navigateTo('cashCount')" style="font-size:12px;padding:6px 12px;border-radius:10px;">
+                <span class="material-symbols-rounded text-[14px]">calculate</span> Kiểm kê tiền
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="window.navigateTo('transactions')" style="font-size:12px;padding:6px 12px;border-radius:10px;">
+                <span class="material-symbols-rounded text-[14px]">receipt_long</span> Giao dịch
+              </button>
+              <button class="btn btn-outline btn-sm" id="btnReopenedReport" style="font-size:12px;padding:6px 12px;border-radius:10px;">
+                <span class="material-symbols-rounded text-[14px]">summarize</span> Xem báo cáo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="card active-shift-card ${isReopened ? 'border-amber-200 bg-amber-50/10' : 'border-emerald-200 bg-emerald-50/20'}">
         <div class="card-body">
           <div class="shift-details-grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
             <div><span class="block text-[11px] text-slate-500 font-medium">Thu ngân</span><strong class="block text-[15px] text-slate-900">${shift.cashierName}</strong></div>
@@ -105,7 +143,67 @@ export function render() {
           </div>
         </div>
       </div>
-      <button class="btn btn-danger w-full mt-6 py-3.5 text-base" id="btnCloseShift"><span class="material-symbols-rounded">stop_circle</span> Đóng ca</button>
+
+      ${isReopened ? `
+      <!-- ── Expanded detail for reopened shift ── -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+
+        <!-- Cash count summary -->
+        <div class="card">
+          <div class="card-header" style="padding:12px 16px;"><h3 style="font-size:13px;margin:0;">💰 Kiểm kê tiền mặt</h3></div>
+          <div class="card-body" style="padding:12px 16px;">
+            ${ccTotal > 0 ? `
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span class="text-slate-500 text-xs">Tổng kiểm kê</span>
+                <strong class="text-emerald-600">${formatCurrency(ccTotal)}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span class="text-slate-500 text-xs">TM kỳ vọng</span>
+                <strong class="text-blue-600">${formatCurrency(sm.expectedCash)}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border);">
+                <span class="text-slate-500 text-xs font-semibold">Chênh lệch</span>
+                <strong style="color:${Math.abs(ccTotal - sm.expectedCash) === 0 ? 'var(--success)' : 'var(--danger)'};">${formatCurrency(ccTotal - sm.expectedCash)}</strong>
+              </div>
+            ` : `<p class="text-slate-400 text-xs text-center py-2">Chưa kiểm kê — bấm nút bên dưới để kiểm kê</p>`}
+            <button class="btn btn-outline btn-sm w-full mt-3" onclick="window.navigateTo('cashCount')" style="font-size:12px;">
+              <span class="material-symbols-rounded text-[14px]">calculate</span> ${ccTotal > 0 ? 'Chỉnh sửa kiểm kê' : 'Bắt đầu kiểm kê'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Transactions summary -->
+        <div class="card">
+          <div class="card-header" style="padding:12px 16px;"><h3 style="font-size:13px;margin:0;">📋 Giao dịch trong ca</h3></div>
+          <div class="card-body" style="padding:12px 16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span class="text-slate-500 text-xs">Thu ngoài POS</span>
+              <strong class="text-emerald-600">${incomeTxs.length} khoản · ${formatCurrency(incomeTxs.reduce((s,t) => s + t.amount, 0))}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span class="text-slate-500 text-xs">Chi phí</span>
+              <strong class="text-rose-600">${expenseTxs.length} khoản · ${formatCurrency(expenseTxs.reduce((s,t) => s + t.amount, 0))}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span class="text-slate-500 text-xs">Thu chi khác</span>
+              <strong class="text-slate-600">${otherTxs.length} khoản</strong>
+            </div>
+            ${cukcukSnap.length > 0 ? `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border);">
+              <span class="text-slate-500 text-xs">🔗 Hóa đơn POS (snapshot)</span>
+              <strong class="text-blue-600">${cukcukSnap.length} bill</strong>
+            </div>
+            ` : ''}
+            <button class="btn btn-outline btn-sm w-full mt-3" onclick="window.navigateTo('transactions')" style="font-size:12px;">
+              <span class="material-symbols-rounded text-[14px]">receipt_long</span> Xem & chỉnh sửa giao dịch
+            </button>
+          </div>
+        </div>
+
+      </div>
+      ` : ''}
+
+      <button class="btn btn-danger w-full mt-6 py-3.5 text-base" id="btnCloseShift"><span class="material-symbols-rounded">stop_circle</span> ${isReopened ? 'Đóng lại ca (lưu cập nhật)' : 'Đóng ca'}</button>
       <button class="btn btn-outline w-full mt-3 text-slate-500 border-slate-200" id="btnForceReset"><span class="material-symbols-rounded">restart_alt</span> Hủy ca (không lưu lịch sử)</button>
     `;
   }
@@ -479,10 +577,19 @@ export function init() {
       else { clearInterval(_timer); _timer = null; }
     }, 30000);
 
+    // Reopened shift → report button (set shiftId so report uses SHIFT MODE)
+    document.getElementById('btnReopenedReport')?.addEventListener('click', () => {
+      var sid = shift.id;
+      window._setReportShiftId = function() { return sid; };
+      window.navigateTo?.('report');
+    });
+
     // Close shift
     document.getElementById('btnCloseShift')?.addEventListener('click', () => {
+      var isReopened = !!shift.reopenedAt || !!shift.originalSummarySnapshot;
       showModal(`
-        <div class="modal-title"><span class="material-symbols-rounded text-rose-600">stop_circle</span> Đóng ca</div>
+        <div class="modal-title"><span class="material-symbols-rounded text-rose-600">stop_circle</span> ${isReopened ? 'Đóng lại ca (cập nhật)' : 'Đóng ca'}</div>
+        ${isReopened ? '<div class="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm"><span class="material-symbols-rounded text-[16px] align-middle">info</span> Ca này đã được <b>mở lại</b> để chỉnh sửa. Khi đóng lại:<ul class="mt-1 ml-4 list-disc text-xs"><li>Báo cáo bàn giao sẽ được <b>tạo lại</b> với dữ liệu mới nhất</li><li>Hóa đơn POS đã chỉnh sửa PTTT sẽ được <b>khóa cứng</b></li><li>Lịch sử ca sẽ hiển thị <b>phiên bản cuối cùng</b></li></ul></div>' : ''}
         <p class="mb-4 text-slate-700">Xác nhận đóng Ca ${shift.shiftNumber}?</p>
         <div class="form-group"><label class="form-label">Ghi chú (tùy chọn)</label><textarea id="closeNotes" class="form-input" rows="3" placeholder="Ghi chú bàn giao..."></textarea></div>
         <div class="form-row">
@@ -576,12 +683,16 @@ export function init() {
     var shiftId = selectEl.value;
     var selectText = selectEl.options[selectEl.selectedIndex].text;
     
-    var ok = await showConfirm('Bạn có muốn mở lại ca này không?\n(' + selectText + ')', { title: 'Mở lại ca', confirmText: 'Mở lại', type: 'info' });
-    if (!ok) return;
+    var password = await showPasswordPrompt('Bạn có muốn mở lại ca này không? Vui lòng nhập mật khẩu quản lý để xác nhận.\n(' + selectText + ')', { title: 'Mở lại ca', placeholder: 'Mật khẩu quản lý...' });
+    if (password === null) return;
+    if (!password) {
+      showToast('⚠️ Mật khẩu không được để trống!', 'warning');
+      return;
+    }
 
     showToast('🔄 Đang mở lại ca làm việc...', 'info');
     try {
-      await reopenShiftById(shiftId);
+      await reopenShiftById(shiftId, password);
       showToast('✅ Ca đã được mở lại thành công! 🎉', 'success');
       window.refreshView?.();
     } catch(err) {
@@ -698,5 +809,8 @@ export function destroy() {
   if (_timer) {
     clearInterval(_timer);
     _timer = null;
+  }
+  if (window._startingCashMoney) {
+    window._startingCashMoney = null;
   }
 }

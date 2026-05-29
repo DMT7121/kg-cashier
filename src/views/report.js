@@ -2,7 +2,8 @@
    BÁO CÁO DOANH THU — Tabs: Hôm nay / Tuần / Tháng / Quý + Phiếu bàn giao
    ═══════════════════════════════════════════════ */
 import { getCurrentShift, getSettings, getShiftHistory, getShiftSummary } from '../store.js';
-import { formatCurrency, formatDate, formatTime, denominations, showToast } from '../utils.js';
+import { getInvoicesForPeriod, getInvoicesByShiftTime } from '../integration/invoiceStore.js';
+import { formatCurrency, formatDate, formatTime, denominations, showToast, consumeTempState } from '../utils.js';
 
 var _activeTab = 'day'; // day | week | month | quarter
 var _refDate = null;    // null = today/now, or Date object for custom period
@@ -342,9 +343,8 @@ function _buildHandoverHTML(revSummary, store) {
     selectedDateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
 
-  var shiftIdToPrint = (typeof window._setReportShiftId === 'function') ? window._setReportShiftId() : null;
-  // CRITICAL: consume the flag immediately so it doesn't persist across navigations
-  window._setReportShiftId = null;
+  var tempShiftId = consumeTempState('_setReportShiftId');
+  var shiftIdToPrint = (typeof tempShiftId === 'function') ? tempShiftId() : tempShiftId;
 
   var currentShift = getCurrentShift();
   var history = getShiftHistory();
@@ -363,7 +363,16 @@ function _buildHandoverHTML(revSummary, store) {
       printSub = 'Ngày: ' + formatDate(target.date) + ' — Ca ' + target.shiftNumber;
       
       // Calculate POS exact revenue for THIS shift
-      var shiftInvoices = target.cukcukInvoicesSnapshot || store.getInvoicesByShiftTime(target.date, target.startTime, target.endTime);
+      var isReopenedShift = !!target.reopenedAt || !!target.originalSummarySnapshot;
+      var shiftInvoices;
+      if (isReopenedShift) {
+        // Reopened: use FULL working-day bounds to capture ALL invoices
+        shiftInvoices = getInvoicesForPeriod('day', target.date);
+      } else if (target.cukcukInvoicesSnapshot && target.cukcukInvoicesSnapshot.length > 0) {
+        shiftInvoices = target.cukcukInvoicesSnapshot;
+      } else {
+        shiftInvoices = getInvoicesByShiftTime(target.date, target.startTime, target.endTime);
+      }
       cukcukRev.total = 0; cukcukRev.cash = 0; cukcukRev.card = 0; cukcukRev.transfer = 0; cukcukRev.bills = 0;
       shiftInvoices.forEach(function(inv) {
         if (inv.unpaid) return;
@@ -382,13 +391,13 @@ function _buildHandoverHTML(revSummary, store) {
         }
       });
 
-      isAutoPrint = !!target.endTime;
+      // Reopened shift: treat as full report
+      isAutoPrint = !!target.endTime || isReopenedShift;
       isSupplemental = !!target.originalSummarySnapshot;
     }
   } else {
     // DAY MODE (Combined)
-    var isHistoryMode = !!window._historyReportMode;
-    window._historyReportMode = false; // consume the flag
+    var isHistoryMode = !!consumeTempState('_historyReportMode');
     var dayShifts = history.filter(function(s) { return s.date === selectedDateStr; });
     if (currentShift && currentShift.date === selectedDateStr && !dayShifts.find(function(s){ return s.id === currentShift.id; })) {
       dayShifts.unshift(currentShift); // Include current shift if it matches selected date (even when viewing history)
@@ -528,7 +537,7 @@ function _buildHandoverHTML(revSummary, store) {
             <div class="a4-address">${settings.storeAddress || ''}</div>
           </div>
           <div class="a4-header-right">
-            <div class="a4-doc-title">${isSupplemental ? '<span style="font-size:12px;opacity:0.8;">(BẢN IN BỔ SUNG)</span>' : ''}</div>
+            <div class="a4-doc-title">${isSupplemental ? '<span style="font-size:11px;color:#d97706;font-weight:700;">(PHIÊN BẢN CẬP NHẬT' + (target.reclosedAt ? ' — ' + new Date(target.reclosedAt).toLocaleString('vi-VN') : '') + ')</span>' : ''}</div>
             <div class="a4-doc-sub">${printSub}</div>
           </div>
         </div>
@@ -536,7 +545,7 @@ function _buildHandoverHTML(revSummary, store) {
         <div class="a4-info-grid">
           <div class="a4-info-row"><span class="a4-info-label">Thu ngân:</span><span class="a4-info-value">${target.cashierName}</span></div>
           <div class="a4-info-row"><span class="a4-info-label">Bắt đầu:</span><span class="a4-info-value">${formatTime(target.startTime)}</span></div>
-          <div class="a4-info-row"><span class="a4-info-label">Kết thúc:</span><span class="a4-info-value">${target.endTime ? formatTime(target.endTime) : '(đang làm việc)'}</span></div>
+          <div class="a4-info-row"><span class="a4-info-label">Kết thúc:</span><span class="a4-info-value">${target.endTime ? formatTime(target.endTime) : (target.reopenedAt ? '<span style="color:#d97706;">(mở lại — đang chỉnh sửa)</span>' : '(đang làm việc)')}</span></div>
           <div class="a4-info-row"><span class="a4-info-label">Tiền đầu:</span><span class="a4-info-value a4-bold">${fc(target.startingCash)}</span></div>
         </div>
 
@@ -628,8 +637,8 @@ function _buildHandoverHTML(revSummary, store) {
           <div class="a4-sig"><div class="a4-sig-title">Quản lý xác nhận</div><div class="a4-sig-line"></div><div class="a4-sig-name">&nbsp;</div></div>
         </div>
         <div class="a4-footer">
-          ${isSupplemental ? '<div style="text-align:center;font-size:11px;color:#d97706;margin-bottom:8px;padding-top:4px;border-top:1px dashed #ccc;">* BẢN IN NÀY CÓ CHỨA CÁC ĐIỀU CHỈNH SAU KHI ĐÓNG CA</div>' : ''}
-          In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Báo cáo ${isAutoPrint ? (isSupplemental ? 'bổ sung' : 'tự động') : 'tạm tính'}
+          ${isSupplemental ? '<div style="text-align:center;font-size:11px;color:#d97706;margin-bottom:8px;padding-top:4px;border-top:1px dashed #ccc;">* PHIÊN BẢN CẬP NHẬT SAU KHI MỞ LẠI CA — Các giá trị đánh dấu * là thay đổi so với bản gốc</div>' : ''}
+          In lúc: ${now.toLocaleString('vi-VN')} — ${settings.storeName} — Báo cáo ${isAutoPrint ? (isSupplemental ? 'cập nhật (mở lại ca)' : 'tự động') : 'tạm tính'}
         </div>
       </div>
     </div>

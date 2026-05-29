@@ -1,7 +1,7 @@
 /* ── History View — Tabbed shift detail w/ snapshot data ── */
 import { getShiftHistory, deleteShiftFromHistory, getShiftSummary, getHistorySummary, saveShiftToHistory, rebuildHistorySnapshots, removeHistoryTransaction, removeHistoryOtherTransaction, backfillHistoryInvoiceSnapshot, healPastShiftsData, reopenShiftById } from '../store.js';
 import { getShiftsFromCloud } from '../api.js';
-import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, denominations } from '../utils.js';
+import { formatCurrency, formatDate, formatTime, showToast, showModal, hideModal, showConfirm, showPasswordPrompt, denominations } from '../utils.js';
 import * as histEdit from './historyEdit.js';
 import { syncInvoicesForDate } from '../integration/cukcuk.js';
 
@@ -82,7 +82,7 @@ function _renderHistoryCards(shifts) {
       <div class="history-card" data-shift-id="${sh.id}">
         <div class="history-header">
           <div>
-            <h4>Ca ${sh.shiftNumber} — ${sh.cashierName}</h4>
+            <h4>Ca ${sh.shiftNumber} — ${sh.cashierName}${sh.reclosedAt || sh.originalSummarySnapshot ? ' <span style="font-size:10px;background:#fef3c7;color:#d97706;padding:1px 6px;border-radius:8px;font-weight:600;vertical-align:middle;">Đã cập nhật</span>' : ''}</h4>
             <span class="text-muted">${formatDate(sh.date)} · ${formatTime(sh.startTime)} → ${formatTime(sh.endTime)}</span>
           </div>
           <div class="history-actions">
@@ -228,16 +228,19 @@ function _renderShiftDetailModal(sh, sm, store) {
     var rpbtn=document.getElementById('btnReopenThisHistoryShift');
     if(rpbtn) {
       rpbtn.addEventListener('click', async function(){
-        var ok = await showConfirm('Bạn có muốn mở lại ca này không? Ca hiện tại (nếu có) phải được đóng trước.', { title: 'Mở lại ca', confirmText: 'Mở lại', type: 'info' });
-        if(ok) {
-          hideModal();
-          try {
-            await reopenShiftById(rpbtn.dataset.shiftId);
-            showToast('Đã mở lại ca thành công!', 'success');
-            window.navigateTo('dashboard');
-          } catch(e) {
-            showToast(e.message, 'error');
-          }
+        var password = await showPasswordPrompt('Bạn có muốn mở lại ca này không? Vui lòng nhập mật khẩu quản lý để xác nhận.', { title: 'Mở lại ca', placeholder: 'Mật khẩu quản lý...' });
+        if(password === null) return;
+        if(!password) {
+          showToast('⚠️ Mật khẩu không được để trống!', 'warning');
+          return;
+        }
+        hideModal();
+        try {
+          await reopenShiftById(rpbtn.dataset.shiftId, password);
+          showToast('Đã mở lại ca thành công!', 'success');
+          window.navigateTo('dashboard');
+        } catch(e) {
+          showToast(e.message, 'error');
         }
       });
     }

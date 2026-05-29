@@ -3,11 +3,40 @@
    COMPATIBLE: No optional chaining, no bare catch
    ============================================ */
 
+import {
+  toMoney,
+  parseMoneyInput,
+  formatMoney,
+  addMoney,
+  subtractMoney,
+  multiplyMoney,
+  safeRoundMoney,
+  isValidMoney,
+  getWorkingDay,
+  getWorkingDayRange,
+  isDateInWorkingDay,
+  normalizeWorkingDayInput,
+  safeJsonParse,
+  normalizeGasResponse,
+  normalizeSheetRow,
+  ensureObject,
+  ensureArray,
+  consumeTempState,
+  logInfo,
+  logWarn,
+  logError
+} from './utils.js';
+
 // Safe dynamic import - if api.js fails, store still works
 var _cloudSync = null;
 var _cloudClose = null;
 var _cloudAudit = null;
 var _cloudGetShift = null;
+var _cloudOpen = null;
+var _cloudReopen = null;
+var _cloudCancel = null;
+var _cloudVoidGhost = null;
+var _cloudGetRegistry = null;
 
 try {
   // Use dynamic import pattern that won't crash module loading
@@ -16,6 +45,11 @@ try {
     _cloudClose = api.closeShiftOnCloud;
     _cloudAudit = api.addAuditLog;
     _cloudGetShift = api.getCurrentShiftFromCloud;
+    _cloudOpen = api.openShiftOnCloud;
+    _cloudReopen = api.reopenShiftOnCloud;
+    _cloudCancel = api.cancelShiftOnCloud;
+    _cloudVoidGhost = api.voidGhostShiftOnCloud;
+    _cloudGetRegistry = api.getShiftRegistryFromCloud;
     console.log('[Store] API module loaded successfully');
   }).catch(function(err) {
     console.warn('[Store] API module failed to load:', err.message);
@@ -119,6 +153,7 @@ function getInitialPrintForms() {
 
 function defaults() {
   const s = {
+    schemaVersion: 2,
     currentShift: null,
     shifts: [],
     categories: JSON.parse(JSON.stringify(defaultCategories)),
@@ -210,15 +245,15 @@ function _getSummaryFromInvoicesSnapshot(shift, invoicesSnapshot) {
     var invTotal = 0;
     var payments = inv.payments || [];
     for (var p = 0; p < payments.length; p++) {
-      var amt = payments[p].amount || 0;
-      invTotal += amt;
-      if (payments[p].method === 'cash') { cashIncome += amt; }
-      else if (payments[p].method === 'card') { cardIncome += amt; }
-      else if (payments[p].method === 'transfer') { transferIncome += amt; }
+      var amt = toMoney(payments[p].amount);
+      invTotal = addMoney(invTotal, amt);
+      if (payments[p].method === 'cash') { cashIncome = addMoney(cashIncome, amt); }
+      else if (payments[p].method === 'card') { cardIncome = addMoney(cardIncome, amt); }
+      else if (payments[p].method === 'transfer') { transferIncome = addMoney(transferIncome, amt); }
     }
-    var effectiveAmt = invTotal > 0 ? invTotal : (inv.amount || 0);
-    cukcukRevenue += effectiveAmt;
-    totalIncome += effectiveAmt;
+    var effectiveAmt = invTotal > 0 ? invTotal : toMoney(inv.amount);
+    cukcukRevenue = addMoney(cukcukRevenue, effectiveAmt);
+    totalIncome = addMoney(totalIncome, effectiveAmt);
   }
 
   // Calculate other transactions
@@ -227,25 +262,35 @@ function _getSummaryFromInvoicesSnapshot(shift, invoicesSnapshot) {
     var isCukcuk = t.note && t.note.indexOf('[CUKCUK]') !== -1;
     if (t.type === 'income') {
       if (isCukcuk) continue; // Skip to prevent double counting
-      totalIncome += t.amount;
+      var tAmt = toMoney(t.amount);
+      totalIncome = addMoney(totalIncome, tAmt);
       billCount++;
-      if (t.paymentMethod === 'cash') cashIncome += t.amount;
-      else if (t.paymentMethod === 'card') cardIncome += t.amount;
-      else if (t.paymentMethod === 'transfer') transferIncome += t.amount;
-      manualIncome += t.amount;
+      if (t.paymentMethod === 'cash') cashIncome = addMoney(cashIncome, tAmt);
+      else if (t.paymentMethod === 'card') cardIncome = addMoney(cardIncome, tAmt);
+      else if (t.paymentMethod === 'transfer') transferIncome = addMoney(transferIncome, tAmt);
+      manualIncome = addMoney(manualIncome, tAmt);
       manualBills++;
     } else {
-      totalExpense += t.amount;
-      if (t.paymentMethod === 'cash') cashExpense += t.amount;
+      var tAmt = toMoney(t.amount);
+      totalExpense = addMoney(totalExpense, tAmt);
+      if (t.paymentMethod === 'cash') cashExpense = addMoney(cashExpense, tAmt);
     }
   }
 
   for (var j = 0; j < otherTxs.length; j++) {
-    if (otherTxs[j].type === 'income') otherIncome += otherTxs[j].amount;
-    else otherExpense += otherTxs[j].amount;
+    var otAmt = toMoney(otherTxs[j].amount);
+    if (otherTxs[j].type === 'income') otherIncome = addMoney(otherIncome, otAmt);
+    else otherExpense = addMoney(otherExpense, otAmt);
   }
 
-  var expectedCash = shift.startingCash + cashIncome - cashExpense + otherIncome - otherExpense;
+  var startingCash = toMoney(shift.startingCash);
+  var expectedCash = addMoney(
+    subtractMoney(
+      addMoney(startingCash, cashIncome),
+      cashExpense
+    ),
+    subtractMoney(otherIncome, otherExpense)
+  );
 
   return {
     totalIncome: totalIncome,
@@ -267,18 +312,59 @@ function _getSummaryFromInvoicesSnapshot(shift, invoicesSnapshot) {
   };
 }
 
-// â”€â”€ Load / Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Load / Save ──────────────────────────────
 export function getState() {
   if (!state) {
     try {
       var saved = localStorage.getItem(STORAGE_KEY);
+      var parsed = null;
       if (saved) {
-        var parsed = JSON.parse(saved);
+        try {
+          parsed = JSON.parse(saved);
+        } catch (eParse) {
+          logError('[Store] JSON parsing of principal storage failed! Restoring from backup...', eParse);
+          // Try to recover from the latest backup
+          var backupKeys = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf('kg-cashier-backup-') === 0) {
+              backupKeys.push(k);
+            }
+          }
+          if (backupKeys.length > 0) {
+            backupKeys.sort();
+            var latestBackupKey = backupKeys[backupKeys.length - 1];
+            var backupVal = localStorage.getItem(latestBackupKey);
+            if (backupVal) {
+              try {
+                parsed = JSON.parse(backupVal);
+                logInfo('[Store] Restored data state successfully from backup: ' + latestBackupKey);
+              } catch (eBackup) {
+                logError('[Store] Backup parsing failed for key: ' + latestBackupKey, eBackup);
+              }
+            }
+          }
+        }
+      }
 
+      if (parsed) {
         var def = defaults();
         // Merge manually for compatibility
         for (var key in def) {
           if (parsed[key] === undefined) parsed[key] = def[key];
+        }
+        // Ensure schema versioning check
+        if (!parsed.schemaVersion) parsed.schemaVersion = 1;
+        if (parsed.schemaVersion < 2) {
+          if (parsed.shifts) {
+            parsed.shifts.forEach(function(sh) {
+              if (sh.version === undefined) sh.version = 2;
+            });
+          }
+          if (parsed.currentShift && parsed.currentShift.version === undefined) {
+            parsed.currentShift.version = 2;
+          }
+          parsed.schemaVersion = 2;
         }
         
         // RECOVERY: Auto-heal corrupted types from previous bugs
@@ -354,13 +440,50 @@ export function getState() {
 
 function save() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    var serialized = JSON.stringify(state);
+    localStorage.setItem(STORAGE_KEY, serialized);
+    
+    // Auto-backup Local Storage (Yêu cầu 11)
+    try {
+      var nowStr = new Date().toISOString().replace(/[:.]/g, '-');
+      localStorage.setItem('kg-cashier-backup-' + nowStr, serialized);
+      
+      // Keep maximum 5 backups
+      var backupKeys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('kg-cashier-backup-') === 0) {
+          backupKeys.push(k);
+        }
+      }
+      if (backupKeys.length > 5) {
+        backupKeys.sort();
+        for (var j = 0; j < backupKeys.length - 5; j++) {
+          localStorage.removeItem(backupKeys[j]);
+        }
+      }
+    } catch (e2) {
+      logWarn('[Store] Backup skipped/failed (possibly storage quota limit): ' + e2.message);
+    }
   } catch (e) {
-    console.error('[Store] Save failed:', e);
+    logError('[Store] Save failed', e);
   }
   for (var i = 0; i < listeners.length; i++) {
     try { listeners[i](state); } catch (e) { /* ignore */ }
   }
+}
+
+export function importState(newState) {
+  if (!newState || typeof newState !== 'object') {
+    throw new Error('Dữ liệu khôi phục không hợp lệ!');
+  }
+  if (newState.schemaVersion === undefined) {
+    throw new Error('Không tìm thấy phiên bản cấu trúc (schemaVersion) trong file.');
+  }
+  state = newState;
+  save();
+  addAudit('IMPORT_BACKUP', 'Khôi phục dữ liệu từ tệp tin JSON');
+  return true;
 }
 
 export function subscribe(fn) {
@@ -457,6 +580,28 @@ export function getSettings() {
   return s.settings || defaults().settings;
 }
 
+function sanitizeSettingsValue(key, val) {
+  if (typeof val === 'string') {
+    // Strip control characters and carriage returns from API Keys and config strings (Yêu cầu 10)
+    return val.trim().replace(/[\r\n\t]/g, '');
+  }
+  if (Array.isArray(val)) {
+    return val.map(function(item) {
+      return typeof item === 'string' ? item.trim().replace(/[\r\n\t]/g, '') : item;
+    });
+  }
+  if (val && typeof val === 'object') {
+    var cleaned = {};
+    for (var k in val) {
+      if (val.hasOwnProperty(k)) {
+        cleaned[k] = sanitizeSettingsValue(k, val[k]);
+      }
+    }
+    return cleaned;
+  }
+  return val;
+}
+
 export function updateSettings(newSettings) {
   var s = getState();
   if (!s.settings) s.settings = defaults().settings;
@@ -469,6 +614,9 @@ export function updateSettings(newSettings) {
     if (typeof val === 'string' && typeof defs[key] === 'object' && defs[key] !== null) {
       try { val = JSON.parse(val); } catch(e) { continue; } // Skip if it can't be parsed
     }
+    
+    // Clean and sanitize API keys and config strings recursively (Yêu cầu 10)
+    val = sanitizeSettingsValue(key, val);
     
     // Ensure array types are preserved (e.g., posTables, posCatalog)
     if (Array.isArray(defs[key]) && !Array.isArray(val)) {
@@ -488,9 +636,66 @@ export function updateSettings(newSettings) {
   addAudit('UPDATE_SETTINGS', 'Cập nhật cấu hình hệ thống');
 }
 
-// â”€â”€ Current shift â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function getCurrentShift() { return getState().currentShift; }
 
+export async function validateOpenShiftBeforeCreate(date, shiftNumber) {
+  var s = getState();
+  var stdDate = getWorkingDay(date);
+  var targetId = 'shift_' + stdDate + '_' + shiftNumber;
+  
+  // 1. Check local currentShift
+  if (s.currentShift) {
+    if (s.currentShift.id === targetId) {
+      throw new Error('Ca làm việc này đang mở.');
+    }
+    throw new Error('Đang có một ca làm việc khác đang mở. Vui lòng đóng ca đó trước.');
+  }
+  
+  // 2. Check local history
+  var existsInHistory = (s.shifts || []).some(function(sh) { return sh.id === targetId; });
+  if (existsInHistory) {
+    throw new Error('Ca ' + shiftNumber + ' ngày ' + stdDate + ' đã tồn tại và đã được đóng. Vui lòng chọn số ca khác hoặc mở lại ca từ Lịch sử.');
+  }
+  
+  // 3. Check Cloud
+  if (_cloudGetShift) {
+    try {
+      var cloudCheck = await _cloudGetShift();
+      if (cloudCheck.success && cloudCheck.shift) {
+        var cloudShift = cloudCheck.shift;
+        if (cloudShift.id === targetId) {
+          if (cloudShift.status !== 'closed') {
+            throw new Error('Xung đột: Ca làm việc này đang mở trên một thiết bị khác.');
+          } else {
+            throw new Error('Xung đột: Ca làm việc này đã được đóng trên hệ thống đám mây.');
+          }
+        }
+        if (cloudShift.status !== 'closed') {
+          // Check if this cloud shift was already closed/force-closed locally
+          var isRecentlyClosed = (s._recentlyClosedIds || []).indexOf(cloudShift.id) !== -1;
+          var isForceClosed = (s._forceClosedIds || []).indexOf(cloudShift.id) !== -1;
+          var isInHistory = (s.shifts || []).some(function(h) { return h.id === cloudShift.id; });
+          
+          if (isRecentlyClosed || isForceClosed || isInHistory) {
+            logInfo('[Store] stale cloud shift detected during validation, closing silently: ' + cloudShift.id);
+            if (_cloudClose) {
+              try { _cloudClose(cloudShift).catch(function() {}); } catch (e2) { /* ignore */ }
+            }
+          } else {
+            var cloudName = cloudShift.cashierName || 'chưa rõ';
+            var cloudNum = cloudShift.shiftNumber || '?';
+            throw new Error('Xung đột: Thiết bị khác đang mở Ca ' + cloudNum + ' bởi ' + cloudName + '. Hạn chế mở song song.');
+          }
+        }
+      }
+    } catch (e) {
+      if (e.message && (e.message.indexOf('Xung đột') > -1 || e.message.indexOf('Ca') > -1)) {
+        throw e;
+      }
+      logWarn('[Store] Cloud shift pre-validation skipped due to network/error: ' + e.message);
+    }
+  }
+}
 export async function openShift(opts) {
   var cashierName = opts.cashierName;
   var shiftNumber = opts.shiftNumber;
@@ -498,55 +703,16 @@ export async function openShift(opts) {
   var startingCash = opts.startingCash;
   var shiftPassword = opts.shiftPassword || '0000';
 
-  console.log('[Store] openShift called:', cashierName, shiftNumber, date, startingCash, shiftPassword);
+  logInfo('[Store] openShift called', { cashierName: cashierName, shiftNumber: shiftNumber, date: date, startingCash: startingCash });
+
+  // 1. Run surgical pre-check & concurrency locking
+  await validateOpenShiftBeforeCreate(date, shiftNumber);
 
   var s = getState();
-  if (s.currentShift) {
-    throw new Error('ÄÃ£ cÃ³ ca Ä‘ang má»Ÿ. HÃ£y Ä‘Ã³ng ca trÆ°á»›c.');
-  }
+  // 2. Standardize date format to yyyy-MM-dd using central Working Day logic
+  var stdDate = getWorkingDay(date);
 
-  // Pre-check: is there an active shift on cloud from another device?
-  if (_cloudGetShift && opts.bypassCloudCheck !== true) {
-    try {
-      var cloudCheck = await _cloudGetShift();
-      if (cloudCheck.success && cloudCheck.shift && cloudCheck.shift.status !== 'closed') {
-        var cloudShiftId = cloudCheck.shift.id;
-        // Check if this cloud shift was already closed/force-closed locally
-        var isRecentlyClosed = (s._recentlyClosedIds || []).indexOf(cloudShiftId) !== -1;
-        var isForceClosed = (s._forceClosedIds || []).indexOf(cloudShiftId) !== -1;
-        var isInHistory = (s.shifts || []).some(function(h) { return h.id === cloudShiftId; });
-
-        if (isRecentlyClosed || isForceClosed || isInHistory) {
-          // Stale cloud shift — clear it silently and proceed
-          console.log('[Store] openShift: clearing stale cloud shift:', cloudShiftId);
-          if (_cloudClose) {
-            try { _cloudClose(cloudCheck.shift).catch(function() {}); } catch (e2) { /* ignore */ }
-          }
-        } else {
-          var cloudName = cloudCheck.shift.cashierName || 'unknown';
-          var cloudNum = cloudCheck.shift.shiftNumber || '?';
-          throw new Error('Thi\u1EBFt b\u1ECB kh\u00E1c \u0111ang m\u1EDF Ca ' + cloudNum + ' b\u1EDFi ' + cloudName + '. H\u00E3y \u0111\u00F3ng ca \u0111\u00F3 tr\u01B0\u1EDBc.');
-        }
-      }
-    } catch (e) {
-      if (e.message && e.message.indexOf('kh\u00E1c') > -1) throw e;
-      // Network error \u2192 allow offline open
-    }
-  }
-
-  // Standardize date format to yyyy-MM-dd
-  var stdDate = date;
-  if (date && date.indexOf('/') > -1) {
-    var parts = date.split('/');
-    if (parts.length === 3) {
-      stdDate = parts[2] + '-' + ('0' + parts[1]).slice(-2) + '-' + ('0' + parts[0]).slice(-2);
-    }
-  }
-  if (!stdDate) {
-    stdDate = new Date().toISOString().split('T')[0];
-  }
-
-  s.currentShift = {
+  var newShift = {
     id: 'shift_' + stdDate + '_' + shiftNumber,
     cashierName: cashierName,
     shiftNumber: shiftNumber,
@@ -564,29 +730,39 @@ export async function openShift(opts) {
     cashToKeep: 0,
     cashToDeposit: 0
   };
+
+  // 3. Cloud transaction openShift registry registration
+  if (_cloudOpen) {
+    var regResult = await _cloudOpen(newShift);
+    if (!regResult || !regResult.success) {
+      throw new Error(regResult ? regResult.message : 'Không thể đăng ký mở ca trên hệ thống đám mây.');
+    }
+  }
+
+  s.currentShift = newShift;
   save();
 
   console.log('[Store] Shift opened successfully:', s.currentShift.id);
 
   addAudit('OPEN_SHIFT', 'Ca ' + shiftNumber + ' - ' + cashierName);
-  addNotification('Ca ' + shiftNumber + ' Ä‘Ã£ Ä‘Æ°á»£c má»Ÿ bá»Ÿi ' + cashierName, 'success');
+  addNotification('Ca ' + shiftNumber + ' đã được mở bởi ' + cashierName, 'success');
   _syncCurrentShift();
   return s.currentShift;
 }
 
-/** Cáº­p nháº­t tiá»n Ä‘áº§u ca (bá»• sung thÃªm tiá»n máº·t vÃ o quá»¹) */
+/** Cập nhật tiền đầu ca (bổ sung thêm tiền mặt vào quỹ) */
 export function updateStartingCash(newAmount) {
   var s = getState();
-  if (!s.currentShift) throw new Error('ChÆ°a cÃ³ ca Ä‘ang má»Ÿ.');
+  if (!s.currentShift) throw new Error('Chưa có ca đang mở.');
 
   // Integrity validation
-  if (!s.currentShift.id) throw new Error('Ca thi\u1EBFu ID');
-  if (!s.currentShift.date) throw new Error('Ca thi\u1EBFu ng\u00E0y');
-  if (!s.currentShift.cashierName) throw new Error('Ca thi\u1EBFu t\u00EAn thu ng\u00E2n');
+  if (!s.currentShift.id) throw new Error('Ca thiếu ID');
+  if (!s.currentShift.date) throw new Error('Ca thiếu ngày');
+  if (!s.currentShift.cashierName) throw new Error('Ca thiếu tên thu ngân');
   var old = s.currentShift.startingCash || 0;
   s.currentShift.startingCash = Number(newAmount) || 0;
   save();
-  addAudit('UPDATE_STARTING_CASH', 'Tiá»n Ä‘áº§u ca: ' + old.toLocaleString() + ' â†’ ' + s.currentShift.startingCash.toLocaleString());
+  addAudit('UPDATE_STARTING_CASH', 'Tiền đầu ca: ' + old.toLocaleString() + ' → ' + s.currentShift.startingCash.toLocaleString());
   _syncCurrentShift();
   return s.currentShift;
 }
@@ -596,7 +772,10 @@ export async function closeShift(opts) {
   _closeInProgress = true;
   try {
   var s = getState();
-  if (!s.currentShift) throw new Error('Kh\u00F4ng c\u00F3 ca n\u00E0o \u0111ang m\u1EDF');
+  if (!s.currentShift) throw new Error('Không có ca nào đang mở');
+
+  // Detect if this was a reopened shift (preserves originalSummarySnapshot for diff-highlighting)
+  var wasReopened = !!s.currentShift.reopenedAt || !!s.currentShift.originalSummarySnapshot;
 
   s.currentShift.endTime = new Date().toISOString();
   s.currentShift.status = 'closed';
@@ -606,7 +785,7 @@ export async function closeShift(opts) {
 
   var summary = getShiftSummary(s.currentShift);
 
-  // â”€â”€ Snapshot drink inventory for this shift â”€â”€
+  // ——— Snapshot drink inventory for this shift ———
   try {
     var invData = localStorage.getItem('kg-drink-inventory');
     if (invData) {
@@ -617,22 +796,19 @@ export async function closeShift(opts) {
       }
     }
   } catch (e) { /* ignore */ }
-
-  // â”€â”€ Snapshot CUKCUK invoices for this shift's working day â”€â”€
+  // ── Snapshot CUKCUK invoices for this shift's working day ──
+  // ALWAYS rebuild snapshot from live invoiceStore (includes new invoices + manualOverride edits)
   try {
     var invoiceData = localStorage.getItem('cukcuk_invoice_store');
     if (invoiceData) {
-      var invStore = JSON.parse(invoiceData);
+      var invStore = safeJsonParse(invoiceData, null);
       if (invStore && invStore.invoices) {
-        var shiftDate = s.currentShift.date;
-        var dp = shiftDate.split('-');
-        var shiftDay = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
-        var boundsStart = new Date(shiftDay.getFullYear(), shiftDay.getMonth(), shiftDay.getDate(), 12, 0, 0);
-        var nextDay = new Date(shiftDay);
-        nextDay.setDate(nextDay.getDate() + 1);
-        var boundsEnd = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate(), 6, 0, 0);
+        var range = getWorkingDayRange(s.currentShift.date);
+        var boundsStart = range.start;
+        var boundsEnd = range.end;
 
         var matchedInvoices = [];
+        var lockCount = 0;
         for (var k in invStore.invoices) {
           if (!invStore.invoices.hasOwnProperty(k)) continue;
           var inv = invStore.invoices[k];
@@ -646,22 +822,34 @@ export async function closeShift(opts) {
             }
             if (!isNaN(rd.getTime())) match = rd >= boundsStart && rd < boundsEnd;
           }
-          if (!match && !inv.refDate) match = inv.date === shiftDate;
+          if (!match && !inv.refDate) match = inv.date === s.currentShift.date;
           if (match) {
             matchedInvoices.push({
               refId: inv.refId, refNo: inv.refNo, refDate: inv.refDate,
               tableName: inv.tableName, amount: inv.amount, payments: inv.payments
             });
+            // Lock invoices from reopened shifts to prevent future CUKCUK sync overwrites
+            if (wasReopened && inv.manualOverride) {
+              lockCount++;
+            }
           }
         }
         if (matchedInvoices.length > 0) {
           s.currentShift.cukcukInvoicesSnapshot = matchedInvoices;
+          console.log('[Store] closeShift: rebuilt cukcukInvoicesSnapshot from live data (' + matchedInvoices.length + ' invoices' + (wasReopened ? ', ' + lockCount + ' manualOverride' : '') + ')');
         }
       }
     }
   } catch (e) { /* ignore */ }
 
-  // â”€â”€ Save summary snapshot FROZEN at close time (history reads this) â”€â”€
+
+  // ── Save summary snapshot FROZEN at close time (history reads this) ──
+  // For reopened shifts: preserve the original snapshot from the FIRST close
+  // so the report can highlight differences between original and updated values
+  if (wasReopened && !s.currentShift.originalSummarySnapshot && s.currentShift.summarySnapshot) {
+    s.currentShift.originalSummarySnapshot = Object.assign({}, s.currentShift.summarySnapshot);
+  }
+
   s.currentShift.summarySnapshot = {
     totalIncome: summary.totalIncome,
     totalExpense: summary.totalExpense,
@@ -683,35 +871,30 @@ export async function closeShift(opts) {
     netTotal: summary.netTotal
   };
 
+  // Track reopened shift version metadata
+  if (wasReopened) {
+    s.currentShift.lastReopenedAt = s.currentShift.reopenedAt || null;
+    s.currentShift.reclosedAt = new Date().toISOString();
+    delete s.currentShift.reopenedAt; // clear the open-state flag
+  }
+
   // Check discrepancy (Feature 5)
   var threshold = (s.settings && s.settings.discrepancyThreshold) ? s.settings.discrepancyThreshold : 50000;
   if (summary.cashCountTotal > 0 && Math.abs(summary.discrepancy) > threshold) {
-    addNotification('âš ï¸ ChÃªnh lá»‡ch tiá»n máº·t: ' + summary.discrepancy.toLocaleString('vi-VN') + 'Ä‘', 'warning');
+    addNotification('⚠️ Chênh lệch tiền mặt: ' + summary.discrepancy.toLocaleString('vi-VN') + 'đ', 'warning');
   }
 
-  s.shifts.unshift(JSON.parse(JSON.stringify(s.currentShift)));
-  // M2: Enforce shift history quota limit (180 entries = 90 days)
-  if (s.shifts.length > 180) {
-    s.shifts = s.shifts.slice(0, 180);
-    console.warn('[Store] Shift history quota exceeded. Pruned to 180 entries.');
-  }
   var closedShift = s.currentShift;
-  // Fix 1B: Track recently closed IDs to prevent cloud restore race condition
-  if (!s._recentlyClosedIds) s._recentlyClosedIds = [];
-  s._recentlyClosedIds.push(closedShift.id);
-  if (s._recentlyClosedIds.length > 20) s._recentlyClosedIds.shift();
-  s.currentShift = null;
-  save();
-  addAudit('CLOSE_SHIFT', 'Ca ' + closedShift.shiftNumber + ' - Doanh thu: ' + summary.totalIncome.toLocaleString('vi-VN') + 'đ');
-  addNotification('Ca ' + closedShift.shiftNumber + ' Ä‘Ã£ Ä‘Ã³ng - DT: ' + summary.totalIncome.toLocaleString('vi-VN') + 'Ä‘', 'info');
 
-  // Fix 4: Retry cloud close up to 3 times
+  // Cloud Close Transaction with 3 retries
+  var closedConfirmed = false;
   if (_cloudClose) {
     for (var _attempt = 1; _attempt <= 3; _attempt++) {
       try {
         var _closeResult = await _cloudClose(closedShift);
         if (_closeResult && _closeResult.success) {
           console.log('[Store] Cloud close confirmed on attempt', _attempt);
+          closedConfirmed = true;
           break;
         }
       } catch (e) {
@@ -719,14 +902,34 @@ export async function closeShift(opts) {
         if (_attempt < 3) await new Promise(function(r) { setTimeout(r, 1000 * _attempt); });
       }
     }
+    if (!closedConfirmed) {
+      throw new Error('Đóng ca thất bại: Không thể đồng bộ trạng thái đóng ca lên đám mây. Vui lòng kiểm tra mạng và thử lại.');
+    }
   }
+
+  s.shifts.unshift(JSON.parse(JSON.stringify(closedShift)));
+  // M2: Enforce shift history quota limit (180 entries = 90 days)
+  if (s.shifts.length > 180) {
+    s.shifts = s.shifts.slice(0, 180);
+    console.warn('[Store] Shift history quota exceeded. Pruned to 180 entries.');
+  }
+
+  // Fix 1B: Track recently closed IDs to prevent cloud restore race condition
+  if (!s._recentlyClosedIds) s._recentlyClosedIds = [];
+  s._recentlyClosedIds.push(closedShift.id);
+  if (s._recentlyClosedIds.length > 20) s._recentlyClosedIds.shift();
+  s.currentShift = null;
+  save();
+  addAudit('CLOSE_SHIFT', 'Ca ' + closedShift.shiftNumber + ' - Doanh thu: ' + summary.totalIncome.toLocaleString('vi-VN') + 'đ');
+  addNotification('Ca ' + closedShift.shiftNumber + ' đã đóng - DT: ' + summary.totalIncome.toLocaleString('vi-VN') + 'đ', 'info');
+
   return closedShift;
   } finally {
     _closeInProgress = false;
   }
 }
 
-export async function reopenShiftById(shiftId) {
+export async function reopenShiftById(shiftId, managerPassword) {
   var s = getState();
   if (s.currentShift) {
     throw new Error('Đang có ca mở. Hãy đóng ca hiện tại trước khi mở lại ca khác.');
@@ -750,6 +953,14 @@ export async function reopenShiftById(shiftId) {
 
   var shiftToReopen = s.shifts[closedShiftIndex];
 
+  // 1. Transactional Cloud Reopen
+  if (_cloudReopen) {
+    var reopenResult = await _cloudReopen(shiftToReopen, managerPassword);
+    if (!reopenResult || !reopenResult.success) {
+      throw new Error(reopenResult ? reopenResult.message : 'Không thể mở lại ca trên đám mây.');
+    }
+  }
+
   // Save the original summary snapshot at first closing to enable highlight comparisons on reports
   if (!shiftToReopen.originalSummarySnapshot && shiftToReopen.summarySnapshot) {
     shiftToReopen.originalSummarySnapshot = Object.assign({}, shiftToReopen.summarySnapshot);
@@ -758,9 +969,8 @@ export async function reopenShiftById(shiftId) {
   // Modify shift status back to 'open'
   shiftToReopen.status = 'open';
   shiftToReopen.endTime = null;
-  
-  // Preserve original closing snapshots so we don't lose CUKCUK invoices backup, expected cash, etc.
-  // We keep them so that they can be used for calculations on different devices or offline.
+  shiftToReopen.reopenedAt = new Date().toISOString();
+  delete shiftToReopen.reclosedAt;
 
   // Restore drink inventory session to local storage if present, so the user can see and adjust their counts
   if (shiftToReopen.drinkInventorySnapshot) {
@@ -786,7 +996,6 @@ export async function reopenShiftById(shiftId) {
   // Remove from shifts history array (since it is active again)
   s.shifts.splice(closedShiftIndex, 1);
 
-  // Sync to Cloud as 'open' immediately to prevent race conditions
   save();
   addAudit('REOPEN_SHIFT', 'Mở lại ca ' + s.currentShift.shiftNumber + ' - ' + s.currentShift.cashierName);
   syncCurrentShiftImmediate();
@@ -980,38 +1189,38 @@ export function getShiftSummary(shift) {
   var cukcukRevenue = 0, cukcukBills = 0;
   var manualIncome = 0, manualBills = 0;
 
-  // Step 1: CUKCUK invoices — use shift actual time window or snapshot if available
+  // Step 1: CUKCUK invoices — snapshot for CLOSED shifts only, live data for OPEN shifts
   var hasInvoiceStoreData = false;
-  if (shift.cukcukInvoicesSnapshot && shift.cukcukInvoicesSnapshot.length > 0) {
-    // Reopened shift or active shift with preset snapshot invoices
+  if (shift.status === 'closed' && shift.cukcukInvoicesSnapshot && shift.cukcukInvoicesSnapshot.length > 0) {
+    // CLOSED shift with snapshot — use frozen data
     var snapInvs = shift.cukcukInvoicesSnapshot;
     cukcukBills = snapInvs.length;
-    billCount += cukcukBills;
+    billCount = billCount + cukcukBills;
     for (var k = 0; k < snapInvs.length; k++) {
       var inv = snapInvs[k];
       hasInvoiceStoreData = true;
       var invTotal = 0;
       var payments = inv.payments || [];
       for (var p = 0; p < payments.length; p++) {
-        var amt = payments[p].amount || 0;
-        invTotal += amt;
-        if (payments[p].method === 'cash') { cashIncome += amt; }
-        else if (payments[p].method === 'card') { cardIncome += amt; }
-        else if (payments[p].method === 'transfer') { transferIncome += amt; }
+        var amt = toMoney(payments[p].amount);
+        invTotal = addMoney(invTotal, amt);
+        if (payments[p].method === 'cash') { cashIncome = addMoney(cashIncome, amt); }
+        else if (payments[p].method === 'card') { cardIncome = addMoney(cardIncome, amt); }
+        else if (payments[p].method === 'transfer') { transferIncome = addMoney(transferIncome, amt); }
       }
-      var effectiveAmt = invTotal > 0 ? invTotal : (inv.amount || 0);
-      cukcukRevenue += effectiveAmt;
-      totalIncome += effectiveAmt;
+      var effectiveAmt = invTotal > 0 ? invTotal : toMoney(inv.amount);
+      cukcukRevenue = addMoney(cukcukRevenue, effectiveAmt);
+      totalIncome = addMoney(totalIncome, effectiveAmt);
     }
   } else if (shift.status === 'closed' && shift.summarySnapshot && shift.summarySnapshot.cukcukRevenue !== undefined) {
-    cukcukRevenue = shift.summarySnapshot.cukcukRevenue || 0;
-    cukcukBills = shift.summarySnapshot.cukcukBills || 0;
-    totalIncome += cukcukRevenue;
-    billCount += cukcukBills;
+    cukcukRevenue = toMoney(shift.summarySnapshot.cukcukRevenue);
+    cukcukBills = Number(shift.summarySnapshot.cukcukBills) || 0;
+    totalIncome = addMoney(totalIncome, cukcukRevenue);
+    billCount = billCount + cukcukBills;
     var snap = shift.summarySnapshot;
-    cashIncome += snap.cashIncome || 0;
-    cardIncome += snap.cardIncome || 0;
-    transferIncome += snap.transferIncome || 0;
+    cashIncome = addMoney(cashIncome, toMoney(snap.cashIncome));
+    cardIncome = addMoney(cardIncome, toMoney(snap.cardIncome));
+    transferIncome = addMoney(transferIncome, toMoney(snap.transferIncome));
     hasInvoiceStoreData = true;
   } else if (shift.date) {
     try {
@@ -1019,9 +1228,11 @@ export function getShiftSummary(shift) {
       if (storeData) {
         var parsed = JSON.parse(storeData);
         if (parsed && parsed.invoices) {
-          var dp = shift.date.split('-');
-          var shiftStart = shift.startTime ? new Date(shift.startTime) : new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0);
-          var shiftEnd = shift.endTime ? new Date(shift.endTime) : (shift.status === 'closed' ? new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]) + 1, 6, 0, 0) : new Date());
+          // Unified Working Day boundaries (Yêu cầu 2)
+          var range = getWorkingDayRange(shift.date);
+          var shiftStart = range.start;
+          var shiftEnd = range.end;
+
           for (var k in parsed.invoices) {
             if (!parsed.invoices.hasOwnProperty(k)) continue;
             var inv = parsed.invoices[k];
@@ -1044,19 +1255,21 @@ export function getShiftSummary(shift) {
             var invTotal = 0;
             var payments = inv.payments || [];
             for (var p = 0; p < payments.length; p++) {
-              var amt = payments[p].amount || 0;
-              invTotal += amt;
-              if (payments[p].method === 'cash') { cashIncome += amt; }
-              else if (payments[p].method === 'card') { cardIncome += amt; }
-              else if (payments[p].method === 'transfer') { transferIncome += amt; }
+              var amt = toMoney(payments[p].amount);
+              invTotal = addMoney(invTotal, amt);
+              if (payments[p].method === 'cash') { cashIncome = addMoney(cashIncome, amt); }
+              else if (payments[p].method === 'card') { cardIncome = addMoney(cardIncome, amt); }
+              else if (payments[p].method === 'transfer') { transferIncome = addMoney(transferIncome, amt); }
             }
-            var effectiveAmt = invTotal > 0 ? invTotal : (inv.amount || 0);
-            cukcukRevenue += effectiveAmt;
-            totalIncome += effectiveAmt;
+            var effectiveAmt = invTotal > 0 ? invTotal : toMoney(inv.amount);
+            cukcukRevenue = addMoney(cukcukRevenue, effectiveAmt);
+            totalIncome = addMoney(totalIncome, effectiveAmt);
           }
         }
       }
-    } catch(e) { /* ignore */ }
+    } catch(e) {
+      logError('[Store] getShiftSummary invoice matching exception: ' + e.message);
+    }
   }
 
   // â”€â”€ Step 2: Process shift.transactions â”€â”€
@@ -1067,40 +1280,53 @@ export function getShiftSummary(shift) {
 
     if (t.type === 'income') {
       if (isCukcuk && hasInvoiceStoreData) {
-        // Skip â€” already counted from invoiceStore
         continue;
       }
-      totalIncome += t.amount;
+      var tAmt = toMoney(t.amount);
+      totalIncome = addMoney(totalIncome, tAmt);
       billCount++;
-      if (t.paymentMethod === 'cash') cashIncome += t.amount;
-      else if (t.paymentMethod === 'card') cardIncome += t.amount;
-      else if (t.paymentMethod === 'transfer') transferIncome += t.amount;
+      if (t.paymentMethod === 'cash') cashIncome = addMoney(cashIncome, tAmt);
+      else if (t.paymentMethod === 'card') cardIncome = addMoney(cardIncome, tAmt);
+      else if (t.paymentMethod === 'transfer') transferIncome = addMoney(transferIncome, tAmt);
       if (isCukcuk) {
-        cukcukRevenue += t.amount;
+        cukcukRevenue = addMoney(cukcukRevenue, tAmt);
         cukcukBills++;
       } else {
-        manualIncome += t.amount;
+        manualIncome = addMoney(manualIncome, tAmt);
         manualBills++;
       }
     } else {
-      totalExpense += t.amount;
-      if (t.paymentMethod === 'cash') cashExpense += t.amount;
+      var tAmt = toMoney(t.amount);
+      totalExpense = addMoney(totalExpense, tAmt);
+      if (t.paymentMethod === 'cash') cashExpense = addMoney(cashExpense, tAmt);
     }
   }
 
   for (var j = 0; j < otherTxs.length; j++) {
-    if (otherTxs[j].type === 'income') otherIncome += otherTxs[j].amount;
-    else otherExpense += otherTxs[j].amount;
+    var otAmt = toMoney(otherTxs[j].amount);
+    if (otherTxs[j].type === 'income') otherIncome = addMoney(otherIncome, otAmt);
+    else otherExpense = addMoney(otherExpense, otAmt);
   }
 
   var cashCountTotal = 0;
   var cc = shift.cashCount || {};
   for (var denom in cc) {
-    cashCountTotal += Number(denom) * Number(cc[denom]);
+    if (cc.hasOwnProperty(denom)) {
+      var denomValue = toMoney(denom);
+      var denomCount = Number(cc[denom]) || 0;
+      cashCountTotal = addMoney(cashCountTotal, multiplyMoney(denomValue, denomCount));
+    }
   }
 
-  var expectedCash = shift.startingCash + cashIncome - cashExpense + otherIncome - otherExpense;
-  var discrepancy = cashCountTotal - expectedCash;
+  var startingCash = toMoney(shift.startingCash);
+  var expectedCash = addMoney(
+    subtractMoney(
+      addMoney(startingCash, cashIncome),
+      cashExpense
+    ),
+    subtractMoney(otherIncome, otherExpense)
+  );
+  var discrepancy = subtractMoney(cashCountTotal, expectedCash);
 
   return {
     totalIncome: totalIncome,
@@ -1282,8 +1508,7 @@ export function healPastShiftsData() {
 
   // Step 3: Backfill missing CUKCUK invoices snapshots for closed shifts by scanning active store using actual shift hours
   var invoiceData = localStorage.getItem('cukcuk_invoice_store');
-  var invStore = null;
-  try { if (invoiceData) invStore = JSON.parse(invoiceData); } catch (e) {}
+  var invStore = safeJsonParse(invoiceData, null);
 
   for (var i = 0; i < dedupedShifts.length; i++) {
     var sh = dedupedShifts[i];
@@ -1294,19 +1519,9 @@ export function healPastShiftsData() {
     
     if (needsInvs && invStore && invStore.invoices) {
       // Define exact bounds based on startTime and endTime
-      var boundsStart, boundsEnd;
-      if (sh.startTime) {
-        boundsStart = new Date(sh.startTime);
-      } else {
-        var dp = sh.date.split('-');
-        boundsStart = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), 12, 0, 0);
-      }
-      if (sh.endTime) {
-        boundsEnd = new Date(sh.endTime);
-      } else {
-        // Fallback to 8 hours duration
-        boundsEnd = new Date(boundsStart.getTime() + 8 * 3600 * 1000);
-      }
+      var range = getWorkingDayRange(sh.date);
+      var boundsStart = range.start;
+      var boundsEnd = range.end;
 
       var matchedInvoices = [];
       for (var k in invStore.invoices) {
@@ -1791,6 +2006,22 @@ export function editHistoryInvoicePayment(shiftId, refId, newPayments) {
       var total = 0;
       for (var p = 0; p < newPayments.length; p++) total += newPayments[p].amount || 0;
       if (total > 0) invoices[i].amount = total;
+
+      // Hard-lock this invoice in invoiceStore to prevent CUKCUK sync from overwriting
+      try {
+        var invStoreData = localStorage.getItem('cukcuk_invoice_store');
+        if (invStoreData) {
+          var invStoreObj = JSON.parse(invStoreData);
+          if (invStoreObj && invStoreObj.invoices && invStoreObj.invoices[refId]) {
+            invStoreObj.invoices[refId].payments = newPayments;
+            invStoreObj.invoices[refId].manualOverride = true;
+            invStoreObj.invoices[refId].unpaid = false;
+            localStorage.setItem('cukcuk_invoice_store', JSON.stringify(invStoreObj));
+            console.log('[Store] editHistoryInvoicePayment: locked invoice ' + refId + ' in invoiceStore');
+          }
+        }
+      } catch(lockErr) { console.warn('[Store] Invoice lock error:', lockErr); }
+
       _rebuildShiftSnapshot(shift);
       save();
       _syncHistoryShiftToCloud(shift);

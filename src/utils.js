@@ -125,6 +125,54 @@ export function showConfirm(message, opts) {
   });
 }
 
+// ── Custom Password Prompt Modal ─────────────────
+export function showPasswordPrompt(message, opts) {
+  var title = (opts && opts.title) || 'Xác nhận Mật khẩu';
+  var placeholder = (opts && opts.placeholder) || 'Nhập mật khẩu...';
+  var type = (opts && opts.type) || 'info';
+  var colors = { warning: 'var(--primary)', danger: 'var(--danger)', info: 'var(--info)' };
+
+  return new Promise(function(resolve) {
+    var html = '<div style="text-align:center;padding:10px 0;">' +
+      '<span class="material-symbols-rounded" style="font-size:48px;color:' + (colors[type] || colors.info) + ';margin-bottom:12px;display:block;">lock</span>' +
+      '<h3 style="font-size:16px;font-weight:700;margin-bottom:8px;">' + title + '</h3>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">' + message + '</p>' +
+      '<div class="form-group" style="margin-bottom:24px;text-align:left;">' +
+      '<input type="password" id="modalPromptPassword" class="form-input" placeholder="' + placeholder + '" style="text-align:center;">' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;justify-content:center;">' +
+      '<button class="btn btn-outline" id="promptCancel">Hủy</button>' +
+      '<button class="btn btn-primary" id="promptOk">Xác nhận</button>' +
+      '</div></div>';
+    showModal(html);
+    setTimeout(function() {
+      var okBtn = document.getElementById('promptOk');
+      var cancelBtn = document.getElementById('promptCancel');
+      var input = document.getElementById('modalPromptPassword');
+      if (input) input.focus();
+
+      if (okBtn) {
+        okBtn.addEventListener('click', function() {
+          var val = input ? input.value : '';
+          hideModal();
+          resolve(val);
+        });
+      }
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+          hideModal();
+          resolve(null);
+        });
+      }
+      if (input) {
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') okBtn?.click();
+        });
+      }
+    }, 50);
+  });
+}
+
 // ── Modal ────────────────────────────────────
 export function showModal(contentHTML, size) {
   const overlay = document.getElementById('modalOverlay');
@@ -277,3 +325,240 @@ export function parseMoneyValue(str) {
   if (!str) return 0;
   return parseInt(String(str).replace(/\./g, '').replace(/\D/g, ''), 10) || 0;
 }
+
+// ── Standardized VND Currency Utilities (Yêu cầu 5) ──
+
+export function toMoney(val) {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') {
+    return isNaN(val) || !isFinite(val) ? 0 : Math.round(val);
+  }
+  var str = String(val).trim().replace(/[.,\sđđ]/g, '');
+  var num = parseFloat(str);
+  return isNaN(num) || !isFinite(num) ? 0 : Math.round(num);
+}
+
+export function parseMoneyInput(str) {
+  if (typeof str === 'number') {
+    return isNaN(str) || !isFinite(str) ? 0 : Math.round(str);
+  }
+  if (!str) return 0;
+  // Strip dots, commas, spaces, and typical currency indicators like 'đ', 'd', 'VND'
+  var clean = String(str).replace(/[.,\sđdDđĐVNDvnd]/g, '');
+  var parsed = parseInt(clean, 10);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+export function formatMoney(val) {
+  return toMoney(val).toLocaleString('vi-VN') + ' đ';
+}
+
+export function addMoney(a, b) {
+  return toMoney(a) + toMoney(b);
+}
+
+export function subtractMoney(a, b) {
+  return toMoney(a) - toMoney(b);
+}
+
+export function multiplyMoney(a, factor) {
+  var f = Number(factor);
+  if (isNaN(f) || !isFinite(f)) f = 0;
+  return Math.round(toMoney(a) * f);
+}
+
+export function safeRoundMoney(val) {
+  return toMoney(val);
+}
+
+export function isValidMoney(val) {
+  if (val === null || val === undefined) return false;
+  var num = Number(val);
+  return !isNaN(num) && isFinite(num);
+}
+
+// ── Centralized Working Day 12:00 - 06:00 (Yêu cầu 2) ──
+
+export function getWorkingDay(date) {
+  var d = null;
+  if (!date) {
+    d = new Date();
+  } else if (date instanceof Date) {
+    d = new Date(date);
+  } else {
+    d = new Date(date);
+    if (isNaN(d.getTime())) {
+      // Handle dd/mm/yyyy hh:mm format
+      var parts = String(date).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (parts) {
+        d = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
+      } else {
+        d = new Date();
+      }
+    }
+  }
+
+  if (isNaN(d.getTime())) d = new Date();
+
+  // If the hour is before 06:00 AM, it belongs to the previous working day
+  if (d.getHours() < 6) {
+    d.setDate(d.getDate() - 1);
+  }
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+export function getWorkingDayRange(workingDay) {
+  var stdDateStr = normalizeWorkingDayInput(workingDay);
+  var parts = stdDateStr.split('-');
+  var y = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10) - 1;
+  var d = parseInt(parts[2], 10);
+
+  var start = new Date(y, m, d, 12, 0, 0);
+  var end = new Date(y, m, d + 1, 6, 0, 0);
+  return { start: start, end: end };
+}
+
+export function isDateInWorkingDay(date, workingDay) {
+  var d = new Date(date);
+  if (isNaN(d.getTime())) return false;
+  var range = getWorkingDayRange(workingDay);
+  return d >= range.start && d < range.end;
+}
+
+export function normalizeWorkingDayInput(input) {
+  if (!input) {
+    var today = new Date();
+    if (today.getHours() < 6) today.setDate(today.getDate() - 1);
+    return today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  }
+  if (input instanceof Date) {
+    var d = new Date(input);
+    if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  var str = String(input).trim();
+  // Match yyyy-mm-dd
+  var partsYMD = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (partsYMD) {
+    return partsYMD[1] + '-' + partsYMD[2] + '-' + partsYMD[3];
+  }
+  // Match dd/mm/yyyy
+  var partsDMY = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (partsDMY) {
+    return partsDMY[3] + '-' + String(partsDMY[2]).padStart(2, '0') + '-' + String(partsDMY[1]).padStart(2, '0');
+  }
+  // Fallback to standard JS Date parsing
+  var parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    if (parsed.getHours() < 6) parsed.setDate(parsed.getDate() - 1);
+    return parsed.getFullYear() + '-' + String(parsed.getMonth() + 1).padStart(2, '0') + '-' + String(parsed.getDate()).padStart(2, '0');
+  }
+  // Ultimate fallback is the current working day
+  return getWorkingDay();
+}
+
+// ── Standardized JSON & GAS Responses Parsing (Yêu cầu 9) ──
+
+export function safeJsonParse(str, fallback) {
+  if (str === null || str === undefined) return fallback;
+  if (typeof str === 'object') return str; // Already parsed
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    console.warn('[Utils] safeJsonParse failed. Raw value:', str, 'Error:', e.message);
+    return fallback;
+  }
+}
+
+export function normalizeGasResponse(response) {
+  if (response === null || response === undefined) {
+    return { success: false, message: 'Phản hồi trống' };
+  }
+  // If response is already an object, return it
+  if (typeof response === 'object' && !Array.isArray(response)) {
+    return response;
+  }
+  // If it's a primitive string, clean up hidden characters (like \r\n) and parse
+  if (typeof response === 'string') {
+    var cleaned = response.trim();
+    // Sometimes GAS returns primitive strings inside java.lang responses.
+    // If it looks like JSON, attempt to parse it
+    if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+      var parsed = safeJsonParse(cleaned, null);
+      if (parsed) return parsed;
+    }
+    // If it is just a string that couldn't be parsed, return wrapped success structure
+    return { success: true, data: cleaned };
+  }
+  return { success: false, message: 'Định dạng phản hồi không hợp lệ' };
+}
+
+export function normalizeSheetRow(row) {
+  if (!row) return {};
+  if (typeof row !== 'object') return {};
+  // Standardize values, ensure strings are trimmed and values are typed correctly
+  var normalized = {};
+  for (var key in row) {
+    if (row.hasOwnProperty(key)) {
+      var val = row[key];
+      if (typeof val === 'string') {
+        normalized[key] = val.trim();
+      } else {
+        normalized[key] = val;
+      }
+    }
+  }
+  return normalized;
+}
+
+export function ensureObject(val) {
+  if (val && typeof val === 'object' && !Array.isArray(val)) return val;
+  return {};
+}
+
+export function ensureArray(val) {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === 'object') return Object.values(val);
+  return [];
+}
+
+// ── SPA Temporary State Consumer (Yêu cầu 7) ──
+
+export function consumeTempState(key) {
+  if (typeof window === 'undefined') return null;
+  var val = window[key];
+  try {
+    delete window[key];
+  } catch (e) {
+    window[key] = undefined;
+  }
+  return val;
+}
+
+// ── Masked Centralized Logging (Yêu cầu 12) ──
+
+function maskSecrets(msg) {
+  if (typeof msg !== 'string') return msg;
+  // Mask typical api keys (Gemini API keys, CUKCUK secrets, passwords)
+  return msg.replace(/(AIzaSy[A-Za-z0-9_-]{31})/g, 'AIzaSy...[MASKED]')
+            .replace(/(cukcuk_token=[A-Za-z0-9_-]+)/gi, 'cukcuk_token=[MASKED]')
+            .replace(/(api_key\s*:\s*["'])[A-Za-z0-9_-]+(["'])/gi, '$1[MASKED]$2')
+            .replace(/(password\s*:\s*["'])[A-Za-z0-9_-]+(["'])/gi, '$1[MASKED]$2');
+}
+
+export function logInfo(message, details) {
+  var formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
+  console.log('[INFO] ' + maskSecrets(message), formattedDetails);
+}
+
+export function logWarn(message, details) {
+  var formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
+  console.warn('[WARN] ' + maskSecrets(message), formattedDetails);
+}
+
+export function logError(message, details) {
+  var formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
+  console.error('[ERROR] ' + maskSecrets(message), formattedDetails);
+}
+

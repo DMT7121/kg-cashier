@@ -3,6 +3,8 @@
    SAFE: All exports are safe - never throw
    ============================================ */
 
+import { safeJsonParse } from './utils.js';
+
 const GAS_URL = import.meta.env.VITE_GAS_URL || '';
 
 let _online = true;
@@ -11,6 +13,40 @@ const _queue = [];
 try { _online = navigator.onLine; } catch (e) { /* ignore */ }
 try { window.addEventListener('online', () => { _online = true; _flushQueue(); }); } catch (e) { /* ignore */ }
 try { window.addEventListener('offline', () => { _online = false; }); } catch (e) { /* ignore */ }
+
+export function getMetadata() {
+  let deviceId = localStorage.getItem('kg_device_id');
+  if (!deviceId) {
+    deviceId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('kg_device_id', deviceId);
+  }
+
+  let sessionId = sessionStorage.getItem('kg_session_id');
+  if (!sessionId) {
+    sessionId = 'sess_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    sessionStorage.setItem('kg_session_id', sessionId);
+  }
+
+  const origin = window.location.origin || '';
+  const host = window.location.hostname || '';
+  const environment = import.meta.env.MODE || 'production';
+  
+  let source = 'webapp-production';
+  if (origin.indexOf('localhost') > -1 || origin.indexOf('127.0.0.1') > -1 || origin.indexOf('file://') > -1) {
+    source = 'localhost';
+  } else if (import.meta.env.DEV) {
+    source = 'webapp-dev';
+  }
+
+  return {
+    deviceId: deviceId,
+    sessionId: sessionId,
+    origin: origin,
+    host: host,
+    environment: environment,
+    source: source
+  };
+}
 
 // ── Core fetch wrapper (NEVER throws) ────────
 async function apiCall(action, data = null, retries = 2) {
@@ -21,13 +57,17 @@ async function apiCall(action, data = null, retries = 2) {
     if (data) {
       opts.method = 'POST';
       opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+      // Inject metadata automatically if it is an object
+      if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+        data = Object.assign({}, data, getMetadata());
+      }
       opts.body = JSON.stringify(data);
     }
 
     const response = await fetch(url, opts);
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const text = await response.text();
-    return JSON.parse(text);
+    return safeJsonParse(text, { success: false, message: 'Phản hồi từ máy chủ không hợp lệ' });
   } catch (error) {
     if (retries > 0) {
       await new Promise(function(r) { setTimeout(r, 1000); });
@@ -75,13 +115,20 @@ async function _flushQueue() {
 try {
   var saved = localStorage.getItem('kg_api_queue');
   if (saved) {
-    var parsed = JSON.parse(saved);
-    for (var i = 0; i < parsed.length; i++) { _queue.push(parsed[i]); }
+    var parsed = safeJsonParse(saved, null);
+    if (parsed && Array.isArray(parsed)) {
+      for (var i = 0; i < parsed.length; i++) { _queue.push(parsed[i]); }
+    }
     if (_online) { _flushQueue(); }
   }
 } catch (e) { /* ignore */ }
 
 // ── Shift API ────────────────────────────────
+// ── Shift API ────────────────────────────────
+export async function openShiftOnCloud(shiftData) {
+  return apiCall('openShift', shiftData);
+}
+
 export async function syncShiftToCloud(shiftData) {
   if (!_online) { enqueue('syncShift', shiftData); return { success: false, offline: true }; }
   return apiCall('syncShift', shiftData);
@@ -91,8 +138,40 @@ export async function closeShiftOnCloud(shiftData) {
   return apiCall('closeShift', shiftData);
 }
 
+export async function reopenShiftOnCloud(shiftData, managerPassword) {
+  return apiCall('reopenShift', { ...shiftData, managerPassword: managerPassword });
+}
+
+export async function cancelShiftOnCloud(shiftData) {
+  return apiCall('cancelShift', shiftData);
+}
+
 export async function deleteShiftFromCloud(shiftId) {
   return apiCall('deleteShift', { id: shiftId });
+}
+
+export async function voidGhostShiftOnCloud(shiftId, managerPassword) {
+  return apiCall('voidGhostShift', { shiftId: shiftId, managerPassword: managerPassword });
+}
+
+export async function getShiftRegistryFromCloud() {
+  return apiCall('getShiftRegistry');
+}
+
+export async function repairShiftsOnCloud(managerPassword) {
+  return apiCall('repairShifts', { managerPassword: managerPassword });
+}
+
+export async function rebuildCukcukIndexOnCloud() {
+  return apiCall('rebuildCukcukIndex');
+}
+
+export async function getCukcukSyncStateFromCloud() {
+  return apiCall('getCukcukSyncState');
+}
+
+export async function saveCukcukSyncStateToCloud(syncState) {
+  return apiCall('saveCukcukSyncState', syncState);
 }
 
 export async function getShiftsFromCloud(limit) {
@@ -120,7 +199,7 @@ export async function getStaffFromCloud() {
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}');
       if (start !== -1 && end !== -1) {
-        const json = JSON.parse(text.substring(start, end + 1));
+        const json = safeJsonParse(text.substring(start, end + 1), null);
         if (json && json.status === 'ok' && json.table && json.table.rows) {
           const colMapping = ['id', 'name', 'pin', 'role', 'status', 'createdAt'];
           const headers = json.table.cols.map((c, idx) => c.label || colMapping[idx] || '');

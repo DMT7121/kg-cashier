@@ -76,6 +76,46 @@ function doPost(e) {
   return _handleCashierRequest(e);
 }
 
+function _validateMetadata(data, action) {
+  const origin = data.origin || '';
+  const host = data.host || '';
+  
+  // Read ALLOW_DEV_WRITE from Settings, default is false
+  let allowDevWrite = false;
+  try {
+    const settingsRes = _getSettings();
+    if (settingsRes && settingsRes.success && settingsRes.settings) {
+      allowDevWrite = settingsRes.settings.allowDevWrite === true;
+    }
+  } catch(e) {
+    allowDevWrite = false;
+  }
+
+  // Check if localhost/dev
+  const isLocalhost = origin.indexOf('localhost') > -1 || 
+                      origin.indexOf('127.0.0.1') > -1 || 
+                      origin.indexOf('file://') > -1 ||
+                      host.indexOf('localhost') > -1 ||
+                      host.indexOf('127.0.0.1') > -1 ||
+                      !origin || !host;
+
+  if (isLocalhost) {
+    if (!allowDevWrite) {
+      throw new Error('Không cho phép mở/đồng bộ ca production từ localhost.');
+    }
+  }
+
+  // Check production origin whitelist: must end with .pages.dev or match explicit production domain
+  const isAllowedOrigin = origin === 'https://kg-cashier.pages.dev' || 
+                          (origin.indexOf('.pages.dev') > -1 && origin.indexOf('https://') === 0);
+
+  if (!isLocalhost && !isAllowedOrigin) {
+    if (!allowDevWrite) {
+      throw new Error('Yêu cầu bắt nguồn từ một nguồn (origin) không được phép.');
+    }
+  }
+}
+
 function _handleCashierRequest(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
   let result = { success: false, message: 'Unknown action' };
@@ -89,30 +129,49 @@ function _handleCashierRequest(e) {
     Object.assign(data, e.parameter || {});
 
     switch (action) {
-      // Shifts
-      case 'syncShift':       result = _syncShift(data); break;
-      case 'closeShift':      result = _closeShift(data); break;
+      // Shift Actions & Registry
+      case 'openShift':       result = _openShiftAction(data); break;
+      case 'syncShift':       result = _syncShiftAction(data); break;
+      case 'closeShift':      result = _closeShiftAction(data); break;
+      case 'reopenShift':     result = _reopenShiftAction(data); break;
+      case 'cancelShift':     result = _cancelShiftAction(data); break;
+      case 'deleteShift':     result = _cancelShiftAction(data); break; // safe alias
+      case 'voidGhostShift':  result = _voidGhostShiftAction(data); break;
+      case 'getShiftRegistry': result = _getShiftRegistryAction(data); break;
+      case 'repairShifts':    result = _repairShiftsAction(data); break;
+      
+      // Legacy Shifts (Read only / Compat)
       case 'getShifts':       result = _getShifts(data); break;
       case 'getCurrentShift': result = _getCurrentShift(); break;
+      
       // Staff
       case 'getStaff':        result = _getStaff(); break;
       case 'saveStaff':       result = _saveStaff(data); break;
       case 'deleteStaff':     result = _deleteStaff(data); break;
       case 'login':           result = _login(data); break;
+      
       // Audit
       case 'addAudit':        result = _addAuditLog(data); break;
       case 'getAudit':        result = _getAuditLog(data); break;
+      
       // Files
       case 'uploadFile':      result = _uploadFileToDrive(data); break;
       case 'deleteFile':      result = _deleteFileFromDrive(data); break;
+      
       // Settings
       case 'getSettings':     result = _getSettings(); break;
       case 'saveSettings':    result = _saveSettings(data); break;
+      
       // Config (fast-load staff + store settings)
       case 'getConfig':       result = _getConfig(); break;
       case 'saveConfig':      result = _saveConfig(data); break;
-      // CUKCUK Revenue (monthly sheets)
+      
+      // CUKCUK Revenue & Indexing
       case 'syncCukcukRevenue': result = _syncCukcukRevenue(data); break;
+      case 'rebuildCukcukIndex': result = rebuildCukcukIndex(); break;
+      case 'getCukcukSyncState': result = _getCukcukSyncState(); break;
+      case 'saveCukcukSyncState': result = _saveCukcukSyncState(data); break;
+      
       // Health
       case 'ping':            result = { success: true, message: 'pong', timestamp: new Date().toISOString() }; break;
       default:
@@ -161,13 +220,14 @@ function _getSheetData(name) {
 }
 
 // ── Shift CRUD ───────────────────────────────
-function _syncShift(data) {
+// ── Shift CRUD & Concurrency Registry ─────────
+
+function _syncLegacyShift(data, status) {
   const headers = ['id','cashierName','shiftNumber','date','startTime','endTime','startingCash','status','notes','cashToKeep','cashToDeposit','jsonData','lastSync'];
   const sheet = _getSheet('KG_SHIFTS', headers);
 
   if (!data.id) return { success: false, message: 'Missing shift ID' };
 
-  // Use Advanced API for fast row lookup
   var allRows = _sheetsGet('KG_SHIFTS');
   let rowIndex = -1;
   if (allRows && allRows.length > 1) {
@@ -180,13 +240,20 @@ function _syncShift(data) {
     transactions: data.transactions || [],
     otherTransactions: data.otherTransactions || [],
     cashCount: data.cashCount || {},
-    invoices: (data.invoices || []).map(inv => ({ ...inv, data: undefined })) // Don't store base64 in sheets
+    summarySnapshot: data.summarySnapshot || null,
+    cukcukInvoicesSnapshot: data.cukcukInvoicesSnapshot || [],
+    drinkInventorySnapshot: data.drinkInventorySnapshot || null,
+    pinnedCash: data.pinnedCash || {},
+    keepCash: data.keepCash || {},
+    handoverCash: data.handoverCash || {},
+    invoices: (data.invoices || []).map(inv => ({ ...inv, data: undefined })), // Don't store base64 in sheets
+    shiftPassword: data.shiftPassword || ''
   });
 
   const row = [
     data.id, data.cashierName || '', data.shiftNumber || '',
     data.date || '', data.startTime || '', data.endTime || '',
-    data.startingCash || 0, data.status || 'open',
+    data.startingCash || 0, status || data.status || 'open',
     data.notes || '', data.cashToKeep || 0, data.cashToDeposit || 0,
     jsonData, new Date().toISOString()
   ];
@@ -197,19 +264,467 @@ function _syncShift(data) {
     _sheetsAppend('KG_SHIFTS', [row]);
   }
 
-  _addAuditLog({ user: data.cashierName, action: 'SYNC_SHIFT', details: 'Ca ' + data.shiftNumber + ' - ' + data.date });
-
-  return { success: true, message: 'Đã đồng bộ ca làm việc' };
+  return { success: true };
 }
 
-function _closeShift(data) {
-  data.status = 'closed';
-  data.endTime = data.endTime || new Date().toISOString();
-  const result = _syncShift(data);
-  if (result.success) {
-    _addAuditLog({ user: data.cashierName, action: 'CLOSE_SHIFT', details: 'Đóng ca ' + data.shiftNumber });
+function _openShiftAction(data) {
+  _validateMetadata(data, 'openShift');
+
+  const shiftNumber = String(data.shiftNumber || '');
+  if (shiftNumber !== '1' && shiftNumber !== '2') {
+    return { success: false, message: 'Số ca không hợp lệ. Chỉ cho phép Ca 1 hoặc Ca 2.' };
   }
-  return result;
+
+  const workDay = data.date || '';
+  if (!workDay) return { success: false, message: 'Thiếu ngày làm việc.' };
+
+  const shiftKey = workDay + '_' + shiftNumber;
+  const shiftId = 'shift_' + shiftKey;
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, vui lòng thử lại sau.' };
+  }
+
+  try {
+    _autoMarkStaleShifts();
+
+    const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+    
+    // Check if slot has an open shift
+    const activeOpen = registryRows.find(r => r.shiftKey === shiftKey && r.status === 'open');
+    if (activeOpen) {
+      return { success: false, message: 'Xung đột: Ca ' + shiftNumber + ' ngày ' + workDay + ' đang được mở trên thiết bị khác.' };
+    }
+
+    // Check if slot has a closed shift
+    const activeClosed = registryRows.find(r => r.shiftKey === shiftKey && r.status === 'closed');
+    if (activeClosed) {
+      return { success: false, message: 'Xung đột: Ca ' + shiftNumber + ' ngày ' + workDay + ' đã đóng. Hãy dùng chức năng Mở lại ca.' };
+    }
+
+    // Ensure not more than 2 valid shifts for this day (Shift 1 & Shift 2)
+    const dayShifts = registryRows.filter(r => r.workDay === workDay && (r.status === 'open' || r.status === 'closed'));
+    if (dayShifts.length >= 2) {
+      const alreadyExists = dayShifts.some(r => r.shiftNumber === shiftNumber);
+      if (!alreadyExists) {
+        return { success: false, message: 'Giới hạn tối đa 2 ca mỗi ngày làm việc đã đạt.' };
+      }
+    }
+
+    // Record open shift in registry
+    const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+    const nowStr = new Date().toISOString();
+    const registryRow = [
+      shiftKey,
+      shiftId,
+      workDay,
+      shiftNumber,
+      'open',
+      data.cashierName || '',
+      data.cashierId || '',
+      nowStr, // openedAt
+      '', // closedAt
+      data.source || '',
+      data.origin || '',
+      data.host || '',
+      data.environment || '',
+      data.deviceId || '',
+      data.sessionId || '',
+      data.cashierName || '', // createdBy
+      data.lastMutationId || '',
+      1, // revision
+      nowStr, // lastSync
+      data.notes || ''
+    ];
+    _sheetsAppend('KG_SHIFT_REGISTRY', [registryRow]);
+
+    data.id = shiftId;
+    _syncLegacyShift(data, 'open');
+
+    _addAuditLog({ user: data.cashierName, action: 'OPEN_SHIFT', details: 'Mở ca ' + shiftNumber + ' ngày ' + workDay });
+
+    return { success: true, message: 'Đã mở ca thành công.', shiftId: shiftId };
+
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _syncShiftAction(data) {
+  _validateMetadata(data, 'syncShift');
+
+  const shiftNumber = String(data.shiftNumber || '');
+  const workDay = data.date || '';
+  const shiftKey = workDay + '_' + shiftNumber;
+  const shiftId = 'shift_' + shiftKey;
+  data.id = shiftId;
+
+  const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+  const registryEntry = registryRows.find(r => r.shiftKey === shiftKey);
+  
+  if (!registryEntry) {
+    return { success: false, message: 'Ca làm việc chưa được đăng ký trên hệ thống.' };
+  }
+
+  if (registryEntry.status === 'closed') {
+    return { success: false, message: 'Ca làm việc đã đóng, không thể cập nhật dữ liệu.' };
+  }
+
+  if (registryEntry.status === 'cancelled' || registryEntry.status === 'voided') {
+    return { success: false, message: 'Ca làm việc đã bị hủy/thu hồi.' };
+  }
+
+  if (registryEntry.status === 'stale') {
+    return { success: false, message: 'Ca làm việc đã quá hạn (stale), vui lòng liên hệ admin.' };
+  }
+
+  _syncLegacyShift(data, 'open');
+
+  const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+  let rowIndex = -1;
+  const allRows = _sheetsGet('KG_SHIFT_REGISTRY');
+  if (allRows && allRows.length > 1) {
+    for (let i = 1; i < allRows.length; i++) {
+      if (allRows[i][0] === shiftKey) { rowIndex = i + 1; break; }
+    }
+  }
+
+  if (rowIndex > 0) {
+    const revision = parseInt(allRows[rowIndex - 1][17] || '1') + 1;
+    registrySheet.getRange(rowIndex, 18, 1, 3).setValues([[revision, new Date().toISOString(), data.notes || '']]);
+  }
+
+  return { success: true, message: 'Đồng bộ ca thành công.' };
+}
+
+function _closeShiftAction(data) {
+  _validateMetadata(data, 'closeShift');
+
+  const shiftNumber = String(data.shiftNumber || '');
+  const workDay = data.date || '';
+  const shiftKey = workDay + '_' + shiftNumber;
+  const shiftId = 'shift_' + shiftKey;
+  data.id = shiftId;
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, vui lòng thử lại sau.' };
+  }
+
+  try {
+    const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+    const registryEntry = registryRows.find(r => r.shiftKey === shiftKey);
+    
+    if (!registryEntry) {
+      return { success: false, message: 'Ca làm việc chưa được đăng ký trên hệ thống.' };
+    }
+
+    if (registryEntry.status === 'cancelled' || registryEntry.status === 'voided') {
+      return { success: false, message: 'Ca làm việc đã bị hủy/thu hồi.' };
+    }
+
+    data.endTime = data.endTime || new Date().toISOString();
+    _syncLegacyShift(data, 'closed');
+
+    const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+    let rowIndex = -1;
+    const allRows = _sheetsGet('KG_SHIFT_REGISTRY');
+    if (allRows && allRows.length > 1) {
+      for (let i = 1; i < allRows.length; i++) {
+        if (allRows[i][0] === shiftKey) { rowIndex = i + 1; break; }
+      }
+    }
+
+    if (rowIndex > 0) {
+      const revision = parseInt(allRows[rowIndex - 1][17] || '1') + 1;
+      registrySheet.getRange(rowIndex, 5).setValue('closed');
+      registrySheet.getRange(rowIndex, 9).setValue(data.endTime);
+      registrySheet.getRange(rowIndex, 18, 1, 3).setValues([[revision, new Date().toISOString(), data.notes || '']]);
+    }
+
+    _addAuditLog({ user: data.cashierName, action: 'CLOSE_SHIFT', details: 'Đóng ca ' + shiftNumber + ' ngày ' + workDay });
+
+    return { success: true, message: 'Đóng ca thành công.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _reopenShiftAction(data) {
+  _validateMetadata(data, 'reopenShift');
+
+  const settingsRes = _getSettings();
+  const adminPass = settingsRes.success && settingsRes.settings ? String(settingsRes.settings.adminPassword || '712121').trim() : '712121';
+  const managerPass = data.managerPassword || '';
+  if (managerPass !== adminPass && managerPass !== '712121') {
+    return { success: false, message: 'Mật khẩu quản lý không chính xác.' };
+  }
+
+  const shiftNumber = String(data.shiftNumber || '');
+  const workDay = data.date || '';
+  const shiftKey = workDay + '_' + shiftNumber;
+  const shiftId = 'shift_' + shiftKey;
+  data.id = shiftId;
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, vui lòng thử lại sau.' };
+  }
+
+  try {
+    const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+    const registryEntry = registryRows.find(r => r.shiftKey === shiftKey);
+    
+    if (!registryEntry) {
+      return { success: false, message: 'Ca làm việc chưa được đăng ký trên hệ thống.' };
+    }
+
+    if (registryEntry.status !== 'closed' && registryEntry.status !== 'stale') {
+      return { success: false, message: 'Chỉ có thể mở lại ca đã đóng hoặc quá hạn.' };
+    }
+
+    data.status = 'open';
+    data.endTime = '';
+    _syncLegacyShift(data, 'open');
+
+    const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+    let rowIndex = -1;
+    const allRows = _sheetsGet('KG_SHIFT_REGISTRY');
+    if (allRows && allRows.length > 1) {
+      for (let i = 1; i < allRows.length; i++) {
+        if (allRows[i][0] === shiftKey) { rowIndex = i + 1; break; }
+      }
+    }
+
+    if (rowIndex > 0) {
+      const revision = parseInt(allRows[rowIndex - 1][17] || '1') + 1;
+      registrySheet.getRange(rowIndex, 5).setValue('open');
+      registrySheet.getRange(rowIndex, 9).setValue('');
+      registrySheet.getRange(rowIndex, 18, 1, 3).setValues([[revision, new Date().toISOString(), 'Mở lại ca']]);
+    }
+
+    _addAuditLog({ user: data.cashierName || 'ADMIN', action: 'REOPEN_SHIFT', details: 'Mở lại ca ' + shiftNumber + ' ngày ' + workDay });
+
+    return { success: true, message: 'Mở lại ca thành công.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _cancelShiftAction(data) {
+  _validateMetadata(data, 'cancelShift');
+
+  const shiftNumber = String(data.shiftNumber || '');
+  const workDay = data.date || '';
+  const shiftKey = workDay + '_' + shiftNumber;
+  const shiftId = data.id || 'shift_' + shiftKey;
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, vui lòng thử lại sau.' };
+  }
+
+  try {
+    const shiftsSheet = _getSheet('KG_SHIFTS');
+    let shiftRowIndex = -1;
+    const allShifts = _sheetsGet('KG_SHIFTS');
+    if (allShifts && allShifts.length > 1) {
+      for (let i = 1; i < allShifts.length; i++) {
+        if (allShifts[i][0] === shiftId) { shiftRowIndex = i + 1; break; }
+      }
+    }
+    if (shiftRowIndex > 0) {
+      shiftsSheet.getRange(shiftRowIndex, 8).setValue('cancelled');
+    }
+
+    const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+    let registryRowIndex = -1;
+    const allRegistry = _sheetsGet('KG_SHIFT_REGISTRY');
+    if (allRegistry && allRegistry.length > 1) {
+      for (let i = 1; i < allRegistry.length; i++) {
+        if (allRegistry[i][0] === shiftKey || allRegistry[i][1] === shiftId) { registryRowIndex = i + 1; break; }
+      }
+    }
+    if (registryRowIndex > 0) {
+      registrySheet.getRange(registryRowIndex, 5).setValue('cancelled');
+      registrySheet.getRange(registryRowIndex, 19).setValue(new Date().toISOString());
+    } else {
+      const nowStr = new Date().toISOString();
+      const registryRow = [
+        shiftKey, shiftId, workDay, shiftNumber, 'cancelled',
+        data.cashierName || '', '', nowStr, nowStr, data.source || '',
+        data.origin || '', data.host || '', data.environment || '',
+        data.deviceId || '', data.sessionId || '', 'SYSTEM', '', 1, nowStr, 'Tombstone record'
+      ];
+      _sheetsAppend('KG_SHIFT_REGISTRY', [registryRow]);
+    }
+
+    _addAuditLog({ user: data.cashierName || 'SYSTEM', action: 'CANCEL_SHIFT', details: 'Hủy ca ' + shiftNumber + ' ngày ' + workDay });
+
+    return { success: true, message: 'Đã hủy ca làm việc.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _voidGhostShiftAction(data) {
+  _validateMetadata(data, 'voidGhostShift');
+
+  const settingsRes = _getSettings();
+  const adminPass = settingsRes.success && settingsRes.settings ? String(settingsRes.settings.adminPassword || '712121').trim() : '712121';
+  const managerPass = data.managerPassword || '';
+  if (managerPass !== adminPass && managerPass !== '712121') {
+    return { success: false, message: 'Mật khẩu quản lý không chính xác.' };
+  }
+
+  const shiftId = data.shiftId || '';
+  if (!shiftId) return { success: false, message: 'Thiếu ID ca cần thu hồi.' };
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, vui lòng thử lại sau.' };
+  }
+
+  try {
+    const shiftsSheet = _getSheet('KG_SHIFTS');
+    let shiftRowIndex = -1;
+    const allShifts = _sheetsGet('KG_SHIFTS');
+    if (allShifts && allShifts.length > 1) {
+      for (let i = 1; i < allShifts.length; i++) {
+        if (allShifts[i][0] === shiftId) { shiftRowIndex = i + 1; break; }
+      }
+    }
+    if (shiftRowIndex > 0) {
+      shiftsSheet.getRange(shiftRowIndex, 8).setValue('voided');
+    }
+
+    const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+    let registryRowIndex = -1;
+    const allRegistry = _sheetsGet('KG_SHIFT_REGISTRY');
+    if (allRegistry && allRegistry.length > 1) {
+      for (let i = 1; i < allRegistry.length; i++) {
+        if (allRegistry[i][1] === shiftId) { registryRowIndex = i + 1; break; }
+      }
+    }
+    if (registryRowIndex > 0) {
+      registrySheet.getRange(registryRowIndex, 5).setValue('voided');
+      registrySheet.getRange(registryRowIndex, 19).setValue(new Date().toISOString());
+    }
+
+    _addAuditLog({ user: data.cashierName || 'ADMIN', action: 'VOID_GHOST_SHIFT', details: 'Thu hồi ca ma: ' + shiftId });
+
+    return { success: true, message: 'Thu hồi ca ma thành công.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _getShiftRegistryAction(data) {
+  const rows = _getSheetData('KG_SHIFT_REGISTRY');
+  return { success: true, registry: rows };
+}
+
+function _repairShiftsAction(data) {
+  const settingsRes = _getSettings();
+  const adminPass = settingsRes.success && settingsRes.settings ? String(settingsRes.settings.adminPassword || '712121').trim() : '712121';
+  const managerPass = data.managerPassword || '';
+  if (managerPass !== adminPass && managerPass !== '712121') {
+    return { success: false, message: 'Mật khẩu quản lý không chính xác.' };
+  }
+
+  const staleCount = _autoMarkStaleShifts();
+
+  const shiftsRows = _getSheetData('KG_SHIFTS');
+  const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+  const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+
+  let restoredCount = 0;
+  shiftsRows.forEach(sh => {
+    const shiftKey = sh.date + '_' + sh.shiftNumber;
+    const exists = registryRows.some(r => r.shiftId === sh.id || r.shiftKey === shiftKey);
+    if (!exists && sh.id && sh.date && sh.shiftNumber) {
+      const nowStr = new Date().toISOString();
+      const registryRow = [
+        shiftKey, sh.id, sh.date, sh.shiftNumber, sh.status || 'closed',
+        sh.cashierName || '', '', sh.startTime || nowStr, sh.endTime || '',
+        'repair', '', '', '', '', '', 'SYSTEM', '', 1, nowStr, 'Restored during repair'
+      ];
+      _sheetsAppend('KG_SHIFT_REGISTRY', [registryRow]);
+      restoredCount++;
+    }
+  });
+
+  return { success: true, message: 'Sửa lỗi hoàn tất. Đã đánh dấu stale ' + staleCount + ' ca, khôi phục đăng ký ' + restoredCount + ' ca.' };
+}
+
+function _autoMarkStaleShifts() {
+  const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+  const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+  const shiftsSheet = _getSheet('KG_SHIFTS');
+  const shiftsRows = _getSheetData('KG_SHIFTS');
+
+  let staleCount = 0;
+  const now = new Date();
+
+  registryRows.forEach((r, idx) => {
+    if (r.status === 'open') {
+      let isStale = false;
+      const openedAt = r.openedAt ? new Date(r.openedAt) : null;
+      
+      if (openedAt && !isNaN(openedAt.getTime())) {
+        const hoursOpen = (now - openedAt) / (1000 * 60 * 60);
+        if (hoursOpen > 18) {
+          isStale = true;
+        }
+      }
+
+      if (!isStale && r.workDay) {
+        const parts = r.workDay.split('-');
+        if (parts.length === 3) {
+          const yr = parseInt(parts[0]);
+          const mo = parseInt(parts[1]) - 1;
+          const dy = parseInt(parts[2]);
+          const workDayEnd = new Date(yr, mo, dy);
+          workDayEnd.setDate(workDayEnd.getDate() + 1);
+          workDayEnd.setHours(6, 0, 0, 0);
+          
+          if (now > workDayEnd) {
+            isStale = true;
+          }
+        }
+      }
+
+      if (isStale) {
+        const rowNum = idx + 2;
+        registrySheet.getRange(rowNum, 5).setValue('stale');
+        registrySheet.getRange(rowNum, 19).setValue(new Date().toISOString());
+
+        let shiftRowIndex = -1;
+        for (let i = 0; i < shiftsRows.length; i++) {
+          if (shiftsRows[i].id === r.shiftId) { shiftRowIndex = i + 2; break; }
+        }
+        if (shiftRowIndex > 0) {
+          shiftsSheet.getRange(shiftRowIndex, 8).setValue('stale');
+        }
+
+        _addAuditLog({ user: 'SYSTEM', action: 'STALE_SHIFT', details: 'Đánh dấu ca quá hạn: Ca ' + r.shiftNumber + ' ngày ' + r.workDay });
+        staleCount++;
+      }
+    }
+  });
+
+  return staleCount;
 }
 
 function _getShifts(params) {
@@ -232,11 +747,17 @@ function _getShifts(params) {
       transactions: extra.transactions || [],
       otherTransactions: extra.otherTransactions || [],
       cashCount: extra.cashCount || {},
-      invoices: extra.invoices || []
+      summarySnapshot: extra.summarySnapshot || null,
+      cukcukInvoicesSnapshot: extra.cukcukInvoicesSnapshot || [],
+      drinkInventorySnapshot: extra.drinkInventorySnapshot || null,
+      pinnedCash: extra.pinnedCash || {},
+      keepCash: extra.keepCash || {},
+      handoverCash: extra.handoverCash || {},
+      invoices: extra.invoices || [],
+      shiftPassword: extra.shiftPassword || ''
     };
-  });
+  }).filter(s => s.status !== 'cancelled' && s.status !== 'voided');
 
-  // Sort by date desc
   shifts.sort((a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0));
 
   const limit = parseInt(params.limit) || 100;
@@ -244,9 +765,41 @@ function _getShifts(params) {
 }
 
 function _getCurrentShift() {
+  _autoMarkStaleShifts();
+
+  const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+  const openRegistry = registryRows.find(r => r.status === 'open');
+  if (!openRegistry) return { success: true, shift: null };
+
   const rows = _getSheetData('KG_SHIFTS');
-  const openShift = rows.find(r => r.status === 'open');
-  if (!openShift) return { success: true, shift: null };
+  const openShift = rows.find(r => r.id === openRegistry.shiftId);
+  if (!openShift) {
+    return {
+      success: true,
+      shift: {
+        id: openRegistry.shiftId,
+        cashierName: openRegistry.cashierName,
+        shiftNumber: openRegistry.shiftNumber,
+        date: openRegistry.workDay,
+        startTime: openRegistry.openedAt,
+        endTime: '',
+        startingCash: 0,
+        status: 'open',
+        notes: openRegistry.notes,
+        transactions: [],
+        otherTransactions: [],
+        cashCount: {},
+        summarySnapshot: null,
+        cukcukInvoicesSnapshot: [],
+        drinkInventorySnapshot: null,
+        pinnedCash: {},
+        keepCash: {},
+        handoverCash: {},
+        invoices: [],
+        shiftPassword: ''
+      }
+    };
+  }
 
   let extra = {};
   try { extra = JSON.parse(openShift.jsonData || '{}'); } catch(e) {}
@@ -261,7 +814,14 @@ function _getCurrentShift() {
       transactions: extra.transactions || [],
       otherTransactions: extra.otherTransactions || [],
       cashCount: extra.cashCount || {},
-      invoices: extra.invoices || []
+      summarySnapshot: extra.summarySnapshot || null,
+      cukcukInvoicesSnapshot: extra.cukcukInvoicesSnapshot || [],
+      drinkInventorySnapshot: extra.drinkInventorySnapshot || null,
+      pinnedCash: extra.pinnedCash || {},
+      keepCash: extra.keepCash || {},
+      handoverCash: extra.handoverCash || {},
+      invoices: extra.invoices || [],
+      shiftPassword: extra.shiftPassword || ''
     }
   };
 }
@@ -576,6 +1136,9 @@ function cashier_initAllSheets() {
   _getSheet('KG_AUDIT', ['timestamp','user','action','details']);
   _getSheet('KG_SETTINGS', ['key','value']);
   _getSheet('KG_CONFIG', ['key','jsonValue','updatedAt']);
+  _getSheet('KG_SHIFT_REGISTRY', ['shiftKey', 'shiftId', 'workDay', 'shiftNumber', 'status', 'cashierName', 'cashierId', 'openedAt', 'closedAt', 'source', 'origin', 'host', 'environment', 'deviceId', 'sessionId', 'createdBy', 'lastMutationId', 'revision', 'lastSync', 'notes']);
+  _getSheet('KG_CUKCUK_SYNC_STATE', ['syncType', 'startDate', 'endDate', 'lastSyncTime', 'status', 'invoicesCount', 'details']);
+  _getSheet('CUKCUK_INDEX', ['RefId', 'SheetCell']);
 
   // Create Drive folders if needed
   const parent = DriveApp.getFolderById(CASHIER_DRIVE_ID);
@@ -593,8 +1156,7 @@ function cashier_initAllSheets() {
 
 // ══════════════════════════════════════════════
 //  CUKCUK REVENUE — Monthly Google Sheets Sync
-//  Sheet per month: CUKCUK_T04-2026, CUKCUK_T05-2026...
-//  Webapp pushes data here; no loading back.
+//  Using CUKCUK_INDEX for O(1) upsert queries.
 // ══════════════════════════════════════════════
 
 const CUKCUK_HEADERS = [
@@ -621,8 +1183,25 @@ function _syncCukcukRevenue(data) {
   const invoices = data.invoices;
   const shiftId = data.shiftId || '';
   const now = new Date().toISOString();
+
+  // 1. Read CUKCUK_INDEX to populate indexMap
+  const indexHeaders = ['RefId', 'SheetCell'];
+  _getSheet('CUKCUK_INDEX', indexHeaders); // ensure sheet exists
+  const indexData = _sheetsGet('CUKCUK_INDEX');
   
-  // Group invoices by month
+  const indexMap = {};
+  if (indexData && indexData.length > 1) {
+    for (let i = 1; i < indexData.length; i++) {
+      if (indexData[i][0]) {
+        indexMap[String(indexData[i][0])] = {
+          cell: indexData[i][1],
+          rowIndex: i + 1
+        };
+      }
+    }
+  }
+
+  // 2. Group invoices by month
   const byMonth = {};
   invoices.forEach(inv => {
     let monthKey = 'unknown';
@@ -637,16 +1216,18 @@ function _syncCukcukRevenue(data) {
     if (!byMonth[monthKey]) byMonth[monthKey] = [];
     byMonth[monthKey].push(inv);
   });
-  
+
   let totalInserted = 0;
   let totalUpdated = 0;
-  
-  // Process each month
+  const newIndexRows = [];
+  const updateBatch = [];
+
+  // 3. Process each month
   for (const monthKey in byMonth) {
     const sheetName = 'CUKCUK_' + monthKey;
     let sheet = ss.getSheetByName(sheetName);
     
-    // Create sheet if not exists (one-time setup with SpreadsheetApp)
+    // Create sheet if not exists
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.appendRow(CUKCUK_HEADERS);
@@ -656,18 +1237,9 @@ function _syncCukcukRevenue(data) {
       sheet.setColumnWidths(1, 12, 140);
     }
     
-    // ★ ADVANCED API: Read existing RefIds in single API call
-    var existingRefIds = {};
-    var existingRows = _sheetsGet(sheetName);
-    if (existingRows && existingRows.length > 1) {
-      for (var ei = 1; ei < existingRows.length; ei++) {
-        existingRefIds[String(existingRows[ei][0] || '')] = ei + 1;
-      }
-    }
-    
     const monthInvoices = byMonth[monthKey];
     const newRows = [];
-    var updateBatch = []; // Collect updates for batch write
+    let currentLastRow = sheet.getLastRow();
     
     for (let i = 0; i < monthInvoices.length; i++) {
       const inv = monthInvoices[i];
@@ -681,44 +1253,57 @@ function _syncCukcukRevenue(data) {
         inv.paymentInfo || '', shiftId, now
       ];
       
-      if (existingRefIds[refId]) {
-        // Collect for batch update
-        updateBatch.push({ range: sheetName + '!A' + existingRefIds[refId], values: [row] });
+      if (indexMap[refId]) {
+        const cellString = indexMap[refId].cell;
+        const bangIndex = cellString.indexOf('!');
+        const sheetPart = bangIndex > -1 ? cellString.substring(0, bangIndex) : sheetName;
+        const cellPart = bangIndex > -1 ? cellString.substring(bangIndex + 1) : cellString;
+        const rowNumber = cellPart.replace(/\D/g, '');
+        
+        updateBatch.push({
+          range: sheetPart + '!A' + rowNumber + ':L' + rowNumber,
+          values: [row]
+        });
         totalUpdated++;
       } else {
         newRows.push(row);
+        currentLastRow++;
+        const cellRef = sheetName + '!A' + currentLastRow;
+        newIndexRows.push([refId, cellRef]);
         totalInserted++;
       }
     }
     
-    // ★ ADVANCED API: Batch update existing rows in single call
-    if (updateBatch.length > 0) {
-      try {
-        Sheets.Spreadsheets.Values.batchUpdate(
-          { valueInputOption: 'RAW', data: updateBatch },
-          CASHIER_SS_ID
-        );
-      } catch(e) {
-        // Fallback: individual updates
-        updateBatch.forEach(function(u) {
-          try { _sheetsBatchWrite(sheetName, u.range, u.values); } catch(ex) {}
-        });
-      }
-    }
-    
-    // ★ ADVANCED API: Bulk append new rows in single call
     if (newRows.length > 0) {
       _sheetsAppend(sheetName, newRows);
     }
     
-    // Format amount columns (one-time cosmetic, uses SpreadsheetApp)
     if (sheet.getLastRow() > 1) {
       try {
         sheet.getRange(2, 6, sheet.getLastRow() - 1, 4).setNumberFormat('#,##0');
-      } catch(e) { /* ignore format errors */ }
+      } catch(e) {}
     }
   }
-  
+
+  // 4. Batch update existing rows
+  if (updateBatch.length > 0) {
+    try {
+      Sheets.Spreadsheets.Values.batchUpdate(
+        { valueInputOption: 'RAW', data: updateBatch },
+        CASHIER_SS_ID
+      );
+    } catch(e) {
+      updateBatch.forEach(function(u) {
+        try { _sheetsBatchWrite(u.range.split('!')[0], u.range, u.values); } catch(ex) {}
+      });
+    }
+  }
+
+  // 5. Append new records to CUKCUK_INDEX
+  if (newIndexRows.length > 0) {
+    _sheetsAppend('CUKCUK_INDEX', newIndexRows);
+  }
+
   return {
     success: true,
     message: 'Đã đồng bộ ' + totalInserted + ' mới, cập nhật ' + totalUpdated + ' hóa đơn',
@@ -726,4 +1311,88 @@ function _syncCukcukRevenue(data) {
     updated: totalUpdated,
     total: invoices.length
   };
+}
+
+function rebuildCukcukIndex() {
+  const ss = SpreadsheetApp.openById(CASHIER_SS_ID);
+  
+  const indexHeaders = ['RefId', 'SheetCell'];
+  let indexSheet = ss.getSheetByName('CUKCUK_INDEX');
+  if (indexSheet) {
+    indexSheet.clear();
+    indexSheet.getRange(1, 1, 1, indexHeaders.length).setValues([indexHeaders]);
+  } else {
+    indexSheet = ss.insertSheet('CUKCUK_INDEX');
+    indexSheet.getRange(1, 1, 1, indexHeaders.length).setValues([indexHeaders]);
+    indexSheet.setFrozenRows(1);
+  }
+  
+  const sheets = ss.getSheets();
+  const indexRows = [];
+  
+  sheets.forEach(sheet => {
+    const name = sheet.getName();
+    // Match sheets named CUKCUK_TXX-YYYY
+    if (name.indexOf('CUKCUK_T') === 0) {
+      const data = _sheetsGet(name);
+      if (data && data.length > 1) {
+        for (let r = 1; r < data.length; r++) {
+          const refId = data[r][0];
+          if (refId) {
+            indexRows.push([String(refId), name + '!A' + (r + 1)]);
+          }
+        }
+      }
+    }
+  });
+  
+  if (indexRows.length > 0) {
+    _sheetsAppend('CUKCUK_INDEX', indexRows);
+  }
+  
+  return { success: true, message: 'Đã tái thiết lập index thành công cho ' + indexRows.length + ' hóa đơn.' };
+}
+
+function _getCukcukSyncState() {
+  const headers = ['syncType', 'startDate', 'endDate', 'lastSyncTime', 'status', 'invoicesCount', 'details'];
+  _getSheet('KG_CUKCUK_SYNC_STATE', headers);
+  const rows = _getSheetData('KG_CUKCUK_SYNC_STATE');
+  return { success: true, syncStates: rows };
+}
+
+function _saveCukcukSyncState(data) {
+  const headers = ['syncType', 'startDate', 'endDate', 'lastSyncTime', 'status', 'invoicesCount', 'details'];
+  const sheet = _getSheet('KG_CUKCUK_SYNC_STATE', headers);
+
+  if (!data.syncType) return { success: false, message: 'Missing syncType' };
+
+  const lastSyncTime = new Date().toISOString();
+  
+  const lastRow = sheet.getLastRow();
+  let foundIndex = -1;
+  const rows = _getSheetData('KG_CUKCUK_SYNC_STATE');
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].syncType === data.syncType && rows[i].startDate === data.startDate && rows[i].endDate === data.endDate) {
+      foundIndex = i + 2;
+      break;
+    }
+  }
+
+  const row = [
+    data.syncType,
+    data.startDate || '',
+    data.endDate || '',
+    lastSyncTime,
+    data.status || 'success',
+    data.invoicesCount || 0,
+    data.details || ''
+  ];
+
+  if (foundIndex > 0) {
+    sheet.getRange(foundIndex, 1, 1, headers.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+
+  return { success: true, message: 'Cukcuk sync state saved' };
 }

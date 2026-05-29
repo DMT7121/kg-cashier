@@ -22,11 +22,23 @@ retryQueue.init(syncCukcukRevenueToCloud);
  */
 
 // ── API Base URL ──
-// - Dev (localhost): Vite proxy → /cukcuk-api → graphapi.cukcuk.vn
-// - Production: Cloudflare Worker proxy → graphapi.cukcuk.vn
-var CUKCUK_API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-  ? '/cukcuk-api'
-  : 'https://kg-cukcuk-api.dmt-kgwork.workers.dev';
+// - Dev (localhost/LAN) & Production (Cloudflare Pages with Functions): Use relative /cukcuk-api proxy to bypass CORS
+// - Fallback: Use external Cloudflare Worker proxy if running as a static file or other hosting environments
+var CUKCUK_API_BASE = '/cukcuk-api';
+
+var useRelativeProxy = 
+  !location.hostname ||
+  location.hostname === 'localhost' || 
+  location.hostname === '127.0.0.1' || 
+  location.hostname.indexOf('pages.dev') !== -1 ||
+  location.hostname.indexOf('kinggrill') !== -1 ||
+  /^192\.168\./.test(location.hostname) ||
+  /^10\./.test(location.hostname) ||
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(location.hostname);
+
+if (!useRelativeProxy && location.protocol !== 'file:') {
+  CUKCUK_API_BASE = 'https://kg-cukcuk-api.dmt-kgwork.workers.dev';
+}
 
 // ── Token Cache ──
 var _cachedToken = null;

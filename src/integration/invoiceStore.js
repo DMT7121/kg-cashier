@@ -9,6 +9,8 @@
 var STORE_KEY = 'cukcuk_invoice_store';
 var STORE_VERSION = 1;
 
+import { getWorkingDayRange } from '../utils.js';
+
 // ── Internal helpers ──
 
 function _load() {
@@ -216,10 +218,10 @@ export function getPeriodBounds(period, refDate) {
 
   switch (period) {
     case 'day': {
-      start = new Date(workNow.getFullYear(), workNow.getMonth(), workNow.getDate(), 12, 0, 0);
-      var nextDay = new Date(workNow);
-      nextDay.setDate(nextDay.getDate() + 1);
-      end = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate(), 6, 0, 0);
+      var dateStr = _dateStr(workNow);
+      var range = getWorkingDayRange(dateStr);
+      start = range.start;
+      end = range.end;
       label = 'Hôm nay (' + _pad2(workNow.getDate()) + '/' + _pad2(workNow.getMonth()+1) + ')';
       break;
     }

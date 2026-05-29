@@ -1,9 +1,9 @@
 /* ── Settings View — Consolidated Hub ──
    Tabs: Hệ thống | Nhân viên | Nhật ký | Biểu mẫu in
    ── */
-import { getSettings, updateSettings, getCategories, addCategory, removeCategory, getPrintForms } from '../store.js';
+import { getSettings, updateSettings, getCategories, addCategory, removeCategory, getPrintForms, getState, importState } from '../store.js';
 import { showToast, showConfirm } from '../utils.js';
-import { saveSettingsToCloud, pingAPI, isOnline, getQueueSize } from '../api.js';
+import { saveSettingsToCloud, pingAPI, isOnline, getQueueSize, rebuildCukcukIndexOnCloud, repairShiftsOnCloud, voidGhostShiftOnCloud, getShiftRegistryFromCloud, getCukcukSyncStateFromCloud, getMetadata } from '../api.js';
 
 // Sub-modules (lazy-rendered via tabs)
 import * as staffModule from './staff.js';
@@ -19,6 +19,7 @@ const _tabs = [
   { key: 'audit',   icon: 'history_edu',  label: 'Nhật ký' },
   { key: 'print',   icon: 'description',  label: 'Biểu mẫu in' },
   { key: 'inventory', icon: 'inventory_2', label: 'Kho & NCC' },
+  { key: 'cloud',   icon: 'cloud_sync',   label: 'Quản trị Cloud' },
 ];
 
 function _renderTabs() {
@@ -577,6 +578,540 @@ function _initInventoryTab() {
   });
 }
 
+// ── Cloud Tab ──
+let _rebuildInterval = null;
+
+function _renderCloudTab() {
+  return `
+    <!-- Health Dashboard Widget -->
+    <div class="card" style="margin-bottom:20px; border:1px solid rgba(16,185,129,0.2);">
+      <div class="card-header" style="background:rgba(16,185,129,0.05); color:#10b981; display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="display:flex; align-items:center; gap:8px; margin:0;">
+          <span class="material-symbols-rounded">health_and_safety</span>
+          Bảng giám sát sức khỏe hệ thống (System Health)
+        </h3>
+        <button class="btn btn-outline btn-sm" id="btnRefreshHealth" style="border-color:#10b981; color:#10b981; padding: 4px 8px; font-size:12px; display:flex; align-items:center; gap:4px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">refresh</span> Kiểm tra lại
+        </button>
+      </div>
+      <div class="card-body">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+          <!-- GAS Connection -->
+          <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+            <span class="text-muted" style="font-size:11px; display:block; margin-bottom:4px;">Kết nối GAS API</span>
+            <strong id="healthGasStatus" style="font-size:14px; color:#10b981;">🟢 Đang kiểm tra...</strong>
+          </div>
+          <!-- Environment -->
+          <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+            <span class="text-muted" style="font-size:11px; display:block; margin-bottom:4px;">Môi trường chạy</span>
+            <strong id="healthEnvironment" style="font-size:14px; color:#38bdf8;">—</strong>
+          </div>
+          <!-- Sync Queue -->
+          <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+            <span class="text-muted" style="font-size:11px; display:block; margin-bottom:4px;">Hàng đợi đồng bộ</span>
+            <strong id="healthQueueSize" style="font-size:14px; color:#fb923c;">0 chờ đồng bộ</strong>
+          </div>
+          <!-- Schema Version -->
+          <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+            <span class="text-muted" style="font-size:11px; display:block; margin-bottom:4px;">Phiên bản dữ liệu (Schema)</span>
+            <strong id="healthSchemaVersion" style="font-size:14px; color:#a78bfa;">v2 (Shifts & Invoices)</strong>
+          </div>
+        </div>
+        <div style="margin-top:12px; padding:8px 12px; background:rgba(0,0,0,0.1); border-radius:6px; font-family:monospace; font-size:11px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;" class="text-muted">
+          <span><strong>Device ID:</strong> <span id="healthDeviceId" style="color:var(--text-color);">—</span></span>
+          <span><strong>Session ID:</strong> <span id="healthSessionId" style="color:var(--text-color);">—</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backup & Restore Widget -->
+    <div class="card" style="margin-bottom:20px; border:1px solid rgba(99,102,241,0.2);">
+      <div class="card-header" style="background:rgba(99,102,241,0.05); color:#818cf8;">
+        <h3 style="display:flex; align-items:center; gap:8px; margin:0;">
+          <span class="material-symbols-rounded">backup</span>
+          Sao lưu & Khôi phục dữ liệu (Backup & Restore)
+        </h3>
+      </div>
+      <div class="card-body">
+        <p class="text-muted" style="font-size:12px; margin-bottom:15px;">
+          Xuất toàn bộ cấu hình, lịch sử ca và cài đặt cục bộ ra tệp tin JSON hoặc nhập lại từ tệp tin đã sao lưu để khôi phục trạng thái.
+        </p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+          <button class="btn btn-outline" id="btnExportBackup" style="display:flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded">download</span> Xuất file sao lưu (JSON)
+          </button>
+          
+          <div style="position:relative; overflow:hidden; display:inline-block;">
+            <button class="btn btn-outline" style="border-color:#fb923c; color:#fb923c; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded">upload</span> Nhập file khôi phục (JSON)
+            </button>
+            <input type="file" id="fileImportBackup" accept=".json" style="position:absolute; font-size:100px; opacity:0; right:0; top:0; cursor:pointer;" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px; border:1px solid rgba(239,68,68,0.2);">
+      <div class="card-header" style="background:rgba(239,68,68,0.05);">
+        <h3 style="display:flex; align-items:center; gap:8px; margin:0;">
+          <span class="material-symbols-rounded" style="color:var(--danger);">security</span>
+          Xác thực Quản lý (Manager Authentication)
+        </h3>
+      </div>
+      <div class="card-body">
+        <p class="text-muted" style="font-size:12px; margin-bottom:12px;">
+          Các hành động quản trị hệ thống đám mây yêu cầu mật khẩu quản lý để thực thi.
+        </p>
+        <div class="form-group" style="max-width: 400px; margin: 0;">
+          <label class="form-label">Mật khẩu Quản lý</label>
+          <input type="password" id="cloudManagerPassword" class="form-input" placeholder="Nhập mật khẩu quản lý (mặc định: 712121 hoặc mã PIN)...">
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- CUKCUK Index Overhaul -->
+      <div class="card">
+        <div class="card-header">
+          <h3 style="display:flex; align-items:center; gap:8px; margin:0;">
+            <span class="material-symbols-rounded" style="color:var(--primary);">speed</span>
+            Tối ưu hóa CUKCUK Sync Index
+          </h3>
+        </div>
+        <div class="card-body">
+          <p class="text-muted" style="font-size:12px; margin-bottom:15px;">
+            Hệ thống sử dụng tệp chỉ mục <code>CUKCUK_INDEX</code> để cập nhật trạng thái hóa đơn O(1). Nếu chỉ mục bị sai lệch hoặc thiếu, hãy nhấn nút bên dưới để tái thiết lập chỉ mục từ đầu.
+          </p>
+          
+          <div style="margin-bottom: 20px;">
+            <button class="btn btn-primary" id="btnRebuildCukcukIndex" style="width:100%;">
+              <span class="material-symbols-rounded">build_circle</span> Tái thiết lập CUKCUK Index
+            </button>
+          </div>
+
+          <div id="rebuildProgressContainer" style="display:none; margin-top:15px; padding:15px; border-radius:8px; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2);">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;">
+              <strong id="rebuildStatusText" style="color:#818cf8;">Đang khởi tạo tái thiết lập...</strong>
+              <span id="rebuildPercentText" style="font-family:monospace; font-weight:bold;">0%</span>
+            </div>
+            <div style="width:100%; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
+              <div id="rebuildProgressBar" style="width:0%; height:100%; background:var(--primary); transition:width 0.3s ease;"></div>
+            </div>
+            <div id="rebuildDetailText" class="text-muted" style="font-size:11px; margin-top:8px; font-family:monospace; white-space:pre-wrap;"></div>
+          </div>
+
+          <div class="mt-20">
+            <h4 style="margin-bottom:10px; font-size:13px; font-weight:bold; color:var(--text-color);">Trạng thái đồng bộ đám mây hiện tại:</h4>
+            <div id="cloudSyncStateContainer" style="font-family:monospace; font-size:12px; background:rgba(0,0,0,0.2); padding:12px; border-radius:6px; max-height:200px; overflow-y:auto; border:1px solid rgba(255,255,255,0.05); line-height:1.5;">
+              Đang tải trạng thái...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shift Registry Controls -->
+      <div class="card">
+        <div class="card-header">
+          <h3 style="display:flex; align-items:center; gap:8px; margin:0;">
+            <span class="material-symbols-rounded" style="color:#f59e0b;">dns</span>
+            Shift Registry & Concurrency Control
+          </h3>
+        </div>
+        <div class="card-body">
+          <p class="text-muted" style="font-size:12px; margin-bottom:15px;">
+            Registry trên Cloud lưu danh sách các ca làm việc đang mở thực tế. Sử dụng các nút bên dưới để cập nhật danh sách hoặc tự động khắc phục xung đột Registry.
+          </p>
+          
+          <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" id="btnRefreshRegistry" style="flex:1;">
+              <span class="material-symbols-rounded">refresh</span> Tải lại Registry
+            </button>
+            <button class="btn btn-danger btn-sm" id="btnRepairRegistry" style="flex:1;">
+              <span class="material-symbols-rounded">healing</span> Sửa lỗi Registry Ca
+            </button>
+          </div>
+
+          <div id="cloudRegistryContainer" style="overflow-x:auto; background:rgba(0,0,0,0.1); border-radius:6px; border:1px solid rgba(255,255,255,0.05); min-height: 100px;">
+            <div style="text-align:center; padding:30px;" class="text-muted">Đang tải danh sách ca...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function _loadRegistryAndSyncStates() {
+  const regContainer = document.getElementById('cloudRegistryContainer');
+  const syncContainer = document.getElementById('cloudSyncStateContainer');
+
+  if (regContainer) {
+    regContainer.innerHTML = `<div style="text-align:center;padding:30px;" class="text-muted"><span class="material-symbols-rounded rotating" style="font-size:24px; vertical-align:middle; margin-right:8px;">sync</span> Đang tải registry...</div>`;
+  }
+  if (syncContainer) {
+    syncContainer.innerHTML = `Đang tải trạng thái đồng bộ...`;
+  }
+
+  try {
+    const regResult = await getShiftRegistryFromCloud();
+    if (regResult && regResult.success && regResult.registry) {
+      if (regContainer) {
+        if (regResult.registry.length === 0) {
+          regContainer.innerHTML = `<div class="text-muted" style="padding:20px;text-align:center;">Không có ca làm việc nào trong registry cloud.</div>`;
+        } else {
+          regContainer.innerHTML = `
+            <table class="table" style="width:100%; font-size:12px; border-collapse:collapse;">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                  <th style="text-align:left; padding:8px 12px;">ID Ca</th>
+                  <th style="text-align:left; padding:8px 12px;">Ngày</th>
+                  <th style="text-align:left; padding:8px 12px;">Số Ca</th>
+                  <th style="text-align:left; padding:8px 12px;">Thu ngân</th>
+                  <th style="text-align:left; padding:8px 12px;">Trạng thái</th>
+                  <th style="text-align:center; padding:8px 12px;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${regResult.registry.map(r => `
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:8px 12px;"><strong>${r.id}</strong></td>
+                    <td style="padding:8px 12px;">${r.date}</td>
+                    <td style="padding:8px 12px;">Ca ${r.shiftNumber}</td>
+                    <td style="padding:8px 12px;">${r.cashierName}</td>
+                    <td style="padding:8px 12px;">
+                      <span class="tag ${r.status === 'open' ? 'tag-income' : r.status === 'closed' ? 'tag-card' : 'tag-expense'}">
+                        ${r.status === 'open' ? 'Mở' : r.status === 'closed' ? 'Đóng' : 'Hủy'}
+                      </span>
+                    </td>
+                    <td style="text-align:center; padding:8px 12px;">
+                      ${r.status === 'open' ? `
+                        <button class="btn btn-danger btn-xs btnVoidShift" data-shift-id="${r.id}" style="padding:4px 8px; font-size:11px;">
+                          Hủy ca (Void)
+                        </button>
+                      ` : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+          // Bind void buttons
+          regContainer.querySelectorAll('.btnVoidShift').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const shiftId = btn.dataset.shiftId;
+              const pwdInput = document.getElementById('cloudManagerPassword');
+              const password = pwdInput ? pwdInput.value.trim() : '';
+              if (!password) {
+                showToast('Vui lòng nhập mật khẩu quản lý để hủy ca!', 'warning');
+                pwdInput?.focus();
+                return;
+              }
+              const ok = await showConfirm(`Xác nhận hủy (void) ca làm việc "${shiftId}" trên đám mây? Ca này sẽ bị vô hiệu hóa hoàn toàn.`, {
+                title: 'Hủy ca Registry',
+                confirmText: 'Xác nhận hủy',
+                type: 'danger'
+              });
+              if (ok) {
+                try {
+                  const res = await voidGhostShiftOnCloud(shiftId, password);
+                  if (res && res.success) {
+                    showToast('Đã hủy ca thành công!', 'success');
+                    _loadRegistryAndSyncStates();
+                  } else {
+                    showToast('Lỗi: ' + (res ? res.message : 'Yêu cầu thất bại'), 'error');
+                  }
+                } catch (e) {
+                  showToast('Lỗi: ' + e.message, 'error');
+                }
+              }
+            });
+          });
+        }
+      }
+    } else {
+      if (regContainer) regContainer.innerHTML = `<div class="text-danger" style="padding:20px;text-align:center;">Lỗi tải registry: ${regResult ? regResult.message : 'Lỗi kết nối'}</div>`;
+    }
+  } catch (e) {
+    if (regContainer) regContainer.innerHTML = `<div class="text-danger" style="padding:20px;text-align:center;">Lỗi tải registry: ${e.message}</div>`;
+  }
+
+  try {
+    const syncResult = await getCukcukSyncStateFromCloud();
+    if (syncResult && syncResult.success && syncResult.syncState) {
+      if (syncContainer) {
+        const state = syncResult.syncState;
+        let html = `<strong>Công việc:</strong> ${state.task || 'Không có'}<br>`;
+        html += `<strong>Trạng thái:</strong> <span class="tag ${state.status === 'RUNNING' ? 'tag-income' : state.status === 'COMPLETED' ? 'tag-card' : 'tag-expense'}">${state.status || 'Chưa chạy'}</span><br>`;
+        html += `<strong>Tiến độ:</strong> ${state.currentRow || 0} / ${state.totalRows || 0} dòng<br>`;
+        if (state.message) html += `<strong>Chi tiết:</strong> ${state.message}<br>`;
+        html += `<strong>Cập nhật:</strong> ${state.timestamp ? new Date(state.timestamp).toLocaleString('vi-VN') : 'chưa rõ'}`;
+        syncContainer.innerHTML = html;
+
+        // If running, show and update progress container
+        if (state.status === 'RUNNING') {
+          const progContainer = document.getElementById('rebuildProgressContainer');
+          const progBar = document.getElementById('rebuildProgressBar');
+          const percentText = document.getElementById('rebuildPercentText');
+          const statusText = document.getElementById('rebuildStatusText');
+          const detailText = document.getElementById('rebuildDetailText');
+
+          if (progContainer) {
+            progContainer.style.display = 'block';
+            const percent = state.totalRows > 0 ? Math.round((state.currentRow / state.totalRows) * 100) : 0;
+            if (progBar) progBar.style.width = percent + '%';
+            if (percentText) percentText.textContent = percent + '%';
+            if (statusText) statusText.textContent = 'Đang thiết lập: ' + state.task;
+            if (detailText) detailText.textContent = `${state.message || ''}\nĐang xử lý dòng ${state.currentRow} trên ${state.totalRows}...`;
+          }
+
+          // Start interval polling if not already started
+          if (!_rebuildInterval) {
+            _startRebuildPolling();
+          }
+        }
+      }
+    } else {
+      if (syncContainer) syncContainer.innerHTML = `Lỗi tải trạng thái đồng bộ: ${syncResult ? syncResult.message : 'Lỗi kết nối'}`;
+    }
+  } catch (e) {
+    if (syncContainer) syncContainer.innerHTML = `Lỗi tải trạng thái đồng bộ: ${e.message}`;
+  }
+}
+
+function _startRebuildPolling() {
+  if (_rebuildInterval) clearInterval(_rebuildInterval);
+  _rebuildInterval = setInterval(async () => {
+    try {
+      const syncResult = await getCukcukSyncStateFromCloud();
+      if (syncResult && syncResult.success && syncResult.syncState) {
+        const state = syncResult.syncState;
+        const progContainer = document.getElementById('rebuildProgressContainer');
+        const progBar = document.getElementById('rebuildProgressBar');
+        const percentText = document.getElementById('rebuildPercentText');
+        const statusText = document.getElementById('rebuildStatusText');
+        const detailText = document.getElementById('rebuildDetailText');
+        const syncContainer = document.getElementById('cloudSyncStateContainer');
+
+        if (syncContainer) {
+          let html = `<strong>Công việc:</strong> ${state.task || 'Không có'}<br>`;
+          html += `<strong>Trạng thái:</strong> <span class="tag ${state.status === 'RUNNING' ? 'tag-income' : state.status === 'COMPLETED' ? 'tag-card' : 'tag-expense'}">${state.status || 'Chưa chạy'}</span><br>`;
+          html += `<strong>Tiến độ:</strong> ${state.currentRow || 0} / ${state.totalRows || 0} dòng<br>`;
+          if (state.message) html += `<strong>Chi tiết:</strong> ${state.message}<br>`;
+          html += `<strong>Cập nhật:</strong> ${state.timestamp ? new Date(state.timestamp).toLocaleString('vi-VN') : 'chưa rõ'}`;
+          syncContainer.innerHTML = html;
+        }
+
+        if (state.status === 'RUNNING' && progContainer) {
+          progContainer.style.display = 'block';
+          const percent = state.totalRows > 0 ? Math.round((state.currentRow / state.totalRows) * 100) : 0;
+          if (progBar) progBar.style.width = percent + '%';
+          if (percentText) percentText.textContent = percent + '%';
+          if (statusText) statusText.textContent = 'Đang thiết lập: ' + state.task;
+          if (detailText) detailText.textContent = `${state.message || ''}\nĐang xử lý dòng ${state.currentRow} trên ${state.totalRows}...`;
+        } else {
+          // Completed or error
+          clearInterval(_rebuildInterval);
+          _rebuildInterval = null;
+          if (progContainer) {
+            if (state.status === 'COMPLETED') {
+              if (progBar) progBar.style.width = '100%';
+              if (percentText) percentText.textContent = '100%';
+              if (statusText) statusText.textContent = 'Hoàn thành chỉ mục!';
+              showToast('Tái thiết lập CUKCUK Index hoàn tất!', 'success');
+              setTimeout(() => {
+                progContainer.style.display = 'none';
+              }, 5000);
+            } else {
+              if (statusText) statusText.textContent = 'Lỗi hoặc Dừng!';
+              showToast('Lỗi khi tái thiết lập CUKCUK Index!', 'error');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Polling error:', e);
+    }
+  }, 3000);
+}
+
+async function _updateHealthStats() {
+  const meta = getMetadata();
+  const online = isOnline();
+  const queueSize = getQueueSize();
+  const state = getState();
+  
+  const gasStatusEl = document.getElementById('healthGasStatus');
+  const envEl = document.getElementById('healthEnvironment');
+  const queueEl = document.getElementById('healthQueueSize');
+  const schemaEl = document.getElementById('healthSchemaVersion');
+  const deviceIdEl = document.getElementById('healthDeviceId');
+  const sessionIdEl = document.getElementById('healthSessionId');
+
+  if (gasStatusEl) {
+    gasStatusEl.innerHTML = '<span class="material-symbols-rounded rotating" style="font-size:14px; vertical-align:middle; margin-right:4px;">sync</span> Đang kiểm tra...';
+    gasStatusEl.style.color = 'var(--text-muted)';
+    try {
+      const pingRes = await pingAPI();
+      if (pingRes.success) {
+        gasStatusEl.innerHTML = '🟢 Kết nối Cloud OK!';
+        gasStatusEl.style.color = '#10b981';
+      } else {
+        gasStatusEl.innerHTML = '🔴 Lỗi: ' + pingRes.message;
+        gasStatusEl.style.color = '#ef4444';
+      }
+    } catch(e) {
+      gasStatusEl.innerHTML = '🔴 Không thể kết nối';
+      gasStatusEl.style.color = '#ef4444';
+    }
+  }
+
+  if (envEl) {
+    envEl.textContent = meta.source === 'localhost' ? '💻 Local Development' : '🌐 Cloud Production';
+  }
+  if (queueEl) {
+    queueEl.textContent = queueSize + ' hàng đợi đang chờ';
+    queueEl.style.color = queueSize > 0 ? '#fb923c' : '#10b981';
+  }
+  if (schemaEl && state) {
+    schemaEl.textContent = 'v' + (state.schemaVersion || 1) + ' (Shifts & Invoices)';
+  }
+  if (deviceIdEl) deviceIdEl.textContent = meta.deviceId || '—';
+  if (sessionIdEl) sessionIdEl.textContent = meta.sessionId || '—';
+}
+
+function _initCloudTab() {
+  // Load registry and sync states immediately
+  _loadRegistryAndSyncStates();
+
+  // Load and refresh health stats
+  _updateHealthStats();
+
+  // Bind refresh health
+  document.getElementById('btnRefreshHealth')?.addEventListener('click', () => {
+    _updateHealthStats();
+    showToast('Đang cập nhật chỉ số sức khỏe hệ thống...', 'info');
+  });
+
+  // Bind export backup JSON
+  document.getElementById('btnExportBackup')?.addEventListener('click', () => {
+    try {
+      const data = getState();
+      const serialized = JSON.stringify(data, null, 2);
+      const blob = new Blob([serialized], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `kg-cashier-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      showToast('Xuất file sao lưu thành công!', 'success');
+    } catch(e) {
+      showToast('Lỗi xuất file: ' + e.message, 'error');
+    }
+  });
+
+  // Bind import backup JSON
+  document.getElementById('fileImportBackup')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        const ok = await showConfirm('Bạn có chắc chắn muốn khôi phục dữ liệu từ tệp này không? Toàn bộ dữ liệu hiện tại trên thiết bị sẽ bị ghi đè.', {
+          title: 'Khôi phục dữ liệu',
+          confirmText: 'Khôi phục',
+          type: 'warning'
+        });
+        if (!ok) return;
+
+        importState(parsed);
+        showToast('Khôi phục dữ liệu thành công! Đang tải lại trang...', 'success');
+        setTimeout(() => location.reload(), 1500);
+      } catch(err) {
+        showToast('Lỗi khôi phục: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // Bind refresh registry
+  document.getElementById('btnRefreshRegistry')?.addEventListener('click', () => {
+    _loadRegistryAndSyncStates();
+    showToast('Đang tải lại dữ liệu từ đám mây...', 'info');
+  });
+
+  // Bind repair shifts registry
+  document.getElementById('btnRepairRegistry')?.addEventListener('click', async () => {
+    const pwdInput = document.getElementById('cloudManagerPassword');
+    const password = pwdInput ? pwdInput.value.trim() : '';
+    if (!password) {
+      showToast('Vui lòng nhập mật khẩu quản lý!', 'warning');
+      pwdInput?.focus();
+      return;
+    }
+    const btn = document.getElementById('btnRepairRegistry');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-rounded rotating">sync</span> Đang sửa...';
+    }
+    try {
+      const res = await repairShiftsOnCloud(password);
+      if (res && res.success) {
+        showToast('Sửa registry ca thành công!', 'success');
+        _loadRegistryAndSyncStates();
+      } else {
+        showToast('Lỗi: ' + (res ? res.message : 'Yêu cầu thất bại'), 'error');
+      }
+    } catch(e) {
+      showToast('Lỗi: ' + e.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-rounded">healing</span> Sửa lỗi Registry Ca';
+      }
+    }
+  });
+
+  // Bind rebuild CUKCUK index
+  document.getElementById('btnRebuildCukcukIndex')?.addEventListener('click', async () => {
+    const pwdInput = document.getElementById('cloudManagerPassword');
+    const password = pwdInput ? pwdInput.value.trim() : '';
+    if (!password) {
+      showToast('Vui lòng nhập mật khẩu quản lý!', 'warning');
+      pwdInput?.focus();
+      return;
+    }
+    const ok = await showConfirm('Xác nhận tái xây dựng CUKCUK index? Tiến trình này có thể tốn vài phút tùy thuộc vào lượng hóa đơn lịch sử.', {
+      title: 'Tái thiết lập CUKCUK Index',
+      confirmText: 'Bắt đầu',
+      type: 'warning'
+    });
+    if (!ok) return;
+
+    const btn = document.getElementById('btnRebuildCukcukIndex');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-rounded rotating">sync</span> Đang bắt đầu...';
+    }
+
+    try {
+      const res = await rebuildCukcukIndexOnCloud(password);
+      if (res && res.success) {
+        showToast('Đang tiến hành tái xây dựng chỉ mục trên cloud...', 'success');
+        _loadRegistryAndSyncStates(); // This will trigger polling since status will be RUNNING
+      } else {
+        showToast('Lỗi: ' + (res ? res.message : 'Yêu cầu thất bại'), 'error');
+      }
+    } catch(e) {
+      showToast('Lỗi: ' + e.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-rounded">build_circle</span> Tái thiết lập CUKCUK Index';
+      }
+    }
+  });
+}
+
 // ── SWITCH TAB ──
 function _switchTab(tabKey) {
   // Destroy previous sub-module if needed
@@ -602,6 +1137,9 @@ function _switchTab(tabKey) {
   } else if (tabKey === 'inventory') {
     container.innerHTML = _renderInventoryTab();
     _initInventoryTab();
+  } else if (tabKey === 'cloud') {
+    container.innerHTML = _renderCloudTab();
+    _initCloudTab();
   } else if (tabKey === 'staff') {
     container.innerHTML = staffModule.render();
     staffModule.init();
@@ -615,6 +1153,10 @@ function _switchTab(tabKey) {
 }
 
 function _destroySubModule() {
+  if (_rebuildInterval) {
+    clearInterval(_rebuildInterval);
+    _rebuildInterval = null;
+  }
   if (_activeTab === 'staff' && staffModule.destroy) {
     try { staffModule.destroy(); } catch(e) { /* ignore */ }
   }
