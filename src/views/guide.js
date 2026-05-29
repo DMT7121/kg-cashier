@@ -50,7 +50,7 @@ export function render() {
               <ul class="list-disc pl-5 space-y-1.5">
                 <li>Truy cập <b class="text-slate-700">Quản lý ca</b>. Nếu chưa có ca nào, hệ thống sẽ hiển thị màn hình <b>Mở ca nhanh</b>.</li>
                 <li>Chọn nhân viên đang trực, xác nhận <b>Mã PIN cá nhân</b> (nếu có).</li>
-                <li>Hệ thống tự động đề xuất <b>Số ca</b> theo giờ (Ca 1: sáng, Ca 2: chiều, Ca 3: tối).</li>
+                <li>Hệ thống tự động đề xuất <b>Số ca</b> theo giờ (Ca 1: sáng, Ca 2: chiều).</li>
                 <li>Nhập <b>Tiền đầu ca</b> (tiền lẻ có sẵn trong két để thối khách). Tính năng nhập tiền có hỗ trợ phép tính tự động (VD: gõ <code class="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-600">500.000 + 200.000</code>).</li>
                 <li>Bắt buộc nhập <b>Mật khẩu ca</b>. Đây là mật khẩu dùng để mở khóa màn hình nếu bạn truy cập ứng dụng từ thiết bị khác trong lúc ca đang diễn ra.</li>
               </ul>

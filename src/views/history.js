@@ -40,7 +40,6 @@ export function render() {
           <option value="">Tất cả</option>
           <option value="1">Ca 1</option>
           <option value="2">Ca 2</option>
-          <option value="3">Ca 3</option>
         </select>
       </div>
     </div>
