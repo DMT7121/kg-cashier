@@ -132,16 +132,36 @@ function _renderShiftDetailModal(sh, sm, store) {
     } catch(e) { /* ignore */ }
   }
 
+  var isSupplemental = !!sh.originalSummarySnapshot;
+  function _hVal(curVal, origField, isMoney) {
+    if (!isSupplemental) return isMoney ? fc(curVal) : curVal;
+    var orig = (sh.originalSummarySnapshot || {})[origField];
+    if (orig !== undefined && curVal !== orig) {
+      if (isMoney) {
+        return '<span class="inline-flex flex-col items-end">' +
+               '<span style="text-decoration:line-through;color:#ef4444;font-size:10px;line-height:1;">' + fc(orig) + '</span>' +
+               '<span style="color:#22c55e;font-weight:700;font-size:11px;line-height:1.2;margin-top:2px;">' + fc(curVal) + '</span>' +
+               '</span>';
+      } else {
+        return '<span class="inline-flex flex-col items-end">' +
+               '<span style="text-decoration:line-through;color:#ef4444;font-size:10px;line-height:1;">' + orig + '</span>' +
+               '<span style="color:#22c55e;font-weight:700;font-size:11px;line-height:1.2;margin-top:2px;">' + curVal + '</span>' +
+               '</span>';
+      }
+    }
+    return isMoney ? fc(curVal) : curVal;
+  }
+
   function tabSummary() {
     return '<table class="report-table mb-3"><tr><td>Thời gian</td><td>'+formatTime(sh.startTime)+' → '+(sh.endTime?formatTime(sh.endTime):'(đang mở)')+'</td></tr><tr><td>Tiền đầu ca <button class="btn-icon w-6 h-6 p-0" id="btnHTabEditStartCash" title="Sửa"><span class="material-symbols-rounded text-[14px] text-blue-600">edit</span></button></td><td>'+fc(sh.startingCash)+'</td></tr></table>'+
-    (sm.cukcukBills>0?'<h4 class="mt-3 mb-1 text-emerald-500 font-bold">🏪 CUKCUK ('+sm.cukcukBills+' bill) — '+fc(sm.cukcukRevenue)+'</h4><table class="report-table"><tr><td>💵 TM</td><td class="text-right">'+fc(sm.cashIncome)+'</td></tr><tr><td>💳 Thẻ</td><td class="text-right">'+fc(sm.cardIncome)+'</td></tr><tr><td>🏦 CK</td><td class="text-right">'+fc(sm.transferIncome)+'</td></tr></table>':'')+
+    (sm.cukcukBills>0?'<h4 class="mt-3 mb-1 text-emerald-500 font-bold flex items-center justify-between"><span>🏪 CUKCUK ('+sm.cukcukBills+' bill)</span><span>'+_hVal(sm.cukcukRevenue, 'cukcukRevenue', true)+'</span></h4><table class="report-table"><tr><td>💵 TM</td><td class="text-right">'+_hVal(sm.cashIncome, 'cashIncome', true)+'</td></tr><tr><td>💳 Thẻ</td><td class="text-right">'+_hVal(sm.cardIncome, 'cardIncome', true)+'</td></tr><tr><td>🏦 CK</td><td class="text-right">'+_hVal(sm.transferIncome, 'transferIncome', true)+'</td></tr></table>':'')+
     '<h4 class="mt-4 mb-1 text-blue-600 font-bold">📊 Tổng kết</h4><table class="report-table bg-indigo-50/30 rounded-xl overflow-hidden">'+
-    (sm.cukcukBills>0?'<tr><td>Tiền mặt CUKCUK ('+sm.cukcukBills+' bill)</td><td class="text-right text-emerald-600">'+fc(sm.cashIncome)+'</td></tr>':'')+
+    (sm.cukcukBills>0?'<tr><td>Tiền mặt CUKCUK ('+sm.cukcukBills+' bill)</td><td class="text-right text-emerald-600">'+_hVal(sm.cashIncome, 'cashIncome', true)+'</td></tr>':'')+
     (manualTxs.length>0?'<tr><td>Thu ngoài POS</td><td class="text-right text-emerald-600">+'+fc(sm.totalIncome - sm.cukcukRevenue)+'</td></tr>':'')+
-    '<tr><td>Chi phí</td><td class="text-right text-rose-600">−'+fc(sm.totalExpense)+'</td></tr>'+
-    '<tr class="border-t-2 border-slate-200"><td><strong>TM kỳ vọng</strong></td><td class="text-right"><strong>'+fc(sm.expectedCash)+'</strong></td></tr>'+
-    '<tr><td>TM kiểm kê</td><td class="text-right">'+fc(sm.cashCountTotal)+'</td></tr>'+
-    '<tr class="'+(Math.abs(sm.discrepancy)>0?'bg-rose-50':'bg-emerald-50')+'"><td><strong>CHÊNH LỆCH</strong></td><td class="text-right"><strong class="'+(sm.discrepancy===0?'text-emerald-500':'text-rose-600')+'">'+(sm.discrepancy===0?'✓ 0 đ':fc(sm.discrepancy))+'</strong></td></tr></table>'+
+    '<tr><td>Chi phí</td><td class="text-right text-rose-600">−'+_hVal(sm.totalExpense, 'totalExpense', true)+'</td></tr>'+
+    '<tr class="border-t-2 border-slate-200"><td><strong>TM kỳ vọng</strong></td><td class="text-right"><strong>'+_hVal(sm.expectedCash, 'expectedCash', true)+'</strong></td></tr>'+
+    '<tr><td>TM kiểm kê</td><td class="text-right">'+_hVal(sm.cashCountTotal, 'cashCountTotal', true)+'</td></tr>'+
+    '<tr class="'+(Math.abs(sm.discrepancy)>0?'bg-rose-50':'bg-emerald-50')+'"><td><strong>CHÊNH LỆCH</strong></td><td class="text-right"><strong class="'+(sm.discrepancy===0?'text-emerald-500':'text-rose-600')+'">'+(sm.discrepancy===0 && !sh.originalSummarySnapshot ? '✓ 0 đ' : _hVal(sm.discrepancy, 'discrepancy', true))+'</strong></td></tr></table>'+
     (sh.notes?'<p class="mt-3 p-3 bg-slate-50 rounded-xl text-[13px]"><strong>📝</strong> '+sh.notes+'</p>':'');
   }
   function tabTransactions() {
@@ -156,7 +176,77 @@ function _renderShiftDetailModal(sh, sm, store) {
     var syncBtn='<button class="btn btn-outline btn-sm ml-2" id="btnHSyncCukcuk"><span class="material-symbols-rounded">sync</span> Đồng bộ</button>';
     if(invoices.length===0) return '<div class="empty-state p-5"><p>Không có hóa đơn POS</p><p class="text-slate-500 text-[12px]">Bấm Đồng bộ để tải từ CUKCUK</p><div class="mt-3"><button class="btn btn-primary btn-sm" id="btnHSyncCukcuk"><span class="material-symbols-rounded">sync</span> Đồng bộ từ CUKCUK</button></div></div>';
     var srcTag = invoicesFromLive ? '<span class="tag bg-orange-100 text-orange-600 text-[10px] ml-2">⚡ Live</span>' : '';
-    var total=0;var rows=invoices.map(function(inv){var amt=0;(inv.payments||[]).forEach(function(p){amt+=p.amount||0;});if(!amt)amt=inv.amount||0;total+=amt;var m=(inv.payments||[]).map(function(p){return p.method==='cash'?'💵':p.method==='card'?'💳':'🏦';}).join('');return '<tr><td>'+(inv.refNo||'—')+'</td><td>'+(inv.tableName||'—')+'</td><td>'+m+'</td><td class="text-right">'+fc(amt)+'</td><td class="w-[30px]"><button class="btn-icon" data-he-edit-inv="'+(inv.refId||'')+'" title="Sửa PTTT"><span class="material-symbols-rounded text-[15px] text-blue-600">edit</span></button></td></tr>';}).join('');
+    
+    // Compute invoice diff if supplemental
+    var diff = { added: [], removed: [], modified: [] };
+    var origMap = {};
+    if (isSupplemental && sh.originalCukcukInvoicesSnapshot) {
+      sh.originalCukcukInvoicesSnapshot.forEach(function(inv) {
+        origMap[inv.refId] = inv;
+      });
+      
+      var curMap = {};
+      invoices.forEach(function(inv) {
+        curMap[inv.refId] = inv;
+      });
+      
+      invoices.forEach(function(inv) {
+        var orig = origMap[inv.refId];
+        if (!orig) {
+          diff.added.push(inv.refId);
+        } else {
+          var amtDiff = inv.amount !== orig.amount;
+          var payDiff = JSON.stringify(inv.payments) !== JSON.stringify(orig.payments);
+          if (amtDiff || payDiff) {
+            diff.modified.push(inv.refId);
+          }
+        }
+      });
+      
+      sh.originalCukcukInvoicesSnapshot.forEach(function(inv) {
+        if (!curMap[inv.refId]) {
+          diff.removed.push(inv);
+        }
+      });
+    }
+
+    var total=0;
+    var rows=invoices.map(function(inv){
+      var amt=0;
+      (inv.payments||[]).forEach(function(p){amt+=p.amount||0;});
+      if(!amt)amt=inv.amount||0;
+      total+=amt;
+      var m=(inv.payments||[]).map(function(p){return p.method==='cash'?'💵':p.method==='card'?'💳':'🏦';}).join('');
+      
+      var rowStyle = '';
+      var rowLabel = '';
+      if (diff.added.indexOf(inv.refId) !== -1) {
+        rowStyle = 'style="background-color: #f0fdf4;"';
+        rowLabel = ' <span class="tag bg-emerald-100 text-emerald-700 text-[9px] px-1 py-0.5 rounded">Mới</span>';
+      } else if (diff.modified.indexOf(inv.refId) !== -1) {
+        rowStyle = 'style="background-color: #fffbeb;"';
+        var origInv = origMap[inv.refId];
+        var origAmt = 0;
+        if (origInv) {
+          (origInv.payments||[]).forEach(function(p){origAmt+=p.amount||0;});
+          if(!origAmt) origAmt = origInv.amount||0;
+        }
+        rowLabel = ' <span class="tag bg-amber-100 text-amber-700 text-[9px] px-1 py-0.5 rounded" title="Gốc: ' + fc(origAmt) + '">Sửa</span>';
+      }
+      
+      return '<tr ' + rowStyle + '><td>'+(inv.refNo||'—') + rowLabel + '</td><td>'+(inv.tableName||'—')+'</td><td>'+m+'</td><td class="text-right">'+fc(amt)+'</td><td class="w-[30px]"><button class="btn-icon" data-he-edit-inv="'+(inv.refId||'')+'" title="Sửa PTTT"><span class="material-symbols-rounded text-[15px] text-blue-600">edit</span></button></td></tr>';
+    }).join('');
+
+    if (diff.removed.length > 0) {
+      rows += diff.removed.map(function(inv) {
+        var amt=0;
+        (inv.payments||[]).forEach(function(p){amt+=p.amount||0;});
+        if(!amt)amt=inv.amount||0;
+        var m=(inv.payments||[]).map(function(p){return p.method==='cash'?'💵':p.method==='card'?'💳':'🏦';}).join('');
+        return '<tr style="background-color: #fef2f2; text-decoration: line-through; opacity: 0.7;"><td>'+(inv.refNo||'—')+' <span class="tag bg-rose-100 text-rose-700 text-[9px] px-1 py-0.5 rounded">Hủy/Xóa</span></td><td>'+(inv.tableName||'—')+'</td><td>'+m+'</td><td class="text-right">'+fc(amt)+'</td><td class="w-[30px]"></td></tr>';
+      }).join('');
+    }
+
     return '<p class="mb-2"><strong>'+invoices.length+'</strong> hóa đơn — Tổng: <strong class="text-emerald-500">'+fc(total)+'</strong>'+srcTag+syncBtn+(invoicesFromLive?'<button class="btn btn-outline btn-sm ml-1" id="btnHSaveSnapshot"><span class="material-symbols-rounded">save</span> Lưu</button>':'')+'</p><table class="report-table"><tr class="bg-slate-50"><th>Bill</th><th>Bàn</th><th>PTTT</th><th class="text-right">Số tiền</th><th></th></tr>'+rows+'</table>';
   }
   function tabCashCount() {

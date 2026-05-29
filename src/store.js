@@ -782,6 +782,13 @@ export async function closeShift(opts) {
   s.currentShift.notes = opts.notes || '';
   s.currentShift.cashToKeep = Number(opts.cashToKeep) || 0;
   s.currentShift.cashToDeposit = Number(opts.cashToDeposit) || 0;
+  s.currentShift.updatedAt = new Date().toISOString();
+  if (opts.actualCash !== undefined && opts.actualCash !== null) {
+    s.currentShift.cashCountTotal = Number(opts.actualCash) || 0;
+  }
+  if (opts.discrepancyNotes !== undefined) {
+    s.currentShift.discrepancyNotes = opts.discrepancyNotes || '';
+  }
 
   var summary = getShiftSummary(s.currentShift);
 
@@ -868,7 +875,8 @@ export async function closeShift(opts) {
     otherIncome: summary.otherIncome,
     otherExpense: summary.otherExpense,
     revenue: summary.revenue,
-    netTotal: summary.netTotal
+    netTotal: summary.netTotal,
+    discrepancyNotes: s.currentShift.discrepancyNotes || ''
   };
 
   // Track reopened shift version metadata
@@ -1318,6 +1326,10 @@ export function getShiftSummary(shift) {
     }
   }
 
+  if (shift.cashCountTotal !== undefined && shift.cashCountTotal !== null) {
+    cashCountTotal = Number(shift.cashCountTotal) || 0;
+  }
+
   var startingCash = toMoney(shift.startingCash);
   var expectedCash = addMoney(
     subtractMoney(
@@ -1749,6 +1761,8 @@ export function deleteShiftFromHistory(id) {
 
 /** Push edited history shift to cloud as closedShift */
 function _syncHistoryShiftToCloud(shift) {
+  shift.updatedAt = new Date().toISOString();
+  save(); // Persist the updated timestamp locally
   try {
     import('./api.js').then(function(api) {
       if (api.closeShiftOnCloud) {
@@ -2138,11 +2152,20 @@ export async function syncShiftHistory() {
         });
         
         if (localStr !== cloudStr) {
-          console.log('[Store] History shift out of sync, updating local:', cs.id);
-          // Preserve local invoices if available
-          cs.invoices = localShift.invoices || cs.invoices || [];
-          s.shifts[localIds[cs.id]] = cs;
-          added++;
+          // Bidirectional timestamp validation to auto-repair data mismatches
+          var localTime = localShift.updatedAt ? new Date(localShift.updatedAt).getTime() : 0;
+          var cloudTime = cs.updatedAt ? new Date(cs.updatedAt).getTime() : 0;
+
+          if (localTime > cloudTime) {
+            console.log('[Store] Local shift is newer, pushing to cloud:', cs.id);
+            _syncHistoryShiftToCloud(localShift);
+          } else {
+            console.log('[Store] Cloud shift is newer, updating local:', cs.id);
+            // Preserve local invoices if available
+            cs.invoices = localShift.invoices || cs.invoices || [];
+            s.shifts[localIds[cs.id]] = cs;
+            added++;
+          }
         }
       }
     }

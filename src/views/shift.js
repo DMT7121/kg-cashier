@@ -1,19 +1,53 @@
 import { getCurrentShift, openShift, closeShift, getShiftSummary, getSettings, getState, setLoggedInUser, getCachedStaff, setCachedStaff, updateStartingCash, getShiftHistory, reopenLastClosedShift, reopenShiftById } from '../store.js';
-import { showToast, showModal, hideModal, showConfirm, showPasswordPrompt, formatCurrency, formatDuration, formatTime, formatDate, todayStr, moneyInput } from '../utils.js';
-import { getStaffFromCloud, getConfigFromCloud, getCurrentShiftFromCloud } from '../api.js';
+import { showToast, showModal, hideModal, showConfirm, showPasswordPrompt, formatCurrency, formatDuration, formatTime, formatDate, todayStr, moneyInput, getWorkingDay, normalizeWorkingDayInput } from '../utils.js';
+import { getStaffFromCloud, getConfigFromCloud, getCurrentShiftFromCloud, getShiftRegistryFromCloud } from '../api.js';
 
 let _staffList = [];
 let _selectedStaff = null;
 let _timer = null;
 let _prefetchedCloudShift = null;
+let _cloudRegistry = [];
+let _isTodayShiftLimitReached = false;
 
-
+function _getTodayShifts(dateStr) {
+  var targetDay = getWorkingDay(dateStr);
+  
+  // Local history
+  var localShifts = (getShiftHistory() || []).filter(function(sh) {
+    return sh.date === targetDay && sh.status !== 'cancelled' && sh.status !== 'voided';
+  });
+  
+  // Cloud Registry
+  var registryShifts = (_cloudRegistry || []).filter(function(r) {
+    return r.workDay === targetDay && r.status !== 'cancelled' && r.status !== 'voided';
+  });
+  
+  var todayShifts = [];
+  var seen = {};
+  
+  localShifts.forEach(function(sh) {
+    var num = String(sh.shiftNumber);
+    if (!seen[num]) {
+      seen[num] = true;
+      todayShifts.push({ id: sh.id, shiftNumber: num, status: sh.status });
+    }
+  });
+  
+  registryShifts.forEach(function(r) {
+    var num = String(r.shiftNumber);
+    if (!seen[num]) {
+      seen[num] = true;
+      todayShifts.push({ id: r.shiftId, shiftNumber: num, status: r.status });
+    }
+  });
+  
+  return todayShifts;
+}
 
 function _autoShiftNumber() {
   var h = new Date().getHours();
-  if (h < 14) return '1';
-  if (h < 22) return '2';
-  return '3';
+  if (h < 15) return '1';
+  return '2';
 }
 
 function _avatarBg(role) {
@@ -211,7 +245,19 @@ export function render() {
   // ── CASE 3: No shift — Quick Open ──
   var cached = getCachedStaff() || [];
   _staffList = cached;
-  var autoShift = _autoShiftNumber();
+  
+  var todayShifts = _getTodayShifts(todayStr());
+  var hasCa1 = todayShifts.some(function(s) { return s.shiftNumber === '1'; });
+  var hasCa2 = todayShifts.some(function(s) { return s.shiftNumber === '2'; });
+  
+  var autoShift = '1';
+  if (hasCa1 && !hasCa2) {
+    autoShift = '2';
+  } else if (!hasCa1) {
+    autoShift = '1';
+  }
+  
+  _isTodayShiftLimitReached = hasCa1 && hasCa2;
   
   var historyShifts = getShiftHistory() || [];
   var closedShifts = historyShifts.filter(function(h) { return h.status === 'closed'; }).slice(0, 5);
@@ -229,6 +275,9 @@ export function render() {
     </div>
 
     <div id="shiftFormError" class="hidden p-3 mb-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm font-semibold"></div>
+    <div id="shiftLimitMessage" class="p-4 mb-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-sm font-semibold" style="${_isTodayShiftLimitReached ? 'display: block;' : 'display: none;'}">
+      ⚠️ Đã đủ 2 ca làm việc (Ca 1 & Ca 2 đều đã được mở/đóng hôm nay). Không thể mở thêm ca mới cho ngày hôm nay.
+    </div>
 
     <!-- Reopen recently closed shift selection banner (Physical reconciliation) -->
     ${closedShifts.length > 0 ? `
@@ -295,9 +344,8 @@ export function render() {
           <div class="form-group mb-0">
             <label class="form-label"># Số ca</label>
             <select id="shiftNumber" class="form-input">
-              <option value="1" ${autoShift === '1' ? 'selected' : ''}>Ca 1</option>
-              <option value="2" ${autoShift === '2' ? 'selected' : ''}>Ca 2</option>
-              <option value="3" ${autoShift === '3' ? 'selected' : ''}>Ca 3</option>
+              ${!hasCa1 ? `<option value="1" ${autoShift === '1' ? 'selected' : ''}>Ca 1</option>` : ''}
+              ${!hasCa2 ? `<option value="2" ${autoShift === '2' ? 'selected' : ''}>Ca 2</option>` : ''}
             </select>
           </div>
           <div class="form-group mb-0">
@@ -317,8 +365,8 @@ export function render() {
       </div>
     </div>
 
-    <button class="btn btn-primary w-full py-4 text-base font-bold shadow-lg shadow-blue-500/30" id="btnOpenShift" disabled>
-      <span class="material-symbols-rounded">play_arrow</span> Chọn nhân viên để mở ca
+    <button class="btn btn-primary w-full py-4 text-base font-bold shadow-lg shadow-blue-500/30" id="btnOpenShift" ${_isTodayShiftLimitReached ? 'disabled' : ''}>
+      <span class="material-symbols-rounded">play_arrow</span> ${_isTodayShiftLimitReached ? 'Đã đủ ca làm việc ngày hôm nay' : 'Chọn nhân viên để mở ca'}
     </button>
   `;
 }
@@ -587,11 +635,51 @@ export function init() {
     // Close shift
     document.getElementById('btnCloseShift')?.addEventListener('click', () => {
       var isReopened = !!shift.reopenedAt || !!shift.originalSummarySnapshot;
+      var summary = getShiftSummary(shift) || { expectedCash: 0, cashCountTotal: 0 };
+      var expectedCash = summary.expectedCash || 0;
+      var threshold = (getSettings() && getSettings().discrepancyThreshold) ? getSettings().discrepancyThreshold : 50000;
+
       showModal(`
         <div class="modal-title"><span class="material-symbols-rounded text-rose-600">stop_circle</span> ${isReopened ? 'Đóng lại ca (cập nhật)' : 'Đóng ca'}</div>
         ${isReopened ? '<div class="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm"><span class="material-symbols-rounded text-[16px] align-middle">info</span> Ca này đã được <b>mở lại</b> để chỉnh sửa. Khi đóng lại:<ul class="mt-1 ml-4 list-disc text-xs"><li>Báo cáo bàn giao sẽ được <b>tạo lại</b> với dữ liệu mới nhất</li><li>Hóa đơn POS đã chỉnh sửa PTTT sẽ được <b>khóa cứng</b></li><li>Lịch sử ca sẽ hiển thị <b>phiên bản cuối cùng</b></li></ul></div>' : ''}
-        <p class="mb-4 text-slate-700">Xác nhận đóng Ca ${shift.shiftNumber}?</p>
-        <div class="form-group"><label class="form-label">Ghi chú (tùy chọn)</label><textarea id="closeNotes" class="form-input" rows="3" placeholder="Ghi chú bàn giao..."></textarea></div>
+        <p class="mb-3 text-slate-700">Xác nhận đóng Ca ${shift.shiftNumber}?</p>
+
+        <!-- Theoretical cash summary -->
+        <div class="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+          <div class="flex justify-between mb-1 text-slate-600">
+            <span>💵 Tiền mặt lý thuyết (kỳ vọng):</span>
+            <strong class="text-slate-900">${formatCurrency(expectedCash)}</strong>
+          </div>
+          <div class="text-[11px] text-slate-400">
+            = Đầu ca (${formatCurrency(shift.startingCash)}) + Thu TM (${formatCurrency(summary.cashIncome)}) - Chi TM (${formatCurrency(summary.cashExpense)})
+          </div>
+        </div>
+
+        <!-- Actual cash count input -->
+        <div class="form-group mb-3">
+          <label class="form-label font-semibold">💰 Tiền mặt thực tế kiểm kê <span class="text-rose-500">*</span></label>
+          <input type="text" id="actualCashInput" class="form-input text-lg font-bold text-right" value="${summary.cashCountTotal || ''}" placeholder="Nhập tổng tiền mặt kiểm kê..." autocomplete="off">
+          <div class="text-[11px] text-slate-400 mt-1">
+            Nhập tổng số tiền mặt thực tế đếm được trong két và bàn giao.
+          </div>
+        </div>
+
+        <!-- Discrepancy Display -->
+        <div class="mb-4 p-3 rounded-xl text-sm flex justify-between items-center" id="discrepancyDisplay" style="display:none; border:1px solid transparent;">
+          <span class="font-medium text-slate-700">Chênh lệch:</span>
+          <strong class="text-lg" id="discrepancyVal">0đ</strong>
+        </div>
+
+        <!-- Discrepancy Explanation (Notes) -->
+        <div class="form-group mb-4" id="discrepancyNotesGroup" style="display:none;">
+          <label class="form-label font-semibold text-rose-700">⚠️ Giải trình chênh lệch <span class="text-rose-500">*</span></label>
+          <textarea id="discrepancyNotesInput" class="form-input border-rose-300 focus:border-rose-500" rows="3" placeholder="Nhập lý do chênh lệch tiền mặt (tối thiểu 10 ký tự)..."></textarea>
+          <div class="text-[11px] text-rose-500 mt-1">
+            Chênh lệch vượt quá ngưỡng cho phép (${formatCurrency(threshold)}). Vui lòng giải trình lý do chênh lệch.
+          </div>
+        </div>
+
+        <div class="form-group"><label class="form-label">Ghi chú (tùy chọn)</label><textarea id="closeNotes" class="form-input" rows="2" placeholder="Ghi chú bàn giao..."></textarea></div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Tiền giữ lại</label><input type="text" id="cashToKeep" class="form-input text-right font-bold" value="${shift.cashToKeep || 0}" autocomplete="off"></div>
           <div class="form-group"><label class="form-label">Tiền nộp</label><input type="text" id="cashToDeposit" class="form-input text-right font-bold" value="${shift.cashToDeposit || 0}" autocomplete="off"></div>
@@ -601,15 +689,74 @@ export function init() {
           <button class="btn btn-danger" id="btnConfirmClose"><span class="material-symbols-rounded">check</span> Đóng ca</button>
         </div>
       `);
+
       setTimeout(() => {
         var keepMoney = moneyInput(document.getElementById('cashToKeep'), { allowMath: true });
         var depositMoney = moneyInput(document.getElementById('cashToDeposit'), { allowMath: true });
+        var actualMoney = moneyInput(document.getElementById('actualCashInput'), { allowMath: true });
+
+        const actualInput = document.getElementById('actualCashInput');
+        const discDisplay = document.getElementById('discrepancyDisplay');
+        const discVal = document.getElementById('discrepancyVal');
+        const notesGroup = document.getElementById('discrepancyNotesGroup');
+        const notesInput = document.getElementById('discrepancyNotesInput');
+
+        function updateDiscrepancy() {
+          var actualVal = actualMoney.getValue() || 0;
+          var diff = actualVal - expectedCash;
+
+          discDisplay.style.display = 'flex';
+          discVal.textContent = (diff >= 0 ? '+' : '') + formatCurrency(diff);
+          
+          if (diff === 0) {
+            discVal.style.color = 'var(--success)';
+            discDisplay.style.backgroundColor = 'var(--success-bg)';
+            discDisplay.style.borderColor = 'rgba(34, 197, 94, 0.2)';
+            notesGroup.style.display = 'none';
+          } else if (Math.abs(diff) <= threshold) {
+            discVal.style.color = 'var(--warning)';
+            discDisplay.style.backgroundColor = 'var(--warning-bg)';
+            discDisplay.style.borderColor = 'rgba(232, 168, 56, 0.2)';
+            notesGroup.style.display = 'none';
+          } else {
+            discVal.style.color = 'var(--danger)';
+            discDisplay.style.backgroundColor = 'var(--danger-bg)';
+            discDisplay.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            notesGroup.style.display = 'block';
+          }
+        }
+
+        actualInput?.addEventListener('input', updateDiscrepancy);
+        // Run once on load to pre-populate and display discrepancy if pre-counted
+        updateDiscrepancy();
+
         document.getElementById('btnConfirmClose')?.addEventListener('click', async () => {
+          var actualVal = actualMoney.getValue();
+          if (actualVal === null || isNaN(actualVal)) {
+            showToast('⚠️ Vui lòng nhập tiền mặt thực tế kiểm kê', 'warning');
+            actualInput?.focus();
+            return;
+          }
+
+          var diff = actualVal - expectedCash;
+          var discNotes = '';
+          if (Math.abs(diff) > threshold) {
+            discNotes = (notesInput?.value || '').trim();
+            if (discNotes.length < 10) {
+              showToast('⚠️ Giải trình chênh lệch phải có tối thiểu 10 ký tự!', 'warning');
+              notesInput?.focus();
+              return;
+            }
+          }
+
           try {
+            showToast('⏳ Đang tiến hành đóng ca trên máy chủ...', 'info');
             var closedShift = await closeShift({
               notes: document.getElementById('closeNotes')?.value || '',
               cashToKeep: keepMoney.getValue(),
-              cashToDeposit: depositMoney.getValue()
+              cashToDeposit: depositMoney.getValue(),
+              actualCash: actualVal,
+              discrepancyNotes: discNotes
             });
             sessionStorage.removeItem('shift_validated');
             hideModal();
@@ -673,6 +820,59 @@ export function init() {
   _selectedStaff = null;
   var _isManualMode = false;
 
+  function _updateFormForDate(dateVal) {
+    var todayShifts = _getTodayShifts(dateVal);
+    var hasCa1 = todayShifts.some(function(s) { return s.shiftNumber === '1'; });
+    var hasCa2 = todayShifts.some(function(s) { return s.shiftNumber === '2'; });
+    
+    var autoShift = '1';
+    if (hasCa1 && !hasCa2) {
+      autoShift = '2';
+    } else if (!hasCa1) {
+      autoShift = '1';
+    }
+    
+    _isTodayShiftLimitReached = hasCa1 && hasCa2;
+    
+    // Update select options
+    var selectEl = document.getElementById('shiftNumber');
+    if (selectEl) {
+      var optsHtml = '';
+      if (!hasCa1) optsHtml += `<option value="1" ${autoShift === '1' ? 'selected' : ''}>Ca 1</option>`;
+      if (!hasCa2) optsHtml += `<option value="2" ${autoShift === '2' ? 'selected' : ''}>Ca 2</option>`;
+      selectEl.innerHTML = optsHtml;
+    }
+    
+    // Update error/limit message
+    var limitMsgEl = document.getElementById('shiftLimitMessage');
+    if (limitMsgEl) {
+      if (_isTodayShiftLimitReached) {
+        limitMsgEl.style.display = 'block';
+        limitMsgEl.textContent = '⚠️ Đã đủ 2 ca làm việc (Ca 1 & Ca 2 đều đã được mở/đóng hôm nay). Không thể mở thêm ca mới cho ngày này.';
+      } else {
+        limitMsgEl.style.display = 'none';
+      }
+    }
+    
+    // Update open button
+    var btn = document.getElementById('btnOpenShift');
+    if (btn) {
+      if (_isTodayShiftLimitReached) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Đã đủ ca làm việc ngày hôm nay';
+      } else {
+        if (_isManualMode) {
+          var nameInput = document.getElementById('manualStaffName');
+          btn.disabled = !(nameInput && nameInput.value.trim());
+          btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Mở ca (thủ công)';
+        } else {
+          btn.disabled = !_selectedStaff;
+          btn.innerHTML = _selectedStaff ? '<span class="material-symbols-rounded">play_arrow</span> Mở ca — ' + _selectedStaff.name : '<span class="material-symbols-rounded">play_arrow</span> Chọn nhân viên để mở ca';
+        }
+      }
+    }
+  }
+
   // Reopen selected shift click event
   document.getElementById('btnReopenSelectedShift')?.addEventListener('click', async function() {
     var selectEl = document.getElementById('reopenShiftSelect');
@@ -708,6 +908,24 @@ export function init() {
 
   // Background cloud refresh
   _loadStaffFromCloud(false);
+
+  // Load cloud registry to update suggestions and enforce Ca 1/Ca 2 constraints
+  getShiftRegistryFromCloud().then(function(res) {
+    if (res.success && res.registry) {
+      _cloudRegistry = res.registry;
+      var dateInput = document.getElementById('shiftDate');
+      if (dateInput) {
+        _updateFormForDate(dateInput.value);
+      }
+    }
+  }).catch(function(e) {
+    console.warn('[Shift] Failed to load registry:', e);
+  });
+
+  // Date change listener
+  document.getElementById('shiftDate')?.addEventListener('change', function(e) {
+    _updateFormForDate(e.target.value);
+  });
 
   // ⚡ Prefetch active cloud shift in background to prevent conflicts without blocking opening
   _prefetchedCloudShift = null;
@@ -747,14 +965,40 @@ export function init() {
       // Deselect cards
       var cards = document.querySelectorAll('.qo-staff-card');
       for (var i = 0; i < cards.length; i++) cards[i].classList.remove('selected');
-      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Mở ca (thủ công)'; }
+      
+      if (btn) {
+        if (_isTodayShiftLimitReached) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Đã đủ ca làm việc ngày hôm nay';
+        } else {
+          var nameInput = document.getElementById('manualStaffName');
+          btn.disabled = !(nameInput && nameInput.value.trim());
+          btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Mở ca (thủ công)';
+        }
+      }
       this.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">group</span> Danh sách';
       document.getElementById('manualStaffName')?.focus();
     } else {
       if (box) box.style.display = 'none';
       if (grid) grid.style.display = '';
-      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Chọn nhân viên để mở ca'; }
+      if (btn) {
+        if (_isTodayShiftLimitReached) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Đã đủ ca làm việc ngày hôm nay';
+        } else {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded">play_arrow</span> Chọn nhân viên để mở ca';
+        }
+      }
       this.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">edit</span> Thủ công';
+    }
+  });
+
+  // Handle manual input typing to update open button
+  document.getElementById('manualStaffName')?.addEventListener('input', function(e) {
+    var btn = document.getElementById('btnOpenShift');
+    if (btn && _isManualMode && !_isTodayShiftLimitReached) {
+      btn.disabled = !e.target.value.trim();
     }
   });
 
@@ -765,6 +1009,11 @@ export function init() {
   btnOpen.addEventListener('click', async function(e) {
     e.preventDefault();
     _clearFormError();
+
+    if (_isTodayShiftLimitReached) {
+      _showFormError('Đã đạt giới hạn tối đa 2 ca làm việc cho ngày hôm nay.');
+      return;
+    }
 
     var staffName = '';
     var staffId = '';
@@ -793,7 +1042,8 @@ export function init() {
     }
 
     try {
-      const result = await openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass, bypassCloudCheck: true });
+      showToast('⏳ Đang liên lạc với máy chủ Cloud để đăng ký ca...', 'info');
+      const result = await openShift({ cashierName: staffName, shiftNumber: num, date: date, startingCash: cash, shiftPassword: shiftPass });
       sessionStorage.setItem('shift_validated', result.id);
       if (!_isManualMode && _selectedStaff) setLoggedInUser(_selectedStaff);
       showToast('Ca ' + num + ' đã mở thành công! 🎉', 'success');

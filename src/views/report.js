@@ -504,13 +504,90 @@ function _buildHandoverHTML(revSummary, store) {
   var billCount = cukcukRev.bills + manualIncomeTxs.length;
   var discrepancy = cashCountTotal - expectedCash;
 
+  function _compareInvoices(currentInvs, originalInvs) {
+    currentInvs = currentInvs || [];
+    originalInvs = originalInvs || [];
+    
+    var origMap = {};
+    originalInvs.forEach(function(inv) {
+      origMap[inv.refId] = inv;
+    });
+    
+    var curMap = {};
+    currentInvs.forEach(function(inv) {
+      curMap[inv.refId] = inv;
+    });
+    
+    var added = [];
+    var removed = [];
+    var modified = [];
+    
+    currentInvs.forEach(function(inv) {
+      var orig = origMap[inv.refId];
+      if (!orig) {
+        added.push(inv);
+      } else {
+        var amtDiff = inv.amount !== orig.amount;
+        var payDiff = JSON.stringify(inv.payments) !== JSON.stringify(orig.payments);
+        if (amtDiff || payDiff) {
+          modified.push({ current: inv, original: orig });
+        }
+      }
+    });
+    
+    originalInvs.forEach(function(inv) {
+      if (!curMap[inv.refId]) {
+        removed.push(inv);
+      }
+    });
+    
+    return { added: added, removed: removed, modified: modified };
+  }
+
   function _val(curVal, origField, isMoney) {
     if (!isSupplemental) return isMoney ? fc(curVal) : curVal;
     var orig = (target.originalSummarySnapshot || {})[origField];
     if (orig !== undefined && curVal !== orig) {
-      return '<span style="color:#d97706;font-weight:700;" title="Gốc: ' + (isMoney ? fc(orig) : orig) + '">' + (isMoney ? fc(curVal) : curVal) + ' *</span>';
+      if (isMoney) {
+        return '<span style="display:inline-flex;flex-direction:column;align-items:flex-end;">' +
+               '<span style="text-decoration:line-through;color:#ef4444;font-size:10px;line-height:1;">' + fc(orig) + '</span>' +
+               '<span style="color:#22c55e;font-weight:700;font-size:11px;line-height:1.2;margin-top:2px;">' + fc(curVal) + '</span>' +
+               '</span>';
+      } else {
+        return '<span style="display:inline-flex;flex-direction:column;align-items:flex-end;">' +
+               '<span style="text-decoration:line-through;color:#ef4444;font-size:10px;line-height:1;">' + orig + '</span>' +
+               '<span style="color:#22c55e;font-weight:700;font-size:11px;line-height:1.2;margin-top:2px;">' + curVal + '</span>' +
+               '</span>';
+      }
     }
     return isMoney ? fc(curVal) : curVal;
+  }
+
+  var billDiffHTML = '';
+  if (isSupplemental) {
+    var diff = _compareInvoices(target.cukcukInvoicesSnapshot, target.originalCukcukInvoicesSnapshot);
+    if (diff.added.length > 0 || diff.removed.length > 0 || diff.modified.length > 0) {
+      billDiffHTML += '<div class="a4-section-wrap" style="grid-column: 1 / -1; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 12px; padding: 12px; margin-bottom: 12px;">';
+      billDiffHTML += '<div class="a4-section-title" style="color:#d97706; margin-bottom: 8px;">▌BIẾN ĐỘNG HÓA ĐƠN (' + (diff.added.length + diff.removed.length + diff.modified.length) + ' bill lệch)</div>';
+      billDiffHTML += '<table class="a4-table" style="font-size: 11px;">';
+      billDiffHTML += '<thead><tr style="background:#fef3c7; color:#92400e;"><th>Số hóa đơn</th><th>Bàn</th><th class="r">Trạng thái gốc</th><th class="r">Trạng thái mới</th></tr></thead><tbody>';
+      
+      diff.added.forEach(function(inv) {
+        billDiffHTML += '<tr style="background:#f0fdf4;"><td style="color:#16a34a; font-weight:600;">✓ ' + (inv.refNo || inv.refId) + '</td><td>' + (inv.tableName || '-') + '</td><td class="r" style="color:var(--text-muted);">Không có</td><td class="r" style="color:#16a34a; font-weight:600;">+' + fc(inv.amount) + '</td></tr>';
+      });
+      
+      diff.removed.forEach(function(inv) {
+        billDiffHTML += '<tr style="background:#fef2f2;"><td style="color:#dc2626; font-weight:600; text-decoration: line-through;">✗ ' + (inv.refNo || inv.refId) + '</td><td>' + (inv.tableName || '-') + '</td><td class="r" style="color:#dc2626;">' + fc(inv.amount) + '</td><td class="r" style="color:#dc2626; font-weight:600;">Đã hủy/xóa</td></tr>';
+      });
+      
+      diff.modified.forEach(function(item) {
+        var origPay = (item.original.payments || []).map(p => (p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦') + fc(p.amount)).join(', ') || fc(item.original.amount);
+        var curPay = (item.current.payments || []).map(p => (p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦') + fc(p.amount)).join(', ') || fc(item.current.amount);
+        billDiffHTML += '<tr style="background:#fffbeb;"><td style="color:#d97706; font-weight:600;">✎ ' + (item.current.refNo || item.current.refId) + '</td><td>' + (item.current.tableName || '-') + '</td><td class="r" style="color:#b45309; text-decoration: line-through;">' + origPay + '</td><td class="r" style="color:#d97706; font-weight:600;">' + curPay + '</td></tr>';
+      });
+      
+      billDiffHTML += '</tbody></table></div>';
+    }
   }
 
   return `
@@ -577,14 +654,14 @@ function _buildHandoverHTML(revSummary, store) {
               '</tbody><tfoot><tr class="a4-highlight-row"><td><strong>TM kỳ vọng</strong></td><td class="r"><strong>' + _val(expectedCash, 'expectedCash', true) + '</strong></td></tr>' +
               '<tr><td>TM kiểm kê thực tế</td><td class="r">' + _val(cashCountTotal, 'cashCountTotal', true) + '</td></tr>' +
               '<tr class="a4-disc-row ' + (Math.abs(discrepancy) > 0 ? 'a4-disc-warn' : 'a4-disc-ok') + '"><td><strong>CHÊNH LỆCH</strong></td><td class="r"><strong>' + (discrepancy === 0 && !target.originalSummarySnapshot ? '✓ 0 đ' : (discrepancy > 0 ? '+' : '') + _val(discrepancy, 'discrepancy', true)) + '</strong></td></tr></tfoot></table></div>';
-
+ 
             // Cash denom logic
             var pc = target.pinnedCash || {};
             var kc = target.keepCash || {};
             var hc = target.handoverCash || {};
             var ccount = target.cashCount || {};
             var ketRows = '', handRows = '', ketTotal = 0, handTotal = 0;
-
+ 
             for (var di = 0; di < denominations.length; di++) {
               var dv = denominations[di].value, dl = denominations[di].label;
               var pinQty = pc[dv] || 0, keepQty = kc[dv] || 0, handQty = hc[dv] || 0;
@@ -599,7 +676,7 @@ function _buildHandoverHTML(revSummary, store) {
                 handTotal += dv * handQty;
               }
             }
-
+ 
             blocks['ket'] = ketRows ? '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#e8a838;">▌TIỀN GIỮ LẠI (KÉT)</div><table class="a4-table"><tbody>' + ketRows + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng két</strong></td><td class="r"><strong>' + fc(ketTotal) + '</strong></td></tr></tfoot></table></div>' : '';
             blocks['handover'] = handRows ? '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#22c55e;">▌TIỀN BÀN GIAO</div><table class="a4-table"><tbody>' + handRows + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng bàn giao</strong></td><td class="r"><strong>' + fc(handTotal) + '</strong></td></tr></tfoot></table></div>' : '';
             
@@ -617,16 +694,15 @@ function _buildHandoverHTML(revSummary, store) {
                 blocks['general'] = '<div class="a4-section-wrap"><div class="a4-section-title" style="color:#0284c7;">▌CHI TIẾT KIỂM KÊ TIỀN</div><table class="a4-table"><tbody>' + generalRows + '</tbody><tfoot><tr class="a4-total-row"><td><strong>Tổng kiểm kê</strong></td><td class="r"><strong>' + fc(generalTotal) + '</strong></td></tr></tfoot></table></div>';
               }
             }
-
+ 
             // Build HTML
-            var html = '';
+            var html = billDiffHTML || '';
             conf.order.forEach(function(key) {
               if (conf.visible[key] && blocks[key]) {
                 html += blocks[key];
               }
             });
             
-
             return html || '<div class="a4-empty-box" style="width:100%;grid-column:1/-1;">Không có dữ liệu báo cáo</div>';
           })()}
         </div>

@@ -14,42 +14,250 @@ try { _online = navigator.onLine; } catch (e) { /* ignore */ }
 try { window.addEventListener('online', () => { _online = true; _flushQueue(); }); } catch (e) { /* ignore */ }
 try { window.addEventListener('offline', () => { _online = false; }); } catch (e) { /* ignore */ }
 
-export function getMetadata() {
+export function getDeviceId() {
   let deviceId = localStorage.getItem('kg_device_id');
   if (!deviceId) {
     deviceId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     localStorage.setItem('kg_device_id', deviceId);
   }
+  return deviceId;
+}
 
+export function getSessionId() {
   let sessionId = sessionStorage.getItem('kg_session_id');
   if (!sessionId) {
     sessionId = 'sess_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     sessionStorage.setItem('kg_session_id', sessionId);
   }
+  return sessionId;
+}
 
+export function createMutationId() {
+  return 'mut_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+}
+
+export function isLocalhostOrigin() {
   const origin = window.location.origin || '';
   const host = window.location.hostname || '';
-  const environment = import.meta.env.MODE || 'production';
-  
-  let source = 'webapp-production';
-  if (origin.indexOf('localhost') > -1 || origin.indexOf('127.0.0.1') > -1 || origin.indexOf('file://') > -1) {
-    source = 'localhost';
-  } else if (import.meta.env.DEV) {
-    source = 'webapp-dev';
-  }
+  return origin.indexOf('localhost') > -1 || 
+         origin.indexOf('127.0.0.1') > -1 || 
+         origin.indexOf('file://') > -1 ||
+         host.indexOf('localhost') > -1 ||
+         host.indexOf('127.0.0.1') > -1 ||
+         !origin || !host;
+}
 
+export function isProductionOrigin() {
+  const origin = window.location.origin || '';
+  return origin === 'https://kg-cashier.pages.dev';
+}
+
+export function getEnvironmentInfo() {
   return {
-    deviceId: deviceId,
-    sessionId: sessionId,
-    origin: origin,
-    host: host,
-    environment: environment,
-    source: source
+    deviceId: getDeviceId(),
+    sessionId: getSessionId(),
+    origin: window.location.origin || '',
+    host: window.location.hostname || '',
+    environment: import.meta.env.MODE || 'production',
+    source: isLocalhostOrigin() ? 'localhost' : (import.meta.env.DEV ? 'webapp-dev' : 'webapp-production')
+  };
+}
+
+let _sandboxMode = localStorage.getItem('kg_sandbox_mode') !== 'false';
+
+export function isSandboxMode() {
+  return isLocalhostOrigin() && _sandboxMode;
+}
+
+export function setSandboxMode(enabled) {
+  _sandboxMode = !!enabled;
+  localStorage.setItem('kg_sandbox_mode', String(_sandboxMode));
+}
+
+export function validateProductionWrite(action) {
+  if (isLocalhostOrigin() && isSandboxMode()) {
+    throw new Error('Chặn ghi dữ liệu lên Production database từ localhost (Sandbox Mode đang BẬT).');
+  }
+}
+
+export function getMetadata() {
+  return {
+    ...getEnvironmentInfo()
   };
 }
 
 // ── Core fetch wrapper (NEVER throws) ────────
 async function apiCall(action, data = null, retries = 2) {
+  // Sandbox mode interception for writes & simulated reads
+  if (isSandboxMode()) {
+    const writeActions = [
+      'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
+      'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
+      'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts'
+    ];
+
+    const readActions = [
+      'getShiftRegistry', 'getCurrentShift'
+    ];
+
+    if (writeActions.indexOf(action) !== -1 || readActions.indexOf(action) !== -1) {
+      console.log(`[API Sandbox Mock] Intercepted action: ${action}`, data);
+      
+      // Simulate slight network delay
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      if (action === 'openShift') {
+        const shiftNumber = data.shiftNumber || '1';
+        const workDay = data.date || new Date().toISOString().split('T')[0];
+        const shiftKey = workDay + '_' + shiftNumber;
+        const shiftId = 'shift_' + shiftKey;
+        
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        
+        const duplicate = mockRegistry.find(r => r.shiftKey === shiftKey && r.status !== 'cancelled' && r.status !== 'voided');
+        if (duplicate) {
+          return { success: false, message: `Xung đột: Ca ${shiftNumber} ngày ${workDay} đang được mở/đã đóng (Sandbox).` };
+        }
+        
+        const newReg = {
+          shiftKey: shiftKey,
+          shiftId: shiftId,
+          workDay: workDay,
+          shiftNumber: shiftNumber,
+          status: 'open',
+          cashierName: data.cashierName || 'Sandbox User',
+          openedAt: new Date().toISOString(),
+          closedAt: '',
+          deviceId: getDeviceId()
+        };
+        mockRegistry.push(newReg);
+        localStorage.setItem('kg_sandbox_registry', JSON.stringify(mockRegistry));
+        return { success: true, message: 'Sandbox: Đã đăng ký ca làm việc thành công.', shiftId: shiftId };
+      }
+
+      if (action === 'getShiftRegistry') {
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        return { success: true, registry: mockRegistry };
+      }
+
+      if (action === 'getCurrentShift') {
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        const openReg = mockRegistry.find(r => r.status === 'open');
+        if (!openReg) return { success: true, shift: null };
+        return {
+          success: true,
+          shift: {
+            id: openReg.shiftId,
+            cashierName: openReg.cashierName,
+            shiftNumber: openReg.shiftNumber,
+            date: openReg.workDay,
+            startTime: openReg.openedAt,
+            endTime: '',
+            startingCash: 0,
+            status: 'open',
+            notes: '',
+            transactions: [],
+            otherTransactions: [],
+            cashCount: {},
+            invoices: [],
+            shiftPassword: ''
+          }
+        };
+      }
+
+      if (action === 'closeShift') {
+        const shiftNumber = data.shiftNumber || '1';
+        const workDay = data.date || new Date().toISOString().split('T')[0];
+        const shiftKey = workDay + '_' + shiftNumber;
+        
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        
+        const entry = mockRegistry.find(r => r.shiftKey === shiftKey);
+        if (entry) {
+          entry.status = 'closed';
+          entry.closedAt = new Date().toISOString();
+          localStorage.setItem('kg_sandbox_registry', JSON.stringify(mockRegistry));
+        }
+        return { success: true, message: 'Sandbox: Đóng ca thành công.' };
+      }
+
+      if (action === 'reopenShift') {
+        const shiftNumber = data.shiftNumber || '1';
+        const workDay = data.date || new Date().toISOString().split('T')[0];
+        const shiftKey = workDay + '_' + shiftNumber;
+        
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        
+        const entry = mockRegistry.find(r => r.shiftKey === shiftKey);
+        if (entry) {
+          entry.status = 'open';
+          entry.closedAt = '';
+          localStorage.setItem('kg_sandbox_registry', JSON.stringify(mockRegistry));
+        }
+        return { success: true, message: 'Sandbox: Mở lại ca thành công.' };
+      }
+
+      if (action === 'cancelShift') {
+        const shiftNumber = data.shiftNumber || '1';
+        const workDay = data.date || new Date().toISOString().split('T')[0];
+        const shiftKey = workDay + '_' + shiftNumber;
+        
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        
+        const entry = mockRegistry.find(r => r.shiftKey === shiftKey);
+        if (entry) {
+          entry.status = 'cancelled';
+          localStorage.setItem('kg_sandbox_registry', JSON.stringify(mockRegistry));
+        }
+        return { success: true, message: 'Sandbox: Hủy ca thành công.' };
+      }
+
+      if (action === 'voidGhostShift') {
+        const shiftId = data.shiftId;
+        
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        
+        const entry = mockRegistry.find(r => r.shiftId === shiftId);
+        if (entry) {
+          entry.status = 'voided';
+          localStorage.setItem('kg_sandbox_registry', JSON.stringify(mockRegistry));
+        }
+        return { success: true, message: 'Sandbox: Thu hồi ca ma thành công.' };
+      }
+
+      if (action === 'saveStaff') {
+        return { success: true, message: 'Sandbox: Đã lưu nhân viên.', id: data.id || 'sb_' + Math.random().toString(36).substring(2, 6) };
+      }
+
+      if (action === 'deleteStaff') {
+        return { success: true, message: 'Sandbox: Đã xóa nhân viên.' };
+      }
+
+      if (action === 'saveSettings') {
+        return { success: true, message: 'Sandbox: Đã lưu cài đặt giả lập.' };
+      }
+
+      if (action === 'repairShifts') {
+        let mockRegistry = [];
+        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        mockRegistry.forEach(r => {
+          if (r.status === 'open') r.status = 'stale';
+        });
+        localStorage.setItem('kg_sandbox_registry', JSON.stringify(mockRegistry));
+        return { success: true, message: 'Sandbox: Sửa lỗi hoàn tất (giả lập).' };
+      }
+
+      return { success: true, message: `Sandbox Action ${action} mock success` };
+    }
+  }
+
   try {
     const url = `${GAS_URL}?action=${encodeURIComponent(action)}`;
     const opts = { redirect: 'follow', mode: 'cors' };

@@ -6,6 +6,72 @@ import './style.css';
 import { getCurrentShift, subscribe, getUnreadCount, syncCurrentShiftWithCloud, isShiftDirty, clearShiftDirty, syncShiftHistory, pullCategoriesFromCloud } from './store.js';
 import { hideModal, showToast } from './utils.js';
 import { initChatbot, toggleChatbot, refreshChatbot } from './views/chatbot.js';
+import { isLocalhostOrigin, isSandboxMode, setSandboxMode } from './api.js';
+
+function setupLocalhostBanner() {
+  if (!isLocalhostOrigin()) return;
+
+  var banner = document.createElement('div');
+  banner.id = 'localhostBanner';
+  
+  function updateBannerStyle() {
+    var isSandbox = isSandboxMode();
+    banner.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 16px;font-size:12px;font-weight:600;z-index:9999;position:relative;box-shadow:0 2px 4px rgba(0,0,0,0.1);transition:background 0.3s;font-family:\'Be Vietnam Pro\', sans-serif;';
+    if (isSandbox) {
+      banner.style.backgroundColor = '#e11d48'; // rose-600
+      banner.style.color = '#ffffff';
+      banner.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">cloud_off</span>
+          <span>⚠️ CHẾ ĐỘ SANDBOX (MÔ PHỎNG LOCAL): Đang chặn mọi ghi dữ liệu lên Production database!</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+          <button id="toggleSandboxBtn" style="background:#be123c;color:#ffffff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;transition:background 0.2s;">
+            Tắt Sandbox (Ghi Live)
+          </button>
+        </div>
+      `;
+    } else {
+      banner.style.backgroundColor = '#d97706'; // amber-600
+      banner.style.color = '#ffffff';
+      banner.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">warning</span>
+          <span>⚠️ CHẾ ĐỘ DEV LIVE: Thiết bị ghi trực tiếp dữ liệu lên Sheets Production database! Cẩn thận!</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+          <button id="toggleSandboxBtn" style="background:#b45309;color:#ffffff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;transition:background 0.2s;">
+            Bật Sandbox (An toàn)
+          </button>
+        </div>
+      `;
+    }
+
+    // Bind event
+    var btn = banner.querySelector('#toggleSandboxBtn');
+    if (btn) {
+      btn.onclick = function() {
+        var currentlySandbox = isSandboxMode();
+        if (currentlySandbox) {
+          if (confirm('Cảnh báo: Tắt Sandbox sẽ gửi các lệnh mở ca, đồng bộ, đóng ca trực tiếp lên database Production của KING\'s GRILL. Bạn có chắc chắn muốn kết nối LIVE không?')) {
+            setSandboxMode(false);
+            updateBannerStyle();
+            showToast('Đã tắt Sandbox. Kết nối LIVE với Production database.', 'warning');
+            window.refreshView?.();
+          }
+        } else {
+          setSandboxMode(true);
+          updateBannerStyle();
+          showToast('Đã bật Sandbox. Ghi dữ liệu Production bị chặn.', 'success');
+          window.refreshView?.();
+        }
+      };
+    }
+  }
+
+  updateBannerStyle();
+  document.body.insertBefore(banner, document.body.firstChild);
+}
 
 // ── Global Error Handler — Show on screen ────
 window.onerror = function(msg, src, line, col, err) {
@@ -209,6 +275,7 @@ function updateClock() {
 // ── Initialize ───────────────────────────────
 function initApp() {
   console.log('[KG-CASHIER] Initializing...');
+  setupLocalhostBanner();
 
   updateClock();
   _globalIntervals.push(setInterval(updateClock, 1000));
