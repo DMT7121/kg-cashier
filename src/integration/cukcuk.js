@@ -1,5 +1,5 @@
 import { getCurrentShift, getSettings, getState, getShiftHistory, getShiftSummary } from '../store.js';
-import { showToast, formatCurrency } from '../utils.js';
+import { showToast, formatCurrency, getWorkingDay, getWorkingDayRange } from '../utils.js';
 import { syncCukcukRevenueToCloud } from '../api.js';
 import * as invoiceStore from './invoiceStore.js';
 import * as retryQueue from './retryQueue.js';
@@ -197,6 +197,42 @@ async function _cukcukApiCall(url, options) {
   }
 
   return data;
+}
+
+// ── Working Day Helpers for CUKCUK ──
+function _getWorkingDayStr() {
+  return getWorkingDay();
+}
+
+function _getWorkingDayRange(shiftDate) {
+  return getWorkingDayRange(shiftDate);
+}
+
+/**
+ * Derive working day (YYYY-MM-DD) from a CUKCUK RefDate string.
+ * If the invoice time is before 06:00, the working day is the previous calendar day.
+ * @param {string} refDate - e.g. "2026-05-13T23:15:00" or "/Date(1747148100000)/"
+ * @param {string} fallback - fallback date if parsing fails
+ */
+function _getWorkingDayFromRefDate(refDate, fallback) {
+  if (!refDate) return fallback;
+  var dt;
+  // Handle .NET "/Date(...)/" format
+  var match = String(refDate).match(/\/Date\((\d+)\)\//);
+  if (match) {
+    dt = new Date(parseInt(match[1]));
+  } else {
+    dt = new Date(refDate);
+  }
+  if (isNaN(dt.getTime())) return fallback;
+  // Before 6AM = previous working day
+  if (dt.getHours() < 6) {
+    dt.setDate(dt.getDate() - 1);
+  }
+  var y = dt.getFullYear();
+  var m = String(dt.getMonth() + 1).padStart(2, '0');
+  var d = String(dt.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
 }
 
 // ── Extract invoice array from API response Data field ──
