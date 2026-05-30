@@ -5,8 +5,9 @@
 
 import { safeJsonParse } from './utils.js';
 import { isCurrentHostCanonical } from './config/env.js';
+import { ENDPOINTS } from './config/endpoints.js';
 
-const GAS_URL = import.meta.env.VITE_GAS_URL || '';
+const GAS_URL = ENDPOINTS.gas || import.meta.env.VITE_GAS_URL || '';
 
 let _online = true;
 const _queue = [];
