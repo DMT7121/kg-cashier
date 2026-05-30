@@ -463,7 +463,7 @@ async function handleProxy(context) {
 
   // Origin check
   const origin = request.headers.get('Origin') || '';
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+  if (origin && !isAllowedOrigin(origin)) {
     return new Response('Forbidden', { status: 403 });
   }
 

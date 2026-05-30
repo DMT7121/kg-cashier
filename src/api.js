@@ -96,7 +96,8 @@ async function apiCall(action, data = null, retries = 2) {
   const writeActions = [
     'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
     'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
-    'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts'
+    'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts',
+    'syncPosOrders'
   ];
 
   if (writeActions.indexOf(action) !== -1) {
@@ -111,7 +112,7 @@ async function apiCall(action, data = null, retries = 2) {
   if (isSandboxMode()) {
 
     const readActions = [
-      'getShiftRegistry', 'getCurrentShift'
+      'getShiftRegistry', 'getCurrentShift', 'getPosOrders'
     ];
 
     if (writeActions.indexOf(action) !== -1 || readActions.indexOf(action) !== -1) {
@@ -266,6 +267,18 @@ async function apiCall(action, data = null, retries = 2) {
         });
         localStorage.setItem('kg_sandbox_registry', JSON.stringify(mockRegistry));
         return { success: true, message: 'Sandbox: Sửa lỗi hoàn tất (giả lập).' };
+      }
+
+      if (action === 'getPosOrders') {
+        let mockOrders = [];
+        try { mockOrders = JSON.parse(localStorage.getItem('kg_sandbox_pos_orders') || '[]'); } catch(e) {}
+        return { success: true, orders: mockOrders };
+      }
+
+      if (action === 'syncPosOrders') {
+        const clientOrders = data.orders || [];
+        localStorage.setItem('kg_sandbox_pos_orders', JSON.stringify(clientOrders));
+        return { success: true, orders: clientOrders };
       }
 
       return { success: true, message: `Sandbox Action ${action} mock success` };
@@ -519,3 +532,12 @@ export function isOnline() {
 export function getQueueSize() {
   return _queue.length;
 }
+
+export async function getPosOrdersFromCloud() {
+  return apiCall('getPosOrders');
+}
+
+export async function syncPosOrdersWithCloud(ordersData) {
+  return apiCall('syncPosOrders', { orders: ordersData });
+}
+

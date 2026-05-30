@@ -13,7 +13,9 @@ export const CUKCUK_PROXY_URL =
   import.meta.env.VITE_CUKCUK_PROXY_URL || `${CANONICAL_URL}/cukcuk-api`;
 
 export const GAS_WEBAPP_URL =
-  import.meta.env.VITE_GAS_WEBAPP_URL || 'https://script.google.com/macros/s/AKfycbyStvCPpvjlBVIUa4eLE5uZghbqT8Vfwrz9wk1GqLN94tHeI3K3TgITl1JBhTLV5o8Y/exec';
+  import.meta.env.VITE_GAS_WEBAPP_URL ||
+  import.meta.env.VITE_GAS_URL ||
+  'https://script.google.com/macros/s/AKfycbyStvCPpvjlBVIUa4eLE5uZghbqT8Vfwrz9wk1GqLN94tHeI3K3TgITl1JBhTLV5o8Y/exec';
 
 export function normalizeUrl(url) {
   return String(url || '').replace(/\/+$/, '');

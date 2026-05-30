@@ -4,6 +4,7 @@
    ═══════════════════════════════════════ */
 import { getCurrentShift, addTransaction, getSettings } from '../store.js';
 import { showToast, showModal, hideModal, formatCurrency } from '../utils.js';
+import { getPosOrdersFromCloud, syncPosOrdersWithCloud } from '../api.js';
 
 // ── Storage keys ──────────────────────
 const CATALOG_KEY  = 'kg-pos-catalog';
@@ -107,11 +108,126 @@ function getOrders() {
 var _posChannel = null;
 try { _posChannel = new BroadcastChannel('kg-pos-sync'); } catch(e){}
 
+let _syncing = false;
+async function syncPOSWithCloud() {
+  if (_syncing) return;
+  _syncing = true;
+  try {
+    var localOrders = getOrders();
+    var tables = getTables();
+    var ordersToSend = [];
+    
+    // Active orders
+    Object.keys(localOrders).forEach(function(tableId) {
+      var o = localOrders[tableId];
+      if (!o || !o.items || o.items.length === 0) return;
+      var table = tables.find(function(t){ return t.id === tableId; }) || { name: tableId };
+      var total = o.items.reduce(function(s, i) { return i.status === 'cancelled' ? s : s + i.price * i.qty; }, 0);
+      
+      ordersToSend.push({
+        orderId: o.id || 'pos_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+        tableId: tableId,
+        tableName: table.name,
+        status: 'active',
+        itemsJson: JSON.stringify(o.items),
+        total: total,
+        createdAt: o.createdAt || new Date().toISOString(),
+        updatedAt: o.updatedAt || new Date().toISOString(),
+        createdBy: o.createdBy || '',
+        updatedBy: o.updatedBy || '',
+        deviceId: o.deviceId || localStorage.getItem('kg_device_id') || 'dev_unknown',
+        sessionId: o.sessionId || sessionStorage.getItem('kg_session_id') || 'sess_unknown',
+        revision: o.revision || 1,
+        lastMutationId: o.lastMutationId || ''
+      });
+    });
+    
+    // Completed orders
+    var completedSyncs = [];
+    try {
+      completedSyncs = JSON.parse(localStorage.getItem('kg-pos-completed-syncs') || '[]');
+    } catch(e) {}
+    
+    completedSyncs.forEach(function(o) {
+      ordersToSend.push({
+        orderId: o.orderId,
+        tableId: o.tableId,
+        tableName: o.tableName,
+        status: 'completed',
+        itemsJson: o.itemsJson || '[]',
+        total: o.total || 0,
+        createdAt: o.createdAt,
+        updatedAt: new Date().toISOString(),
+        createdBy: o.createdBy || '',
+        updatedBy: o.updatedBy || '',
+        deviceId: o.deviceId || localStorage.getItem('kg_device_id') || 'dev_unknown',
+        sessionId: o.sessionId || sessionStorage.getItem('kg_session_id') || 'sess_unknown',
+        revision: o.revision || 1,
+        lastMutationId: o.lastMutationId || ''
+      });
+    });
+    
+    var response = await syncPosOrdersWithCloud(ordersToSend);
+    if (response && response.success && response.orders) {
+      var updatedLocalOrders = {};
+      response.orders.forEach(function(co) {
+        if (co.status === 'active') {
+          var items = [];
+          try { items = JSON.parse(co.itemsJson || '[]'); } catch(e) {}
+          updatedLocalOrders[co.tableId] = {
+            id: co.orderId,
+            tableId: co.tableId,
+            items: items,
+            createdAt: co.createdAt,
+            updatedAt: co.updatedAt,
+            createdBy: co.createdBy,
+            updatedBy: co.updatedBy,
+            deviceId: co.deviceId,
+            sessionId: co.sessionId,
+            revision: Number(co.revision) || 1,
+            lastMutationId: co.lastMutationId
+          };
+        }
+      });
+      
+      // Update local storage directly
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(updatedLocalOrders));
+      localStorage.setItem('kg-pos-completed-syncs', '[]');
+      
+      if (_posChannel) {
+        try { _posChannel.postMessage({ type: 'orders-updated', source: 'pos-sync' }); } catch(e){}
+      }
+      
+      if (typeof window.refreshView === 'function') {
+        window.refreshView();
+      }
+    }
+  } catch (error) {
+    console.warn('[POS Sync] Failed to sync with cloud:', error);
+  } finally {
+    _syncing = false;
+  }
+}
+
 function saveOrders(orders) {
+  var devId = localStorage.getItem('kg_device_id') || 'dev_unknown';
+  var sessId = sessionStorage.getItem('kg_session_id') || 'sess_unknown';
+  
+  Object.keys(orders).forEach(function(tableId) {
+    var o = orders[tableId];
+    if (o) {
+      o.updatedAt = new Date().toISOString();
+      o.deviceId = devId;
+      o.sessionId = sessId;
+      o.lastMutationId = 'mut_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    }
+  });
+
   localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
   if (_posChannel) {
     try { _posChannel.postMessage({ type: 'orders-updated', source: 'pos' }); } catch(e){}
   }
+  syncPOSWithCloud();
 }
 
 // ── Kitchen routing rules ─────────────
@@ -136,6 +252,7 @@ var _screen = 'tables'; // 'tables' | 'order'
 var _activeTableId = null;
 var _activeCatFilter = 'Tất cả';
 var _searchQ = '';
+var _syncInterval = null;
 
 // ── Utilities ─────────────────────────
 function uid() { return 'pos_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -307,11 +424,16 @@ function _renderOrderScreen() {
 export function init() {
   if (_screen === 'tables') _initTableMap();
   else _initOrderScreen();
+
+  if (!_syncInterval) {
+    syncPOSWithCloud();
+    _syncInterval = setInterval(syncPOSWithCloud, 10000);
+  }
 }
 
 function _initTableMap() {
   document.getElementById('btnPosRefresh')?.addEventListener('click', function() {
-    window.refreshView();
+    syncPOSWithCloud();
   });
   document.querySelectorAll('[data-table-id]').forEach(function(card) {
     card.addEventListener('click', function() {
@@ -637,6 +759,21 @@ function _showTransferTableModal() {
         } else {
           orders[targetId] = { id: order.id, tableId: targetId, items: order.items, createdAt: order.createdAt };
         }
+        // Clear old table order from cloud
+        var completedSyncs = [];
+        try { completedSyncs = JSON.parse(localStorage.getItem('kg-pos-completed-syncs') || '[]'); } catch(e){}
+        completedSyncs.push({
+          orderId: order.id || 'pos_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+          tableId: _activeTableId,
+          tableName: currentTable.name,
+          itemsJson: JSON.stringify(order.items),
+          total: orderTotal(order),
+          createdAt: order.createdAt || new Date().toISOString(),
+          revision: order.revision || 1,
+          lastMutationId: order.lastMutationId || ''
+        });
+        localStorage.setItem('kg-pos-completed-syncs', JSON.stringify(completedSyncs));
+
         // Remove old order
         delete orders[_activeTableId];
         saveOrders(orders);
@@ -720,6 +857,21 @@ function _showMergeTableModal() {
         var sourceTable = tables.find(function(t) { return t.id === sourceId; }) || { name: '?' };
         var sourceOrder = orders[sourceId];
         if (!sourceOrder) return;
+        // Clear merged source table from cloud
+        var completedSyncs = [];
+        try { completedSyncs = JSON.parse(localStorage.getItem('kg-pos-completed-syncs') || '[]'); } catch(e){}
+        completedSyncs.push({
+          orderId: sourceOrder.id || 'pos_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+          tableId: sourceId,
+          tableName: sourceTable.name,
+          itemsJson: JSON.stringify(sourceOrder.items),
+          total: orderTotal(sourceOrder),
+          createdAt: sourceOrder.createdAt || new Date().toISOString(),
+          revision: sourceOrder.revision || 1,
+          lastMutationId: sourceOrder.lastMutationId || ''
+        });
+        localStorage.setItem('kg-pos-completed-syncs', JSON.stringify(completedSyncs));
+
         // Merge items into current table
         order.items = order.items.concat(sourceOrder.items);
         delete orders[sourceId];
@@ -1033,7 +1185,21 @@ function _showCheckoutModal(table, order) {
           paymentMethod: selectedMethod,
           note: note || itemNames
         });
-        // Clear order
+        // Clear order & record completed sync
+        var completedSyncs = [];
+        try { completedSyncs = JSON.parse(localStorage.getItem('kg-pos-completed-syncs') || '[]'); } catch(e){}
+        completedSyncs.push({
+          orderId: order.id || 'pos_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+          tableId: _activeTableId,
+          tableName: table.name,
+          itemsJson: JSON.stringify(order.items),
+          total: total,
+          createdAt: order.createdAt || new Date().toISOString(),
+          revision: order.revision || 1,
+          lastMutationId: order.lastMutationId || ''
+        });
+        localStorage.setItem('kg-pos-completed-syncs', JSON.stringify(completedSyncs));
+
         var orders = getOrders();
         delete orders[_activeTableId];
         saveOrders(orders);
@@ -1092,4 +1258,8 @@ export function destroy() {
   _screen = 'tables';
   _activeTableId = null;
   _searchQ = '';
+  if (_syncInterval) {
+    clearInterval(_syncInterval);
+    _syncInterval = null;
+  }
 }

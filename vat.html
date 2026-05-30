@@ -12,9 +12,16 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
     <script>
-        if (window.location.hostname === 'main.kg-cashier.pages.dev') {
-            window.location.replace('https://kg-cashier.pages.dev' + window.location.pathname + window.location.search + window.location.hash);
-        }
+        (function() {
+            var hostname = window.location.hostname;
+            var isLocal = hostname === 'localhost' || 
+                          hostname === '127.0.0.1' || 
+                          /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(hostname) || 
+                          hostname.slice(-6) === '.local';
+            if (!isLocal && hostname !== 'kg-cashier.pages.dev') {
+                window.location.replace('https://kg-cashier.pages.dev' + window.location.pathname + window.location.search + window.location.hash);
+            }
+        })();
     </script>
     <style>
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f3f4f6; }

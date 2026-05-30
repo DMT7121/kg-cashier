@@ -562,3 +562,81 @@ export function logError(message, details) {
   console.error('[ERROR] ' + maskSecrets(message), formattedDetails);
 }
 
+export function sha256(ascii) {
+  function rightRotate(value, amount) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+  
+  var mathPow = Math.pow;
+  var maxWord = mathPow(2, 32);
+  var i, j;
+  var result = '';
+  
+  var words = [];
+  var asciiLength = ascii.length;
+  
+  var hash = [];
+  var k = [];
+  var primeCounter = 0;
+  
+  var isComposite = {};
+  for (var candidate = 2; primeCounter < 64; candidate++) {
+    if (!isComposite[candidate]) {
+      for (i = 0; i < 313; i += candidate) {
+        isComposite[i] = candidate;
+      }
+      hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+      k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+    }
+  }
+  
+  ascii += '\x80';
+  while (ascii.length % 64 - 56) ascii += '\x00';
+  
+  for (i = 0; i < ascii.length; i++) {
+    j = ascii.charCodeAt(i);
+    if (j >> 8) return; // ASCII only
+    words[i >> 2] |= j << (24 - (i % 4) * 8);
+  }
+  
+  words[words.length] = ((asciiLength / maxWord) | 0);
+  words[words.length] = (asciiLength << 3);
+  
+  for (j = 0; j < words.length; j += 16) {
+    var w = words.slice(j, j + 16);
+    var oldHash = hash.slice(0);
+    
+    for (i = 0; i < 64; i++) {
+      var wItem = w[i];
+      if (i >= 16) {
+        var s0 = rightRotate(w[i - 15], 7) ^ rightRotate(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        var s1 = rightRotate(w[i - 2], 17) ^ rightRotate(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        wItem = w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      
+      var temp1 = (hash[7] + (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) +
+        ((hash[4] & hash[5]) ^ (~hash[4] & hash[6])) + k[i] + wItem) | 0;
+      var temp2 = ((rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) +
+        ((hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2]))) | 0;
+      
+      hash = [(temp1 + temp2) | 0].concat(hash);
+      hash[4] = (hash[4] + temp1) | 0;
+      hash.length = 8;
+    }
+    
+    for (i = 0; i < 8; i++) {
+      hash[i] = (hash[i] + oldHash[i]) | 0;
+    }
+  }
+  
+  for (i = 0; i < 8; i++) {
+    var val = hash[i];
+    if (val < 0) val += maxWord;
+    var str = val.toString(16);
+    while (str.length < 8) str = '0' + str;
+    result += str;
+  }
+  return result;
+}
+
+

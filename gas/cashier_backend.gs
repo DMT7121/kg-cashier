@@ -175,6 +175,10 @@ function _handleCashierRequest(e) {
       case 'rebuildCukcukIndex': result = rebuildCukcukIndex(); break;
       case 'getCukcukSyncState': result = _getCukcukSyncState(); break;
       case 'saveCukcukSyncState': result = _saveCukcukSyncState(data); break;
+
+      // POS Cloud Sync
+      case 'getPosOrders':    result = _getPosOrdersAction(data); break;
+      case 'syncPosOrders':   result = _syncPosOrdersAction(data); break;
       
       // Health
       case 'ping':            result = { success: true, message: 'pong', timestamp: new Date().toISOString() }; break;
@@ -1489,3 +1493,218 @@ function _saveCukcukSyncState(data) {
 
   return { success: true, message: 'Cukcuk sync state saved' };
 }
+
+// ── POS Cloud Sync Helpers ───────────────────
+
+function _getPosOrdersAction(data) {
+  const headers = ['orderId', 'tableId', 'tableName', 'status', 'itemsJson', 'total', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'deviceId', 'sessionId', 'revision', 'lastMutationId'];
+  _getSheet('KG_POS_ORDERS', headers);
+  const rows = _getSheetData('KG_POS_ORDERS');
+  // Only return active orders
+  const activeOrders = rows.filter(r => r.status === 'active');
+  return { success: true, orders: activeOrders };
+}
+
+function _syncPosOrdersAction(data) {
+  const val = _validateMetadata(data, 'syncPosOrders');
+  if (val && !val.success) return val;
+
+  const headers = ['orderId', 'tableId', 'tableName', 'status', 'itemsJson', 'total', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'deviceId', 'sessionId', 'revision', 'lastMutationId'];
+  const sheet = _getSheet('KG_POS_ORDERS', headers);
+  
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, vui lòng thử lại sau.' };
+  }
+
+  try {
+    const cloudOrders = _getSheetData('KG_POS_ORDERS');
+    const clientOrders = data.orders || [];
+    const responseOrders = [];
+    const rowsToWrite = [];
+    
+    // Create a map of cloud orders by tableId
+    const cloudMap = {};
+    cloudOrders.forEach(o => {
+      cloudMap[o.tableId] = o;
+    });
+    
+    clientOrders.forEach(clientOrder => {
+      const tableId = clientOrder.tableId;
+      const cloudOrder = cloudMap[tableId];
+      
+      if (!cloudOrder) {
+        // New order on client, save to cloud
+        clientOrder.revision = 1;
+        clientOrder.updatedAt = clientOrder.updatedAt || new Date().toISOString();
+        rowsToWrite.push(clientOrder);
+        responseOrders.push(clientOrder);
+      } else {
+        // Order exists on both
+        if (clientOrder.lastMutationId === cloudOrder.lastMutationId) {
+          // Same mutation, no change
+          responseOrders.push(cloudOrder);
+        } else {
+          const clientRev = Number(clientOrder.revision || 0);
+          const cloudRev = Number(cloudOrder.revision || 0);
+          
+          if (clientRev > cloudRev) {
+            // Client is newer
+            clientOrder.updatedAt = new Date().toISOString();
+            rowsToWrite.push(clientOrder);
+            responseOrders.push(clientOrder);
+          } else if (clientRev < cloudRev) {
+            // Cloud is newer, send to client
+            responseOrders.push(cloudOrder);
+          } else {
+            // Same revision but different mutation (conflict!)
+            // Merge items by item.id, keeping latest printedAt or active item
+            let mergedItems = [];
+            let clientItems = [];
+            let cloudItems = [];
+            try { clientItems = JSON.parse(clientOrder.itemsJson || '[]'); } catch(e) {}
+            try { cloudItems = JSON.parse(cloudOrder.itemsJson || '[]'); } catch(e) {}
+            
+            const itemMap = {};
+            clientItems.forEach(i => { itemMap[i.id] = { item: i, source: 'client' }; });
+            cloudItems.forEach(i => {
+              const existing = itemMap[i.id];
+              if (!existing) {
+                itemMap[i.id] = { item: i, source: 'cloud' };
+              } else {
+                // Conflict resolution: compare printedAt or qty
+                const clientTime = new Date(existing.item.printedAt || existing.item.cancelledAt || clientOrder.updatedAt).getTime();
+                const cloudTime = new Date(i.printedAt || i.cancelledAt || cloudOrder.updatedAt).getTime();
+                if (cloudTime > clientTime) {
+                  itemMap[i.id] = { item: i, source: 'cloud' };
+                }
+              }
+            });
+            
+            mergedItems = Object.values(itemMap).map(x => x.item);
+            
+            // Re-calculate total
+            const mergedTotal = mergedItems.reduce((sum, item) => {
+              if (item.status === 'cancelled') return sum;
+              return sum + (Number(item.price) || 0) * (Number(item.qty) || 0);
+            }, 0);
+            
+            const mergedOrder = {
+              orderId: cloudOrder.orderId,
+              tableId: tableId,
+              tableName: cloudOrder.tableName,
+              status: clientOrder.status || cloudOrder.status,
+              itemsJson: JSON.stringify(mergedItems),
+              total: mergedTotal,
+              createdAt: cloudOrder.createdAt,
+              updatedAt: new Date().toISOString(),
+              createdBy: cloudOrder.createdBy,
+              updatedBy: clientOrder.updatedBy || 'SYSTEM',
+              deviceId: clientOrder.deviceId,
+              sessionId: clientOrder.sessionId,
+              revision: cloudRev + 1,
+              lastMutationId: clientOrder.lastMutationId
+            };
+            
+            rowsToWrite.push(mergedOrder);
+            responseOrders.push(mergedOrder);
+          }
+        }
+        // Remove from map so we know which cloud orders are NOT in client list
+        delete cloudMap[tableId];
+      }
+    });
+    
+    // Any remaining cloud orders (not sent by client):
+    // We should send active ones to the client!
+    Object.values(cloudMap).forEach(cloudOrder => {
+      if (cloudOrder.status === 'active') {
+        responseOrders.push(cloudOrder);
+      }
+    });
+    
+    // Write modifications to sheet
+    if (rowsToWrite.length > 0) {
+      const allRows = _sheetsGet('KG_POS_ORDERS');
+      const dataRows = allRows.slice(1);
+      
+      rowsToWrite.forEach(wOrder => {
+        let rowIndex = -1;
+        for (let i = 0; i < dataRows.length; i++) {
+          if (dataRows[i][1] === wOrder.tableId) { // match tableId
+            rowIndex = i;
+            break;
+          }
+        }
+        
+        const newRow = [
+          wOrder.orderId || ('pos_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
+          wOrder.tableId,
+          wOrder.tableName,
+          wOrder.status || 'active',
+          wOrder.itemsJson || '[]',
+          wOrder.total || 0,
+          wOrder.createdAt || new Date().toISOString(),
+          wOrder.updatedAt || new Date().toISOString(),
+          wOrder.createdBy || '',
+          wOrder.updatedBy || '',
+          wOrder.deviceId || '',
+          wOrder.sessionId || '',
+          wOrder.revision || 1,
+          wOrder.lastMutationId || ''
+        ];
+        
+        if (rowIndex !== -1) {
+          _sheetsBatchWrite('KG_POS_ORDERS', 'KG_POS_ORDERS!A' + (rowIndex + 2) + ':N' + (rowIndex + 2), [newRow]);
+        } else {
+          sheet.appendRow(newRow);
+        }
+      });
+    }
+    
+    // Automatically archive/remove completed/cancelled orders older than 7 days to keep the list clean
+    try {
+      _cleanupOldPosOrders(sheet);
+    } catch(e) {
+      // ignore cleanup errors
+    }
+
+    return { success: true, orders: responseOrders.filter(o => o.status === 'active') };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _cleanupOldPosOrders(sheet) {
+  const allRows = _sheetsGet('KG_POS_ORDERS');
+  if (!allRows || allRows.length < 2) return;
+  const dataRows = allRows.slice(1);
+  const now = new Date().getTime();
+  const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+  
+  let changed = false;
+  const keepRows = [];
+  
+  dataRows.forEach(row => {
+    const status = row[3];
+    const updatedAtStr = row[7];
+    if ((status === 'completed' || status === 'cancelled') && updatedAtStr) {
+      const updatedTime = new Date(updatedAtStr).getTime();
+      if (now - updatedTime > maxAge) {
+        changed = true;
+        return; // drop this row
+      }
+    }
+    keepRows.push(row);
+  });
+  
+  if (changed) {
+    _sheetsClear('KG_POS_ORDERS!A2:N');
+    if (keepRows.length > 0) {
+      _sheetsBatchWrite('KG_POS_ORDERS', 'KG_POS_ORDERS!A2:N' + (keepRows.length + 1), keepRows);
+    }
+  }
+}
+
