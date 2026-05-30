@@ -919,6 +919,13 @@ export async function syncTransactions(force) {
       return { success: true, synced: 0, total: apiTotal, skipped: allSyncedRefIds.length, amount: 0, date: todayStr, smart: true };
     }
 
+    // Sort from newest to oldest by RefDate to prioritize newest invoices first
+    toProcess.sort(function(a, b) {
+      var dateA = new Date(a.inv.RefDate || 0);
+      var dateB = new Date(b.inv.RefDate || 0);
+      return dateB - dateA;
+    });
+
     // ═══ STEP 5: Fetch details for invoices that need update ═══
     if (toProcess.length > 3) {
       showToast('📥 ' + toProcess.length + ' hóa đơn cần cập nhật từ CUKCUK...', 'info');
@@ -1181,6 +1188,13 @@ export async function syncInvoicesForDate(dateStr) {
         invoicesToFetch.push(inv);
       }
     }
+
+    // Sort from newest to oldest by RefDate to prioritize newest invoices first
+    invoicesToFetch.sort(function(a, b) {
+      var dateA = new Date(a.RefDate || 0);
+      var dateB = new Date(b.RefDate || 0);
+      return dateB - dateA;
+    });
 
     if (invoicesToFetch.length > 0) {
       // Fetch details in batches of 5
