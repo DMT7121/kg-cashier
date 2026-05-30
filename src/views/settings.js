@@ -102,6 +102,13 @@ function _renderSystemTab() {
               <span class="toggle-slider"></span>
             </label>
           </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:12px;padding:10px 0;">
+            <label class="form-label" style="margin-bottom:0;flex:1;">Cho phép thiết bị Local/LAN ghi dữ liệu lên Cloud</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settAllowDevWrite" ${s.allowDevWrite ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -1211,6 +1218,7 @@ function _initSystemTab() {
       shiftWarningHours: Number(document.getElementById('settShiftWarning').value) || 10,
       autoSync: document.getElementById('settAutoSync').checked,
       requireLogin: document.getElementById('settRequireLogin').checked,
+      allowDevWrite: document.getElementById('settAllowDevWrite').checked,
       cukcuk: {
         domain: document.getElementById('cuk_domain').value,
         appId: document.getElementById('cuk_appId').value,

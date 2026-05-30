@@ -91,17 +91,18 @@ function _validateMetadata(data, action) {
     allowDevWrite = false;
   }
 
-  // Check if localhost/dev
-  const isLocalhost = origin.indexOf('localhost') > -1 || 
-                      origin.indexOf('127.0.0.1') > -1 || 
-                      origin.indexOf('file://') > -1 ||
-                      host.indexOf('localhost') > -1 ||
-                      host.indexOf('127.0.0.1') > -1 ||
-                      !origin || !host;
+  // Check if localhost/dev or LAN IP (e.g. 192.168.x.x, 10.x.x.x, 172.x.x.x)
+  const isLocalOrLan = origin.indexOf('localhost') > -1 || 
+                       origin.indexOf('127.0.0.1') > -1 || 
+                       origin.indexOf('file://') > -1 ||
+                       host.indexOf('localhost') > -1 ||
+                       host.indexOf('127.0.0.1') > -1 ||
+                       /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host) ||
+                       !origin || !host;
 
-  if (isLocalhost) {
+  if (isLocalOrLan) {
     if (!allowDevWrite) {
-      throw new Error('Không cho phép mở/đồng bộ ca production từ localhost.');
+      return { success: false, message: 'Ghi dữ liệu bị chặn từ môi trường local/LAN. Vui lòng bật "Cho phép thiết bị Local/LAN ghi dữ liệu" trong Cài đặt hệ thống.' };
     }
   }
 
@@ -109,11 +110,13 @@ function _validateMetadata(data, action) {
   const isAllowedOrigin = origin === 'https://kg-cashier.pages.dev' || 
                           (origin.indexOf('.pages.dev') > -1 && origin.indexOf('https://') === 0);
 
-  if (!isLocalhost && !isAllowedOrigin) {
+  if (!isLocalOrLan && !isAllowedOrigin) {
     if (!allowDevWrite) {
-      throw new Error('Yêu cầu bắt nguồn từ một nguồn (origin) không được phép.');
+      return { success: false, message: 'Yêu cầu từ origin không được phép: ' + origin };
     }
   }
+
+  return { success: true };
 }
 
 function _handleCashierRequest(e) {
@@ -269,7 +272,8 @@ function _syncLegacyShift(data, status) {
 }
 
 function _openShiftAction(data) {
-  _validateMetadata(data, 'openShift');
+  const val = _validateMetadata(data, 'openShift');
+  if (val && !val.success) return val;
 
   const shiftNumber = String(data.shiftNumber || '');
   if (shiftNumber !== '1' && shiftNumber !== '2') {
@@ -355,7 +359,8 @@ function _openShiftAction(data) {
 }
 
 function _syncShiftAction(data) {
-  _validateMetadata(data, 'syncShift');
+  const val = _validateMetadata(data, 'syncShift');
+  if (val && !val.success) return val;
 
   const shiftNumber = String(data.shiftNumber || '');
   const workDay = data.date || '';
@@ -402,7 +407,8 @@ function _syncShiftAction(data) {
 }
 
 function _closeShiftAction(data) {
-  _validateMetadata(data, 'closeShift');
+  const val = _validateMetadata(data, 'closeShift');
+  if (val && !val.success) return val;
 
   const shiftNumber = String(data.shiftNumber || '');
   const workDay = data.date || '';
@@ -457,7 +463,8 @@ function _closeShiftAction(data) {
 }
 
 function _reopenShiftAction(data) {
-  _validateMetadata(data, 'reopenShift');
+  const val = _validateMetadata(data, 'reopenShift');
+  if (val && !val.success) return val;
 
   const settingsRes = _getSettings();
   const adminPass = settingsRes.success && settingsRes.settings ? String(settingsRes.settings.adminPassword || '712121').trim() : '712121';
@@ -520,7 +527,8 @@ function _reopenShiftAction(data) {
 }
 
 function _cancelShiftAction(data) {
-  _validateMetadata(data, 'cancelShift');
+  const val = _validateMetadata(data, 'cancelShift');
+  if (val && !val.success) return val;
 
   const shiftNumber = String(data.shiftNumber || '');
   const workDay = data.date || '';
@@ -578,7 +586,8 @@ function _cancelShiftAction(data) {
 }
 
 function _voidGhostShiftAction(data) {
-  _validateMetadata(data, 'voidGhostShift');
+  const val = _validateMetadata(data, 'voidGhostShift');
+  if (val && !val.success) return val;
 
   const settingsRes = _getSettings();
   const adminPass = settingsRes.success && settingsRes.settings ? String(settingsRes.settings.adminPassword || '712121').trim() : '712121';

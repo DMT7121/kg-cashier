@@ -30,6 +30,10 @@ export function joinUrl(base, path) {
  * If running on a preview or alias URL in production environment, it returns false.
  */
 export function isCurrentHostCanonical() {
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host)) {
+    return true;
+  }
   if (APP_ENV !== 'production') return true;
   const currentHost = window.location.hostname;
   // Canonical host must be exactly 'kg-cashier.pages.dev'

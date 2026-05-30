@@ -3,6 +3,7 @@ import { showToast, formatCurrency, getWorkingDay, getWorkingDayRange } from '..
 import { syncCukcukRevenueToCloud } from '../api.js';
 import * as invoiceStore from './invoiceStore.js';
 import * as retryQueue from './retryQueue.js';
+import { ENDPOINTS } from '../config/endpoints.js';
 
 // Initialize retry queue with Sheets push function
 retryQueue.init(syncCukcukRevenueToCloud);
@@ -85,7 +86,7 @@ var CACHE_VERSION = 4; // Bump: force re-sync to fetch SAInvoiceDetails (drink i
 export async function loginAndGetToken() {
   try {
     var reqHeaders = {};
-    var gasUrl = import.meta.env.VITE_GAS_URL || '';
+    var gasUrl = ENDPOINTS.gas || '';
     if (gasUrl) reqHeaders['X-Gas-Url'] = gasUrl;
     var settings = getSettings();
     if (settings && settings.adminPassword) {
@@ -123,7 +124,7 @@ export async function loginAndGetToken() {
 export async function testConnection() {
   try {
     var reqHeaders = {};
-    var gasUrl = import.meta.env.VITE_GAS_URL || '';
+    var gasUrl = ENDPOINTS.gas || '';
     if (gasUrl) reqHeaders['X-Gas-Url'] = gasUrl;
     var settings = getSettings();
     if (settings && settings.adminPassword) {
@@ -166,7 +167,7 @@ async function _cukcukApiCall(url, options) {
   }
 
   // Attach GAS routing instructions for the CF proxy fallback
-  var gasUrl = import.meta.env.VITE_GAS_URL || '';
+  var gasUrl = ENDPOINTS.gas || '';
   if (gasUrl) {
     reqHeaders['X-Gas-Url'] = gasUrl;
   }
@@ -844,24 +845,24 @@ export async function syncTransactions(force) {
       return newOnThisPage;
     }
 
-    if (force) {
-      // ═══ FORCE: Targeted scan — only pages that COULD have new invoices ═══
-      var totalPages = Math.ceil(apiTotal / 100) || 1;
+    // Scan page 1 first
+    _scanPage(firstPageInvoices);
 
-      if (newOnApi > 0) {
-        // New invoices detected! Scan from the page where they start
-        var startPage = Math.floor(totalStored / 100) + 1;
-        if (startPage < 1) startPage = 1;
-        console.log('[CUKCUK] SMART: ' + newOnApi + ' new detected, scanning pages ' + startPage + '-' + totalPages);
-        showToast('🔍 Tìm ' + newOnApi + ' hóa đơn mới...', 'info');
+    var totalPages = Math.ceil(apiTotal / 100) || 1;
+    if (totalPages > 1) {
+      if (newOnApi > 0 || force) {
+        // Parallel scan all remaining pages
+        var startPage = force ? (Math.floor(totalStored / 100) + 1) : 2;
+        if (startPage < 2) startPage = 2;
+        
+        console.log('[CUKCUK] SMART: ' + (force ? 'force' : 'auto') + ' sync, fetching pages ' + startPage + '-' + totalPages + ' in parallel');
+        if (force && newOnApi > 0) {
+          showToast('🔍 Tìm ' + newOnApi + ' hóa đơn mới...', 'info');
+        }
 
         var pagesToFetch = [];
         for (var pg = startPage; pg <= totalPages; pg++) {
-          if (pg === 1) {
-            _scanPage(firstPageInvoices);
-          } else {
-            pagesToFetch.push(pg);
-          }
+          pagesToFetch.push(pg);
         }
 
         if (pagesToFetch.length > 0) {
@@ -877,32 +878,11 @@ export async function syncTransactions(force) {
           }
         }
       } else {
-        // API says same count — do a quick check on page 1 + last page for edge cases
-        console.log('[CUKCUK] SMART: API total unchanged (' + apiTotal + '), checking page 1 + last page');
-        _scanPage(firstPageInvoices);
-        if (totalPages > 1) {
-          var lastData = await _fetchInvoices(useFrom, useTo, totalPages);
-          if (lastData && lastData.Success) {
-            var lastInvoices = _extractPageData(lastData);
-            _scanPage(lastInvoices);
-          }
-        }
-      }
-    } else {
-      // ═══ AUTO: Scan page 1 only, extend if new found ═══
-      var newOnPage1 = _scanPage(firstPageInvoices);
-      if (firstPageInvoices.length >= 100 && (newOnPage1 > 0 || newOnApi > 0)) {
-        var page = 2;
-        var emptyRun = 0;
-        while (page <= 20) {
-          var pageData = await _fetchInvoices(useFrom, useTo, page);
-          if (pageData._authFailed || !pageData.Success) break;
-          var pageInvoices = _extractPageData(pageData);
-          if (pageInvoices.length === 0) break;
-          var n = _scanPage(pageInvoices);
-          if (n === 0) { emptyRun++; if (emptyRun >= 2) break; } else { emptyRun = 0; }
-          if (pageInvoices.length < 100) break;
-          page++;
+        // API total unchanged and not forced: check the last page just in case to be 100% correct
+        console.log('[CUKCUK] SMART: total count matches cached (' + apiTotal + '), scanning last page (' + totalPages + ')');
+        var lastData = await _fetchInvoices(useFrom, useTo, totalPages);
+        if (lastData && lastData.Success) {
+          _scanPage(_extractPageData(lastData));
         }
       }
     }
