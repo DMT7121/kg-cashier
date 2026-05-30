@@ -54,12 +54,70 @@ function _buildPrompt() {
     '\nHỏi chuyện bình thường → trả lời text, KHÔNG JSON.';
 }
 
+// ── Auto-evaluate money additions in text ──
+function _autoEvaluateTextMoney(text) {
+  var hasPlus = text.indexOf('+') !== -1;
+  // Clean text from quantities to avoid false matches (e.g. kg, ly, cái, hộp)
+  var cleanText = text.replace(/\b\d+(?:[.,]\d+)?\s*(?:kg|g|l|lít|lit|ly|cái|cai|hộp|hop|chai|lon|bịch|bich|con|quả|qua|trứng|trung|túi|tui|củ|cu|gói|goi|tép|tep|nhánh|nhanh|bó|bo|phần|phan|suất|suat)\b/gi, '');
+  
+  var sum = 0;
+  var matches = [];
+  var match;
+
+  // Match [number]k or [number]K
+  var kRegex = /(\d+(?:[.,]\d+)?)\s*[kK](?![gG\w])/g;
+  while ((match = kRegex.exec(cleanText)) !== null) {
+    var val = parseFloat(match[1].replace(',', '.'));
+    sum += val * 1000;
+    matches.push({ text: match[0], val: val * 1000 });
+  }
+
+  // Match [number]tr, triệu, M, m
+  var trRegex = /(\d+(?:[.,]\d+)?)\s*(?:tr|triệu|M|m)\b/gi;
+  while ((match = trRegex.exec(cleanText)) !== null) {
+    var val = parseFloat(match[1].replace(',', '.'));
+    sum += val * 1000000;
+    matches.push({ text: match[0], val: val * 1000000 });
+  }
+
+  // Plain numbers
+  var remainingText = cleanText;
+  matches.forEach(function(m) {
+    remainingText = remainingText.replace(m.text, ' ');
+  });
+
+  var plainMoneyRegex = /\b(\d{1,3}(?:\.\d{3})+|\d{4,12})\b/g;
+  while ((match = plainMoneyRegex.exec(remainingText)) !== null) {
+    var rawNum = match[1].replace(/\./g, '');
+    var val = parseInt(rawNum, 10);
+    if (val >= 1000) {
+      sum += val;
+      matches.push({ text: match[0], val: val });
+    }
+  }
+
+  // Only return sum if:
+  // - There is a '+' symbol
+  // - OR we have at least 2 distinct money items and the text doesn't contain mixed 'thu' and 'chi'
+  var isMixed = (text.toLowerCase().indexOf('thu') !== -1 && text.toLowerCase().indexOf('chi') !== -1);
+  if (hasPlus || (matches.length >= 2 && !isMixed)) {
+    return sum;
+  }
+  return 0;
+}
+
 // ── AI Call ──
 async function _callAI(msg) {
   var provider = _getProvider();
   if (!provider) return '⚠️ Chưa có API key. Vào Hóa đơn VAT → Cấu hình để thêm key.';
 
   var sys = _buildPrompt();
+  
+  var calculatedSum = _autoEvaluateTextMoney(msg);
+  if (calculatedSum > 0) {
+    sys += '\n\n⚠️ LƯU Ý TOÁN HỌC: Tin nhắn của user chứa nhiều khoản tiền hoặc phép tính. Hệ thống đã tính toán chính xác tổng số tiền này là: ' + calculatedSum + ' VNĐ. Bạn MUST sử dụng số tiền ' + calculatedSum + ' này cho trường "amount" trong JSON action nếu tạo lệnh thu/chi.';
+  }
+
   var ctx = _messages.slice(-6).map(function(m) { return (m.role === 'user' ? 'User: ' : 'AI: ') + m.text; }).join('\n');
   var full = ctx ? ctx + '\nUser: ' + msg : msg;
 
