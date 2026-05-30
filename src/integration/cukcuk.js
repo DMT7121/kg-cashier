@@ -204,6 +204,17 @@ function _getWorkingDayStr() {
   return getWorkingDay();
 }
 
+function _formatLocalISO(date) {
+  if (!date) return null;
+  var pad = function(n) { return n < 10 ? '0' + n : String(n); };
+  return date.getFullYear() + '-' +
+         pad(date.getMonth() + 1) + '-' +
+         pad(date.getDate()) + 'T' +
+         pad(date.getHours()) + ':' +
+         pad(date.getMinutes()) + ':' +
+         pad(date.getSeconds());
+}
+
 function _getWorkingDayRange(shiftDate) {
   return getWorkingDayRange(shiftDate);
 }
@@ -773,8 +784,8 @@ export async function syncTransactions(force) {
     // ═══ Use SHIFT DATE for working day range ═══
     var shiftDate = shift.date || _getWorkingDayStr();
     var workingDay = _getWorkingDayRange(shiftDate);
-    var fromDate = workingDay.from;
-    var toDate = workingDay.to;
+    var fromDate = _formatLocalISO(workingDay.start);
+    var toDate = _formatLocalISO(workingDay.end);
     var todayStr = shiftDate;
     
     // Clean up old indexes periodically
@@ -844,12 +855,26 @@ export async function syncTransactions(force) {
         console.log('[CUKCUK] SMART: ' + newOnApi + ' new detected, scanning pages ' + startPage + '-' + totalPages);
         showToast('🔍 Tìm ' + newOnApi + ' hóa đơn mới...', 'info');
 
+        var pagesToFetch = [];
         for (var pg = startPage; pg <= totalPages; pg++) {
-          var pgData = (pg === 1) ? data : await _fetchInvoices(useFrom, useTo, pg);
-          if (pg !== 1 && (pgData._authFailed || !pgData.Success)) break;
-          var pgInvoices = (pg === 1) ? firstPageInvoices : _extractPageData(pgData);
-          if (pgInvoices.length === 0) break;
-          _scanPage(pgInvoices);
+          if (pg === 1) {
+            _scanPage(firstPageInvoices);
+          } else {
+            pagesToFetch.push(pg);
+          }
+        }
+
+        if (pagesToFetch.length > 0) {
+          var promises = pagesToFetch.map(function(pg) {
+            return _fetchInvoices(useFrom, useTo, pg);
+          });
+          var pagesResults = await Promise.all(promises);
+          for (var idx = 0; idx < pagesResults.length; idx++) {
+            var pgData = pagesResults[idx];
+            if (pgData && pgData.Success) {
+              _scanPage(_extractPageData(pgData));
+            }
+          }
         }
       } else {
         // API says same count — do a quick check on page 1 + last page for edge cases
@@ -857,7 +882,7 @@ export async function syncTransactions(force) {
         _scanPage(firstPageInvoices);
         if (totalPages > 1) {
           var lastData = await _fetchInvoices(useFrom, useTo, totalPages);
-          if (lastData.Success) {
+          if (lastData && lastData.Success) {
             var lastInvoices = _extractPageData(lastData);
             _scanPage(lastInvoices);
           }
@@ -1110,20 +1135,32 @@ export async function syncInvoicesForDate(dateStr) {
 
   try {
     var range = _getWorkingDayRange(dateStr);
+    var fromDate = _formatLocalISO(range.start);
+    var toDate = _formatLocalISO(range.end);
     showToast('🔄 Đang tải hóa đơn POS ngày ' + dateStr + '...', 'info');
 
-    // Fetch all pages
-    var allInvoices = [];
-    var page = 1;
-    while (page <= 50) {
-      var data = await _fetchInvoices(range.from, range.to, page);
-      if (data._authFailed) return { success: false, message: data.message };
-      if (!data.Success) throw new Error(data.ErrorMessage || 'Lỗi API');
-      var pageItems = _extractPageData(data);
-      if (pageItems.length === 0) break;
-      allInvoices = allInvoices.concat(pageItems);
-      if (pageItems.length < 100) break;
-      page++;
+    // Fetch page 1 first to get total count
+    var firstPageData = await _fetchInvoices(fromDate, toDate, 1);
+    if (firstPageData._authFailed) return { success: false, message: firstPageData.message };
+    if (!firstPageData.Success) throw new Error(firstPageData.ErrorMessage || 'Lỗi API');
+    
+    var firstPageItems = _extractPageData(firstPageData);
+    var apiTotal = firstPageData.Total || firstPageItems.length;
+    var allInvoices = [].concat(firstPageItems);
+    
+    var totalPages = Math.ceil(apiTotal / 100) || 1;
+    if (totalPages > 1) {
+      var promises = [];
+      for (var pg = 2; pg <= totalPages; pg++) {
+        promises.push(_fetchInvoices(fromDate, toDate, pg));
+      }
+      var pagesResults = await Promise.all(promises);
+      for (var idx = 0; idx < pagesResults.length; idx++) {
+        var pgData = pagesResults[idx];
+        if (pgData && pgData.Success) {
+          allInvoices = allInvoices.concat(_extractPageData(pgData));
+        }
+      }
     }
 
     if (allInvoices.length === 0) {
@@ -1131,50 +1168,65 @@ export async function syncInvoicesForDate(dateStr) {
       return { success: true, synced: 0, total: 0 };
     }
 
-    // Fetch details in batches of 5
-    var BATCH = 5;
+    // Smart Optimization: Only fetch details for new or unpaid invoices
+    var invoicesToFetch = [];
     var records = [];
-    for (var b = 0; b < allInvoices.length; b += BATCH) {
-      var batch = allInvoices.slice(b, b + BATCH);
-      var promises = batch.map(function(inv) {
-        var refId = String(inv.RefId || inv.RefID || '');
-        return _fetchInvoiceDetail(refId).then(function(detail) {
-          return { inv: inv, refId: refId, detail: detail };
+    for (var i = 0; i < allInvoices.length; i++) {
+      var inv = allInvoices[i];
+      var refId = String(inv.RefId || inv.RefID || '');
+      var existing = invoiceStore.getInvoice(refId);
+      if (existing && !existing.unpaid) {
+        records.push(existing);
+      } else {
+        invoicesToFetch.push(inv);
+      }
+    }
+
+    if (invoicesToFetch.length > 0) {
+      // Fetch details in batches of 5
+      var BATCH = 5;
+      for (var b = 0; b < invoicesToFetch.length; b += BATCH) {
+        var batch = invoicesToFetch.slice(b, b + BATCH);
+        var promisesDetails = batch.map(function(inv) {
+          var refId = String(inv.RefId || inv.RefID || '');
+          return _fetchInvoiceDetail(refId).then(function(detail) {
+            return { inv: inv, refId: refId, detail: detail };
+          });
         });
-      });
-      var results = await Promise.all(promises);
+        var results = await Promise.all(promisesDetails);
 
-      for (var ri = 0; ri < results.length; ri++) {
-        var r = results[ri];
-        var inv = r.inv;
-        var refId = r.refId;
-        var detail = r.detail;
-        var detailAmount = (detail && detail.Amount) ? detail.Amount : (inv.Amount || 0);
-        var invoicePayments = [];
-        var pmts = (detail && detail.SAInvoicePayments) ? detail.SAInvoicePayments : [];
+        for (var ri = 0; ri < results.length; ri++) {
+          var r = results[ri];
+          var inv = r.inv;
+          var refId = r.refId;
+          var detail = r.detail;
+          var detailAmount = (detail && detail.Amount) ? detail.Amount : (inv.Amount || 0);
+          var invoicePayments = [];
+          var pmts = (detail && detail.SAInvoicePayments) ? detail.SAInvoicePayments : [];
 
-        for (var p = 0; p < pmts.length; p++) {
-          var pmt = pmts[p];
-          if ((pmt.Amount || 0) <= 0) continue;
-          var mapped = _mapPayment(pmt);
-          invoicePayments.push({ method: mapped.method, amount: pmt.Amount, label: mapped.label });
+          for (var p = 0; p < pmts.length; p++) {
+            var pmt = pmts[p];
+            if ((pmt.Amount || 0) <= 0) continue;
+            var mapped = _mapPayment(pmt);
+            invoicePayments.push({ method: mapped.method, amount: pmt.Amount, label: mapped.label });
+          }
+
+          var effAmt = 0;
+          invoicePayments.forEach(function(ip) { effAmt += ip.amount; });
+          if (!effAmt) effAmt = detailAmount;
+
+          records.push({
+            refId: refId, refNo: inv.RefNo || '', refDate: inv.RefDate || '', date: dateStr,
+            tableName: inv.TableName || '', employeeName: inv.EmployeeName || '',
+            amount: effAmt, payments: invoicePayments,
+            unpaid: invoicePayments.length === 0, confirmed: true,
+            syncedAt: new Date().toISOString(), pushedToSheets: false
+          });
         }
 
-        var effAmt = 0;
-        invoicePayments.forEach(function(ip) { effAmt += ip.amount; });
-        if (!effAmt) effAmt = detailAmount;
-
-        records.push({
-          refId: refId, refNo: inv.RefNo || '', refDate: inv.RefDate || '', date: dateStr,
-          tableName: inv.TableName || '', employeeName: inv.EmployeeName || '',
-          amount: effAmt, payments: invoicePayments,
-          unpaid: invoicePayments.length === 0, confirmed: true,
-          syncedAt: new Date().toISOString(), pushedToSheets: false
-        });
-      }
-
-      if (b + BATCH < allInvoices.length) {
-        showToast('📥 ' + Math.min(b + BATCH, allInvoices.length) + '/' + allInvoices.length + ' hóa đơn...', 'info');
+        if (b + BATCH < invoicesToFetch.length) {
+          showToast('📥 ' + Math.min(b + BATCH, invoicesToFetch.length) + '/' + invoicesToFetch.length + ' hóa đơn...', 'info');
+        }
       }
     }
 
