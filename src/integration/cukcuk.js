@@ -47,6 +47,13 @@ var _cachedCompanyCode = null;
 var _cachedTokenTime = 0;
 var TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours (official CUKCUK TTL)
 
+function _getCachedToken() {
+  var settings = getSettings();
+  var cukcuk = settings.cukcuk;
+  if (!cukcuk || !cukcuk.domain || !cukcuk.appId || !cukcuk.key) return null;
+  return localStorage.getItem('cukcuk_connected_flag') || 'proxy_managed_token';
+}
+
 // ── Active Login Lock ──
 var _activeLoginPromise = null;
 
@@ -104,12 +111,14 @@ export async function loginAndGetToken() {
 
     var data = await response.json();
     if (data && data.success && data.status === 'connected') {
+      localStorage.setItem('cukcuk_connected_flag', 'connected');
       return { 
         success: true, 
         message: 'Kết nối CUKCUK thành công!', 
         authInfo: data.auth 
       };
     } else {
+      localStorage.removeItem('cukcuk_connected_flag');
       return { 
         success: false, 
         message: (data && data.message) || 'Không thể xác thực kết nối CUKCUK' 
@@ -143,12 +152,14 @@ export async function testConnection() {
 
     var data = await response.json();
     if (data && data.success) {
+      localStorage.setItem('cukcuk_connected_flag', 'connected');
       return { 
         success: true, 
         message: data.message || 'Lấy lại token kết nối thành công!', 
         authInfo: data.auth 
       };
     } else {
+      localStorage.removeItem('cukcuk_connected_flag');
       return { 
         success: false, 
         message: (data && data.message) || 'Làm mới token kết nối thất bại' 
