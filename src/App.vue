@@ -20,6 +20,7 @@ import VATInvoice from './views/VATInvoice.vue';
 import Extensions from './views/Extensions.vue';
 import UserGuide from './views/UserGuide.vue';
 import SettingsHub from './views/SettingsHub.vue';
+import ChatbotAssistant from './components/ChatbotAssistant.vue';
 
 // Pinia Stores
 const appStore = useAppStore();
@@ -455,6 +456,9 @@ onUnmounted(() => {
       class="fixed inset-0 bg-slate-900/40 z-30 md:hidden transition-opacity" 
       @click="isMobileSidebarOpen = false"
     ></div>
+
+    <!-- AI Chatbot Assistant -->
+    <ChatbotAssistant />
   </div>
 </template>
 
