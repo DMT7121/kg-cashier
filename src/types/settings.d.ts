@@ -40,6 +40,9 @@ export interface ExtensionConfig {
   qrTemplates: QrTemplate[];
   lastSelectedQr: QrTemplate | null;
   ttsTemplates: TtsTemplate[];
+  numFormat?: 'dot' | 'comma';
+  defaultTax?: number;
+  calcType?: '1' | '2' | '3' | '4';
 }
 
 export interface Settings {
