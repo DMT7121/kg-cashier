@@ -502,10 +502,10 @@ async function savePaymentOverride() {
     ].filter(p => p.amount > 0);
     
     // Save to IndexedDB
-    await editInvoicePayment(editingInvoice.value.refId, newPayments);
+    const { oldPayments, newPayments: savedNewPayments } = await editInvoicePayment(editingInvoice.value.refId, newPayments);
     
     // Push manual edit to Google Sheets
-    const pushResult = await pushManualEditToSheets(editingInvoice.value.refId);
+    const pushResult = await pushManualEditToSheets(editingInvoice.value.refId, oldPayments, savedNewPayments);
     if (pushResult && pushResult.success) {
       showToast('✅ Đã ghi nhận thay đổi và đẩy lên Sheets thành công!', 'success');
     } else {

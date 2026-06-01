@@ -432,10 +432,11 @@ export async function getInvoicesByShiftTime(dateStr: string, startTime?: string
 }
 
 /** Edit payment methods on an invoice directly in the store */
-export async function editInvoicePayment(refId: string, newPayments: PaymentLine[]): Promise<void> {
+export async function editInvoicePayment(refId: string, newPayments: PaymentLine[]): Promise<{ oldPayments: PaymentLine[], newPayments: PaymentLine[] }> {
   const key = String(refId);
   const inv = await invoicesDb.getItem<SAInvoice>(key);
   if (!inv) throw new Error('Không tìm thấy hóa đơn: ' + refId);
+  const oldPayments = inv.payments || [];
   inv.payments = newPayments;
   inv.manualOverride = JSON.stringify(newPayments);
   (inv as any).isManuallyEdited = true;
@@ -446,6 +447,7 @@ export async function editInvoicePayment(refId: string, newPayments: PaymentLine
   }
   if (total > 0) inv.amount = total;
   await invoicesDb.setItem(key, inv);
+  return { oldPayments, newPayments };
 }
 
 // ── Google Sheets Tracking ──
@@ -597,4 +599,72 @@ export async function pullInvoicesFromCloud(dateStr: string): Promise<number> {
     console.warn('[InvoiceStore] Cloud pull failed:', e.message);
     return 0;
   }
+}
+
+/**
+ * Merges raw invoices loaded from Google Sheets (KG_CUKCUK_INVOICES) into local IndexedDB.
+ * Respects ManualLock / manual overrides correctly.
+ */
+export async function mergeCloudInvoices(cloudInvoices: any[]): Promise<number> {
+  let added = 0;
+  for (let i = 0; i < cloudInvoices.length; i++) {
+    const raw = cloudInvoices[i];
+    const refId = String(raw.RefId || raw.refId || '');
+    if (!refId) continue;
+
+    const existing = await invoicesDb.getItem<SAInvoice>(refId);
+    
+    // Parse payments list from Sheet row
+    let payments: PaymentLine[] = [];
+    const manualLock = raw.ManualLock === true || String(raw.ManualLock).toLowerCase() === 'true';
+    const jsonStr = manualLock ? (raw.ManualOverrideJson || raw.PaymentJson) : raw.PaymentJson;
+    
+    if (jsonStr) {
+      try {
+        payments = JSON.parse(jsonStr);
+      } catch (e) {
+        payments = [];
+      }
+    }
+
+    // Determine values
+    const amount = Number(raw.Amount) || 0;
+    const isPaid = raw.IsPaid === true || String(raw.IsPaid).toLowerCase() === 'true';
+    const isCancelled = raw.IsCancelled === true || String(raw.IsCancelled).toLowerCase() === 'true';
+    const isDeleted = raw.IsDeleted === true || String(raw.IsDeleted).toLowerCase() === 'true';
+
+    // If local version has manualOverride but cloud version doesn't have ManualLock yet,
+    // we should preserve local override until it's successfully pushed to Sheets.
+    if (existing && (existing.manualOverride || (existing as any).isManuallyEdited) && !manualLock) {
+      continue; 
+    }
+
+    const newInv: SAInvoice = {
+      refId: refId,
+      refNo: String(raw.RefNo || raw.refNo || ''),
+      refDate: String(raw.RefDate || raw.refDate || ''),
+      workDate: String(raw.WorkDate || raw.workDate || ''),
+      tableName: String(raw.TableName || raw.tableName || ''),
+      employeeName: String(raw.EmployeeName || raw.employeeName || ''),
+      amount: amount,
+      payments: payments,
+      isPaid: isPaid,
+      isCancelled: isCancelled,
+      isDeleted: isDeleted,
+      rowHash: String(raw.RowHash || raw.rowHash || ''),
+      itemsCount: Number(raw.ItemsCount || raw.itemsCount) || 0
+    };
+    (newInv as any).unpaid = !isPaid;
+    (newInv as any).syncedAt = String(raw.UpdatedAt || raw.LastFetchedAt || new Date().toISOString());
+    (newInv as any).pushedToSheets = true; // Loaded from Sheets, so it is already on Sheets
+    
+    if (manualLock) {
+      newInv.manualOverride = true;
+      (newInv as any).isManuallyEdited = true;
+    }
+
+    await invoicesDb.setItem(refId, newInv);
+    added++;
+  }
+  return added;
 }

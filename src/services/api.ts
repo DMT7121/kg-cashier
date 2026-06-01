@@ -608,3 +608,109 @@ export async function getPosOrdersFromCloud(): Promise<any> {
 export async function syncPosOrdersWithCloud(ordersData: any[]): Promise<any> {
   return apiCall('syncPosOrders', { orders: ordersData });
 }
+
+// ── CUKCUK New Flow Cloud APIs ────────────────
+
+export async function syncCukcukToSheetsOnCloud(params: {
+  workDate?: string;
+  fromDate?: string;
+  toDate?: string;
+  forceDetail?: boolean;
+  mode?: string;
+}): Promise<any> {
+  return apiCall('syncCukcukToSheets', params);
+}
+
+export async function saveCukcukOverrideOnCloud(overrideData: {
+  refId: string;
+  overrideType?: string;
+  oldValueJson?: string;
+  newValueJson?: string;
+  reason?: string;
+  editedBy?: string;
+  editedAt?: string;
+}): Promise<any> {
+  return apiCall('saveCukcukOverride', overrideData);
+}
+
+export async function getCukcukInvoicesFromCloud(params: {
+  workDate?: string;
+  fromDate?: string;
+  toDate?: string;
+  since?: string;
+  page?: number;
+  limit?: number;
+}): Promise<any> {
+  const ssId = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
+  let url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_CUKCUK_INVOICES`;
+  
+  if (params.workDate) {
+    url += `&tq=${encodeURIComponent(`select * where D = '${params.workDate}'`)}`;
+  } else if (params.fromDate && params.toDate) {
+    url += `&tq=${encodeURIComponent(`select * where C >= '${params.fromDate}' and C <= '${params.toDate}'`)}`;
+  } else if (params.fromDate) {
+    url += `&tq=${encodeURIComponent(`select * where C >= '${params.fromDate}'`)}`;
+  }
+
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 2500); // 2.5s timeout
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+
+    if (response.ok) {
+      const text = await response.text();
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1) {
+        const json = safeJsonParse<GVizResponse | null>(text.substring(start, end + 1), null);
+        if (json && json.status === 'ok' && json.table && json.table.rows) {
+          const INVOICES_HEADERS = [
+            'RefId', 'RefNo', 'RefDate', 'WorkDate', 'ShiftId', 'ShiftNumber', 'TableName', 'EmployeeName', 'CustomerName',
+            'Amount', 'CashAmount', 'CardAmount', 'TransferAmount', 'OtherAmount', 'PaymentInfo', 'PaymentJson',
+            'Status', 'IsPaid', 'IsCancelled', 'IsDeleted', 'SourceUpdatedAt', 'LastFetchedAt', 'RowHash', 'DetailHash',
+            'ItemsCount', 'ManualOverrideJson', 'ManualEditedAt', 'ManualEditedBy', 'ManualLock', 'SyncBatchId',
+            'CreatedAt', 'UpdatedAt'
+          ];
+          const headers = json.table.cols.map((c, idx) => c.label || INVOICES_HEADERS[idx] || '');
+          const invoices = json.table.rows.map(r => {
+            const obj: Record<string, any> = {};
+            if (r.c) {
+              r.c.forEach((cell, idx) => {
+                const header = headers[idx] || INVOICES_HEADERS[idx];
+                if (header) {
+                  let val = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : '') : '';
+                  // Handle cell formatting/numbers
+                  if (typeof val === 'string' && val.startsWith('Date(')) {
+                    try {
+                      const match = val.match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/);
+                      if (match) {
+                        const y = parseInt(match[1]);
+                        const m = parseInt(match[2]);
+                        const d = parseInt(match[3]);
+                        const hr = match[4] ? parseInt(match[4]) : 0;
+                        const min = match[5] ? parseInt(match[5]) : 0;
+                        const sec = match[6] ? parseInt(match[6]) : 0;
+                        val = new Date(y, m, d, hr, min, sec).toISOString();
+                      }
+                    } catch(e) {}
+                  }
+                  obj[header] = val;
+                }
+              });
+            }
+            return obj;
+          });
+          
+          console.log('[API] Ultra-fast invoices direct load success:', invoices.length);
+          return { success: true, invoices: invoices, direct: true };
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[API] Direct spreadsheet invoices fetch failed/timeout, falling back to GAS:', e.message);
+  }
+
+  // Fallback to Apps Script
+  return apiCall('getCukcukInvoices', params);
+}
