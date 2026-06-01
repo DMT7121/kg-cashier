@@ -31,30 +31,7 @@
   <meta name="apple-mobile-web-app-title" content="KG Order">
 </head>
 <body>
-  <div class="staff-app">
-    <!-- Minimal header for staff -->
-    <header class="staff-header" id="staffHeader">
-      <div class="staff-header-left">
-        <img src="/android-chrome-192x192.png" alt="KG" class="staff-logo">
-        <div>
-          <div class="staff-brand">KING's GRILL</div>
-          <div class="staff-role">📱 Nhân viên phục vụ</div>
-        </div>
-      </div>
-      <div class="staff-header-right">
-        <span class="staff-clock" id="staffClock"></span>
-      </div>
-    </header>
-
-    <!-- POS view renders here -->
-    <div class="staff-view" id="viewContainer"></div>
-  </div>
-
-  <!-- Modal Overlay (required by pos.js) -->
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal-content" id="modalBody"></div>
-  </div>
-
-  <script type="module" src="/src/staff-main.js"></script>
+  <div id="app"></div>
+  <script type="module" src="/src/staff-main.ts"></script>
 </body>
 </html>

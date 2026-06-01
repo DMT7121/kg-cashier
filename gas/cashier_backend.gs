@@ -22,7 +22,16 @@ function _sheetsGet(sheetName) {
     var resp = Sheets.Spreadsheets.Values.get(CASHIER_SS_ID, sheetName);
     return resp.values || [];
   } catch(e) {
-    // Fallback: sheet doesn't exist or API not enabled
+    Logger.log('[GAS API Fallback] _sheetsGet error using Advanced Sheets API on ' + sheetName + ': ' + e.toString());
+    try {
+      var ss = SpreadsheetApp.openById(CASHIER_SS_ID);
+      var sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        return sheet.getDataRange().getValues();
+      }
+    } catch(err) {
+      Logger.log('[GAS API Fallback] _sheetsGet SpreadsheetApp fallback also failed: ' + err.toString());
+    }
     return [];
   }
 }
@@ -36,12 +45,33 @@ function _sheetsGet(sheetName) {
  */
 function _sheetsBatchWrite(sheetName, range, values) {
   if (!values || values.length === 0) return;
-  Sheets.Spreadsheets.Values.update(
-    { values: values },
-    CASHIER_SS_ID,
-    range,
-    { valueInputOption: 'RAW' }
-  );
+  try {
+    Sheets.Spreadsheets.Values.update(
+      { values: values },
+      CASHIER_SS_ID,
+      range,
+      { valueInputOption: 'RAW' }
+    );
+  } catch(e) {
+    Logger.log('[GAS API Fallback] _sheetsBatchWrite error using Advanced Sheets API on ' + range + ': ' + e.toString());
+    try {
+      var ss = SpreadsheetApp.openById(CASHIER_SS_ID);
+      var cleanRange = range;
+      var targetSheet = null;
+      if (range.indexOf('!') > -1) {
+        var parts = range.split('!');
+        targetSheet = ss.getSheetByName(parts[0]);
+        cleanRange = parts[1];
+      } else {
+        targetSheet = ss.getSheetByName(sheetName);
+      }
+      if (targetSheet) {
+        targetSheet.getRange(cleanRange).setValues(values);
+      }
+    } catch(err) {
+      Logger.log('[GAS API Fallback] _sheetsBatchWrite SpreadsheetApp fallback failed: ' + err.toString());
+    }
+  }
 }
 
 /**
@@ -50,12 +80,27 @@ function _sheetsBatchWrite(sheetName, range, values) {
  */
 function _sheetsAppend(sheetName, values) {
   if (!values || values.length === 0) return;
-  Sheets.Spreadsheets.Values.append(
-    { values: values },
-    CASHIER_SS_ID,
-    sheetName + '!A1',
-    { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' }
-  );
+  try {
+    Sheets.Spreadsheets.Values.append(
+      { values: values },
+      CASHIER_SS_ID,
+      sheetName + '!A1',
+      { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' }
+    );
+  } catch(e) {
+    Logger.log('[GAS API Fallback] _sheetsAppend error using Advanced Sheets API on ' + sheetName + ': ' + e.toString());
+    try {
+      var ss = SpreadsheetApp.openById(CASHIER_SS_ID);
+      var sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        for (var i = 0; i < values.length; i++) {
+          sheet.appendRow(values[i]);
+        }
+      }
+    } catch(err) {
+      Logger.log('[GAS API Fallback] _sheetsAppend SpreadsheetApp fallback failed: ' + err.toString());
+    }
+  }
 }
 
 /**
@@ -134,8 +179,10 @@ function _handleCashierRequest(e) {
     switch (action) {
       // Shift Actions & Registry
       case 'openShift':       result = _openShiftAction(data); break;
+      case 'tryOpenShift':    result = _tryOpenShiftAction(data); break;
       case 'syncShift':       result = _syncShiftAction(data); break;
       case 'closeShift':      result = _closeShiftAction(data); break;
+      case 'closeShiftAtomic': result = _closeShiftAtomicAction(data); break;
       case 'reopenShift':     result = _reopenShiftAction(data); break;
       case 'cancelShift':     result = _cancelShiftAction(data); break;
       case 'deleteShift':     result = _cancelShiftAction(data); break; // safe alias
@@ -175,6 +222,11 @@ function _handleCashierRequest(e) {
       case 'rebuildCukcukIndex': result = rebuildCukcukIndex(); break;
       case 'getCukcukSyncState': result = _getCukcukSyncState(); break;
       case 'saveCukcukSyncState': result = _saveCukcukSyncState(data); break;
+      case 'syncCukcukToSheets': result = _syncCukcukToSheetsAction(data); break;
+      case 'getCukcukInvoices': result = _getCukcukInvoicesAction(data); break;
+      case 'getCukcukItems':    result = _getCukcukItemsAction(data); break;
+      case 'getCukcukDailySales': result = _getCukcukDailySalesAction(data); break;
+      case 'saveCukcukOverride': result = _saveCukcukOverrideAction(data); break;
 
       // POS Cloud Sync
       case 'getPosOrders':    result = _getPosOrdersAction(data); break;
@@ -1236,6 +1288,10 @@ function cashier_initAllSheets() {
   _getSheet('KG_SHIFT_REGISTRY', ['shiftKey', 'shiftId', 'workDay', 'shiftNumber', 'status', 'cashierName', 'cashierId', 'openedAt', 'closedAt', 'source', 'origin', 'host', 'environment', 'deviceId', 'sessionId', 'createdBy', 'lastMutationId', 'revision', 'lastSync', 'notes']);
   _getSheet('KG_CUKCUK_SYNC_STATE', ['syncType', 'startDate', 'endDate', 'lastSyncTime', 'status', 'invoicesCount', 'details']);
   _getSheet('CUKCUK_INDEX', ['RefId', 'SheetCell']);
+  _getSheet('KG_CUKCUK_INVOICES', INVOICES_HEADERS);
+  _getSheet('KG_CUKCUK_ITEMS', ITEMS_HEADERS);
+  _getSheet('KG_ITEM_CATEGORY_MAP', CATEGORY_MAP_HEADERS);
+  _getSheet('KG_CUKCUK_OVERRIDES', ['OverrideId', 'RefId', 'OverrideType', 'OldValueJson', 'NewValueJson', 'Reason', 'EditedBy', 'EditedAt', 'SyncedAt', 'Status']);
 
   // Create Drive folders if needed
   const parent = DriveApp.getFolderById(CASHIER_DRIVE_ID);
@@ -1707,4 +1763,1029 @@ function _cleanupOldPosOrders(sheet) {
     }
   }
 }
+
+
+// ══════════════════════════════════════════════
+//  NEW CENTRAL CUKCUK BACKEND SYNC AND ACTIONS
+// ══════════════════════════════════════════════
+
+const INVOICES_HEADERS = [
+  'RefId', 'RefNo', 'RefDate', 'WorkDate', 'ShiftId', 'ShiftNumber', 'TableName', 'EmployeeName', 'CustomerName',
+  'Amount', 'CashAmount', 'CardAmount', 'TransferAmount', 'OtherAmount', 'PaymentInfo', 'PaymentJson',
+  'Status', 'IsPaid', 'IsCancelled', 'IsDeleted', 'SourceUpdatedAt', 'LastFetchedAt', 'RowHash', 'DetailHash',
+  'ItemsCount', 'ManualOverrideJson', 'ManualEditedAt', 'ManualEditedBy', 'ManualLock', 'SyncBatchId',
+  'CreatedAt', 'UpdatedAt'
+];
+
+const ITEMS_HEADERS = [
+  'ItemRowKey', 'RefId', 'RefNo', 'RefDate', 'WorkDate', 'RefDetailID', 'ItemID', 'ItemCode', 'ItemName',
+  'CategoryID', 'CategoryName', 'UnitID', 'UnitName', 'Quantity', 'UnitPrice', 'Amount', 'DiscountAmount',
+  'InventoryItemType', 'ItemType', 'IsDrink', 'IsFood', 'ClassifySource', 'RowHash', 'CreatedAt', 'UpdatedAt'
+];
+
+const CATEGORY_MAP_HEADERS = [
+  'ItemID', 'ItemCode', 'ItemName', 'CategoryName', 'IsDrink', 'IsFood', 'InventoryProductId', 'Aliases', 'UpdatedBy', 'UpdatedAt'
+];
+
+function _md5Gas(inputStr) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, inputStr, Utilities.Charset.UTF_8);
+  let hexStr = '';
+  for (let i = 0; i < digest.length; i++) {
+    let byteVal = digest[i];
+    if (byteVal < 0) byteVal += 256;
+    let byteHex = byteVal.toString(16);
+    hexStr += byteHex.length === 1 ? '0' + byteHex : byteHex;
+  }
+  return hexStr;
+}
+
+function _colLetter(colNumber) {
+  let temp, letter = '';
+  while (colNumber > 0) {
+    temp = (colNumber - 1) % 26;
+    letter = String.fromCharCode(65 + temp) + letter;
+    colNumber = (colNumber - temp - 1) / 26;
+  }
+  return letter;
+}
+
+function _sheetsBatchUpdate(sheetName, updates) {
+  if (!updates || updates.length === 0) return;
+  const data = updates.map(u => ({
+    range: sheetName + '!A' + u.rowIndex + ':' + u.rangeEndLetter + u.rowIndex,
+    values: [u.rowData]
+  }));
+  try {
+    Sheets.Spreadsheets.Values.batchUpdate(
+      { valueInputOption: 'RAW', data: data },
+      CASHIER_SS_ID
+    );
+  } catch(e) {
+    Logger.log('[GAS API Fallback] batchUpdate failed, falling back to sequential: ' + e.toString());
+    updates.forEach(u => {
+      _sheetsBatchWrite(sheetName, sheetName + '!A' + u.rowIndex, [u.rowData]);
+    });
+  }
+}
+
+function _getWorkingDayGas(dateOrStr) {
+  let dateObj;
+  if (!dateOrStr) {
+    dateObj = new Date();
+  } else if (typeof dateOrStr === 'string') {
+    dateObj = new Date(dateOrStr.replace(' ', 'T'));
+  } else {
+    dateObj = dateOrStr;
+  }
+  
+  const tz = 'Asia/Ho_Chi_Minh';
+  const hourStr = Utilities.formatDate(dateObj, tz, 'H');
+  const hour = parseInt(hourStr);
+  
+  let targetDate = new Date(dateObj.getTime());
+  if (hour < 6) {
+    targetDate.setTime(targetDate.getTime() - 24 * 60 * 60 * 1000);
+  }
+  
+  return Utilities.formatDate(targetDate, tz, 'yyyy-MM-dd');
+}
+
+function _getWorkingDayRangeGas(workDateStr) {
+  var parts = workDateStr.split('-');
+  var y = parseInt(parts[0]);
+  var m = parseInt(parts[1]) - 1;
+  var d = parseInt(parts[2]);
+  
+  var fromDate = new Date(y, m, d, 6, 0, 0);
+  var toDate = new Date(y, m, d + 1, 6, 0, 0);
+  
+  var pad = function(n) { return n < 10 ? '0' + n : String(n); };
+  var formatLocal = function(dt) {
+    return dt.getFullYear() + '-' +
+           pad(dt.getMonth() + 1) + '-' +
+           pad(dt.getDate()) + 'T' +
+           pad(dt.getHours()) + ':' +
+           pad(dt.getMinutes()) + ':' +
+           pad(dt.getSeconds());
+  };
+  
+  return {
+    fromDate: formatLocal(fromDate),
+    toDate: formatLocal(toDate)
+  };
+}
+
+function _loginCukcukInGas(appId, domain, secretKey) {
+  const loginTime = Utilities.formatDate(new Date(), "GMT", "yyyy-MM-dd'T'HH:mm:ss'Z'");
+  const cleanAppId = appId.trim();
+  const cleanDomain = domain.trim().toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\.cukcuk\.vn\/?$/, '')
+    .replace(/\/$/, '');
+  
+  const payloadStr = JSON.stringify({
+    AppID: cleanAppId,
+    Domain: cleanDomain,
+    LoginTime: loginTime
+  });
+  
+  const signatureBytes = Utilities.computeHmacSignature(
+    Utilities.MacAlgorithm.HMAC_SHA_256,
+    payloadStr,
+    secretKey,
+    Utilities.Charset.UTF_8
+  );
+  
+  let signatureHex = '';
+  for (let i = 0; i < signatureBytes.length; i++) {
+    let byteVal = signatureBytes[i];
+    if (byteVal < 0) byteVal += 256;
+    let hexStr = byteVal.toString(16);
+    signatureHex += hexStr.length === 1 ? '0' + hexStr : hexStr;
+  }
+  
+  const upstreamUrl = 'https://graphapi.cukcuk.vn/api/Account/Login';
+  const response = UrlFetchApp.fetch(upstreamUrl, {
+    method: 'POST',
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      AppID: cleanAppId,
+      Domain: cleanDomain,
+      LoginTime: loginTime,
+      SignatureInfo: signatureHex
+    }),
+    muteHttpExceptions: true
+  });
+  
+  if (response.getResponseCode() !== 200) {
+    throw new Error('Đăng nhập CUKCUK thất bại với mã HTTP ' + response.getResponseCode());
+  }
+  
+  const data = JSON.parse(response.getContentText());
+  if (data && data.Success && data.Data) {
+    const accessToken = data.Data.AccessToken || data.Data;
+    const companyCode = data.Data.CompanyCode || cleanDomain;
+    return {
+      accessToken: accessToken,
+      companyCode: companyCode
+    };
+  } else {
+    throw new Error((data && (data.ErrorMessage || data.Message)) || 'Lỗi đăng nhập CUKCUK');
+  }
+}
+
+function _cukcukApiCallInGas(url, options, accessToken, companyCode) {
+  const headers = options.headers || {};
+  headers['Authorization'] = 'Bearer ' + accessToken;
+  headers['CompanyCode'] = companyCode;
+  
+  const fetchOptions = {
+    method: options.method || 'GET',
+    headers: headers,
+    muteHttpExceptions: true
+  };
+  if (options.body) {
+    fetchOptions.payload = options.body;
+    fetchOptions.contentType = 'application/json';
+  }
+  
+  const targetUrl = 'https://graphapi.cukcuk.vn' + url;
+  
+  let delay = 500;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = UrlFetchApp.fetch(targetUrl, fetchOptions);
+      const respCode = response.getResponseCode();
+      if (respCode === 200) {
+        const bodyText = response.getContentText();
+        let bodyJson;
+        try { bodyJson = JSON.parse(bodyText); } catch(e) {}
+        if (bodyJson && !bodyJson.Success) {
+          const errMsg = (bodyJson.ErrorMessage || bodyJson.Message || '').toLowerCase();
+          const errCode = bodyJson.ErrorCode || 0;
+          if (errCode === 102 || errMsg.indexOf('102') !== -1 || errMsg.indexOf('đang xử lý') !== -1) {
+            Logger.log('[GAS CUKCUK] Concurrency Lock (102). Retrying in ' + delay + 'ms...');
+            Utilities.sleep(delay);
+            delay *= 2;
+            continue;
+          }
+        }
+        return bodyJson || bodyText;
+      } else if (respCode === 401) {
+        return { _authFailed: true };
+      } else {
+        throw new Error('HTTP ' + respCode + ' from ' + url);
+      }
+    } catch(error) {
+      if (attempt === 2) throw error;
+      Logger.log('[GAS CUKCUK] Connection error (attempt ' + (attempt + 1) + '): ' + error.toString() + '. Retrying...');
+      Utilities.sleep(delay);
+      delay *= 2;
+    }
+  }
+  return null;
+}
+
+function _syncCukcukToSheetsAction(data) {
+  const val = _validateMetadata(data, 'syncCukcukToSheets');
+  if (val && !val.success) return val;
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(60000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận (không thể lấy khóa đồng bộ), vui lòng thử lại sau.' };
+  }
+
+  const startTimeMs = Date.now();
+  
+  try {
+    const props = PropertiesService.getScriptProperties();
+    let domain = props.getProperty('CUKCUK_DOMAIN') || '';
+    let appId = props.getProperty('CUKCUK_APP_ID') || '';
+    let secretKey = props.getProperty('CUKCUK_SECRET_KEY') || '';
+
+    if (!domain || !appId || !secretKey) {
+      try {
+        const settingsRows = _getSheetData('KG_SETTINGS');
+        const settingsObj = {};
+        settingsRows.forEach(r => { settingsObj[r.key] = r.value; });
+        if (settingsObj.cukcuk) {
+          const cukcukConf = JSON.parse(settingsObj.cukcuk);
+          domain = cukcukConf.domain || '';
+          appId = cukcukConf.appId || '';
+          secretKey = cukcukConf.key || '';
+        }
+      } catch(e) {
+        Logger.log('[GAS CUKCUK] Settings parse fallback failed: ' + e.toString());
+      }
+    }
+
+    if (!domain || !appId || !secretKey) {
+      return { success: false, message: 'Thiếu cấu hình kết nối CUKCUK (CUKCUK_DOMAIN, CUKCUK_APP_ID, CUKCUK_SECRET_KEY).' };
+    }
+
+    let loginRes;
+    try {
+      loginRes = _loginCukcukInGas(appId, domain, secretKey);
+    } catch(err) {
+      return { success: false, message: 'Lỗi đăng nhập CUKCUK: ' + err.toString() };
+    }
+
+    let useFromDate, useToDate;
+    if (data.fromDate && data.toDate) {
+      useFromDate = data.fromDate;
+      useToDate = data.toDate;
+    } else if (data.workDate) {
+      const range = _getWorkingDayRangeGas(data.workDate);
+      useFromDate = range.fromDate;
+      useToDate = range.toDate;
+    } else {
+      const todayWorkDateStr = _getWorkingDayGas(new Date());
+      const parts = todayWorkDateStr.split('-');
+      const y = parseInt(parts[0]);
+      const m = parseInt(parts[1]) - 1;
+      const d = parseInt(parts[2]);
+      
+      const fromDateObj = new Date(y, m, d - 2, 6, 0, 0);
+      const toDateObj = new Date(y, m, d + 1, 6, 0, 0);
+      
+      const pad = function(n) { return n < 10 ? '0' + n : String(n); };
+      const formatLocal = function(dt) {
+        return dt.getFullYear() + '-' +
+               pad(dt.getMonth() + 1) + '-' +
+               pad(dt.getDate()) + 'T' +
+               pad(dt.getHours()) + ':' +
+               pad(dt.getMinutes()) + ':' +
+               pad(dt.getSeconds());
+      };
+      useFromDate = formatLocal(fromDateObj);
+      useToDate = formatLocal(toDateObj);
+    }
+
+    Logger.log('[GAS CUKCUK] Sync window: ' + useFromDate + ' -> ' + useToDate);
+
+    let page = 1;
+    let allApiInvoices = [];
+    let hasMore = true;
+    const limit = 100;
+    
+    while (hasMore) {
+      const body = {
+        Page: page,
+        Limit: limit,
+        FromDate: useFromDate,
+        ToDate: useToDate
+      };
+      
+      let response = _cukcukApiCallInGas('/api/v1/sainvoices/paging', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }, loginRes.accessToken, loginRes.companyCode);
+      
+      if (response && response._authFailed) {
+        loginRes = _loginCukcukInGas(appId, domain, secretKey);
+        response = _cukcukApiCallInGas('/api/v1/sainvoices/paging', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        }, loginRes.accessToken, loginRes.companyCode);
+      }
+      
+      let items = [];
+      if (response && response.Success && response.Data) {
+        if (Array.isArray(response.Data)) items = response.Data;
+        else if (response.Data.PageData) items = response.Data.PageData;
+        else if (response.Data.Items) items = response.Data.Items;
+      }
+      
+      if (items.length > 0) {
+        allApiInvoices = allApiInvoices.concat(items);
+        if (items.length < limit) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    Logger.log('[GAS CUKCUK] Found ' + allApiInvoices.length + ' invoices on API.');
+
+    _getSheet('KG_CUKCUK_INVOICES', INVOICES_HEADERS);
+    _getSheet('KG_CUKCUK_ITEMS', ITEMS_HEADERS);
+    _getSheet('KG_ITEM_CATEGORY_MAP', CATEGORY_MAP_HEADERS);
+    
+    const allInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
+    const invoiceHeaders = allInvoices[0] || INVOICES_HEADERS;
+    const colIndex = {};
+    invoiceHeaders.forEach((h, idx) => { colIndex[h] = idx; });
+    
+    const invoiceMap = {};
+    for (let i = 1; i < allInvoices.length; i++) {
+      const refId = String(allInvoices[i][colIndex['RefId']] || '');
+      if (refId) {
+        invoiceMap[refId] = {
+          rowIndex: i + 1,
+          rowHash: String(allInvoices[i][colIndex['RowHash']] || ''),
+          detailHash: String(allInvoices[i][colIndex['DetailHash']] || ''),
+          isPaid: allInvoices[i][colIndex['IsPaid']] === true || String(allInvoices[i][colIndex['IsPaid']]).toLowerCase() === 'true',
+          manualLock: allInvoices[i][colIndex['ManualLock']] === true || String(allInvoices[i][colIndex['ManualLock']]).toLowerCase() === 'true',
+        };
+      }
+    }
+
+    const allItems = _sheetsGet('KG_CUKCUK_ITEMS');
+    const itemsHeaders = allItems[0] || ITEMS_HEADERS;
+    const itemsColIndex = {};
+    itemsHeaders.forEach((h, idx) => { itemsColIndex[h] = idx; });
+    
+    const itemsMap = {};
+    for (let i = 1; i < allItems.length; i++) {
+      const itemRowKey = String(allItems[i][itemsColIndex['ItemRowKey']] || '');
+      if (itemRowKey) {
+        itemsMap[itemRowKey] = {
+          rowIndex: i + 1
+        };
+      }
+    }
+
+    const categoryMapRows = _getSheetData('KG_ITEM_CATEGORY_MAP');
+    const categoryMap = {};
+    categoryMapRows.forEach(r => {
+      categoryMap[String(r.ItemID)] = r;
+    });
+
+    const newCategoryMapRows = [];
+    const invoicesToAppend = [];
+    const invoicesToUpdate = [];
+    const itemsToAppend = [];
+    const itemsToUpdate = [];
+    
+    let insertedInvoices = 0;
+    let updatedInvoices = 0;
+    let skippedInvoices = 0;
+    let insertedItems = 0;
+    let updatedItems = 0;
+    let skippedItems = 0;
+    let detailFetched = 0;
+
+    const forceDetail = data.forceDetail === true || String(data.forceDetail).toLowerCase() === 'true';
+    const syncBatchId = 'batch_' + Date.now().toString(36);
+    const nowStr = new Date().toISOString();
+
+    for (let i = 0; i < allApiInvoices.length; i++) {
+      const inv = allApiInvoices[i];
+      const refId = String(inv.RefId || '');
+      if (!refId) continue;
+
+      const lightHashStr = [
+        refId,
+        inv.RefNo || '',
+        inv.RefDate || '',
+        inv.Amount || 0,
+        inv.Status || 0,
+        inv.IsPaid === true || String(inv.IsPaid).toLowerCase() === 'true',
+        inv.IsCancelled === true || String(inv.IsCancelled).toLowerCase() === 'true',
+        inv.IsDeleted === true || String(inv.IsDeleted).toLowerCase() === 'true'
+      ].join('|');
+      const lightHash = _md5Gas(lightHashStr);
+
+      const existingInv = invoiceMap[refId];
+
+      if (existingInv && existingInv.rowHash === lightHash && existingInv.isPaid && !forceDetail) {
+        skippedInvoices++;
+        continue;
+      }
+
+      if (existingInv && existingInv.manualLock && !forceDetail) {
+        skippedInvoices++;
+        continue;
+      }
+
+      let detail = null;
+      try {
+        detail = _cukcukApiCallInGas('/api/v1/sainvoices/' + refId, { method: 'GET' }, loginRes.accessToken, loginRes.companyCode);
+        detailFetched++;
+      } catch(detailErr) {
+        Logger.log('[GAS CUKCUK] Detail fetch failed for ' + refId + ': ' + detailErr.toString());
+        continue;
+      }
+
+      if (detail && detail.Success && detail.Data) {
+        const detailData = detail.Data;
+        const payments = detailData.SAInvoicePayments || detailData.Payments || [];
+        const detailAmount = detailData.Amount || 0;
+        
+        let invCash = 0, invCard = 0, invTransfer = 0, invOther = 0;
+        const paymentInfoParts = [];
+        const paymentJsonList = [];
+
+        payments.forEach(pmt => {
+          const pmtAmount = pmt.Amount || 0;
+          if (pmtAmount <= 0) return;
+          
+          const name = (pmt.PaymentName || '').toLowerCase();
+          const type = pmt.PaymentType;
+          let method = 'cash';
+          let label = 'Tiền mặt';
+
+          if (name.indexOf('mặt') !== -1 || name.indexOf('tiền mặt') !== -1 || name.indexOf('cash') !== -1) {
+            method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount;
+          } else if (name.indexOf('chuyển') !== -1 || name.indexOf('khoản') !== -1 || name.indexOf('ngân hàng') !== -1 || name.indexOf('bank') !== -1 || name.indexOf('transfer') !== -1) {
+            method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount;
+          } else if (name.indexOf('thẻ') !== -1 || name.indexOf('card') !== -1 || name.indexOf('visa') !== -1 || name.indexOf('master') !== -1) {
+            method = 'card'; label = 'Thẻ'; invCard += pmtAmount;
+          } else {
+            switch (type) {
+              case 1: method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount; break;
+              case 2: method = 'card'; label = 'Thẻ'; invCard += pmtAmount; break;
+              case 3: method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount; break;
+              default: method = 'other'; label = pmt.PaymentName || 'Khác'; invOther += pmtAmount; break;
+            }
+          }
+          paymentInfoParts.push(label + ': ' + pmtAmount.toLocaleString('vi-VN'));
+          paymentJsonList.push({ method: method, amount: pmtAmount, label: label });
+        });
+
+        const effectiveAmount = (invCash + invCard + invTransfer + invOther) || detailAmount;
+        const paymentInfo = paymentInfoParts.join(' + ') || 'Chưa thanh toán';
+
+        const itemsList = detailData.SAInvoiceDetails || detailData.Details || [];
+        
+        const detailItemsStr = (itemsList || []).map(item => {
+          return [
+            item.InventoryItemName || item.ItemName || item.Name || '',
+            item.Quantity || item.Qty || 0,
+            item.UnitPrice || item.Price || 0,
+            item.Amount || 0
+          ].join(',');
+        }).join('|');
+        const detailHash = _md5Gas(detailItemsStr);
+
+        const workDate = _getWorkingDayGas(detailData.RefDate || inv.RefDate);
+
+        const newInvoiceRow = new Array(INVOICES_HEADERS.length).fill('');
+        newInvoiceRow[colIndex['RefId']] = refId;
+        newInvoiceRow[colIndex['RefNo']] = detailData.RefNo || inv.RefNo || '';
+        newInvoiceRow[colIndex['RefDate']] = detailData.RefDate || inv.RefDate || '';
+        newInvoiceRow[colIndex['WorkDate']] = workDate;
+        newInvoiceRow[colIndex['ShiftId']] = '';
+        newInvoiceRow[colIndex['ShiftNumber']] = '';
+        newInvoiceRow[colIndex['TableName']] = detailData.TableName || inv.TableName || '';
+        newInvoiceRow[colIndex['EmployeeName']] = detailData.EmployeeName || inv.EmployeeName || '';
+        newInvoiceRow[colIndex['CustomerName']] = detailData.CustomerName || inv.CustomerName || '';
+        newInvoiceRow[colIndex['Amount']] = effectiveAmount;
+        newInvoiceRow[colIndex['CashAmount']] = invCash;
+        newInvoiceRow[colIndex['CardAmount']] = invCard;
+        newInvoiceRow[colIndex['TransferAmount']] = invTransfer;
+        newInvoiceRow[colIndex['OtherAmount']] = invOther;
+        newInvoiceRow[colIndex['PaymentInfo']] = paymentInfo;
+        newInvoiceRow[colIndex['PaymentJson']] = JSON.stringify(paymentJsonList);
+        newInvoiceRow[colIndex['Status']] = detailData.Status !== undefined ? detailData.Status : (inv.Status || 0);
+        newInvoiceRow[colIndex['IsPaid']] = detailData.IsPaid !== undefined ? detailData.IsPaid : (inv.IsPaid || false);
+        newInvoiceRow[colIndex['IsCancelled']] = detailData.IsCancelled !== undefined ? detailData.IsCancelled : (inv.IsCancelled || false);
+        newInvoiceRow[colIndex['IsDeleted']] = detailData.IsDeleted !== undefined ? detailData.IsDeleted : (inv.IsDeleted || false);
+        newInvoiceRow[colIndex['SourceUpdatedAt']] = detailData.ModifiedDate || '';
+        newInvoiceRow[colIndex['LastFetchedAt']] = nowStr;
+        newInvoiceRow[colIndex['RowHash']] = lightHash;
+        newInvoiceRow[colIndex['DetailHash']] = detailHash;
+        newInvoiceRow[colIndex['ItemsCount']] = itemsList.length;
+        newInvoiceRow[colIndex['ManualOverrideJson']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualOverrideJson']] || '{}') : '{}';
+        newInvoiceRow[colIndex['ManualEditedAt']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualEditedAt']] || '') : '';
+        newInvoiceRow[colIndex['ManualEditedBy']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualEditedBy']] || '') : '';
+        newInvoiceRow[colIndex['ManualLock']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualLock']] === true || String(allInvoices[existingInv.rowIndex - 1][colIndex['ManualLock']]).toLowerCase() === 'true') : false;
+        newInvoiceRow[colIndex['SyncBatchId']] = syncBatchId;
+        newInvoiceRow[colIndex['CreatedAt']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['CreatedAt']] || nowStr) : nowStr;
+        newInvoiceRow[colIndex['UpdatedAt']] = nowStr;
+
+        if (existingInv) {
+          invoicesToUpdate.push({
+            rowIndex: existingInv.rowIndex,
+            rangeEndLetter: _colLetter(INVOICES_HEADERS.length),
+            rowData: newInvoiceRow
+          });
+          updatedInvoices++;
+        } else {
+          invoicesToAppend.push(newInvoiceRow);
+          insertedInvoices++;
+        }
+
+        if (!existingInv || existingInv.detailHash !== detailHash || forceDetail) {
+          itemsList.forEach((item, itemIdx) => {
+            const itemId = String(item.InventoryItemID || item.ItemID || '');
+            if (!itemId) return;
+            const refDetailId = String(item.RefDetailID || '');
+            const itemRowKey = refDetailId ? (refId + '__' + refDetailId) : (refId + '__' + itemId + '__' + itemIdx);
+
+            const itemName = item.InventoryItemName || item.ItemName || item.Name || '';
+            const itemCode = item.InventoryItemCode || item.ItemCode || '';
+            const itemCategoryName = item.InventoryItemCategoryName || item.CategoryName || '';
+
+            let isDrink = false;
+            let isFood = true;
+            if (categoryMap[itemId]) {
+              isDrink = categoryMap[itemId].IsDrink === true || String(categoryMap[itemId].IsDrink).toLowerCase() === 'true';
+              isFood = categoryMap[itemId].IsFood === true || String(categoryMap[itemId].IsFood).toLowerCase() === 'true';
+            } else {
+              const lowerName = itemName.toLowerCase();
+              const lowerCat = itemCategoryName.toLowerCase();
+              if (lowerCat.indexOf('uống') > -1 || lowerCat.indexOf('nước') > -1 || lowerCat.indexOf('bia') > -1 || lowerCat.indexOf('ngọt') > -1 || lowerCat.indexOf('rượu') > -1 || lowerCat.indexOf('cà phê') > -1 || lowerCat.indexOf('cafe') > -1 || lowerCat.indexOf('sinh tố') > -1 || lowerCat.indexOf('trà') > -1) {
+                isDrink = true; isFood = false;
+              } else if (lowerName.indexOf('nước') > -1 || lowerName.indexOf('bia') > -1 || lowerName.indexOf('coca') > -1 || lowerName.indexOf('pepsi') > -1 || lowerName.indexOf('rượu') > -1 || lowerName.indexOf('redbull') > -1 || lowerName.indexOf('sting') > -1 || lowerName.indexOf('trà') > -1 || lowerName.indexOf('cafe') > -1 || lowerName.indexOf('chai') > -1 || lowerName.indexOf('lon') > -1) {
+                isDrink = true; isFood = false;
+              }
+
+              newCategoryMapRows.push([
+                itemId, itemCode, itemName, itemCategoryName,
+                isDrink ? 'TRUE' : 'FALSE', isFood ? 'TRUE' : 'FALSE',
+                '', '', 'SYSTEM', nowStr
+              ]);
+              categoryMap[itemId] = {
+                ItemID: itemId,
+                IsDrink: isDrink,
+                IsFood: isFood
+              };
+            }
+
+            const newItemRow = new Array(ITEMS_HEADERS.length).fill('');
+            newItemRow[itemsColIndex['ItemRowKey']] = itemRowKey;
+            newItemRow[itemsColIndex['RefId']] = refId;
+            newItemRow[itemsColIndex['RefNo']] = detailData.RefNo || inv.RefNo || '';
+            newItemRow[itemsColIndex['RefDate']] = detailData.RefDate || inv.RefDate || '';
+            newItemRow[itemsColIndex['WorkDate']] = workDate;
+            newItemRow[itemsColIndex['RefDetailID']] = refDetailId;
+            newItemRow[itemsColIndex['ItemID']] = itemId;
+            newItemRow[itemsColIndex['ItemCode']] = itemCode;
+            newItemRow[itemsColIndex['ItemName']] = itemName;
+            newItemRow[itemsColIndex['CategoryID']] = item.InventoryItemCategoryID || item.CategoryID || '';
+            newItemRow[itemsColIndex['CategoryName']] = itemCategoryName;
+            newItemRow[itemsColIndex['UnitID']] = item.UnitID || '';
+            newItemRow[itemsColIndex['UnitName']] = item.UnitName || '';
+            newItemRow[itemsColIndex['Quantity']] = item.Quantity || item.Qty || 1;
+            newItemRow[itemsColIndex['UnitPrice']] = item.UnitPrice || item.Price || 0;
+            newItemRow[itemsColIndex['Amount']] = item.Amount || 0;
+            newItemRow[itemsColIndex['DiscountAmount']] = item.DiscountAmount || 0;
+            newItemRow[itemsColIndex['InventoryItemType']] = item.InventoryItemType || 0;
+            newItemRow[itemsColIndex['ItemType']] = item.ItemType || 0;
+            newItemRow[itemsColIndex['IsDrink']] = isDrink;
+            newItemRow[itemsColIndex['IsFood']] = isFood;
+            newItemRow[itemsColIndex['ClassifySource']] = categoryMap[itemId].UpdatedBy ? 'manual' : 'system';
+            newItemRow[itemsColIndex['RowHash']] = detailHash;
+            newItemRow[itemsColIndex['CreatedAt']] = itemsMap[itemRowKey] ? (allItems[itemsMap[itemRowKey].rowIndex - 1][itemsColIndex['CreatedAt']] || nowStr) : nowStr;
+            newItemRow[itemsColIndex['UpdatedAt']] = nowStr;
+
+            if (itemsMap[itemRowKey]) {
+              itemsToUpdate.push({
+                rowIndex: itemsMap[itemRowKey].rowIndex,
+                rangeEndLetter: _colLetter(ITEMS_HEADERS.length),
+                rowData: newItemRow
+              });
+              updatedItems++;
+            } else {
+              itemsToAppend.push(newItemRow);
+              insertedItems++;
+            }
+          });
+        } else {
+          skippedItems += itemsList.length;
+        }
+      }
+    }
+
+    if (invoicesToAppend.length > 0) _sheetsAppend('KG_CUKCUK_INVOICES', invoicesToAppend);
+    if (invoicesToUpdate.length > 0) _sheetsBatchUpdate('KG_CUKCUK_INVOICES', invoicesToUpdate);
+    
+    if (itemsToAppend.length > 0) _sheetsAppend('KG_CUKCUK_ITEMS', itemsToAppend);
+    if (itemsToUpdate.length > 0) _sheetsBatchUpdate('KG_CUKCUK_ITEMS', itemsToUpdate);
+
+    if (newCategoryMapRows.length > 0) _sheetsAppend('KG_ITEM_CATEGORY_MAP', newCategoryMapRows);
+
+    const durationMs = Date.now() - startTimeMs;
+    _saveCukcukSyncState({
+      syncType: data.mode || 'auto',
+      startDate: useFromDate,
+      endDate: useToDate,
+      status: 'success',
+      invoicesCount: allApiInvoices.length,
+      details: JSON.stringify({
+        insertedInvoices: insertedInvoices,
+        updatedInvoices: updatedInvoices,
+        skippedInvoices: skippedInvoices,
+        insertedItems: insertedItems,
+        updatedItems: updatedItems,
+        skippedItems: skippedItems,
+        durationMs: durationMs
+      })
+    });
+
+    return {
+      success: true,
+      insertedInvoices: insertedInvoices,
+      updatedInvoices: updatedInvoices,
+      skippedInvoices: skippedInvoices,
+      insertedItems: insertedItems,
+      updatedItems: updatedItems,
+      skippedItems: skippedItems,
+      detailFetched: detailFetched,
+      durationMs: durationMs,
+      syncBatchId: syncBatchId
+    };
+
+  } catch(syncErr) {
+    Logger.log('[GAS CUKCUK] Sync failed: ' + syncErr.toString());
+    _saveCukcukSyncState({
+      syncType: data.mode || 'auto',
+      startDate: data.fromDate || '',
+      endDate: data.toDate || '',
+      status: 'failed',
+      invoicesCount: 0,
+      details: syncErr.toString()
+    });
+    return { success: false, message: 'Lỗi đồng bộ: ' + syncErr.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _getCukcukInvoicesAction(data) {
+  const rows = _getSheetData('KG_CUKCUK_INVOICES');
+  let filtered = rows;
+  
+  if (data.workDate) {
+    filtered = filtered.filter(r => r.WorkDate === data.workDate);
+  } else {
+    if (data.fromDate) {
+      filtered = filtered.filter(r => r.RefDate >= data.fromDate);
+    }
+    if (data.toDate) {
+      filtered = filtered.filter(r => r.RefDate <= data.toDate);
+    }
+  }
+  
+  if (data.since) {
+    filtered = filtered.filter(r => r.UpdatedAt > data.since);
+  }
+  
+  filtered.sort((a, b) => (a.UpdatedAt || '').localeCompare(b.UpdatedAt || ''));
+  
+  const page = parseInt(data.page || 1);
+  const limit = parseInt(data.limit || 0);
+  let pageData = filtered;
+  if (limit > 0) {
+    const start = (page - 1) * limit;
+    pageData = filtered.slice(start, start + limit);
+  }
+  
+  return {
+    success: true,
+    invoices: pageData,
+    total: filtered.length,
+    page: page,
+    limit: limit
+  };
+}
+
+function _getCukcukItemsAction(data) {
+  const rows = _getSheetData('KG_CUKCUK_ITEMS');
+  let filtered = rows;
+  
+  if (data.workDate) {
+    filtered = filtered.filter(r => r.WorkDate === data.workDate);
+  } else {
+    if (data.fromDate) {
+      filtered = filtered.filter(r => r.RefDate >= data.fromDate);
+    }
+    if (data.toDate) {
+      filtered = filtered.filter(r => r.RefDate <= data.toDate);
+    }
+  }
+  
+  if (data.since) {
+    filtered = filtered.filter(r => r.UpdatedAt > data.since);
+  }
+  
+  return {
+    success: true,
+    items: filtered
+  };
+}
+
+function _getCukcukDailySalesAction(data) {
+  const rows = _getSheetData('KG_CUKCUK_ITEMS');
+  let filtered = rows;
+  
+  if (data.workDate) {
+    filtered = filtered.filter(r => r.WorkDate === data.workDate);
+  } else {
+    if (data.fromDate) {
+      filtered = filtered.filter(r => r.RefDate >= data.fromDate);
+    }
+    if (data.toDate) {
+      filtered = filtered.filter(r => r.RefDate <= data.toDate);
+    }
+  }
+  
+  const agg = {};
+  filtered.forEach(item => {
+    const key = item.ItemID;
+    if (!agg[key]) {
+      agg[key] = {
+        itemId: item.ItemID,
+        itemCode: item.ItemCode,
+        itemName: item.ItemName,
+        categoryName: item.CategoryName,
+        isDrink: item.IsDrink === true || String(item.IsDrink).toLowerCase() === 'true',
+        isFood: item.IsFood === true || String(item.IsFood).toLowerCase() === 'true',
+        unitName: item.UnitName,
+        quantity: 0,
+        amount: 0,
+        bills: {},
+        billCount: 0
+      };
+    }
+    const q = parseFloat(item.Quantity || 0);
+    const amt = parseFloat(item.Amount || 0);
+    agg[key].quantity += q;
+    agg[key].amount += amt;
+    agg[key].bills[item.RefId] = true;
+  });
+  
+  const result = Object.values(agg).map(x => {
+    x.billCount = Object.keys(x.bills).length;
+    x.bills = undefined;
+    return x;
+  });
+  
+  result.sort((a, b) => b.quantity - a.quantity);
+  
+  return {
+    success: true,
+    sales: result
+  };
+}
+
+function _saveCukcukOverrideAction(data) {
+  const val = _validateMetadata(data, 'saveCukcukOverride');
+  if (val && !val.success) return val;
+
+  if (!data.refId) {
+    return { success: false, message: 'Missing refId' };
+  }
+  
+  const headers = ['OverrideId', 'RefId', 'OverrideType', 'OldValueJson', 'NewValueJson', 'Reason', 'EditedBy', 'EditedAt', 'SyncedAt', 'Status'];
+  const sheet = _getSheet('KG_CUKCUK_OVERRIDES', headers);
+  
+  const overrideId = data.overrideId || ('ovr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  const row = [
+    overrideId,
+    data.refId,
+    data.overrideType || 'payment',
+    data.oldValueJson || '{}',
+    data.newValueJson || '{}',
+    data.reason || '',
+    data.editedBy || 'SYSTEM',
+    data.editedAt || new Date().toISOString(),
+    new Date().toISOString(),
+    'active'
+  ];
+  
+  _sheetsAppend('KG_CUKCUK_OVERRIDES', [row]);
+  
+  const invoicesSheet = _getSheet('KG_CUKCUK_INVOICES');
+  const allInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
+  let rowIndex = -1;
+  const colIndex = {};
+  if (allInvoices && allInvoices.length > 0) {
+    allInvoices[0].forEach((h, idx) => { colIndex[h] = idx; });
+    for (let i = 1; i < allInvoices.length; i++) {
+      if (String(allInvoices[i][colIndex['RefId']] || '') === data.refId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+  }
+  
+  if (rowIndex > 0) {
+    invoicesSheet.getRange(rowIndex, colIndex['ManualOverrideJson'] + 1).setValue(data.newValueJson || '{}');
+    invoicesSheet.getRange(rowIndex, colIndex['ManualEditedAt'] + 1).setValue(data.editedAt || new Date().toISOString());
+    invoicesSheet.getRange(rowIndex, colIndex['ManualEditedBy'] + 1).setValue(data.editedBy || 'SYSTEM');
+    invoicesSheet.getRange(rowIndex, colIndex['ManualLock'] + 1).setValue(true);
+    invoicesSheet.getRange(rowIndex, colIndex['UpdatedAt'] + 1).setValue(new Date().toISOString());
+  }
+  
+  return { success: true, message: 'Đã lưu chỉnh sửa thủ công và khóa hóa đơn.' };
+}
+
+function _tryOpenShiftAction(data) {
+  const val = _validateMetadata(data, 'tryOpenShift');
+  if (val && !val.success) return val;
+
+  const shiftNumber = String(data.shiftNumber || '');
+  if (shiftNumber !== '1' && shiftNumber !== '2') {
+    return { success: false, message: 'Số ca không hợp lệ. Chỉ cho phép Ca 1 hoặc Ca 2.' };
+  }
+
+  const workDay = data.date || '';
+  if (!workDay) return { success: false, message: 'Thiếu ngày làm việc.' };
+
+  const shiftKey = workDay + '_' + shiftNumber;
+  const shiftId = 'shift_' + shiftKey;
+  const clientRequestId = data.clientRequestId || '';
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, không thể lấy khóa mở ca. Vui lòng thử lại.' };
+  }
+
+  try {
+    _autoMarkStaleShifts();
+
+    const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+    
+    if (clientRequestId) {
+      const duplicate = registryRows.find(r => r.lastMutationId === clientRequestId);
+      if (duplicate) {
+        const shifts = _getSheetData('KG_SHIFTS');
+        const existingShift = shifts.find(s => s.id === duplicate.shiftId);
+        let shiftData = {};
+        if (existingShift && existingShift.jsonData) {
+          try { shiftData = JSON.parse(existingShift.jsonData); } catch(ex) {}
+        }
+        return { success: true, message: 'Yêu cầu mở ca trùng lặp. Đang khôi phục ca hiện tại.', shift: shiftData, shiftId: duplicate.shiftId };
+      }
+    }
+
+    const activeOpen = registryRows.find(r => r.shiftKey === shiftKey && r.status === 'open');
+    if (activeOpen) {
+      return { success: false, code: 'SHIFT_ALREADY_OPEN', message: 'Ca ' + shiftNumber + ' ngày ' + workDay + ' đang được mở trên thiết bị khác.', shift: activeOpen };
+    }
+
+    const activeClosed = registryRows.find(r => r.shiftKey === shiftKey && r.status === 'closed');
+    if (activeClosed) {
+      return { success: false, code: 'SHIFT_ALREADY_CLOSED', message: 'Ca ' + shiftNumber + ' ngày ' + workDay + ' đã đóng. Hãy dùng chức năng Mở lại ca.' };
+    }
+
+    const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+    const nowStr = new Date().toISOString();
+    const registryRow = [
+      shiftKey,
+      shiftId,
+      workDay,
+      shiftNumber,
+      'open',
+      data.cashierName || '',
+      data.cashierId || '',
+      nowStr,
+      '',
+      data.source || '',
+      data.origin || '',
+      data.host || '',
+      data.environment || '',
+      data.deviceId || '',
+      data.sessionId || '',
+      data.cashierName || '',
+      clientRequestId,
+      1,
+      nowStr,
+      data.notes || ''
+    ];
+    _sheetsAppend('KG_SHIFT_REGISTRY', [registryRow]);
+
+    data.id = shiftId;
+    data.version = 1;
+    data.status = 'open';
+    data.startTime = nowStr;
+    _syncLegacyShift(data, 'open');
+
+    _addAuditLog({ user: data.cashierName, action: 'OPEN_SHIFT', details: 'Mở ca ' + shiftNumber + ' ngày ' + workDay });
+
+    return { success: true, message: 'Đã mở ca thành công.', shiftId: shiftId, shift: data };
+
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _closeShiftAtomicAction(data) {
+  const val = _validateMetadata(data, 'closeShiftAtomic');
+  if (val && !val.success) return val;
+
+  const shiftData = data.shift || {};
+  const shiftId = shiftData.id;
+  if (!shiftId) {
+    return { success: false, message: 'Thiếu shift ID.' };
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch(e) {
+    return { success: false, message: 'Hệ thống bận, vui lòng thử lại sau.' };
+  }
+
+  try {
+    const registryRows = _getSheetData('KG_SHIFT_REGISTRY');
+    const registryEntry = registryRows.find(r => r.shiftId === shiftId);
+    
+    if (!registryEntry) {
+      return { success: false, message: 'Ca làm việc chưa được đăng ký trên hệ thống.' };
+    }
+
+    if (registryEntry.status === 'cancelled' || registryEntry.status === 'voided') {
+      return { success: false, message: 'Ca làm việc đã bị hủy/thu hồi.' };
+    }
+
+    const currentVersion = parseInt(registryEntry.revision || '1');
+    const clientVersion = parseInt(data.version || shiftData.version || 1);
+
+    if (registryEntry.status === 'closed') {
+      if (clientVersion > currentVersion) {
+        _syncLegacyShift(shiftData, 'closed');
+        
+        const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+        let rowIndex = -1;
+        const allRows = _sheetsGet('KG_SHIFT_REGISTRY');
+        for (let i = 1; i < allRows.length; i++) {
+          if (allRows[i][1] === shiftId) { rowIndex = i + 1; break; }
+        }
+        if (rowIndex > 0) {
+          registrySheet.getRange(rowIndex, 18, 1, 2).setValues([[clientVersion, new Date().toISOString()]]);
+        }
+        return { success: true, message: 'Đã cập nhật ca làm việc đã đóng.', isClosed: true };
+      }
+      return { success: true, message: 'Ca làm việc đã đóng từ trước.', isClosed: true };
+    }
+
+    const endTime = data.closedAt || shiftData.endTime || new Date().toISOString();
+    shiftData.endTime = endTime;
+    _syncLegacyShift(shiftData, 'closed');
+
+    const registrySheet = _getSheet('KG_SHIFT_REGISTRY');
+    let rowIndex = -1;
+    const allRows = _sheetsGet('KG_SHIFT_REGISTRY');
+    for (let i = 1; i < allRows.length; i++) {
+      if (allRows[i][1] === shiftId) { rowIndex = i + 1; break; }
+    }
+
+    if (rowIndex > 0) {
+      registrySheet.getRange(rowIndex, 5).setValue('closed');
+      registrySheet.getRange(rowIndex, 9).setValue(endTime);
+      registrySheet.getRange(rowIndex, 18, 1, 2).setValues([[clientVersion, new Date().toISOString()]]);
+    }
+
+    _addAuditLog({ 
+      user: shiftData.cashierName || 'SYSTEM', 
+      action: 'CLOSE_SHIFT', 
+      details: 'Đóng ca ' + (shiftData.shiftNumber || '') + ' ngày ' + (shiftData.date || '') 
+    });
+
+    return { success: true, message: 'Đóng ca thành công.', isClosed: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 

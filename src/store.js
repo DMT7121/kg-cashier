@@ -40,7 +40,7 @@ var _cloudGetRegistry = null;
 
 try {
   // Use dynamic import pattern that won't crash module loading
-  import('./api.js').then(function(api) {
+  import('./services/api').then(function(api) {
     _cloudSync = api.syncShiftToCloud;
     _cloudClose = api.closeShiftOnCloud;
     _cloudAudit = api.addAuditLog;
@@ -1624,7 +1624,7 @@ export function healPastShiftsData() {
 
   // Push healed shifts back to Google Sheets database in background
   try {
-    import('./api.js').then(function(api) {
+    import('./services/api').then(function(api) {
       if (api.closeShiftOnCloud) {
         console.log('[Store] healPastShiftsData: syncing healed shifts to cloud...');
         var syncNext = function(idx) {
@@ -1749,7 +1749,7 @@ export function deleteShiftFromHistory(id) {
   save();
   addAudit('DELETE_SHIFT_HISTORY', 'ID: ' + id);
   // Also delete from cloud + push tombstone list for cross-device sync
-  import('./api.js').then(function(api) {
+  import('./services/api').then(function(api) {
     if (api.deleteShiftFromCloud) api.deleteShiftFromCloud(id).catch(function() {});
     // Push tombstones to cloud so other devices skip this shift too
     var tombstones = getState()._deletedShiftIds || [];
@@ -1764,7 +1764,7 @@ function _syncHistoryShiftToCloud(shift) {
   shift.updatedAt = new Date().toISOString();
   save(); // Persist the updated timestamp locally
   try {
-    import('./api.js').then(function(api) {
+    import('./services/api').then(function(api) {
       if (api.closeShiftOnCloud) {
         var cleanShift = JSON.parse(JSON.stringify(shift));
         if (cleanShift.invoices) {
@@ -2076,7 +2076,7 @@ export async function syncShiftHistory() {
   try {
     var getShiftsFromCloud = null;
     try {
-      var api = await import('./api.js');
+      var api = await import('./services/api');
       getShiftsFromCloud = api.getShiftsFromCloud;
     } catch(e) { _historySyncInFlight = false; return false; }
 
@@ -2268,7 +2268,7 @@ export function removeCategory(type, name) {
 /** Push categories to cloud for cross-device sync */
 function _syncCategoriesToCloud() {
   try {
-    import('./api.js').then(function(api) {
+    import('./services/api').then(function(api) {
       var cats = getState().categories;
       api.saveConfigToCloud('categories', JSON.stringify(cats)).catch(function() {});
     });
@@ -2278,7 +2278,7 @@ function _syncCategoriesToCloud() {
 /** Pull categories from cloud (called on startup) */
 export async function pullCategoriesFromCloud() {
   try {
-    var api = await import('./api.js');
+    var api = await import('./services/api');
     var res = await api.getConfigFromCloud();
     if (res && res.success && res.config) {
       var cloudCats = null;

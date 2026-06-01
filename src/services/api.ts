@@ -1,22 +1,29 @@
 /* ============================================
-   KG-CASHIER — Google Apps Script API Client
-   SAFE: All exports are safe - never throw
+   KG-CASHIER — Google Apps Script API Client (TypeScript)
    ============================================ */
 
-import { safeJsonParse } from './utils.js';
-import { isCurrentHostCanonical } from './config/env.js';
-import { ENDPOINTS } from './config/endpoints.js';
+import { safeJsonParse } from '../utils';
+import { isCurrentHostCanonical } from '../config/env';
+import { ENDPOINTS } from '../config/endpoints';
 
-const GAS_URL = ENDPOINTS.gas || import.meta.env.VITE_GAS_URL || '';
+const GAS_URL = ENDPOINTS.gas || '';
 
 let _online = true;
-const _queue = [];
+interface QueueItem {
+  action: string;
+  data: any;
+  timestamp: number;
+}
+const _queue: QueueItem[] = [];
 
-try { _online = navigator.onLine; } catch (e) { /* ignore */ }
-try { window.addEventListener('online', () => { _online = true; _flushQueue(); }); } catch (e) { /* ignore */ }
-try { window.addEventListener('offline', () => { _online = false; }); } catch (e) { /* ignore */ }
+if (typeof window !== 'undefined') {
+  try { _online = navigator.onLine; } catch (e) { /* ignore */ }
+  try { window.addEventListener('online', () => { _online = true; _flushQueue(); }); } catch (e) { /* ignore */ }
+  try { window.addEventListener('offline', () => { _online = false; }); } catch (e) { /* ignore */ }
+}
 
-export function getDeviceId() {
+export function getDeviceId(): string {
+  if (typeof localStorage === 'undefined') return 'server';
   let deviceId = localStorage.getItem('kg_device_id');
   if (!deviceId) {
     deviceId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -25,7 +32,8 @@ export function getDeviceId() {
   return deviceId;
 }
 
-export function getSessionId() {
+export function getSessionId(): string {
+  if (typeof sessionStorage === 'undefined') return 'server';
   let sessionId = sessionStorage.getItem('kg_session_id');
   if (!sessionId) {
     sessionId = 'sess_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -34,11 +42,12 @@ export function getSessionId() {
   return sessionId;
 }
 
-export function createMutationId() {
+export function createMutationId(): string {
   return 'mut_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
 }
 
-export function isLocalhostOrigin() {
+export function isLocalhostOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
   const origin = window.location.origin || '';
   const host = window.location.hostname || '';
   return origin.indexOf('localhost') > -1 || 
@@ -49,50 +58,73 @@ export function isLocalhostOrigin() {
          !origin || !host;
 }
 
-export function isProductionOrigin() {
+export function isProductionOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
   const origin = window.location.origin || '';
   return origin === 'https://kg-cashier.pages.dev';
 }
 
-export function getEnvironmentInfo() {
+export interface EnvironmentInfo {
+  deviceId: string;
+  sessionId: string;
+  origin: string;
+  host: string;
+  environment: string;
+  source: string;
+}
+
+export function getEnvironmentInfo(): EnvironmentInfo {
   return {
     deviceId: getDeviceId(),
     sessionId: getSessionId(),
-    origin: window.location.origin || '',
-    host: window.location.hostname || '',
-    environment: import.meta.env.MODE || 'production',
+    origin: typeof window !== 'undefined' ? window.location.origin || '' : '',
+    host: typeof window !== 'undefined' ? window.location.hostname || '' : '',
+    environment: (import.meta.env.MODE as string) || 'production',
     source: isLocalhostOrigin() ? 'localhost' : (import.meta.env.DEV ? 'webapp-dev' : 'webapp-production')
   };
 }
 
-let _sandboxMode = localStorage.getItem('kg_sandbox_mode') !== 'false';
+let _sandboxMode = typeof localStorage !== 'undefined' && localStorage.getItem('kg_sandbox_mode') !== 'false';
 
-export function isSandboxMode() {
+export function isSandboxMode(): boolean {
   return isLocalhostOrigin() && _sandboxMode;
 }
 
-export function setSandboxMode(enabled) {
+export function setSandboxMode(enabled: boolean): void {
   _sandboxMode = !!enabled;
-  localStorage.setItem('kg_sandbox_mode', String(_sandboxMode));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('kg_sandbox_mode', String(_sandboxMode));
+  }
 }
 
-export function validateProductionWrite(action) {
+export function validateProductionWrite(action: string): void {
   if (!isCurrentHostCanonical()) {
     throw new Error('Cấu hình production không hợp lệ. Hệ thống phải chạy tại https://kg-cashier.pages.dev/ và không được dùng alias/preview URL để ghi dữ liệu thật.');
   }
   if (isLocalhostOrigin() && isSandboxMode()) {
-    throw new Error('Chặn ghi dữ liệu lên Production database từ localhost (Sandbox Mode đang BẬT).');
+    throw new Error(`Chặn ghi dữ liệu hành động ${action} lên Production database từ localhost (Sandbox Mode đang BẬT).`);
   }
 }
 
-export function getMetadata() {
-  return {
-    ...getEnvironmentInfo()
-  };
+export function getMetadata(): EnvironmentInfo {
+  return getEnvironmentInfo();
+}
+
+// Sandbox Registry item structure
+interface SandboxRegistryItem {
+  shiftKey: string;
+  shiftId: string;
+  workDay: string;
+  shiftNumber: string | number;
+  status: 'open' | 'closed' | 'cancelled' | 'voided' | 'stale';
+  cashierName: string;
+  openedAt: string;
+  closedAt: string;
+  deviceId: string;
 }
 
 // ── Core fetch wrapper (NEVER throws) ────────
-async function apiCall(action, data = null, retries = 2) {
+async function apiCall(action: string, data: any = null, retries = 2): Promise<any> {
   const writeActions = [
     'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
     'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
@@ -103,17 +135,14 @@ async function apiCall(action, data = null, retries = 2) {
   if (writeActions.indexOf(action) !== -1) {
     try {
       validateProductionWrite(action);
-    } catch (err) {
+    } catch (err: any) {
       return { success: false, message: err.message };
     }
   }
 
   // Sandbox mode interception for writes & simulated reads
   if (isSandboxMode()) {
-
-    const readActions = [
-      'getShiftRegistry', 'getCurrentShift', 'getPosOrders'
-    ];
+    const readActions = ['getShiftRegistry', 'getCurrentShift', 'getPosOrders'];
 
     if (writeActions.indexOf(action) !== -1 || readActions.indexOf(action) !== -1) {
       console.log(`[API Sandbox Mock] Intercepted action: ${action}`, data);
@@ -127,15 +156,17 @@ async function apiCall(action, data = null, retries = 2) {
         const shiftKey = workDay + '_' + shiftNumber;
         const shiftId = 'shift_' + shiftKey;
         
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         
         const duplicate = mockRegistry.find(r => r.shiftKey === shiftKey && r.status !== 'cancelled' && r.status !== 'voided');
         if (duplicate) {
           return { success: false, message: `Xung đột: Ca ${shiftNumber} ngày ${workDay} đang được mở/đã đóng (Sandbox).` };
         }
         
-        const newReg = {
+        const newReg: SandboxRegistryItem = {
           shiftKey: shiftKey,
           shiftId: shiftId,
           workDay: workDay,
@@ -152,14 +183,18 @@ async function apiCall(action, data = null, retries = 2) {
       }
 
       if (action === 'getShiftRegistry') {
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         return { success: true, registry: mockRegistry };
       }
 
       if (action === 'getCurrentShift') {
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         const openReg = mockRegistry.find(r => r.status === 'open');
         if (!openReg) return { success: true, shift: null };
         return {
@@ -188,8 +223,10 @@ async function apiCall(action, data = null, retries = 2) {
         const workDay = data.date || new Date().toISOString().split('T')[0];
         const shiftKey = workDay + '_' + shiftNumber;
         
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         
         const entry = mockRegistry.find(r => r.shiftKey === shiftKey);
         if (entry) {
@@ -205,8 +242,10 @@ async function apiCall(action, data = null, retries = 2) {
         const workDay = data.date || new Date().toISOString().split('T')[0];
         const shiftKey = workDay + '_' + shiftNumber;
         
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         
         const entry = mockRegistry.find(r => r.shiftKey === shiftKey);
         if (entry) {
@@ -222,8 +261,10 @@ async function apiCall(action, data = null, retries = 2) {
         const workDay = data.date || new Date().toISOString().split('T')[0];
         const shiftKey = workDay + '_' + shiftNumber;
         
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         
         const entry = mockRegistry.find(r => r.shiftKey === shiftKey);
         if (entry) {
@@ -236,8 +277,10 @@ async function apiCall(action, data = null, retries = 2) {
       if (action === 'voidGhostShift') {
         const shiftId = data.shiftId;
         
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         
         const entry = mockRegistry.find(r => r.shiftId === shiftId);
         if (entry) {
@@ -260,8 +303,10 @@ async function apiCall(action, data = null, retries = 2) {
       }
 
       if (action === 'repairShifts') {
-        let mockRegistry = [];
-        try { mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]'); } catch(e) {}
+        let mockRegistry: SandboxRegistryItem[] = [];
+        try {
+          mockRegistry = JSON.parse(localStorage.getItem('kg_sandbox_registry') || '[]');
+        } catch(e) {}
         mockRegistry.forEach(r => {
           if (r.status === 'open') r.status = 'stale';
         });
@@ -287,23 +332,24 @@ async function apiCall(action, data = null, retries = 2) {
 
   try {
     const url = `${GAS_URL}?action=${encodeURIComponent(action)}`;
-    const opts = { redirect: 'follow', mode: 'cors' };
+    const opts: RequestInit = { redirect: 'follow', mode: 'cors' };
 
     if (data) {
       opts.method = 'POST';
       opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
       // Inject metadata automatically if it is an object
+      let payload = data;
       if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
-        data = Object.assign({}, data, getMetadata());
+        payload = Object.assign({}, data, getMetadata());
       }
-      opts.body = JSON.stringify(data);
+      opts.body = JSON.stringify(payload);
     }
 
     const response = await fetch(url, opts);
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const text = await response.text();
     return safeJsonParse(text, { success: false, message: 'Phản hồi từ máy chủ không hợp lệ' });
-  } catch (error) {
+  } catch (error: any) {
     if (retries > 0) {
       await new Promise(function(r) { setTimeout(r, 1000); });
       return apiCall(action, data, retries - 1);
@@ -314,19 +360,19 @@ async function apiCall(action, data = null, retries = 2) {
 }
 
 // ── Offline queue ────────────────────────────
-function enqueue(action, data) {
+function enqueue(action: string, data: any): void {
   try {
     _queue.push({ action: action, data: data, timestamp: Date.now() });
     localStorage.setItem('kg_api_queue', JSON.stringify(_queue));
   } catch (e) { /* ignore */ }
 }
 
-async function _flushQueue() {
+async function _flushQueue(): Promise<void> {
   if (_queue.length === 0) return;
   try {
     while (_queue.length > 0) {
-      var item = _queue[0];
-      var result = await apiCall(item.action, item.data, 1);
+      const item = _queue[0];
+      const result = await apiCall(item.action, item.data, 1);
       if (result && result.success) {
         _queue.shift();
         if (_queue.length > 0) {
@@ -347,77 +393,94 @@ async function _flushQueue() {
 }
 
 // Restore queue on load
-try {
-  var saved = localStorage.getItem('kg_api_queue');
-  if (saved) {
-    var parsed = safeJsonParse(saved, null);
-    if (parsed && Array.isArray(parsed)) {
-      for (var i = 0; i < parsed.length; i++) { _queue.push(parsed[i]); }
+if (typeof localStorage !== 'undefined') {
+  try {
+    const saved = localStorage.getItem('kg_api_queue');
+    if (saved) {
+      const parsed = safeJsonParse<QueueItem[] | null>(saved, null);
+      if (parsed && Array.isArray(parsed)) {
+        for (let i = 0; i < parsed.length; i++) { _queue.push(parsed[i]); }
+      }
+      if (_online) { _flushQueue(); }
     }
-    if (_online) { _flushQueue(); }
-  }
-} catch (e) { /* ignore */ }
+  } catch (e) { /* ignore */ }
+}
 
 // ── Shift API ────────────────────────────────
-// ── Shift API ────────────────────────────────
-export async function openShiftOnCloud(shiftData) {
+export async function openShiftOnCloud(shiftData: any): Promise<any> {
   return apiCall('openShift', shiftData);
 }
 
-export async function syncShiftToCloud(shiftData) {
+export async function syncShiftToCloud(shiftData: any): Promise<any> {
   if (!_online) { enqueue('syncShift', shiftData); return { success: false, offline: true }; }
   return apiCall('syncShift', shiftData);
 }
 
-export async function closeShiftOnCloud(shiftData) {
+export async function closeShiftOnCloud(shiftData: any): Promise<any> {
   return apiCall('closeShift', shiftData);
 }
 
-export async function reopenShiftOnCloud(shiftData, managerPassword) {
+export async function reopenShiftOnCloud(shiftData: any, managerPassword?: string): Promise<any> {
   return apiCall('reopenShift', { ...shiftData, managerPassword: managerPassword });
 }
 
-export async function cancelShiftOnCloud(shiftData) {
+export async function cancelShiftOnCloud(shiftData: any): Promise<any> {
   return apiCall('cancelShift', shiftData);
 }
 
-export async function deleteShiftFromCloud(shiftId) {
+export async function deleteShiftFromCloud(shiftId: string): Promise<any> {
   return apiCall('deleteShift', { id: shiftId });
 }
 
-export async function voidGhostShiftOnCloud(shiftId, managerPassword) {
+export async function voidGhostShiftOnCloud(shiftId: string, managerPassword?: string): Promise<any> {
   return apiCall('voidGhostShift', { shiftId: shiftId, managerPassword: managerPassword });
 }
 
-export async function getShiftRegistryFromCloud() {
+export async function getShiftRegistryFromCloud(): Promise<any> {
   return apiCall('getShiftRegistry');
 }
 
-export async function repairShiftsOnCloud(managerPassword) {
+export async function repairShiftsOnCloud(managerPassword?: string): Promise<any> {
   return apiCall('repairShifts', { managerPassword: managerPassword });
 }
 
-export async function rebuildCukcukIndexOnCloud() {
-  return apiCall('rebuildCukcukIndex');
+export async function rebuildCukcukIndexOnCloud(managerPassword?: string): Promise<any> {
+  return apiCall('rebuildCukcukIndex', { managerPassword: managerPassword });
 }
 
-export async function getCukcukSyncStateFromCloud() {
+export async function getCukcukSyncStateFromCloud(): Promise<any> {
   return apiCall('getCukcukSyncState');
 }
 
-export async function saveCukcukSyncStateToCloud(syncState) {
+export async function saveCukcukSyncStateToCloud(syncState: any): Promise<any> {
   return apiCall('saveCukcukSyncState', syncState);
 }
 
-export async function getShiftsFromCloud(limit) {
+export async function getShiftsFromCloud(limit?: number): Promise<any> {
   return apiCall('getShifts', null);
 }
 
-export async function getCurrentShiftFromCloud() {
+export async function getCurrentShiftFromCloud(): Promise<any> {
   return apiCall('getCurrentShift');
 }
 
-export async function getStaffFromCloud() {
+interface GVizCell {
+  v: any;
+  f?: string;
+}
+interface GVizRow {
+  c: (GVizCell | null)[];
+}
+interface GVizTable {
+  cols: { id: string; label: string; type: string }[];
+  rows: { c: (GVizCell | null)[] }[];
+}
+interface GVizResponse {
+  status: string;
+  table?: GVizTable;
+}
+
+export async function getStaffFromCloud(): Promise<any> {
   try {
     // ⚡ Try ultra-fast direct Spreadsheet read first (CORS-friendly via gviz/tq)
     const ssId = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
@@ -434,19 +497,21 @@ export async function getStaffFromCloud() {
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}');
       if (start !== -1 && end !== -1) {
-        const json = safeJsonParse(text.substring(start, end + 1), null);
+        const json = safeJsonParse<GVizResponse | null>(text.substring(start, end + 1), null);
         if (json && json.status === 'ok' && json.table && json.table.rows) {
           const colMapping = ['id', 'name', 'pin', 'role', 'status', 'createdAt'];
           const headers = json.table.cols.map((c, idx) => c.label || colMapping[idx] || '');
           const staff = json.table.rows.map(r => {
-            const obj = {};
-            r.c.forEach((cell, idx) => {
-              const header = headers[idx];
-              if (header) {
-                var val = cell ? (cell.v !== null ? cell.v : '') : '';
-                obj[header] = String(val).trim();
-              }
-            });
+            const obj: Record<string, string> = {};
+            if (r.c) {
+              r.c.forEach((cell, idx) => {
+                const header = headers[idx];
+                if (header) {
+                  const val = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : '') : '';
+                  obj[header] = String(val).trim();
+                }
+              });
+            }
             return obj;
           }).filter(s => s.id && s.name);
           
@@ -457,7 +522,7 @@ export async function getStaffFromCloud() {
         }
       }
     }
-  } catch (e) {
+  } catch (e: any) {
     console.warn('[API] Direct spreadsheet fetch failed/timeout, falling back to GAS:', e.message);
   }
   
@@ -465,79 +530,81 @@ export async function getStaffFromCloud() {
   return apiCall('getStaff');
 }
 
-export async function saveStaffToCloud(staffData) {
+export async function saveStaffToCloud(staffData: any): Promise<any> {
   return apiCall('saveStaff', staffData);
 }
 
-export async function deleteStaffFromCloud(id) {
+export async function deleteStaffFromCloud(id: string): Promise<any> {
   return apiCall('deleteStaff', { id: id });
 }
 
-export async function loginWithPin(pin) {
+export async function loginWithPin(pin: string): Promise<any> {
   return apiCall('login', { pin: pin });
 }
 
 // ── Audit API ────────────────────────────────
-export async function addAuditLog(entry) {
+export async function addAuditLog(entry: any): Promise<any> {
   if (!_online) { enqueue('addAudit', entry); return { success: false, offline: true }; }
   return apiCall('addAudit', entry);
 }
 
-export async function getAuditLogFromCloud(limit) {
+export async function getAuditLogFromCloud(limit?: number): Promise<any> {
   return apiCall('getAudit', { limit: limit || 200 });
 }
 
 // ── File Upload API ──────────────────────────
-export async function uploadFileToCloud(fileData) {
+export async function uploadFileToCloud(fileData: any): Promise<any> {
   return apiCall('uploadFile', fileData);
 }
 
-export async function deleteFileFromCloud(fileId) {
+export async function deleteFileFromCloud(fileId: string): Promise<any> {
   return apiCall('deleteFile', { fileId: fileId });
 }
 
 // ── Settings API ─────────────────────────────
-export async function getSettingsFromCloud() {
+export async function getSettingsFromCloud(): Promise<any> {
   return apiCall('getSettings');
 }
 
-export async function saveSettingsToCloud(settings) {
+export async function saveSettingsToCloud(settings: any): Promise<any> {
   return apiCall('saveSettings', { settings: settings });
 }
 
 // ── CUKCUK Revenue → Google Sheets ──────────
-export async function syncCukcukRevenueToCloud(invoices, shiftId) {
-  if (!_online) { enqueue('syncCukcukRevenue', { invoices: invoices, shiftId: shiftId }); return { success: false, offline: true }; }
+export async function syncCukcukRevenueToCloud(invoices: any[], shiftId: string): Promise<any> {
+  if (!_online) {
+    enqueue('syncCukcukRevenue', { invoices: invoices, shiftId: shiftId });
+    return { success: false, offline: true };
+  }
   return apiCall('syncCukcukRevenue', { invoices: invoices, shiftId: shiftId });
 }
 
 // ── Config API (fast staff loading) ─────────
-export async function getConfigFromCloud() {
+export async function getConfigFromCloud(): Promise<any> {
   return apiCall('getConfig');
 }
 
-export async function saveConfigToCloud(key, value) {
+export async function saveConfigToCloud(key: string, value: any): Promise<any> {
   return apiCall('saveConfig', { key: key, value: value });
 }
 
 // ── Health Check ─────────────────────────────
-export async function pingAPI() {
+export async function pingAPI(): Promise<any> {
   return apiCall('ping');
 }
 
-export function isOnline() {
+export function isOnline(): boolean {
   return _online;
 }
 
-export function getQueueSize() {
+export function getQueueSize(): number {
   return _queue.length;
 }
 
-export async function getPosOrdersFromCloud() {
+export async function getPosOrdersFromCloud(): Promise<any> {
   return apiCall('getPosOrders');
 }
 
-export async function syncPosOrdersWithCloud(ordersData) {
+export async function syncPosOrdersWithCloud(ordersData: any[]): Promise<any> {
   return apiCall('syncPosOrders', { orders: ordersData });
 }
-

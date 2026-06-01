@@ -1,4 +1,4 @@
-import { CUKCUK_PROXY_URL, GAS_WEBAPP_URL, joinUrl } from './env.js';
+import { CUKCUK_PROXY_URL, GAS_WEBAPP_URL, joinUrl } from './env';
 
 export const ENDPOINTS = {
   cukcuk: {

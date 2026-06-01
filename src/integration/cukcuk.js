@@ -1,7 +1,7 @@
 import { getCurrentShift, getSettings, getState, getShiftHistory, getShiftSummary } from '../store.js';
 import { showToast, formatCurrency, getWorkingDay, getWorkingDayRange } from '../utils.js';
-import { syncCukcukRevenueToCloud } from '../api.js';
-import * as invoiceStore from './invoiceStore.js';
+import { syncCukcukRevenueToCloud } from '../services/api';
+import * as invoiceStore from '../services/invoiceStore';
 import * as retryQueue from './retryQueue.js';
 import { ENDPOINTS } from '../config/endpoints.js';
 

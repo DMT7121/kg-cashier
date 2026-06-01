@@ -1,47 +1,59 @@
 /* ============================================
-   KG-CASHIER — Utility Functions
+   KG-CASHIER — Utility Functions (TypeScript)
    ============================================ */
 
 /** Escape HTML special chars to prevent XSS when using innerHTML */
-export function escapeHtml(str) {
+export function escapeHtml(str: string | null | undefined): string {
   if (!str) return '';
-  var s = String(str);
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const s = String(str);
+  return s.replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
 }
 
 // ── Currency & Date Formatting ───────────────
-export function formatCurrency(amount) {
-  return Number(amount || 0).toLocaleString('vi-VN') + ' đ';
+export function formatCurrency(amount: number | string | null | undefined): string {
+  const value = amount === null || amount === undefined ? 0 : Number(amount);
+  return (isNaN(value) ? 0 : value).toLocaleString('vi-VN') + ' đ';
 }
 
-export function formatDate(dateStr) {
+export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
+    if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  } catch (e) { return dateStr; }
+  } catch (e) {
+    return dateStr;
+  }
 }
 
-export function formatDateTime(dateStr) {
+export function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
+    if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) + ' ' +
            d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  } catch (e) { return dateStr; }
+  } catch (e) {
+    return dateStr;
+  }
 }
 
-export function formatTime(dateStr) {
+export function formatTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
     const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  } catch { return dateStr; }
+  } catch {
+    return dateStr;
+  }
 }
 
-export function formatDuration(startISO) {
+export function formatDuration(startISO: string | null | undefined): string {
   if (!startISO) return '—';
   const ms = Date.now() - new Date(startISO).getTime();
   const h = Math.floor(ms / 3600000);
@@ -49,12 +61,18 @@ export function formatDuration(startISO) {
   return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
-export function todayStr() {
+export function todayStr(): string {
   return new Date().toISOString().split('T')[0];
 }
 
 // ── Vietnamese denominations ─────────────────
-export const denominations = [
+export interface Denomination {
+  value: number;
+  label: string;
+  color: string;
+}
+
+export const denominations: Denomination[] = [
   { value: 500000, label: '500.000', color: '#ef4444' },
   { value: 200000, label: '200.000', color: '#f97316' },
   { value: 100000, label: '100.000', color: '#eab308' },
@@ -68,9 +86,10 @@ export const denominations = [
 ];
 
 // ── Toast Notifications ──────────────────────
-let toastContainer = null;
+let toastContainer: HTMLDivElement | null = null;
 
-export function showToast(message, type = 'info', duration = 3500) {
+export function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', duration = 3500): void {
+  if (typeof document === 'undefined') return;
   if (!toastContainer) {
     toastContainer = document.createElement('div');
     toastContainer.id = 'toastContainer';
@@ -81,12 +100,12 @@ export function showToast(message, type = 'info', duration = 3500) {
   const icons = { success: 'check_circle', error: 'error', warning: 'warning', info: 'info' };
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span class="material-symbols-rounded">${icons[type] || 'info'}</span><span>${message}</span>`;
+  toast.innerHTML = `<span class="material-symbols-rounded">${icons[type] || 'info'}</span><span>${escapeHtml(message)}</span>`;
   toastContainer.appendChild(toast);
 
   // Limit max visible toasts to prevent overflow
   while (toastContainer.children.length > 5) {
-    toastContainer.firstChild.remove();
+    toastContainer.firstChild?.remove();
   }
 
   requestAnimationFrame(() => toast.classList.add('show'));
@@ -98,74 +117,89 @@ export function showToast(message, type = 'info', duration = 3500) {
 }
 
 // ── Custom Confirm Modal ─────────────────────
-export function showConfirm(message, opts) {
-  var title = (opts && opts.title) || 'Xác nhận';
-  var confirmText = (opts && opts.confirmText) || 'Đồng ý';
-  var cancelText = (opts && opts.cancelText) || 'Hủy';
-  var type = (opts && opts.type) || 'warning';
-  var icons = { warning: 'warning', danger: 'delete_forever', info: 'help' };
-  var colors = { warning: 'var(--primary)', danger: 'var(--danger)', info: 'var(--info)' };
+export interface ConfirmOptions {
+  title?: string;
+  confirmText?: string;
+  cancelText?: string;
+  type?: 'warning' | 'danger' | 'info';
+}
 
-  return new Promise(function(resolve) {
-    var html = '<div style="text-align:center;padding:10px 0;">' +
+export function showConfirm(message: string, opts?: ConfirmOptions): Promise<boolean> {
+  if (typeof document === 'undefined') return Promise.resolve(false);
+  const title = opts?.title || 'Xác nhận';
+  const confirmText = opts?.confirmText || 'Đồng ý';
+  const cancelText = opts?.cancelText || 'Hủy';
+  const type = opts?.type || 'warning';
+  const icons = { warning: 'warning', danger: 'delete_forever', info: 'help' };
+  const colors = { warning: 'var(--primary)', danger: 'var(--danger)', info: 'var(--info)' };
+
+  return new Promise<boolean>((resolve) => {
+    const html = '<div style="text-align:center;padding:10px 0;">' +
       '<span class="material-symbols-rounded" style="font-size:48px;color:' + (colors[type] || colors.warning) + ';margin-bottom:12px;display:block;">' + (icons[type] || 'help') + '</span>' +
-      '<h3 style="font-size:16px;font-weight:700;margin-bottom:8px;">' + title + '</h3>' +
-      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:24px;">' + message + '</p>' +
+      '<h3 style="font-size:16px;font-weight:700;margin-bottom:8px;">' + escapeHtml(title) + '</h3>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:24px;">' + escapeHtml(message) + '</p>' +
       '<div style="display:flex;gap:10px;justify-content:center;">' +
-      '<button class="btn btn-outline" id="confirmCancel">' + cancelText + '</button>' +
-      '<button class="btn ' + (type === 'danger' ? 'btn-danger' : 'btn-primary') + '" id="confirmOk">' + confirmText + '</button>' +
+      '<button class="btn btn-outline" id="confirmCancel">' + escapeHtml(cancelText) + '</button>' +
+      '<button class="btn ' + (type === 'danger' ? 'btn-danger' : 'btn-primary') + '" id="confirmOk">' + escapeHtml(confirmText) + '</button>' +
       '</div></div>';
     showModal(html);
-    setTimeout(function() {
-      var okBtn = document.getElementById('confirmOk');
-      var cancelBtn = document.getElementById('confirmCancel');
-      if (okBtn) okBtn.addEventListener('click', function() { hideModal(); resolve(true); });
-      if (cancelBtn) cancelBtn.addEventListener('click', function() { hideModal(); resolve(false); });
+    setTimeout(() => {
+      const okBtn = document.getElementById('confirmOk');
+      const cancelBtn = document.getElementById('confirmCancel');
+      if (okBtn) okBtn.addEventListener('click', () => { hideModal(); resolve(true); });
+      if (cancelBtn) cancelBtn.addEventListener('click', () => { hideModal(); resolve(false); });
     }, 50);
   });
 }
 
 // ── Custom Password Prompt Modal ─────────────────
-export function showPasswordPrompt(message, opts) {
-  var title = (opts && opts.title) || 'Xác nhận Mật khẩu';
-  var placeholder = (opts && opts.placeholder) || 'Nhập mật khẩu...';
-  var type = (opts && opts.type) || 'info';
-  var colors = { warning: 'var(--primary)', danger: 'var(--danger)', info: 'var(--info)' };
+export interface PasswordPromptOptions {
+  title?: string;
+  placeholder?: string;
+  type?: 'warning' | 'danger' | 'info';
+}
 
-  return new Promise(function(resolve) {
-    var html = '<div style="text-align:center;padding:10px 0;">' +
+export function showPasswordPrompt(message: string, opts?: PasswordPromptOptions): Promise<string | null> {
+  if (typeof document === 'undefined') return Promise.resolve(null);
+  const title = opts?.title || 'Xác nhận Mật khẩu';
+  const placeholder = opts?.placeholder || 'Nhập mật khẩu...';
+  const type = opts?.type || 'info';
+  const colors = { warning: 'var(--primary)', danger: 'var(--danger)', info: 'var(--info)' };
+
+  return new Promise<string | null>((resolve) => {
+    const html = '<div style="text-align:center;padding:10px 0;">' +
       '<span class="material-symbols-rounded" style="font-size:48px;color:' + (colors[type] || colors.info) + ';margin-bottom:12px;display:block;">lock</span>' +
-      '<h3 style="font-size:16px;font-weight:700;margin-bottom:8px;">' + title + '</h3>' +
-      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">' + message + '</p>' +
+      '<h3 style="font-size:16px;font-weight:700;margin-bottom:8px;">' + escapeHtml(title) + '</h3>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">' + escapeHtml(message) + '</p>' +
       '<div class="form-group" style="margin-bottom:24px;text-align:left;">' +
-      '<input type="password" id="modalPromptPassword" class="form-input" placeholder="' + placeholder + '" style="text-align:center;">' +
+      '<input type="password" id="modalPromptPassword" class="form-input" placeholder="' + escapeHtml(placeholder) + '" style="text-align:center;">' +
       '</div>' +
       '<div style="display:flex;gap:10px;justify-content:center;">' +
       '<button class="btn btn-outline" id="promptCancel">Hủy</button>' +
       '<button class="btn btn-primary" id="promptOk">Xác nhận</button>' +
       '</div></div>';
     showModal(html);
-    setTimeout(function() {
-      var okBtn = document.getElementById('promptOk');
-      var cancelBtn = document.getElementById('promptCancel');
-      var input = document.getElementById('modalPromptPassword');
+    setTimeout(() => {
+      const okBtn = document.getElementById('promptOk');
+      const cancelBtn = document.getElementById('promptCancel');
+      const input = document.getElementById('modalPromptPassword') as HTMLInputElement | null;
       if (input) input.focus();
 
       if (okBtn) {
-        okBtn.addEventListener('click', function() {
-          var val = input ? input.value : '';
+        okBtn.addEventListener('click', () => {
+          const val = input ? input.value : '';
           hideModal();
           resolve(val);
         });
       }
       if (cancelBtn) {
-        cancelBtn.addEventListener('click', function() {
+        cancelBtn.addEventListener('click', () => {
           hideModal();
           resolve(null);
         });
       }
       if (input) {
-        input.addEventListener('keydown', function(e) {
+        input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') okBtn?.click();
         });
       }
@@ -174,12 +208,12 @@ export function showPasswordPrompt(message, opts) {
 }
 
 // ── Modal ────────────────────────────────────
-export function showModal(contentHTML, size) {
+export function showModal(contentHTML: string, size?: 'large' | string): void {
+  if (typeof document === 'undefined') return;
   const overlay = document.getElementById('modalOverlay');
   const body = document.getElementById('modalBody');
   if (overlay && body) {
     body.innerHTML = contentHTML;
-    // Support 'large' size for editors
     if (size === 'large') {
       body.classList.add('modal-large');
     } else {
@@ -189,7 +223,8 @@ export function showModal(contentHTML, size) {
   }
 }
 
-export function hideModal() {
+export function hideModal(): void {
+  if (typeof document === 'undefined') return;
   const overlay = document.getElementById('modalOverlay');
   const body = document.getElementById('modalBody');
   if (overlay) overlay.classList.remove('active');
@@ -197,7 +232,8 @@ export function hideModal() {
 }
 
 // ── Download helpers ─────────────────────────
-export function downloadCSV(filename, csv) {
+export function downloadCSV(filename: string, csv: string): void {
+  if (typeof document === 'undefined') return;
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -207,26 +243,29 @@ export function downloadCSV(filename, csv) {
 }
 
 // ── Money Input: auto-format + math expressions ──
-function _fmtDots(n) { return n.toLocaleString('vi-VN'); }
+function _fmtDots(n: number): string {
+  return n.toLocaleString('vi-VN');
+}
 
-function _safeEval(expr) {
-  // Only allow digits, dots, commas, spaces, +, -, *, /
-  var clean = expr.replace(/\./g, '').replace(/,/g, '.').replace(/\s/g, '');
+function _safeEval(expr: string): number | null {
+  const clean = expr.replace(/\./g, '').replace(/,/g, '.').replace(/\s/g, '');
   if (!/^[\d.+\-*/]+$/.test(clean)) return null;
-  // Safe stack-based math parser — no Function()/eval()
   try {
-    var tokens = clean.match(/(\d+\.?\d*|[+\-*/])/g);
+    const tokens = clean.match(/(\d+\.?\d*|[+\-*/])/g);
     if (!tokens || tokens.length === 0) return null;
+    
     // First pass: handle * and /
-    var stack = [parseFloat(tokens[0])];
+    const stack: number[] = [parseFloat(tokens[0])];
     if (isNaN(stack[0])) return null;
-    var ops = [];
-    for (var i = 1; i < tokens.length; i += 2) {
-      var op = tokens[i];
-      var next = parseFloat(tokens[i + 1]);
+    const ops: string[] = [];
+    
+    for (let i = 1; i < tokens.length; i += 2) {
+      const op = tokens[i];
+      const next = parseFloat(tokens[i + 1]);
       if (isNaN(next)) return null;
-      if (op === '*') { stack[stack.length - 1] *= next; }
-      else if (op === '/') {
+      if (op === '*') {
+        stack[stack.length - 1] *= next;
+      } else if (op === '/') {
         if (next === 0) return null;
         stack[stack.length - 1] /= next;
       } else {
@@ -234,54 +273,67 @@ function _safeEval(expr) {
         stack.push(next);
       }
     }
+    
     // Second pass: handle + and -
-    var result = stack[0];
-    for (var j = 0; j < ops.length; j++) {
+    let result = stack[0];
+    for (let j = 0; j < ops.length; j++) {
       if (ops[j] === '+') result += stack[j + 1];
       else if (ops[j] === '-') result -= stack[j + 1];
     }
     return isFinite(result) ? result : null;
-  } catch(e) { return null; }
+  } catch (e) {
+    return null;
+  }
+}
+
+export interface MoneyInputControl {
+  getValue: () => number;
+  getExpression: () => string | null;
+  format: () => void;
 }
 
 /**
  * Bind auto-format + math expression support to an input element.
- * @param {HTMLInputElement} el - The input (should be type="text")
- * @param {object} opts - { allowMath: true/false }
- * Returns: { getValue: () => number }
  */
-export function moneyInput(el, opts) {
-  if (!el) return { getValue: function() { return 0; } };
-  opts = opts || {};
-  var allowMath = opts.allowMath !== false;
-  var previewEl = null;
+export function moneyInput(el: HTMLInputElement | null, opts?: { allowMath?: boolean }): MoneyInputControl {
+  if (!el) {
+    return {
+      getValue: () => 0,
+      getExpression: () => null,
+      format: () => {}
+    };
+  }
+  const allowMath = opts?.allowMath !== false;
+  let previewEl: HTMLDivElement | null = null;
 
-  // Create math preview element if math is allowed
-  if (allowMath) {
+  if (allowMath && typeof document !== 'undefined') {
     previewEl = document.createElement('div');
     previewEl.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;min-height:16px;';
     if (el.parentElement) el.parentElement.appendChild(previewEl);
   }
 
-  function formatDisplay() {
-    var raw = el.value;
-    var clean = raw.replace(/[.,\s]/g, '');
+  function formatDisplay(): void {
+    if (!el) return;
+    const raw = el.value;
+    const clean = raw.replace(/[.,\s]/g, '');
     
-    var formatted = clean.replace(/\d+/g, function(match) {
+    const formatted = clean.replace(/\d+/g, (match) => {
       return match.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     });
 
-    var oldCursor = el.selectionStart;
-    var oldLen = raw.length;
+    const oldCursor = el.selectionStart || 0;
+    const oldLen = raw.length;
     el.value = formatted;
-    var newLen = formatted.length;
-    var newCursor = oldCursor + (newLen - oldLen);
-    try { el.setSelectionRange(newCursor, newCursor); } catch(e) {}
+    const newLen = formatted.length;
+    const newCursor = oldCursor + (newLen - oldLen);
+    try {
+      el.setSelectionRange(newCursor, newCursor);
+    } catch (e) {}
 
     if (allowMath && /[+\-*/]/.test(clean)) {
-      var result = _safeEval(clean);
+      const result = _safeEval(clean);
       if (previewEl) {
-        if (result != null && !isNaN(result)) {
+        if (result !== null && !isNaN(result)) {
           previewEl.textContent = '= ' + _fmtDots(Math.round(result)) + ' đ';
           previewEl.style.color = 'var(--success)';
         } else {
@@ -294,93 +346,93 @@ export function moneyInput(el, opts) {
     }
   }
 
-  function getValue() {
-    var raw = el.value.replace(/[.,\s]/g, '');
+  function getValue(): number {
+    if (!el) return 0;
+    const raw = el.value.replace(/[.,\s]/g, '');
     if (allowMath && /[+\-*/]/.test(raw)) {
-      var result = _safeEval(raw);
-      return (result != null && !isNaN(result)) ? Math.round(result) : 0;
+      const result = _safeEval(raw);
+      return (result !== null && !isNaN(result)) ? Math.round(result) : 0;
     }
     return parseInt(raw, 10) || 0;
   }
 
-  function getExpression() {
-    var raw = el.value;
+  function getExpression(): string | null {
+    if (!el) return null;
+    const raw = el.value;
     if (/[+\-*/]/.test(raw)) return raw;
     return null;
   }
 
   el.addEventListener('input', formatDisplay);
-  // Format initial value if present
   if (el.value && /^\d+$/.test(el.value.trim())) {
-    var initNum = parseInt(el.value, 10);
+    const initNum = parseInt(el.value, 10);
     if (!isNaN(initNum) && initNum > 0) el.value = _fmtDots(initNum);
   }
 
-  return { getValue: getValue, getExpression: getExpression, format: formatDisplay };
+  return { getValue, getExpression, format: formatDisplay };
 }
 
 /** Parse a money-formatted string (e.g. "2.495.000") to a number */
-export function parseMoneyValue(str) {
+export function parseMoneyValue(str: string | number | null | undefined): number {
   if (typeof str === 'number') return str;
   if (!str) return 0;
   return parseInt(String(str).replace(/\./g, '').replace(/\D/g, ''), 10) || 0;
 }
 
-// ── Standardized VND Currency Utilities (Yêu cầu 5) ──
+// ── Standardized VND Currency Utilities ──
 
-export function toMoney(val) {
+export function toMoney(val: any): number {
   if (val === null || val === undefined) return 0;
   if (typeof val === 'number') {
     return isNaN(val) || !isFinite(val) ? 0 : Math.round(val);
   }
-  var str = String(val).trim().replace(/[.,\sđđ]/g, '');
-  var num = parseFloat(str);
+  const str = String(val).trim().replace(/[.,\sđđ]/g, '');
+  const num = parseFloat(str);
   return isNaN(num) || !isFinite(num) ? 0 : Math.round(num);
 }
 
-export function parseMoneyInput(str) {
+export function parseMoneyInput(str: string | number | null | undefined): number {
   if (typeof str === 'number') {
     return isNaN(str) || !isFinite(str) ? 0 : Math.round(str);
   }
   if (!str) return 0;
-  // Strip dots, commas, spaces, and typical currency indicators like 'đ', 'd', 'VND'
-  var clean = String(str).replace(/[.,\sđdDđĐVNDvnd]/g, '');
-  var parsed = parseInt(clean, 10);
+  const clean = String(str).replace(/[.,\sđdDđĐVNDvnd]/g, '');
+  const parsed = parseInt(clean, 10);
   return isNaN(parsed) ? 0 : parsed;
 }
 
-export function formatMoney(val) {
+export function formatMoney(val: any): string {
   return toMoney(val).toLocaleString('vi-VN') + ' đ';
 }
 
-export function addMoney(a, b) {
+export function addMoney(a: any, b: any): number {
   return toMoney(a) + toMoney(b);
 }
 
-export function subtractMoney(a, b) {
+export function subtractMoney(a: any, b: any): number {
   return toMoney(a) - toMoney(b);
 }
 
-export function multiplyMoney(a, factor) {
-  var f = Number(factor);
+export function multiplyMoney(a: any, factor: number | string): number {
+  let f = Number(factor);
   if (isNaN(f) || !isFinite(f)) f = 0;
   return Math.round(toMoney(a) * f);
 }
 
-export function safeRoundMoney(val) {
+export function safeRoundMoney(val: any): number {
   return toMoney(val);
 }
 
-export function isValidMoney(val) {
+export function isValidMoney(val: any): boolean {
   if (val === null || val === undefined) return false;
-  var num = Number(val);
+  const num = Number(val);
   return !isNaN(num) && isFinite(num);
 }
 
-// ── Centralized Working Day 12:00 - 06:00 (Yêu cầu 2) ──
+// ── Centralized Working Day 12:00 - 06:00 ──
 
-export function getWorkingDay(date) {
-  var d = null;
+export function getWorkingDay(date?: Date | string | number): string {
+  let d: Date;
   if (!date) {
     d = new Date();
   } else if (date instanceof Date) {
@@ -388,8 +440,7 @@ export function getWorkingDay(date) {
   } else {
     d = new Date(date);
     if (isNaN(d.getTime())) {
-      // Handle dd/mm/yyyy hh:mm format
-      var parts = String(date).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      const parts = String(date).match(/(\d{2})\/(\d{2})\/(\d{4})/);
       if (parts) {
         d = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
       } else {
@@ -407,101 +458,103 @@ export function getWorkingDay(date) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-export function getWorkingDayRange(workingDay) {
-  var stdDateStr = normalizeWorkingDayInput(workingDay);
-  var parts = stdDateStr.split('-');
-  var y = parseInt(parts[0], 10);
-  var m = parseInt(parts[1], 10) - 1;
-  var d = parseInt(parts[2], 10);
-
-  var start = new Date(y, m, d, 12, 0, 0);
-  var end = new Date(y, m, d + 1, 6, 0, 0);
-  return { start: start, end: end };
+export interface WorkingDayRange {
+  start: Date;
+  end: Date;
 }
 
-export function isDateInWorkingDay(date, workingDay) {
-  var d = new Date(date);
+export function getWorkingDayRange(workingDay: string): WorkingDayRange {
+  const stdDateStr = normalizeWorkingDayInput(workingDay);
+  const parts = stdDateStr.split('-');
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+
+  const start = new Date(y, m, d, 12, 0, 0);
+  const end = new Date(y, m, d + 1, 6, 0, 0);
+  return { start, end };
+}
+
+export function isDateInWorkingDay(date: Date | string | number, workingDay: string): boolean {
+  const d = new Date(date);
   if (isNaN(d.getTime())) return false;
-  var range = getWorkingDayRange(workingDay);
+  const range = getWorkingDayRange(workingDay);
   return d >= range.start && d < range.end;
 }
 
-export function normalizeWorkingDayInput(input) {
+export function normalizeWorkingDayInput(input?: Date | string | number | null): string {
   if (!input) {
-    var today = new Date();
+    const today = new Date();
     if (today.getHours() < 6) today.setDate(today.getDate() - 1);
     return today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
   }
   if (input instanceof Date) {
-    var d = new Date(input);
+    const d = new Date(input);
     if (d.getHours() < 6) d.setDate(d.getDate() - 1);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
-  var str = String(input).trim();
-  // Match yyyy-mm-dd
-  var partsYMD = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const str = String(input).trim();
+  const partsYMD = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (partsYMD) {
     return partsYMD[1] + '-' + partsYMD[2] + '-' + partsYMD[3];
   }
-  // Match dd/mm/yyyy
-  var partsDMY = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  const partsDMY = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (partsDMY) {
     return partsDMY[3] + '-' + String(partsDMY[2]).padStart(2, '0') + '-' + String(partsDMY[1]).padStart(2, '0');
   }
-  // Fallback to standard JS Date parsing
-  var parsed = new Date(str);
+  const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
     if (parsed.getHours() < 6) parsed.setDate(parsed.getDate() - 1);
     return parsed.getFullYear() + '-' + String(parsed.getMonth() + 1).padStart(2, '0') + '-' + String(parsed.getDate()).padStart(2, '0');
   }
-  // Ultimate fallback is the current working day
   return getWorkingDay();
 }
 
-// ── Standardized JSON & GAS Responses Parsing (Yêu cầu 9) ──
+// ── Standardized JSON & GAS Responses Parsing ──
 
-export function safeJsonParse(str, fallback) {
+export function safeJsonParse<T>(str: any, fallback: T): T {
   if (str === null || str === undefined) return fallback;
-  if (typeof str === 'object') return str; // Already parsed
+  if (typeof str === 'object') return str as T;
   try {
-    return JSON.parse(str);
+    return JSON.parse(str) as T;
   } catch (e) {
-    console.warn('[Utils] safeJsonParse failed. Raw value:', str, 'Error:', e.message);
+    const errMsg = e instanceof Error ? e.message : 'Unknown error';
+    console.warn('[Utils] safeJsonParse failed. Raw value:', str, 'Error:', errMsg);
     return fallback;
   }
 }
 
-export function normalizeGasResponse(response) {
+export interface GasResponse {
+  success: boolean;
+  message?: string;
+  data?: any;
+  [key: string]: any;
+}
+
+export function normalizeGasResponse(response: any): GasResponse {
   if (response === null || response === undefined) {
     return { success: false, message: 'Phản hồi trống' };
   }
-  // If response is already an object, return it
   if (typeof response === 'object' && !Array.isArray(response)) {
-    return response;
+    return response as GasResponse;
   }
-  // If it's a primitive string, clean up hidden characters (like \r\n) and parse
   if (typeof response === 'string') {
-    var cleaned = response.trim();
-    // Sometimes GAS returns primitive strings inside java.lang responses.
-    // If it looks like JSON, attempt to parse it
+    const cleaned = response.trim();
     if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
-      var parsed = safeJsonParse(cleaned, null);
+      const parsed = safeJsonParse<GasResponse | null>(cleaned, null);
       if (parsed) return parsed;
     }
-    // If it is just a string that couldn't be parsed, return wrapped success structure
     return { success: true, data: cleaned };
   }
   return { success: false, message: 'Định dạng phản hồi không hợp lệ' };
 }
 
-export function normalizeSheetRow(row) {
-  if (!row) return {};
-  if (typeof row !== 'object') return {};
-  // Standardize values, ensure strings are trimmed and values are typed correctly
-  var normalized = {};
-  for (var key in row) {
-    if (row.hasOwnProperty(key)) {
-      var val = row[key];
+export function normalizeSheetRow(row: any): Record<string, any> {
+  if (!row || typeof row !== 'object') return {};
+  const normalized: Record<string, any> = {};
+  for (const key in row) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) {
+      const val = row[key];
       if (typeof val === 'string') {
         normalized[key] = val.trim();
       } else {
@@ -512,75 +565,74 @@ export function normalizeSheetRow(row) {
   return normalized;
 }
 
-export function ensureObject(val) {
+export function ensureObject(val: any): Record<string, any> {
   if (val && typeof val === 'object' && !Array.isArray(val)) return val;
   return {};
 }
 
-export function ensureArray(val) {
+export function ensureArray<T>(val: any): T[] {
   if (Array.isArray(val)) return val;
-  if (val && typeof val === 'object') return Object.values(val);
+  if (val && typeof val === 'object') return Object.values(val) as T[];
   return [];
 }
 
-// ── SPA Temporary State Consumer (Yêu cầu 7) ──
+// ── SPA Temporary State Consumer ──
 
-export function consumeTempState(key) {
+export function consumeTempState(key: string): any {
   if (typeof window === 'undefined') return null;
-  var val = window[key];
+  const val = (window as any)[key];
   try {
-    delete window[key];
+    delete (window as any)[key];
   } catch (e) {
-    window[key] = undefined;
+    (window as any)[key] = undefined;
   }
   return val;
 }
 
-// ── Masked Centralized Logging (Yêu cầu 12) ──
+// ── Masked Centralized Logging ──
 
-function maskSecrets(msg) {
+function maskSecrets(msg: string): string {
   if (typeof msg !== 'string') return msg;
-  // Mask typical api keys (Gemini API keys, CUKCUK secrets, passwords)
   return msg.replace(/(AIzaSy[A-Za-z0-9_-]{31})/g, 'AIzaSy...[MASKED]')
             .replace(/(cukcuk_token=[A-Za-z0-9_-]+)/gi, 'cukcuk_token=[MASKED]')
             .replace(/(api_key\s*:\s*["'])[A-Za-z0-9_-]+(["'])/gi, '$1[MASKED]$2')
             .replace(/(password\s*:\s*["'])[A-Za-z0-9_-]+(["'])/gi, '$1[MASKED]$2');
 }
 
-export function logInfo(message, details) {
-  var formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
+export function logInfo(message: string, details?: any): void {
+  const formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
   console.log('[INFO] ' + maskSecrets(message), formattedDetails);
 }
 
-export function logWarn(message, details) {
-  var formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
+export function logWarn(message: string, details?: any): void {
+  const formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
   console.warn('[WARN] ' + maskSecrets(message), formattedDetails);
 }
 
-export function logError(message, details) {
-  var formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
+export function logError(message: string, details?: any): void {
+  const formattedDetails = details ? maskSecrets(typeof details === 'object' ? JSON.stringify(details) : String(details)) : '';
   console.error('[ERROR] ' + maskSecrets(message), formattedDetails);
 }
 
-export function sha256(ascii) {
-  function rightRotate(value, amount) {
+export function sha256(ascii: string): string {
+  function rightRotate(value: number, amount: number): number {
     return (value >>> amount) | (value << (32 - amount));
   }
   
-  var mathPow = Math.pow;
-  var maxWord = mathPow(2, 32);
-  var i, j;
-  var result = '';
+  const mathPow = Math.pow;
+  const maxWord = mathPow(2, 32);
+  let i: number, j: number;
+  let result = '';
   
-  var words = [];
-  var asciiLength = ascii.length;
+  const words: number[] = [];
+  const asciiLength = ascii.length;
   
-  var hash = [];
-  var k = [];
-  var primeCounter = 0;
+  let hash: number[] = [];
+  const k: number[] = [];
+  let primeCounter = 0;
   
-  var isComposite = {};
-  for (var candidate = 2; primeCounter < 64; candidate++) {
+  const isComposite: Record<number, number> = {};
+  for (let candidate = 2; primeCounter < 64; candidate++) {
     if (!isComposite[candidate]) {
       for (i = 0; i < 313; i += candidate) {
         isComposite[i] = candidate;
@@ -595,7 +647,7 @@ export function sha256(ascii) {
   
   for (i = 0; i < ascii.length; i++) {
     j = ascii.charCodeAt(i);
-    if (j >> 8) return; // ASCII only
+    if (j >> 8) return ''; // ASCII only
     words[i >> 2] |= j << (24 - (i % 4) * 8);
   }
   
@@ -603,20 +655,20 @@ export function sha256(ascii) {
   words[words.length] = (asciiLength << 3);
   
   for (j = 0; j < words.length; j += 16) {
-    var w = words.slice(j, j + 16);
-    var oldHash = hash.slice(0);
+    const w = words.slice(j, j + 16);
+    const oldHash = hash.slice(0);
     
     for (i = 0; i < 64; i++) {
-      var wItem = w[i];
+      let wItem = w[i];
       if (i >= 16) {
-        var s0 = rightRotate(w[i - 15], 7) ^ rightRotate(w[i - 15], 18) ^ (w[i - 15] >>> 3);
-        var s1 = rightRotate(w[i - 2], 17) ^ rightRotate(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        const s0 = rightRotate(w[i - 15], 7) ^ rightRotate(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        const s1 = rightRotate(w[i - 2], 17) ^ rightRotate(w[i - 2], 19) ^ (w[i - 2] >>> 10);
         wItem = w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
       }
       
-      var temp1 = (hash[7] + (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) +
+      const temp1 = (hash[7] + (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) +
         ((hash[4] & hash[5]) ^ (~hash[4] & hash[6])) + k[i] + wItem) | 0;
-      var temp2 = ((rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) +
+      const temp2 = ((rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) +
         ((hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2]))) | 0;
       
       hash = [(temp1 + temp2) | 0].concat(hash);
@@ -630,13 +682,11 @@ export function sha256(ascii) {
   }
   
   for (i = 0; i < 8; i++) {
-    var val = hash[i];
+    let val = hash[i];
     if (val < 0) val += maxWord;
-    var str = val.toString(16);
+    let str = val.toString(16);
     while (str.length < 8) str = '0' + str;
     result += str;
   }
   return result;
 }
-
-

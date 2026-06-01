@@ -122,7 +122,7 @@ export async function processQueue() {
 
 function _markPushed(refIds) {
   try {
-    import('./invoiceStore.js').then(function(store) {
+    import('../services/invoiceStore').then(function(store) {
       store.markPushedToSheets(refIds);
     });
   } catch(e) { /* ignore */ }
