@@ -44,6 +44,7 @@ export interface Shift {
   cashToDeposit: number;
   reopenedAt?: string;
   lastReopenedAt?: string;
+  reclosedAt?: string;
   discrepancyNotes?: string;
   originalSummarySnapshot?: ShiftSummary;
   updatedAt: string;
@@ -56,6 +57,7 @@ export interface Shift {
   handoverCash?: CashCountDetail;
   drinkInventorySnapshot?: any;
   cukcukInvoicesSnapshot?: any[];
+  originalCukcukInvoicesSnapshot?: any[];
   summarySnapshot?: ShiftSummary;
   invoices?: any[];
 }

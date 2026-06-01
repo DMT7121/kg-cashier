@@ -4,6 +4,8 @@ declare module '*/integration/cukcuk.js' {
   export function getSyncStatus(): any;
   export function loginAndGetToken(): Promise<any>;
   export function pushManualEditToSheets(refId: string): Promise<any>;
+  export function syncSingleInvoice(refId: string): Promise<any>;
+  export function syncInvoicesForDate(dateStr: string, force?: boolean): Promise<any>;
 }
 
 declare module '*.js' {

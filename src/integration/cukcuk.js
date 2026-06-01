@@ -1,4 +1,34 @@
-import { getCurrentShift, getSettings, getState, getShiftHistory, getShiftSummary } from '../store.js';
+import { useShiftStore } from '../stores/shift';
+import { useSettingsStore } from '../stores/settings';
+
+function getCurrentShift() {
+  try {
+    return useShiftStore().currentShift;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getSettings() {
+  try {
+    return useSettingsStore().settings;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getShiftHistory() {
+  try {
+    return useShiftStore().shifts || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function getShiftSummary(shift) {
+  if (!shift) return {};
+  return shift.summarySnapshot || {};
+}
 import { showToast, formatCurrency, getWorkingDay, getWorkingDayRange } from '../utils.js';
 import { syncCukcukRevenueToCloud } from '../services/api';
 import * as invoiceStore from '../services/invoiceStore';
