@@ -222,11 +222,15 @@ function _handleCashierRequest(e) {
       case 'rebuildCukcukIndex': result = rebuildCukcukIndex(); break;
       case 'getCukcukSyncState': result = _getCukcukSyncState(); break;
       case 'saveCukcukSyncState': result = _saveCukcukSyncState(data); break;
-      case 'syncCukcukToSheets': result = _syncCukcukToSheetsAction(data); break;
-      case 'getCukcukInvoices': result = _getCukcukInvoicesAction(data); break;
+      case 'syncCukcukToSheets': result = _syncCukcukInvoicesAction(data); break;
+      case 'syncCukcukInvoices': result = _syncCukcukInvoicesAction(data); break;
+      case 'loadCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
+      case 'getCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
       case 'getCukcukItems':    result = _getCukcukItemsAction(data); break;
       case 'getCukcukDailySales': result = _getCukcukDailySalesAction(data); break;
-      case 'saveCukcukOverride': result = _saveCukcukOverrideAction(data); break;
+      case 'saveCukcukOverride': result = _overrideCukcukInvoiceAction(data); break;
+      case 'overrideCukcukInvoice': result = _overrideCukcukInvoiceAction(data); break;
+      case 'rollbackCukcukInvoice': result = _rollbackCukcukInvoiceAction(data); break;
 
       // POS Cloud Sync
       case 'getPosOrders':    result = _getPosOrdersAction(data); break;
@@ -2787,5 +2791,825 @@ function _closeShiftAtomicAction(data) {
     lock.releaseLock();
   }
 }
+
+
+// ══════════════════════════════════════════════════════════════
+//  UPGRADED CLOUD-FIRST CUKCUK INTEGRATION SERVICE & SCHEMAS
+// ══════════════════════════════════════════════════════════════
+
+const NEW_INVOICES_HEADERS = [
+  'invoiceKey', 'cukcukInvoiceId', 'cukcukRefNo', 'branchId', 'branchName', 'workDate', 'businessDate', 
+  'invoiceTime', 'createdTime', 'modifiedTime', 'tableName', 'customerName', 'guestCount', 'totalAmount', 
+  'discountAmount', 'serviceCharge', 'vatAmount', 'finalAmount', 'paymentMethod', 'paymentStatus', 
+  'paymentRawJson', 'itemsJson', 'sourceRawJson', 'manualOverride', 'overrideAt', 'overrideBy', 
+  'overrideReason', 'overrideFieldsJson', 'syncBatchId', 'lastSyncedAt', 'syncStatus', 'syncError', 
+  'shiftId', 'sessionId', 'cashierName', 'isDeleted', 'deletedAt', 'note', 'createdAt', 'updatedAt'
+];
+
+const NEW_OVERRIDES_HEADERS = [
+  'overrideId', 'invoiceKey', 'cukcukInvoiceId', 'workDate', 'fieldName', 'oldValue', 'newValue', 
+  'reason', 'overrideBy', 'overrideAt', 'deviceId', 'sessionId', 'shiftId', 'clientSnapshotJson', 
+  'serverSnapshotJson', 'status', 'note'
+];
+
+const NEW_SYNC_LOGS_HEADERS = [
+  'syncBatchId', 'workDate', 'fromTime', 'toTime', 'triggeredBy', 'triggerSource', 'startedAt', 'finishedAt', 
+  'durationMs', 'totalFetched', 'totalInserted', 'totalUpdated', 'totalSkippedManualOverride', 'totalDeletedMarked', 
+  'totalErrors', 'status', 'errorMessage', 'requestId', 'tokenRefreshed', 'apiCallCount', 'note'
+];
+
+const NEW_CONFIG_HEADERS = [
+  'key', 'value', 'description', 'updatedAt', 'updatedBy'
+];
+
+/**
+ * Centered service class for CUKCUK authentication, paging fetches, and retry controls.
+ */
+const CukcukService = {
+  getAccessToken: function() {
+    const props = PropertiesService.getScriptProperties();
+    return props.getProperty('CUKCUK_ACCESS_TOKEN');
+  },
+  
+  saveTokenInfo: function(accessToken, expiresAt, companyCode) {
+    const props = PropertiesService.getScriptProperties();
+    if (accessToken) props.setProperty('CUKCUK_ACCESS_TOKEN', accessToken);
+    if (expiresAt) props.setProperty('CUKCUK_TOKEN_EXPIRES_AT', String(expiresAt));
+    if (companyCode) props.setProperty('CUKCUK_COMPANY_CODE', companyCode);
+  },
+
+  refreshAccessTokenIfNeeded: function(force) {
+    const props = PropertiesService.getScriptProperties();
+    const token = props.getProperty('CUKCUK_ACCESS_TOKEN');
+    const expiresAt = Number(props.getProperty('CUKCUK_TOKEN_EXPIRES_AT') || 0);
+    const companyCode = props.getProperty('CUKCUK_COMPANY_CODE');
+    
+    const now = Date.now();
+    // Refresh if no token, expired, or expiring in less than 5 minutes
+    if (!token || now >= (expiresAt - 5 * 60 * 1000) || force) {
+      const domain = props.getProperty('CUKCUK_DOMAIN') || '';
+      const appId = props.getProperty('CUKCUK_APP_ID') || '';
+      const secretKey = props.getProperty('CUKCUK_SECRET_KEY') || '';
+      
+      if (!domain || !appId || !secretKey) {
+        throw new Error('Thiếu cấu hình CUKCUK trong Script Properties (CUKCUK_DOMAIN, CUKCUK_APP_ID, CUKCUK_SECRET_KEY).');
+      }
+      
+      const loginUrl = 'https://' + domain.replace(/^https?:\/\//, '') + '/api/oauth/token';
+      const payload = {
+        AppID: appId,
+        SecretKey: secretKey
+      };
+      
+      const response = UrlFetchApp.fetch(loginUrl, {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      
+      const code = response.getResponseCode();
+      const resText = response.getContentText();
+      if (code !== 200) {
+        throw new Error('CUKCUK Auth failed: HTTP ' + code + ' - ' + resText);
+      }
+      
+      const resData = JSON.parse(resText);
+      if (!resData.Success) {
+        throw new Error('CUKCUK API Auth error: ' + (resData.ErrorMessage || 'Chưa xác định'));
+      }
+      
+      const access_token = resData.Data.AccessToken;
+      const expires_in = resData.Data.ExpiresIn || 3600; // default 1 hour
+      const company_code = resData.Data.CompanyCode;
+      
+      this.saveTokenInfo(access_token, now + expires_in * 1000, company_code);
+      return { token: access_token, companyCode: company_code, refreshed: true };
+    }
+    
+    return { token: token, companyCode: companyCode, refreshed: false };
+  },
+  
+  _apiCall: function(path, options, loginInfo) {
+    const props = PropertiesService.getScriptProperties();
+    const domain = props.getProperty('CUKCUK_DOMAIN') || '';
+    const url = 'https://' + domain.replace(/^https?:\/\//, '') + path;
+    
+    const headers = {
+      'Authorization': 'Bearer ' + loginInfo.token,
+      'CompanyCode': loginInfo.companyCode,
+      'Content-Type': 'application/json'
+    };
+    
+    const params = {
+      method: options.method || 'GET',
+      headers: headers,
+      muteHttpExceptions: true
+    };
+    if (options.body) {
+      params.payload = options.body;
+    }
+    
+    let attempt = 0;
+    const maxRetry = 3;
+    let delay = 1000;
+    
+    while (attempt < maxRetry) {
+      try {
+        const response = UrlFetchApp.fetch(url, params);
+        const code = response.getResponseCode();
+        const text = response.getContentText();
+        
+        if (code === 401) {
+          // Token expired or invalid, trigger refresh
+          const newLogin = this.refreshAccessTokenIfNeeded(true);
+          headers['Authorization'] = 'Bearer ' + newLogin.token;
+          headers['CompanyCode'] = newLogin.companyCode;
+          params.headers = headers;
+          
+          // Retry immediately once with new token
+          const retryResponse = UrlFetchApp.fetch(url, params);
+          const retryCode = retryResponse.getResponseCode();
+          const retryText = retryResponse.getContentText();
+          if (retryCode !== 200) {
+            throw new Error('CUKCUK API Retry HTTP Error: ' + retryCode + ' - ' + retryText);
+          }
+          return JSON.parse(retryText);
+        }
+        
+        if (code === 200) {
+          return JSON.parse(text);
+        }
+        
+        // Handle concurrency or too many requests error 102
+        if (text.indexOf('102') > -1 || code === 429) {
+          Logger.log('[CUKCUK API 102/429] Busy, retrying in ' + delay + 'ms...');
+          Utilities.sleep(delay);
+          attempt++;
+          delay *= 2;
+          continue;
+        }
+        
+        throw new Error('CUKCUK API HTTP Error: ' + code + ' - ' + text);
+      } catch (e) {
+        attempt++;
+        if (attempt >= maxRetry) throw e;
+        Logger.log('[CUKCUK API Error] attempt ' + attempt + ': ' + e.toString());
+        Utilities.sleep(delay);
+        delay *= 2;
+      }
+    }
+    throw new Error('CUKCUK API call failed after max retries');
+  },
+  
+  fetchInvoicesByDateRange: function(fromTime, toTime, loginInfo) {
+    let page = 1;
+    let allInvoices = [];
+    let hasMore = true;
+    const limit = 100;
+    
+    while (hasMore) {
+      const body = {
+        Page: page,
+        Limit: limit,
+        FromDate: fromTime,
+        ToDate: toTime
+      };
+      
+      const response = this._apiCall('/api/v1/sainvoices/paging', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }, loginInfo);
+      
+      let items = [];
+      if (response && response.Success && response.Data) {
+        if (Array.isArray(response.Data)) items = response.Data;
+        else if (response.Data.PageData) items = response.Data.PageData;
+        else if (response.Data.Items) items = response.Data.Items;
+      }
+      
+      if (items.length > 0) {
+        allInvoices = allInvoices.concat(items);
+        if (items.length < limit) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+    
+    return allInvoices;
+  },
+  
+  fetchInvoiceDetail: function(invoiceId, loginInfo) {
+    const response = this._apiCall('/api/v1/sainvoices/' + invoiceId, {
+      method: 'GET'
+    }, loginInfo);
+    
+    if (response && response.Success && response.Data) {
+      return response.Data;
+    }
+    return null;
+  },
+  
+  normalizeInvoice: function(rawInvoice, rawDetail) {
+    const refId = String(rawInvoice.RefId || rawInvoice.RefID || '');
+    const refNo = rawInvoice.RefNo || '';
+    
+    // Parse payments
+    const payments = (rawDetail && (rawDetail.SAInvoicePayments || rawDetail.Payments)) || [];
+    let invCash = 0, invCard = 0, invTransfer = 0, invOther = 0;
+    const paymentJsonList = [];
+    
+    payments.forEach(pmt => {
+      const pmtAmount = pmt.Amount || 0;
+      if (pmtAmount <= 0) return;
+      
+      const name = (pmt.PaymentName || '').toLowerCase();
+      const type = pmt.PaymentType;
+      let method = 'cash';
+      let label = 'Tiền mặt';
+      
+      if (name.indexOf('mặt') !== -1 || name.indexOf('tiền mặt') !== -1 || name.indexOf('cash') !== -1) {
+        method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount;
+      } else if (name.indexOf('chuyển') !== -1 || name.indexOf('khoản') !== -1 || name.indexOf('ngân hàng') !== -1 || name.indexOf('bank') !== -1 || name.indexOf('transfer') !== -1) {
+        method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount;
+      } else if (name.indexOf('thẻ') !== -1 || name.indexOf('card') !== -1 || name.indexOf('visa') !== -1 || name.indexOf('master') !== -1) {
+        method = 'card'; label = 'Thẻ'; invCard += pmtAmount;
+      } else {
+        switch (type) {
+          case 1: method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount; break;
+          case 2: method = 'card'; label = 'Thẻ'; invCard += pmtAmount; break;
+          case 3: method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount; break;
+          default: method = 'other'; label = pmt.PaymentName || 'Khác'; invOther += pmtAmount; break;
+        }
+      }
+      paymentJsonList.push({ method: method, amount: pmtAmount, label: label });
+    });
+    
+    let paymentMethodStr = 'Chưa thanh toán';
+    if (paymentJsonList.length > 0) {
+      paymentMethodStr = paymentJsonList.map(p => p.label).join(' + ');
+    }
+    
+    // items JSON
+    const itemsList = (rawDetail && (rawDetail.SAInvoiceDetails || rawDetail.Details)) || [];
+    const itemsJsonList = itemsList.map(item => ({
+      name: item.InventoryItemName || item.ItemName || item.Name || '',
+      qty: item.Quantity || item.Qty || 1,
+      price: item.UnitPrice || item.Price || 0,
+      amount: item.Amount || 0,
+      discount: item.DiscountAmount || 0
+    }));
+    
+    const finalAmount = (invCash + invCard + invTransfer + invOther) || rawInvoice.Amount || 0;
+    
+    return {
+      invoiceKey: refId,
+      cukcukInvoiceId: refId,
+      cukcukRefNo: refNo,
+      branchId: rawInvoice.BranchID || rawInvoice.BranchId || '',
+      branchName: rawInvoice.BranchName || '',
+      workDate: '', // populated in sync handler
+      businessDate: rawInvoice.RefDate ? rawInvoice.RefDate.split('T')[0] : '',
+      invoiceTime: rawInvoice.RefDate || '',
+      createdTime: rawInvoice.CreatedDate || '',
+      modifiedTime: rawInvoice.ModifiedDate || '',
+      tableName: rawInvoice.TableName || '',
+      customerName: rawInvoice.CustomerName || '',
+      guestCount: rawInvoice.NumberOfGuests || 0,
+      totalAmount: rawInvoice.TotalAmount || finalAmount,
+      discountAmount: rawInvoice.DiscountAmount || 0,
+      serviceCharge: rawInvoice.ServiceChargeAmount || 0,
+      vatAmount: rawInvoice.VATAmount || 0,
+      finalAmount: finalAmount,
+      paymentMethod: paymentMethodStr,
+      paymentStatus: (rawInvoice.IsPaid === true || String(rawInvoice.IsPaid).toLowerCase() === 'true') ? 'Thanh toán' : 'Chưa thanh toán',
+      paymentRawJson: JSON.stringify(paymentJsonList),
+      itemsJson: JSON.stringify(itemsJsonList),
+      sourceRawJson: JSON.stringify(rawInvoice),
+      manualOverride: false,
+      overrideAt: '',
+      overrideBy: '',
+      overrideReason: '',
+      overrideFieldsJson: '{}',
+      isDeleted: rawInvoice.IsDeleted === true || String(rawInvoice.IsDeleted).toLowerCase() === 'true',
+      deletedAt: (rawInvoice.IsDeleted === true) ? new Date().toISOString() : '',
+      note: rawInvoice.Description || ''
+    };
+  }
+};
+
+/**
+ * Initializes CUKCUK Configuration Sheet if it doesn't exist yet.
+ */
+function _initializeCukcukConfigSheet() {
+  const headers = NEW_CONFIG_HEADERS;
+  const sheet = _getSheet('KG_CUKCUK_CONFIG', headers);
+  const rows = _getSheetData('KG_CUKCUK_CONFIG');
+  if (rows.length === 0) {
+    const defaultConfigs = [
+      ['CUKCUK_WORKDAY_START_HOUR', '12', 'Giờ bắt đầu ngày làm việc để đồng bộ (12 = 12h trưa)', new Date().toISOString(), 'SYSTEM'],
+      ['CUKCUK_WORKDAY_END_NEXT_DAY_HOUR', '6', 'Giờ kết thúc ngày làm việc vào sáng hôm sau (6 = 6h sáng)', new Date().toISOString(), 'SYSTEM'],
+      ['CUKCUK_READ_MODE', 'GVIZ', 'Chế độ đọc dữ liệu hóa đơn về Webapp (GVIZ hoặc GAS_PROXY)', new Date().toISOString(), 'SYSTEM'],
+      ['CUKCUK_SYNC_PAGE_SIZE', '100', 'Số lượng hóa đơn tải mỗi trang từ API', new Date().toISOString(), 'SYSTEM'],
+      ['CUKCUK_MAX_RETRY', '3', 'Số lần tối đa gọi lại API khi gặp lỗi bận', new Date().toISOString(), 'SYSTEM'],
+      ['CUKCUK_RETRY_DELAY_MS', '1000', 'Độ trễ cơ sở để retry (mili giây)', new Date().toISOString(), 'SYSTEM']
+    ];
+    _sheetsAppend('KG_CUKCUK_CONFIG', defaultConfigs);
+  }
+}
+
+/**
+ * Upgraded central backend action to execute the sync process.
+ */
+function _syncCukcukInvoicesAction(data) {
+  const val = _validateMetadata(data, 'syncCukcukInvoices');
+  if (val && !val.success) return val;
+
+  const lock = LockService.getScriptLock();
+  const hasLock = lock.tryLock(10000); // 10s wait timeout
+  if (!hasLock) {
+    return {
+      ok: false,
+      action: 'syncCukcukInvoices',
+      requestId: data.requestId || '',
+      syncBatchId: '',
+      message: 'Hệ thống đang bận đồng bộ hóa đơn CUKCUK từ một thiết bị khác. Vui lòng thử lại sau ít phút.',
+      error: { code: 'SYNC_ALREADY_RUNNING', detail: 'Lock could not be acquired within 10s', retryable: true }
+    };
+  }
+
+  const startedAt = new Date();
+  const syncBatchId = 'batch_' + Date.now().toString(36);
+  const requestId = data.requestId || 'req_' + startedAt.getTime().toString(36);
+  const workDateStr = data.workDate || _getWorkingDayGas(startedAt);
+  
+  let totalFetched = 0;
+  let totalInserted = 0;
+  let totalUpdated = 0;
+  let totalSkippedManualOverride = 0;
+  let totalDeletedMarked = 0;
+  let totalErrors = 0;
+  let tokenRefreshed = false;
+  let apiCallCount = 0;
+  let status = 'SUCCESS';
+  let errorMessage = '';
+
+  try {
+    // Ensure config exists
+    _initializeCukcukConfigSheet();
+
+    // 1. Refresh CUKCUK Token
+    apiCallCount++;
+    const loginInfo = CukcukService.refreshAccessTokenIfNeeded();
+    if (loginInfo.refreshed) tokenRefreshed = true;
+
+    // 2. Setup date boundaries:
+    // Bắt đầu: 12:00:00 của workDate
+    // Kết thúc: 06:00:00 của ngày tiếp theo
+    const parts = workDateStr.split('-');
+    const y = parseInt(parts[0]);
+    const m = parseInt(parts[1]) - 1;
+    const d = parseInt(parts[2]);
+    
+    const pad = function(n) { return n < 10 ? '0' + n : String(n); };
+    const fromTime = y + '-' + pad(m + 1) + '-' + pad(d) + 'T12:00:00';
+    
+    const nextDay = new Date(y, m, d + 1);
+    const toTime = nextDay.getFullYear() + '-' + pad(nextDay.getMonth() + 1) + '-' + pad(nextDay.getDate()) + 'T06:00:00';
+
+    Logger.log('[GAS CUKCUK] Syncing ' + workDateStr + ' Window: ' + fromTime + ' -> ' + toTime);
+
+    // 3. Fetch Invoices from CUKCUK
+    apiCallCount++;
+    const invoices = CukcukService.fetchInvoicesByDateRange(fromTime, toTime, loginInfo);
+    totalFetched = invoices.length;
+
+    // 4. Initialize Sheets
+    _getSheet('KG_CUKCUK_INVOICES', NEW_INVOICES_HEADERS);
+    _getSheet('KG_CUKCUK_OVERRIDES', NEW_OVERRIDES_HEADERS);
+    _getSheet('KG_CUKCUK_SYNC_LOGS', NEW_SYNC_LOGS_HEADERS);
+
+    // 5. Read existing invoices
+    const allInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
+    const headers = allInvoices[0] || NEW_INVOICES_HEADERS;
+    const colIndex = {};
+    headers.forEach((h, idx) => { colIndex[h] = idx; });
+
+    const invoiceMap = {};
+    for (let i = 1; i < allInvoices.length; i++) {
+      const key = String(allInvoices[i][colIndex['invoiceKey']] || '');
+      if (key) {
+        invoiceMap[key] = {
+          rowIndex: i + 1,
+          manualOverride: allInvoices[i][colIndex['manualOverride']] === true || String(allInvoices[i][colIndex['manualOverride']]).toLowerCase() === 'true',
+          row: allInvoices[i]
+        };
+      }
+    }
+
+    const invoicesToAppend = [];
+    const invoicesToUpdate = [];
+
+    // 6. Process each fetched invoice
+    for (let i = 0; i < invoices.length; i++) {
+      const inv = invoices[i];
+      const key = String(inv.RefId || inv.RefID || '');
+      if (!key) continue;
+
+      const existing = invoiceMap[key];
+
+      // If existing invoice is manually overridden, skip updating payment-related protected fields
+      if (existing && existing.manualOverride && !data.forceMode) {
+        totalSkippedManualOverride++;
+        continue;
+      }
+
+      // Fetch invoice detail to retrieve payment and items breakdown
+      apiCallCount++;
+      let detail = null;
+      try {
+        detail = CukcukService.fetchInvoiceDetail(key, loginInfo);
+      } catch (err) {
+        Logger.log('[GAS CUKCUK] Fetch detail failed for ' + key + ': ' + err.toString());
+        totalErrors++;
+        continue;
+      }
+
+      if (!detail) {
+        totalErrors++;
+        continue;
+      }
+
+      const normalized = CukcukService.normalizeInvoice(inv, detail);
+      normalized.workDate = workDateStr;
+      normalized.syncBatchId = syncBatchId;
+      normalized.lastSyncedAt = new Date().toISOString();
+      
+      if (normalized.isDeleted) {
+        totalDeletedMarked++;
+      }
+
+      // Build row
+      const newRow = new Array(NEW_INVOICES_HEADERS.length).fill('');
+      NEW_INVOICES_HEADERS.forEach((h, idx) => {
+        newRow[idx] = normalized[h] !== undefined ? normalized[h] : '';
+      });
+
+      if (existing) {
+        // If forceMode is true or not manual overridden, we overwrite.
+        newRow[colIndex['createdAt']] = existing.row[colIndex['createdAt']] || normalized.createdAt || new Date().toISOString();
+        newRow[colIndex['updatedAt']] = new Date().toISOString();
+
+        invoicesToUpdate.push({
+          rowIndex: existing.rowIndex,
+          rangeEndLetter: _colLetter(NEW_INVOICES_HEADERS.length),
+          rowData: newRow
+        });
+        totalUpdated++;
+      } else {
+        newRow[colIndex['createdAt']] = new Date().toISOString();
+        newRow[colIndex['updatedAt']] = new Date().toISOString();
+        invoicesToAppend.push(newRow);
+        totalInserted++;
+      }
+    }
+
+    // 7. Write to Sheet in batches
+    if (invoicesToAppend.length > 0) {
+      _sheetsAppend('KG_CUKCUK_INVOICES', invoicesToAppend);
+    }
+    if (invoicesToUpdate.length > 0) {
+      _sheetsBatchUpdate('KG_CUKCUK_INVOICES', invoicesToUpdate);
+    }
+
+  } catch (e) {
+    status = 'FAILED';
+    errorMessage = e.toString();
+    Logger.log('[GAS CUKCUK Sync Error] ' + errorMessage);
+  } finally {
+    lock.releaseLock();
+  }
+
+  const finishedAt = new Date();
+  const durationMs = finishedAt.getTime() - startedAt.getTime();
+
+  // Log the sync batch
+  try {
+    const syncLogRow = [
+      syncBatchId,
+      workDateStr,
+      data.fromDate || '',
+      data.toDate || '',
+      data.cashierName || 'SYSTEM',
+      data.triggerSource || 'webapp',
+      startedAt.toISOString(),
+      finishedAt.toISOString(),
+      durationMs,
+      totalFetched,
+      totalInserted,
+      totalUpdated,
+      totalSkippedManualOverride,
+      totalDeletedMarked,
+      totalErrors,
+      status,
+      errorMessage,
+      requestId,
+      tokenRefreshed ? 'TRUE' : 'FALSE',
+      apiCallCount,
+      data.note || ''
+    ];
+    _sheetsAppend('KG_CUKCUK_SYNC_LOGS', [syncLogRow]);
+  } catch (logErr) {
+    Logger.log('[GAS CUKCUK Log Error] ' + logErr.toString());
+  }
+
+  return {
+    ok: status === 'SUCCESS',
+    action: 'syncCukcukInvoices',
+    requestId: requestId,
+    syncBatchId: syncBatchId,
+    message: status === 'SUCCESS' ? 'Đồng bộ hoàn tất' : ('Lỗi đồng bộ: ' + errorMessage),
+    data: {
+      totalFetched: totalFetched,
+      totalInserted: totalInserted,
+      totalUpdated: totalUpdated,
+      totalSkippedManualOverride: totalSkippedManualOverride,
+      totalDeletedMarked: totalDeletedMarked,
+      totalErrors: totalErrors,
+      durationMs: durationMs
+    },
+    error: status === 'FAILED' ? { code: 'UNKNOWN_ERROR', detail: errorMessage, retryable: true } : null
+  };
+}
+
+/**
+ * Loads JSON invoices from Sheets for a given workDate.
+ */
+function _loadCukcukInvoicesAction(data) {
+  try {
+    _getSheet('KG_CUKCUK_INVOICES', NEW_INVOICES_HEADERS);
+    const rows = _getSheetData('KG_CUKCUK_INVOICES');
+    let filtered = rows;
+    
+    if (data.workDate) {
+      filtered = filtered.filter(r => r.workDate === data.workDate);
+    } else {
+      if (data.fromDate) {
+        filtered = filtered.filter(r => r.invoiceTime >= data.fromDate);
+      }
+      if (data.toDate) {
+        filtered = filtered.filter(r => r.invoiceTime <= data.toDate);
+      }
+    }
+    
+    // Sort from oldest to newest by invoiceTime
+    filtered.sort((a, b) => (a.invoiceTime || '').localeCompare(b.invoiceTime || ''));
+    
+    return {
+      ok: true,
+      action: 'loadCukcukInvoices',
+      message: 'Tải hóa đơn thành công',
+      data: {
+        invoices: filtered,
+        total: filtered.length
+      },
+      error: null
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      action: 'loadCukcukInvoices',
+      message: 'Không thể tải hóa đơn',
+      error: { code: 'SHEET_WRITE_FAILED', detail: e.toString(), retryable: true }
+    };
+  }
+}
+
+/**
+ * Saves manual overrides for specific fields of a CUKCUK invoice.
+ */
+function _overrideCukcukInvoiceAction(data) {
+  const val = _validateMetadata(data, 'overrideCukcukInvoice');
+  if (val && !val.success) return val;
+
+  const key = data.invoiceId || data.invoiceKey || data.refId;
+  if (!key) {
+    return { ok: false, action: 'overrideCukcukInvoice', message: 'Thiếu invoiceKey', error: { code: 'UNKNOWN_ERROR', detail: 'Missing invoiceKey' } };
+  }
+  
+  const workDate = data.workDate || '';
+  
+  try {
+    _getSheet('KG_CUKCUK_INVOICES', NEW_INVOICES_HEADERS);
+    _getSheet('KG_CUKCUK_OVERRIDES', NEW_OVERRIDES_HEADERS);
+    
+    const invoicesSheet = _getSheet('KG_CUKCUK_INVOICES');
+    const allInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
+    let rowIndex = -1;
+    const colIndex = {};
+    
+    if (allInvoices && allInvoices.length > 0) {
+      allInvoices[0].forEach((h, idx) => { colIndex[h] = idx; });
+      for (let i = 1; i < allInvoices.length; i++) {
+        if (String(allInvoices[i][colIndex['invoiceKey']] || '') === key) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+    }
+    
+    if (rowIndex === -1) {
+      return { ok: false, action: 'overrideCukcukInvoice', message: 'Không tìm thấy hóa đơn cần chỉnh sửa trên Sheet', error: { code: 'UNKNOWN_ERROR', detail: 'Invoice not found on sheet' } };
+    }
+    
+    const oldRow = allInvoices[rowIndex - 1];
+    
+    // Support legacy saveCukcukOverride parameter mapping
+    let changedFields = data.changedFields;
+    if (!changedFields && data.newValueJson) {
+      try {
+        changedFields = JSON.parse(data.newValueJson);
+      } catch(ex) {
+        changedFields = {};
+      }
+    }
+    if (!changedFields) changedFields = {};
+    
+    const overrideId = data.overrideId || ('ovr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    
+    // Prepare log fields
+    const overrideRow = [
+      overrideId,
+      key,
+      oldRow[colIndex['cukcukInvoiceId']] || '',
+      workDate || oldRow[colIndex['workDate']] || '',
+      Object.keys(changedFields).join(','),
+      JSON.stringify(Object.keys(changedFields).reduce((acc, f) => { acc[f] = oldRow[colIndex[f]] || ''; return acc; }, {})),
+      JSON.stringify(changedFields),
+      data.reason || data.overrideReason || '',
+      data.cashierName || data.overrideBy || data.editedBy || 'SYSTEM',
+      new Date().toISOString(),
+      data.deviceId || '',
+      data.sessionId || '',
+      data.shiftId || '',
+      data.clientSnapshotJson || '{}',
+      JSON.stringify(oldRow),
+      'SUCCESS',
+      ''
+    ];
+    
+    _sheetsAppend('KG_CUKCUK_OVERRIDES', [overrideRow]);
+    
+    // Update invoice row
+    invoicesSheet.getRange(rowIndex, colIndex['manualOverride'] + 1).setValue(true);
+    invoicesSheet.getRange(rowIndex, colIndex['overrideAt'] + 1).setValue(new Date().toISOString());
+    invoicesSheet.getRange(rowIndex, colIndex['overrideBy'] + 1).setValue(data.cashierName || data.overrideBy || data.editedBy || 'SYSTEM');
+    invoicesSheet.getRange(rowIndex, colIndex['overrideReason'] + 1).setValue(data.reason || data.overrideReason || '');
+    invoicesSheet.getRange(rowIndex, colIndex['overrideFieldsJson'] + 1).setValue(JSON.stringify(changedFields));
+    
+    // Apply changes (paymentMethod, paymentStatus, finalAmount, note)
+    if (changedFields.paymentMethod !== undefined) {
+      invoicesSheet.getRange(rowIndex, colIndex['paymentMethod'] + 1).setValue(changedFields.paymentMethod);
+    }
+    if (changedFields.paymentStatus !== undefined) {
+      invoicesSheet.getRange(rowIndex, colIndex['paymentStatus'] + 1).setValue(changedFields.paymentStatus);
+    }
+    if (changedFields.finalAmount !== undefined) {
+      invoicesSheet.getRange(rowIndex, colIndex['finalAmount'] + 1).setValue(Number(changedFields.finalAmount) || 0);
+    }
+    if (changedFields.note !== undefined) {
+      invoicesSheet.getRange(rowIndex, colIndex['note'] + 1).setValue(changedFields.note);
+    }
+    
+    invoicesSheet.getRange(rowIndex, colIndex['updatedAt'] + 1).setValue(new Date().toISOString());
+    
+    return {
+      ok: true,
+      action: 'overrideCukcukInvoice',
+      message: 'Cập nhật chỉnh sửa thủ công và khóa hóa đơn thành công',
+      data: { invoiceKey: key },
+      error: null
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      action: 'overrideCukcukInvoice',
+      message: 'Lỗi cập nhật ghi đè: ' + e.toString(),
+      error: { code: 'SHEET_WRITE_FAILED', detail: e.toString() }
+    };
+  }
+}
+
+/**
+ * Resets manualOverride to FALSE and restores original CUKCUK details.
+ */
+function _rollbackCukcukInvoiceAction(data) {
+  const val = _validateMetadata(data, 'rollbackCukcukInvoice');
+  if (val && !val.success) return val;
+
+  if (!data.invoiceKey) {
+    return { ok: false, action: 'rollbackCukcukInvoice', message: 'Thiếu invoiceKey', error: { code: 'UNKNOWN_ERROR', detail: 'Missing invoiceKey' } };
+  }
+  
+  const key = data.invoiceKey;
+  
+  try {
+    _getSheet('KG_CUKCUK_INVOICES', NEW_INVOICES_HEADERS);
+    _getSheet('KG_CUKCUK_OVERRIDES', NEW_OVERRIDES_HEADERS);
+    
+    const invoicesSheet = _getSheet('KG_CUKCUK_INVOICES');
+    const allInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
+    let rowIndex = -1;
+    const colIndex = {};
+    
+    if (allInvoices && allInvoices.length > 0) {
+      allInvoices[0].forEach((h, idx) => { colIndex[h] = idx; });
+      for (let i = 1; i < allInvoices.length; i++) {
+        if (String(allInvoices[i][colIndex['invoiceKey']] || '') === key) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+    }
+    
+    if (rowIndex === -1) {
+      return { ok: false, action: 'rollbackCukcukInvoice', message: 'Không tìm thấy hóa đơn cần rollback trên Sheet', error: { code: 'UNKNOWN_ERROR', detail: 'Invoice not found on sheet' } };
+    }
+    
+    const oldRow = allInvoices[rowIndex - 1];
+    
+    // Save to OVERRIDES log
+    const overrideId = 'ovr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    
+    const overrideRow = [
+      overrideId,
+      key,
+      oldRow[colIndex['cukcukInvoiceId']] || '',
+      oldRow[colIndex['workDate']] || '',
+      'manualOverride',
+      'TRUE',
+      'FALSE',
+      'Rollback manual override to CUKCUK data',
+      data.cashierName || 'SYSTEM',
+      new Date().toISOString(),
+      data.deviceId || '',
+      data.sessionId || '',
+      data.shiftId || '',
+      '{}',
+      JSON.stringify(oldRow),
+      'SUCCESS',
+      ''
+    ];
+    
+    _sheetsAppend('KG_CUKCUK_OVERRIDES', [overrideRow]);
+    
+    // Unlock the invoice: set manualOverride = FALSE
+    invoicesSheet.getRange(rowIndex, colIndex['manualOverride'] + 1).setValue(false);
+    invoicesSheet.getRange(rowIndex, colIndex['overrideAt'] + 1).setValue('');
+    invoicesSheet.getRange(rowIndex, colIndex['overrideBy'] + 1).setValue('');
+    invoicesSheet.getRange(rowIndex, colIndex['overrideReason'] + 1).setValue('');
+    invoicesSheet.getRange(rowIndex, colIndex['overrideFieldsJson'] + 1).setValue('{}');
+    invoicesSheet.getRange(rowIndex, colIndex['updatedAt'] + 1).setValue(new Date().toISOString());
+
+    // Fetch original invoice details from CUKCUK to override the local manual modifications
+    try {
+      const loginInfo = CukcukService.refreshAccessTokenIfNeeded();
+      const detail = CukcukService.fetchInvoiceDetail(key, loginInfo);
+      if (detail) {
+        const normalized = CukcukService.normalizeInvoice(detail, detail);
+        normalized.workDate = oldRow[colIndex['workDate']];
+        normalized.lastSyncedAt = new Date().toISOString();
+        
+        NEW_INVOICES_HEADERS.forEach((h, idx) => {
+          if (h !== 'createdAt' && h !== 'manualOverride' && h !== 'overrideAt' && h !== 'overrideBy' && h !== 'overrideReason' && h !== 'overrideFieldsJson') {
+            invoicesSheet.getRange(rowIndex, idx + 1).setValue(normalized[h] !== undefined ? normalized[h] : '');
+          }
+        });
+      }
+    } catch (apiErr) {
+      Logger.log('[GAS CUKCUK Rollback Sync Error] ' + apiErr.toString());
+    }
+    
+    return {
+      ok: true,
+      action: 'rollbackCukcukInvoice',
+      message: 'Khôi phục và mở khóa hóa đơn thành công',
+      data: { invoiceKey: key },
+      error: null
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      action: 'rollbackCukcukInvoice',
+      message: 'Lỗi rollback: ' + e.toString(),
+      error: { code: 'SHEET_WRITE_FAILED', detail: e.toString() }
+    };
+  }
+}
+
 
 
