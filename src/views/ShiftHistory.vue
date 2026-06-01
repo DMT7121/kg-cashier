@@ -1700,16 +1700,24 @@ async function saveInvoiceSnapshot(invoices: any[]) {
 
 <style scoped>
 .report-table {
-  @apply w-full border-collapse mt-2 text-left;
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  text-align: left;
 }
 .report-table th, .report-table td {
-  @apply p-2.5 border-b border-slate-100;
+  padding: 0.625rem;
+  border-bottom: 1px solid #f1f5f9;
 }
 .report-table th {
-  @apply text-slate-500 font-semibold;
+  color: #64748b;
+  font-weight: 600;
 }
 .btn-xs {
-  @apply px-2.5 py-1 text-[11px] font-semibold rounded-lg;
+  padding: 0.25rem 0.625rem;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 0.5rem;
 }
 .spin {
   animation: spin 1s linear infinite;
