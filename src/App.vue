@@ -447,7 +447,7 @@ onUnmounted(() => {
 
       <div class="view-container flex-1 overflow-y-auto">
         <keep-alive>
-          <component :is="activeComponent" />
+          <component :is="activeComponent" @navigate="handleNav" />
         </keep-alive>
       </div>
     </main>

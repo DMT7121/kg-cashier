@@ -168,21 +168,60 @@ onUnmounted(() => {
   <div class="view-content p-6">
 
     <!-- 1. EMPTY STATE (No active shift) -->
-    <div v-if="!shiftStore.currentShift" class="max-w-md mx-auto mt-12 text-center bg-white p-8 rounded-3xl border border-slate-100 shadow-xs space-y-6 animate-fade-in">
-      <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
-        <span class="material-symbols-rounded text-3xl">storefront</span>
+    <div v-if="!shiftStore.currentShift" class="relative max-w-md mx-auto mt-20">
+      <!-- Ambient background glow -->
+      <div class="absolute -inset-4 bg-gradient-to-tr from-blue-500/15 via-indigo-500/10 to-purple-500/15 rounded-[40px] blur-2xl opacity-75 animate-pulse"></div>
+      
+      <!-- Glassmorphic Card -->
+      <div class="relative bg-white/85 backdrop-blur-xl p-8 rounded-[32px] border border-white/60 shadow-[0_20px_50px_rgba(37,99,235,0.06)] space-y-6 text-center animate-fade-in">
+        
+        <!-- Icon Container -->
+        <div class="relative w-18 h-18 mx-auto">
+          <!-- Soft glowing halo behind icon -->
+          <div class="absolute -inset-1 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-2xl blur-md opacity-30 animate-pulse"></div>
+          <!-- Real Icon block -->
+          <div class="relative w-18 h-18 bg-gradient-to-tr from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 transition-transform duration-300 hover:scale-105">
+            <span class="material-symbols-rounded text-4xl">storefront</span>
+          </div>
+        </div>
+
+        <!-- Typography -->
+        <div class="space-y-2">
+          <h2 class="text-xl font-extrabold text-slate-800 tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+            Chào mừng đến KING's GRILL
+          </h2>
+          <p class="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-[280px] mx-auto">
+            Vui lòng bắt đầu mở ca làm việc mới để tiến hành bán hàng, quản lý thu chi và đồng bộ dữ liệu.
+          </p>
+        </div>
+
+        <!-- Feature Badges -->
+        <div class="flex flex-wrap justify-center gap-2 py-2 border-t border-b border-slate-100/50">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/50 border border-slate-100/50 rounded-xl text-[10px] font-extrabold text-slate-500 transition-all hover:bg-slate-100/50">
+            <span class="material-symbols-rounded text-sm text-blue-500">point_of_sale</span> POS & Bán hàng
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/50 border border-slate-100/50 rounded-xl text-[10px] font-extrabold text-slate-500 transition-all hover:bg-slate-100/50">
+            <span class="material-symbols-rounded text-sm text-indigo-500">sync</span> Đồng bộ CUKCUK
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/50 border border-slate-100/50 rounded-xl text-[10px] font-extrabold text-slate-500 transition-all hover:bg-slate-100/50">
+            <span class="material-symbols-rounded text-sm text-emerald-500">receipt</span> Hóa đơn VAT
+          </span>
+        </div>
+
+        <!-- Action Button -->
+        <button 
+          class="group relative w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-2xl transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer shadow-md shadow-blue-500/15 hover:shadow-lg hover:shadow-blue-500/25 overflow-hidden"
+          @click="emit('navigate', 'shift')"
+        >
+          <!-- Shine effect -->
+          <div class="animate-shine"></div>
+          
+          <div class="relative flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+            <span class="material-symbols-rounded text-base transition-transform duration-300 group-hover:translate-x-0.5">play_arrow</span>
+            Mở ca làm việc mới
+          </div>
+        </button>
       </div>
-      <div>
-        <h2 class="text-xl font-bold text-slate-800">Chào mừng đến KING's GRILL</h2>
-        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">Hãy bắt đầu mở ca làm việc mới để tiến hành bán hàng, quản lý thu chi và đồng bộ dữ liệu.</p>
-      </div>
-      <button 
-        class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all cursor-pointer shadow-md shadow-blue-500/15"
-        @click="emit('navigate', 'shift')"
-      >
-        <span class="material-symbols-rounded text-base mr-1.5">play_arrow</span>
-        Mở ca làm việc mới
-      </button>
     </div>
 
     <!-- 2. ACTIVE DASHBOARD INTERFACE -->
@@ -501,7 +540,27 @@ onUnmounted(() => {
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes shine {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-shine {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transform: skewX(-25deg);
+  transition: none;
+}
+
+.group:hover .animate-shine {
+  animation: shine 0.75s ease-in-out;
 }
 </style>
