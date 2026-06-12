@@ -92,7 +92,7 @@ async function loadStaff(silent = false) {
     if (result.success) {
       staffList.value = result.staff || [];
       // Update store cache as well
-      authStore.setCachedStaff(staffList.value.map(s => s.name));
+      authStore.setStaffList(staffList.value);
       syncStatus.value = `✅ ${staffList.value.length} nhân viên — Realtime từ Cloud`;
       syncTime.value = new Date().toLocaleTimeString('vi-VN');
     } else {
@@ -197,7 +197,7 @@ async function handleSaveStaff() {
     });
   }
 
-  authStore.setCachedStaff(staffList.value.map(s => s.name));
+  authStore.setStaffList(staffList.value);
   showToast(isEdit ? `✅ Đã sửa nhân viên ${name}` : `✅ Đã thêm nhân viên ${name}`, 'success');
   syncStatus.value = `✅ ${staffList.value.length} nhân viên — Đang đồng bộ Sheets...`;
 
@@ -213,20 +213,20 @@ async function handleSaveStaff() {
           }
           return s;
         });
-        authStore.setCachedStaff(staffList.value.map(s => s.name));
+        authStore.setStaffList(staffList.value);
       }
       syncStatus.value = `✅ ${staffList.value.length} nhân viên — Đã đồng bộ Sheets`;
       syncTime.value = new Date().toLocaleTimeString('vi-VN');
     } else {
       // Rollback
       staffList.value = backupList;
-      authStore.setCachedStaff(staffList.value.map(s => s.name));
+      authStore.setStaffList(staffList.value);
       showToast('❌ Lỗi đồng bộ Cloud: ' + (result.message || 'Thử lại sau'), 'error');
       syncStatus.value = '⚠️ Lỗi đồng bộ — Đã khôi phục dữ liệu';
     }
   } catch (err: any) {
     staffList.value = backupList;
-    authStore.setCachedStaff(staffList.value.map(s => s.name));
+    authStore.setStaffList(staffList.value);
     showToast('❌ Lỗi kết nối đồng bộ', 'error');
     syncStatus.value = '⚠️ Lỗi kết nối Cloud — Đã khôi phục dữ liệu';
   } finally {
@@ -245,7 +245,7 @@ async function handleDeleteStaff(staff: Staff) {
   // OPTIMISTIC REMOVAL
   const backupList = [...staffList.value];
   staffList.value = staffList.value.filter(s => s.id !== staff.id);
-  authStore.setCachedStaff(staffList.value.map(s => s.name));
+  authStore.setStaffList(staffList.value);
 
   showToast(`✅ Đã xóa nhân viên ${staff.name}`, 'success');
   syncStatus.value = `✅ ${staffList.value.length} nhân viên — Đang xóa trên Sheets...`;
@@ -258,13 +258,13 @@ async function handleDeleteStaff(staff: Staff) {
     } else {
       // Rollback
       staffList.value = backupList;
-      authStore.setCachedStaff(staffList.value.map(s => s.name));
+      authStore.setStaffList(staffList.value);
       showToast('❌ Không thể xóa trên Cloud: ' + (result.message || 'Thử lại sau'), 'error');
       syncStatus.value = '⚠️ Lỗi xóa — Đã hoàn tác';
     }
   } catch (err) {
     staffList.value = backupList;
-    authStore.setCachedStaff(staffList.value.map(s => s.name));
+    authStore.setStaffList(staffList.value);
     showToast('❌ Lỗi kết nối khi xóa nhân viên', 'error');
     syncStatus.value = '⚠️ Lỗi kết nối — Đã hoàn tác';
   } finally {
@@ -343,16 +343,16 @@ function getRoleBadgeClass(role: string) {
         <p class="text-xs text-slate-400 mt-1">Bấm "Thêm nhân viên" ở góc trên bên phải để tạo tài khoản đầu tiên.</p>
       </div>
 
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <div v-for="staff in staffList" :key="staff.id" class="card p-4 bg-white rounded-2xl border border-slate-100 shadow-xs flex items-center gap-4 hover:shadow-sm transition-shadow">
-          <div class="w-10 h-10 rounded-full flex items-center justify-center" :class="staff.role === 'admin' ? 'bg-indigo-50 text-indigo-600' : staff.role === 'manager' ? 'bg-sky-50 text-sky-600' : 'bg-emerald-50 text-emerald-600'">
+      <div v-else class="staff-grid">
+        <div v-for="staff in staffList" :key="staff.id" class="staff-card">
+          <div class="staff-avatar" :class="staff.role === 'admin' ? 'bg-indigo-50 text-indigo-600' : staff.role === 'manager' ? 'bg-sky-50 text-sky-600' : 'bg-emerald-50 text-emerald-600'">
             <span class="material-symbols-rounded text-xl">
               {{ staff.role === 'admin' ? 'admin_panel_settings' : staff.role === 'manager' ? 'supervisor_account' : 'person' }}
             </span>
           </div>
 
-          <div class="flex-1 min-w-0">
-            <h4 class="font-bold text-slate-800 text-sm truncate">{{ staff.name }}</h4>
+          <div class="staff-info">
+            <h4>{{ staff.name }}</h4>
             <div class="flex gap-1.5 items-center mt-1">
               <span class="px-2 py-0.5 text-xxs font-semibold border rounded-full" :class="getRoleBadgeClass(staff.role)">
                 {{ getRoleLabel(staff.role) }}
@@ -363,7 +363,7 @@ function getRoleBadgeClass(role: string) {
             </div>
           </div>
 
-          <div class="flex gap-1">
+          <div class="staff-actions">
             <button @click="triggerEditStaff(staff)" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors" title="Sửa">
               <span class="material-symbols-rounded text-lg">edit</span>
             </button>

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useShiftStore } from '../stores/shift';
 import { useAuthStore } from '../stores/auth';
 import { useSettingsStore } from '../stores/settings';
+import { getStaffFromCloud } from '../services/api';
 import { showToast } from '../utils';
 
 const shiftStore = useShiftStore();
@@ -16,11 +17,20 @@ const showPin = ref(false);
 
 // Open Shift form state
 const cashierNameInput = ref('');
+const selectedStaffId = ref('');
+const staffPinInput = ref('');
+const showStaffPin = ref(false);
+const isCustomStaff = ref(false);
+const isLoadingStaff = ref(false);
 const shiftNumberInput = ref(1);
 const dateInput = ref('');
 const startingCashInput = ref(0);
 const shiftPasswordInput = ref('');
 const isOpening = ref(false);
+
+const activeStaffList = computed(() => {
+  return authStore.staffList.filter(s => s.status === 'active');
+});
 
 // Active Shift state
 const summary = ref<any>(null);
@@ -90,6 +100,62 @@ watch(() => shiftStore.currentShift, (newShift) => {
   }
 }, { immediate: true });
 
+// Watch selected staff ID to sync with cashierNameInput and check for PIN
+watch(selectedStaffId, (newId) => {
+  staffPinInput.value = '';
+  if (newId === 'custom') {
+    isCustomStaff.value = true;
+    cashierNameInput.value = '';
+    showStaffPin.value = false;
+  } else if (newId) {
+    isCustomStaff.value = false;
+    const staff = authStore.staffList.find(s => s.id === newId);
+    if (staff) {
+      cashierNameInput.value = staff.name;
+      showStaffPin.value = !!staff.pin;
+      // Pre-fill shift lock code to their staff PIN by default (making screen unlock seamless)
+      if (staff.pin) {
+        shiftPasswordInput.value = staff.pin;
+      } else {
+        shiftPasswordInput.value = '';
+      }
+    } else {
+      cashierNameInput.value = '';
+      showStaffPin.value = false;
+      shiftPasswordInput.value = '';
+    }
+  } else {
+    isCustomStaff.value = false;
+    cashierNameInput.value = '';
+    showStaffPin.value = false;
+    shiftPasswordInput.value = '';
+  }
+});
+
+// Load staff list from Cloud Spreadsheet
+async function loadStaffList() {
+  isLoadingStaff.value = true;
+  try {
+    const res = await getStaffFromCloud();
+    if (res.success && res.staff) {
+      authStore.setStaffList(res.staff);
+      
+      // Auto-select based on last remembered user or default
+      if (authStore.cachedStaff.length > 0 && !selectedStaffId.value) {
+        const lastStaffName = authStore.cachedStaff[authStore.cachedStaff.length - 1];
+        const lastStaff = authStore.staffList.find(s => s.name === lastStaffName && s.status === 'active');
+        if (lastStaff) {
+          selectedStaffId.value = lastStaff.id;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load staff list:', err);
+  } finally {
+    isLoadingStaff.value = false;
+  }
+}
+
 // Check next shift index on open
 function computeNextShiftNumber() {
   const today = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -103,9 +169,10 @@ function computeNextShiftNumber() {
   dateInput.value = today;
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (!shiftStore.currentShift) {
     computeNextShiftNumber();
+    await loadStaffList();
   } else {
     loadSummary();
   }
@@ -150,6 +217,21 @@ async function handleOpenShift() {
   if (!cashierNameInput.value.trim()) {
     showToast('Vui lòng chọn hoặc nhập tên thu ngân', 'warning');
     return;
+  }
+
+  // Verification check if selected staff has a PIN
+  if (!isCustomStaff.value && selectedStaffId.value) {
+    const staff = authStore.staffList.find(s => s.id === selectedStaffId.value);
+    if (staff && staff.pin) {
+      if (!staffPinInput.value.trim()) {
+        showToast('Vui lòng nhập mã PIN xác thực nhân viên', 'warning');
+        return;
+      }
+      if (staffPinInput.value.trim() !== staff.pin) {
+        showToast('Mã PIN xác thực nhân viên không chính xác!', 'error');
+        return;
+      }
+    }
   }
 
   isOpening.value = true;
@@ -266,7 +348,13 @@ async function handleConfirmCloseShift() {
 
 // Quick staff selection chip helper
 function selectCachedStaff(name: string) {
-  cashierNameInput.value = name;
+  const staff = authStore.staffList.find(s => s.name === name);
+  if (staff) {
+    selectedStaffId.value = staff.id;
+  } else {
+    selectedStaffId.value = 'custom';
+    cashierNameInput.value = name;
+  }
 }
 
 // Formatting
@@ -359,23 +447,56 @@ function formatMoney(val: number) {
           <!-- Cashier name -->
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Họ tên thu ngân</label>
-            <input 
-              v-model="cashierNameInput" 
-              type="text" 
-              class="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm text-slate-800 font-semibold"
-              placeholder="Nhập tên thu ngân..."
-            />
+            <div class="relative">
+              <select 
+                v-model="selectedStaffId" 
+                class="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm text-slate-800 font-semibold bg-white appearance-none"
+              >
+                <option value="" disabled>-- Chọn nhân viên --</option>
+                <option v-for="staff in activeStaffList" :key="staff.id" :value="staff.id">
+                  {{ staff.name }} ({{ staff.role === 'admin' ? 'Admin' : staff.role === 'manager' ? 'Quản lý' : 'Thu ngân' }})
+                </option>
+                <option value="custom">Khác (Nhập thủ công)...</option>
+              </select>
+              <span class="material-symbols-rounded absolute right-4 top-3 pointer-events-none text-slate-400">unfold_more</span>
+            </div>
+
+            <!-- Manual name entry if custom selected -->
+            <div v-if="isCustomStaff" class="mt-4 animate-fade-in">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nhập tên thu ngân mới</label>
+              <input 
+                v-model="cashierNameInput" 
+                type="text" 
+                class="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm text-slate-800 font-semibold"
+                placeholder="Nhập tên thu ngân..."
+              />
+            </div>
+
+            <!-- Verification PIN if staff selected and has PIN -->
+            <div v-if="showStaffPin" class="mt-4 animate-fade-in">
+              <label class="block text-xs font-bold text-rose-500 uppercase tracking-wider mb-2">Mã PIN xác thực nhân viên *</label>
+              <input 
+                v-model="staffPinInput" 
+                type="password" 
+                maxlength="6"
+                inputmode="numeric"
+                class="w-full px-4 py-3 rounded-2xl border border-rose-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all text-sm text-center font-bold tracking-[6px]"
+                placeholder="••••"
+              />
+              <small class="text-[10px] text-slate-400 mt-1 block">Nhập mã PIN của bạn để xác thực và bắt đầu ca.</small>
+            </div>
+
             <!-- Quick selecting cached names -->
             <div v-if="authStore.cachedStaff.length > 0" class="mt-3">
               <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Thu ngân thường trực:</span>
               <div class="flex flex-wrap gap-2">
                 <button 
-                  v-for="staff in authStore.cachedStaff" 
-                  :key="staff"
+                  v-for="staffName in authStore.cachedStaff" 
+                  :key="staffName"
                   class="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-all border border-transparent cursor-pointer"
-                  @click="selectCachedStaff(staff)"
+                  @click="selectCachedStaff(staffName)"
                 >
-                  {{ staff }}
+                  {{ staffName }}
                 </button>
               </div>
             </div>

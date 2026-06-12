@@ -9,12 +9,22 @@ export interface User {
   [key: string]: any;
 }
 
+export interface Staff {
+  id: string;
+  name: string;
+  pin: string;
+  role: 'admin' | 'manager' | 'cashier';
+  status: 'active' | 'inactive';
+  createdAt?: string;
+}
+
 const SESSION_KEY = 'kg_logged_in_user';
 const STAFF_CACHE_KEY = 'kg_cached_staff';
 
 export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref<User | null>(null);
   const cachedStaff = ref<string[]>([]);
+  const staffList = ref<Staff[]>([]);
   const auditsStore = useAuditsStore();
 
   function loadAuth() {
@@ -36,6 +46,17 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (e) {
       cachedStaff.value = [];
+    }
+
+    try {
+      const savedStaffList = localStorage.getItem('kg_cached_staff_list');
+      if (savedStaffList) {
+        staffList.value = JSON.parse(savedStaffList);
+      } else {
+        staffList.value = [];
+      }
+    } catch (e) {
+      staffList.value = [];
     }
   }
 
@@ -78,16 +99,30 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function setStaffList(list: Staff[]) {
+    staffList.value = [...list];
+    try {
+      localStorage.setItem('kg_cached_staff_list', JSON.stringify(list));
+    } catch (e) {
+      console.warn('[AuthStore] Staff list cache write error:', e);
+    }
+    // Sync to name list for backward compatibility
+    setCachedStaff(list.map(s => s.name));
+  }
+
   function clearCachedStaff() {
     cachedStaff.value = [];
+    staffList.value = [];
     try {
       localStorage.removeItem(STAFF_CACHE_KEY);
+      localStorage.removeItem('kg_cached_staff_list');
     } catch (e) {}
   }
 
   return {
     currentUser,
     cachedStaff,
+    staffList,
     isLoggedIn,
     loadAuth,
     setLoggedInUser,
@@ -95,6 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasRole,
     getCachedStaff,
     setCachedStaff,
+    setStaffList,
     clearCachedStaff
   };
 });
