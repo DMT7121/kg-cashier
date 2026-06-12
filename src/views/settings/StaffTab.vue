@@ -353,7 +353,7 @@ function getRoleBadgeClass(role: string) {
 
           <div class="staff-info">
             <h4>{{ staff.name }}</h4>
-            <div class="flex gap-1.5 items-center mt-1">
+            <div class="flex flex-wrap gap-1.5 items-center mt-1">
               <span class="px-2 py-0.5 text-xxs font-semibold border rounded-full" :class="getRoleBadgeClass(staff.role)">
                 {{ getRoleLabel(staff.role) }}
               </span>

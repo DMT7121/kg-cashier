@@ -1482,7 +1482,8 @@
 
   /* Staff Grid & Cards in Admin Settings */
   .staff-grid {
-    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5;
+    @apply grid gap-5;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
   .staff-card {
     @apply flex items-center gap-4 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
