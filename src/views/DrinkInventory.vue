@@ -186,6 +186,12 @@ const currentShiftName = ref('Ca sáng');
 const sortBy = ref<'name' | 'difference'>('name');
 const showOnlyDiff = ref(false);
 const expandedRow = ref<string | null>(null);
+const selectedCategory = ref<string>('Tất cả');
+const viewMode = ref<'table' | 'cards'>((localStorage.getItem('kg_drink_inventory_view_mode') as 'table' | 'cards') || 'cards');
+
+watch(viewMode, (newVal) => {
+  localStorage.setItem('kg_drink_inventory_view_mode', newVal);
+});
 
 const products = ref<Product[]>([]);
 const sessions = ref<Record<string, InventorySession>>({});
@@ -249,6 +255,24 @@ const categories = computed(() => {
   return map;
 });
 
+const categoryTabs = computed(() => {
+  const cats = new Set<string>();
+  products.value.forEach(p => {
+    if (p.active) cats.add(p.category);
+  });
+  return ['Tất cả', ...Array.from(cats)];
+});
+
+function getCategoryEmoji(cat: string) {
+  if (cat === 'Tất cả') return '🍹';
+  if (cat === 'Bia') return '🍺';
+  if (cat === 'Rượu') return '🍶';
+  if (cat === 'Nước ngọt') return '🥤';
+  if (cat === 'Nước tăng lực') return '⚡';
+  if (cat === 'Nước suối') return '💧';
+  return '🥤';
+}
+
 // Cleaned/Sorted rows for UI display
 const filteredRows = computed(() => {
   const session = currentSession.value;
@@ -260,6 +284,11 @@ const filteredRows = computed(() => {
   }, {} as Record<string, Product>);
 
   let rows = session.rows.filter(r => !!pMap[r.productId]);
+
+  // Filter by category
+  if (selectedCategory.value !== 'Tất cả') {
+    rows = rows.filter(r => pMap[r.productId]?.category === selectedCategory.value);
+  }
 
   if (showOnlyDiff.value) {
     rows = rows.filter(r => r.differenceType !== 'MATCH');
@@ -485,6 +514,21 @@ function updateRowValues(row: InventoryRow) {
     syncItemsSnapshot(currentSession.value);
   }
   saveSessionsToLocalStorage();
+}
+
+function incrementStock(row: InventoryRow) {
+  row.closingStock = (Number(row.closingStock) || 0) + 1;
+  row.closingFormula = '';
+  updateRowValues(row);
+}
+
+function decrementStock(row: InventoryRow) {
+  const current = Number(row.closingStock) || 0;
+  if (current > 0) {
+    row.closingStock = current - 1;
+    row.closingFormula = '';
+    updateRowValues(row);
+  }
 }
 
 // ── Input formula getters & handlers ───────────
@@ -1089,6 +1133,22 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- ═══ CATEGORY SLIDER BAR ═══ -->
+    <div class="di-category-slider-wrapper px-6 mt-4">
+      <div class="di-category-slider flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none scroll-smooth">
+        <button 
+          v-for="cat in categoryTabs" 
+          :key="cat"
+          class="di-cat-tab flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border shrink-0 cursor-pointer select-none"
+          :class="selectedCategory === cat ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'"
+          @click="selectedCategory = cat"
+        >
+          <span class="di-cat-emoji text-sm">{{ getCategoryEmoji(cat) }}</span>
+          <span class="di-cat-name">{{ cat }}</span>
+        </button>
+      </div>
+    </div>
+
     <!-- ═══ FILTER BAR ═══ -->
     <div class="di-filter-bar">
       <div class="di-filter-left">
@@ -1112,15 +1172,177 @@ onMounted(() => {
           <span>Chỉ xem chênh lệch</span>
         </label>
       </div>
-      <div class="di-filter-right">
-        <span class="text-slate-400 text-[11px]">
+      <div class="di-filter-right flex items-center gap-4">
+        <!-- View switcher -->
+        <div class="flex bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/50 shrink-0">
+          <button 
+            class="px-2.5 py-1 text-[10px] font-black rounded-lg transition-all border-none bg-transparent cursor-pointer flex items-center gap-1"
+            :class="viewMode === 'cards' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-700'"
+            @click="viewMode = 'cards'"
+          >
+            <span class="material-symbols-rounded text-xs">grid_view</span>
+            <span>Thẻ chạm</span>
+          </button>
+          <button 
+            class="px-2.5 py-1 text-[10px] font-black rounded-lg transition-all border-none bg-transparent cursor-pointer flex items-center gap-1"
+            :class="viewMode === 'table' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-700'"
+            @click="viewMode = 'table'"
+          >
+            <span class="material-symbols-rounded text-xs">table_chart</span>
+            <span>Bảng tính</span>
+          </button>
+        </div>
+
+        <span class="text-slate-400 text-[11px] font-bold">
           Hiển thị {{ filteredRows.length }}/{{ stats.total }} sản phẩm
         </span>
       </div>
     </div>
 
-    <!-- ═══ TABLE ═══ -->
-    <div class="di-table-wrap overflow-hidden">
+    <!-- ═══ TOUCH CARD GRID ═══ -->
+    <div v-if="viewMode === 'cards'" class="di-cards-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-6 mb-6">
+      <div v-if="filteredRows.length === 0" class="col-span-full py-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-xs">
+        <span class="material-symbols-rounded text-[40px] opacity-30 mb-2">local_bar</span>
+        <p>{{ showOnlyDiff ? 'Không có sản phẩm chênh lệch 🎉' : 'Chưa có sản phẩm nào' }}</p>
+      </div>
+
+      <div 
+        v-else 
+        v-for="row in filteredRows" 
+        :key="row.id" 
+        class="di-inventory-card bg-white border border-slate-100 rounded-3xl p-5 shadow-xs flex flex-col justify-between transition-all hover:shadow-md hover:border-blue-100 relative overflow-hidden"
+        :class="row.differenceType !== 'MATCH' ? 'border-l-4 border-l-orange-500' : ''"
+      >
+        <!-- Card Top: Product Info and Status Badge -->
+        <div class="space-y-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <img 
+                v-if="productMap[row.productId]?.image" 
+                :src="productMap[row.productId].image" 
+                :alt="productMap[row.productId].name" 
+                class="di-card-image w-12 h-12 object-contain rounded-xl bg-slate-50 border border-slate-100 p-1 shrink-0"
+                :style="{ '--scale-factor': getScaleFactor(productMap[row.productId]) }"
+              />
+              <span v-else class="di-card-emoji text-3xl w-12 h-12 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100 shrink-0">
+                {{ productMap[row.productId]?.emoji || '🥤' }}
+              </span>
+              <div class="min-w-0">
+                <h4 class="text-sm font-extrabold text-slate-800 leading-snug truncate">{{ productMap[row.productId]?.name }}</h4>
+                <p class="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
+                  {{ productMap[row.productId]?.category }} · {{ productMap[row.productId]?.unit }}
+                  <span v-if="productMap[row.productId]?.volume"> · {{ productMap[row.productId].volume }}</span>
+                </p>
+              </div>
+            </div>
+
+            <!-- Chênh lệch badge -->
+            <span 
+              class="di-card-diff-badge text-[10px] font-black px-2.5 py-1 rounded-full border flex items-center gap-0.5 shadow-2xs shrink-0 cursor-pointer"
+              :class="'di-diff-' + row.differenceType.toLowerCase()"
+              @click="toggleRowExpanded(row.id)"
+            >
+              <span class="material-symbols-rounded text-xs">{{ getDiffIcon(row.differenceType) }}</span>
+              {{ getDiffLabel(row) }}
+            </span>
+          </div>
+
+          <!-- Card Mid: Quick Stats (Tồn đầu, Nhập, Tổng) -->
+          <div class="grid grid-cols-3 gap-2 py-2.5 px-3 bg-slate-50/50 border border-slate-100/50 rounded-2xl text-center text-[10px] font-bold text-slate-500">
+            <div>
+              <span class="block text-slate-400 text-[9px] uppercase tracking-wider">Đầu ca</span>
+              <span class="text-slate-700 text-xs font-extrabold">{{ formatNum(row.openingStock) }}</span>
+            </div>
+            <div>
+              <span class="block text-slate-400 text-[9px] uppercase tracking-wider">Nhập mới</span>
+              <span class="text-blue-600 text-xs font-extrabold">+{{ formatNum(row.newImport) }}</span>
+            </div>
+            <div>
+              <span class="block text-slate-400 text-[9px] uppercase tracking-wider">Tổng có</span>
+              <span class="text-slate-800 text-xs font-black">{{ formatNum(row.openingStock + row.newImport) }}</span>
+            </div>
+          </div>
+
+          <!-- Card Input: TỒN CUỐI (with Slider and Steppers) -->
+          <div class="space-y-2 pt-2 border-t border-slate-100/60">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Tồn cuối ca</span>
+              <!-- Direct numeric typing input -->
+              <input 
+                type="number" 
+                class="w-16 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 text-center text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none"
+                v-model.number="row.closingStock"
+                @input="updateRowValues(row)"
+                placeholder="0"
+                min="0"
+              />
+            </div>
+
+            <!-- Stepper slider control -->
+            <div class="flex items-center gap-3">
+              <button 
+                class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center transition-all select-none border border-slate-200/30 cursor-pointer active:scale-90"
+                @click="decrementStock(row)"
+              >
+                ➖
+              </button>
+              <input 
+                type="range" 
+                min="0" 
+                :max="Math.max(48, row.openingStock + row.newImport + 12)" 
+                v-model.number="row.closingStock" 
+                @input="updateRowValues(row)"
+                class="flex-1 accent-blue-600 cursor-pointer h-1.5 bg-slate-100 rounded-lg appearance-none"
+              />
+              <button 
+                class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center transition-all select-none border border-slate-200/30 cursor-pointer active:scale-90"
+                @click="incrementStock(row)"
+              >
+                ➕
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Bottom: Sales Comparison -->
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold">
+          <div class="flex gap-4">
+            <span class="text-slate-400">Thực bán: <strong class="text-orange-600 text-xs font-extrabold">{{ formatNum(row.actualSold) }}</strong></span>
+            <span class="text-slate-400">CUKCUK: <strong class="text-teal-600 text-xs font-extrabold">{{ formatNum(row.cukcukSold) }}</strong></span>
+          </div>
+          
+          <button 
+            class="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 bg-transparent border-0 cursor-pointer"
+            @click="toggleRowExpanded(row.id)"
+          >
+            <span>Chi tiết</span>
+            <span class="material-symbols-rounded text-xs">
+              {{ expandedRow === row.id ? 'expand_less' : 'expand_more' }}
+            </span>
+          </button>
+        </div>
+
+        <!-- Expanded Detail panel inside Card layout -->
+        <div v-if="expandedRow === row.id" class="mt-4 pt-3 border-t border-slate-100 space-y-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100 text-xs text-left">
+          <div>
+            <span class="block font-bold text-slate-700">Lý do chênh lệch / Ghi chú:</span>
+            <input 
+              type="text" 
+              class="w-full mt-1.5 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-xl"
+              v-model="row.notes" 
+              @blur="saveSessionsToLocalStorage"
+              placeholder="Nhập lý do chênh lệch..."
+            />
+          </div>
+          <div class="text-[10px] text-slate-400 font-medium leading-relaxed">
+            * <strong>Công thức tính:</strong> Tồn đầu ({{ formatNum(row.openingStock) }}) + Nhập ({{ formatNum(row.newImport) }}) - Tồn cuối ({{ formatNum(row.closingStock) }}) = Thực bán ({{ formatNum(row.actualSold) }}).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TABLE VIEW ═══ -->
+    <div v-else-if="viewMode === 'table'" class="di-table-wrap overflow-hidden">
       <table class="di-table" id="diTable">
         <thead>
           <tr class="di-thead-main">
@@ -1338,6 +1560,33 @@ onMounted(() => {
                         <div class="di-calc-row di-calc-result flex justify-between font-bold border-t border-slate-200 pt-1 text-slate-800">
                           <span>＝ Đã bán (thực)</span>
                           <span class="text-orange-600">{{ formatNum(row.actualSold) }} {{ productMap[row.productId]?.unit }}</span>
+                        </div>
+                      </div>
+
+                      <!-- Slider Stepper controls for table view detail panel -->
+                      <div class="mt-4 pt-3 border-t border-slate-200/60">
+                        <label class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase tracking-wider">Kéo nhanh tồn cuối ca:</label>
+                        <div class="flex items-center gap-2">
+                          <button 
+                            class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs flex items-center justify-center cursor-pointer select-none border border-slate-200/20 active:scale-95"
+                            @click="decrementStock(row)"
+                          >
+                            ➖
+                          </button>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            :max="Math.max(48, row.openingStock + row.newImport + 12)" 
+                            v-model.number="row.closingStock" 
+                            @input="updateRowValues(row)"
+                            class="flex-1 accent-blue-600 cursor-pointer h-1.5 bg-slate-100 rounded-lg appearance-none"
+                          />
+                          <button 
+                            class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs flex items-center justify-center cursor-pointer select-none border border-slate-200/20 active:scale-95"
+                            @click="incrementStock(row)"
+                          >
+                            ➕
+                          </button>
                         </div>
                       </div>
                     </div>

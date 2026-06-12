@@ -793,6 +793,63 @@
   }
   .di-filter-toggle input { @apply accent-blue-600 w-3.5 h-3.5; }
 
+  /* ── Category Slider ── */
+  .di-category-slider-wrapper {
+    @apply border-b border-slate-200/50 pb-2 mb-2;
+  }
+  .di-category-slider {
+    scrollbar-width: none; /* Firefox */
+  }
+  .di-category-slider::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+  .di-cat-tab {
+    @apply transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  /* ── Touch Cards Grid ── */
+  .di-cards-grid {
+    @apply transition-all duration-300;
+  }
+  .di-inventory-card {
+    @apply bg-white border border-slate-100 rounded-[24px] p-5 flex flex-col justify-between transition-all duration-300;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.01), 0 2px 8px rgba(0,0,0,0.02);
+  }
+  .di-inventory-card:hover {
+    @apply border-blue-200 -translate-y-1 shadow-md;
+    box-shadow: 0 12px 24px rgba(37,99,235,0.04), 0 4px 12px rgba(0,0,0,0.01);
+  }
+  .di-card-image {
+    transform: scale(var(--scale-factor, 1));
+    transform-origin: center bottom;
+  }
+
+  /* Scoped range inputs */
+  .di-wrapper input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: #f1f5f9;
+    height: 6px;
+    border-radius: 9999px;
+    outline: none;
+    transition: background 0.2s;
+  }
+  .di-wrapper input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #2563eb;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+    transition: transform 0.15s, background-color 0.2s;
+  }
+  .di-wrapper input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.25);
+    background: #1d4ed8;
+  }
+
   /* ── Table ── */
   .di-table-wrap {
     @apply mx-6 bg-white border border-slate-200 rounded-2xl shadow-sm;
