@@ -35,6 +35,14 @@ interface ItemSale {
   category: 'Đồ ăn' | 'Đồ uống';
 }
 
+const toLocalDateStr = (d: Date) => {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+};
+
+const toLocalMonthStr = (d: Date) => {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+};
+
 // ── Stores ──────────────────────────────────
 const shiftStore = useShiftStore();
 const settingsStore = useSettingsStore();
@@ -46,7 +54,7 @@ const activeTab = ref<'report' | 'invoices' | 'analytics'>('report');
 const selectedPeriod = ref<'day' | 'week' | 'month' | 'quarter'>('day');
 const reportDate = ref<string>(todayStr());
 const reportWeek = ref<string>(''); // YYYY-Www format
-const reportMonth = ref<string>(new Date().toISOString().substring(0, 7)); // YYYY-MM
+const reportMonth = ref<string>(toLocalMonthStr(new Date())); // YYYY-MM
 const reportQuarter = ref<number>(Math.floor((new Date().getMonth() + 3) / 3));
 const reportQuarterYear = ref<number>(new Date().getFullYear());
 
@@ -261,8 +269,8 @@ async function refreshReportData() {
   const { start, end } = activeDateRange.value;
   
   // Format boundaries for text matching
-  const startStr = start.toISOString().split('T')[0];
-  const endStr = end.toISOString().split('T')[0];
+  const startStr = toLocalDateStr(start);
+  const endStr = toLocalDateStr(end);
   
   const labelStart = formatDate(startStr);
   const labelEnd = formatDate(endStr);
@@ -302,8 +310,14 @@ async function refreshReportData() {
   // 4. Update list of shifts if period is 'day'
   if (selectedPeriod.value === 'day') {
     const dateStr = startStr;
-    const dayShifts = shiftStore.shifts.filter(s => s.date === dateStr);
-    shiftsForDay.value = dayShifts;
+    const dayShifts = [...shiftStore.shifts];
+    if (shiftStore.currentShift && shiftStore.currentShift.date === dateStr) {
+      if (!dayShifts.some(s => s.id === shiftStore.currentShift.id)) {
+        dayShifts.unshift(shiftStore.currentShift);
+      }
+    }
+    const filteredShifts = dayShifts.filter(s => s.date === dateStr);
+    shiftsForDay.value = filteredShifts;
     
     // Auto-select shift or default to 'all'
     if (dayShifts.length > 0) {
@@ -750,9 +764,10 @@ watch(activeTab, async (newTab) => {
 // Navigation functions for DatePicker
 function navigatePeriod(direction: 'prev' | 'next') {
   if (selectedPeriod.value === 'day') {
-    const d = new Date(reportDate.value);
+    const parts = reportDate.value.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
     d.setDate(d.getDate() + (direction === 'next' ? 1 : -1));
-    reportDate.value = d.toISOString().split('T')[0];
+    reportDate.value = toLocalDateStr(d);
   } else if (selectedPeriod.value === 'week') {
     const parts = reportWeek.value.split('-W');
     const year = parseInt(parts[0]);
@@ -772,8 +787,8 @@ function navigatePeriod(direction: 'prev' | 'next') {
     const parts = reportMonth.value.split('-');
     const year = parseInt(parts[0]);
     const month = parseInt(parts[1]) - 1; // 0-indexed
-    const d = new Date(year, month + (direction === 'next' ? 1 : -1), 1);
-    reportMonth.value = d.toISOString().substring(0, 7);
+    const d = new Date(year, month + (direction === 'next' ? 1 : -1), 1, 12, 0, 0);
+    reportMonth.value = toLocalMonthStr(d);
   } else if (selectedPeriod.value === 'quarter') {
     let q = reportQuarter.value + (direction === 'next' ? 1 : -1);
     let y = reportQuarterYear.value;

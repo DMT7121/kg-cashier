@@ -544,7 +544,7 @@ export async function syncTransactions(force?: boolean): Promise<{ success: bool
       mode: 'manual'
     });
 
-    if (!syncRes || !syncRes.success) {
+    if (!syncRes || (!syncRes.success && !syncRes.ok)) {
       throw new Error(syncRes?.message || 'Không thể đồng bộ CUKCUK sang Sheets');
     }
 

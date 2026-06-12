@@ -26,6 +26,7 @@ const cukKey = ref('');
 const cukAutoSync = ref(false);
 const cukTestLoading = ref(false);
 const cukSyncLoading = ref(false);
+const cukMenuLoading = ref(false);
 const cukResultMsg = ref('');
 const cukResultSuccess = ref(true);
 
@@ -194,6 +195,37 @@ async function handleSyncInvoices() {
     showToast('❌ Lỗi: ' + e.message, 'error');
   } finally {
     cukSyncLoading.value = false;
+  }
+}
+
+async function handleSyncMenu() {
+  await saveSettings(true);
+  cukMenuLoading.value = true;
+  cukResultMsg.value = '';
+  showToast('Đang đồng bộ thực đơn CUKCUK...', 'info');
+
+  try {
+    const { syncCukcukMenuOnCloud } = await import('../../services/api');
+    const result = await syncCukcukMenuOnCloud();
+    if (result && result.success) {
+      let msg = '✅ Đồng bộ thực đơn hoàn tất!\n';
+      if (result.products) {
+        msg += `🍹 Tổng số món/đồ uống: ${result.products.length}\n`;
+      }
+      cukResultSuccess.value = true;
+      cukResultMsg.value = msg;
+      showToast('✅ Đồng bộ thực đơn CUKCUK hoàn tất!', 'success');
+    } else {
+      cukResultSuccess.value = false;
+      cukResultMsg.value = '❌ ' + (result?.message || 'Lỗi không xác định');
+      showToast('❌ Đồng bộ thực đơn thất bại', 'error');
+    }
+  } catch (e: any) {
+    cukResultSuccess.value = false;
+    cukResultMsg.value = '❌ Lỗi: ' + e.message;
+    showToast('❌ Lỗi: ' + e.message, 'error');
+  } finally {
+    cukMenuLoading.value = false;
   }
 }
 
@@ -386,6 +418,10 @@ async function handleVatAdminLogin() {
           <button @click="handleSyncInvoices" :disabled="cukSyncLoading" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-emerald-600/10 hover:shadow-md hover:shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
             <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': cukSyncLoading }">sync</span>
             Đồng bộ hóa đơn
+          </button>
+          <button @click="handleSyncMenu" :disabled="cukMenuLoading" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-600/10 hover:shadow-md hover:shadow-blue-600/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
+            <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': cukMenuLoading }">restaurant_menu</span>
+            Đồng bộ thực đơn
           </button>
         </div>
 

@@ -157,13 +157,36 @@ export interface PeriodBounds {
 }
 
 export function getPeriodBounds(period: string, refDate?: string | Date): PeriodBounds {
-  const now = refDate ? new Date(refDate) : new Date();
+  let now: Date;
+  let shouldShift = true;
+
+  if (refDate) {
+    if (typeof refDate === 'string') {
+      const parts = refDate.split('-');
+      if (parts.length === 3) {
+        now = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+      } else {
+        now = new Date(refDate);
+      }
+      shouldShift = false;
+    } else {
+      now = new Date(refDate.getTime());
+      if (now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+        shouldShift = false;
+      }
+    }
+  } else {
+    now = new Date();
+  }
+
+  const workNow = new Date(now);
+  if (shouldShift && workNow.getHours() < 6) {
+    workNow.setDate(workNow.getDate() - 1);
+  }
+
   let start: Date;
   let end: Date;
   let label: string;
-
-  const workNow = new Date(now);
-  if (workNow.getHours() < 6) workNow.setDate(workNow.getDate() - 1);
 
   const _pad2 = (n: number) => String(n).padStart(2, '0');
 

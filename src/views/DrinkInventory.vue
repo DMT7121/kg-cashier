@@ -9,6 +9,7 @@ import {
   showToast,
   getWorkingDayRange
 } from '../utils';
+import { getConfigFromCloud, saveConfigToCloud, syncCukcukMenuOnCloud } from '../services/api';
 
 // ── Interfaces ──────────────────────────────
 interface Product {
@@ -367,6 +368,9 @@ function loadFromLocalStorage() {
 
 function saveProductsToLocalStorage() {
   localStorage.setItem('kg-drink-products', JSON.stringify(products.value));
+  saveConfigToCloud('products', products.value).catch(err => {
+    console.warn('[DrinkInventory] Failed to sync products to cloud:', err);
+  });
 }
 
 function saveSessionsToLocalStorage() {
@@ -850,6 +854,7 @@ async function handleResetProducts() {
   showToast('Đã khôi phục sản phẩm về mặc định', 'info');
   loadFromLocalStorage();
   ensureSessionExists();
+  saveProductsToLocalStorage();
 }
 
 // ── Report Modal Printing and Sharing ──────────
@@ -1045,10 +1050,58 @@ function buildPrintReport(session: InventorySession, productsList: Product[], pM
   `;
 }
 
+// ── Cloud Products Sync ────────────────────────
+const isSyncingMenu = ref(false);
+
+async function syncProductsFromCloud() {
+  try {
+    const res = await getConfigFromCloud();
+    if (res && res.success && res.config && res.config.products) {
+      const cloudProducts = typeof res.config.products === 'string' ? JSON.parse(res.config.products) : res.config.products;
+      if (Array.isArray(cloudProducts) && cloudProducts.length > 0) {
+        products.value = cloudProducts;
+        localStorage.setItem('kg-drink-products', JSON.stringify(cloudProducts));
+        localStorage.setItem('kg-drink-products-version', 'v7');
+        ensureSessionExists();
+        console.log('[DrinkInventory] Loaded products from cloud config successfully');
+      }
+    } else {
+      if (products.value && products.value.length > 0) {
+        saveConfigToCloud('products', products.value).catch(err => {
+          console.warn('[DrinkInventory] Failed to seed products on cloud:', err);
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[DrinkInventory] Failed to pull products from cloud:', err);
+  }
+}
+
+async function handleSyncCukcukMenu() {
+  isSyncingMenu.value = true;
+  showToast('Đang đồng bộ thực đơn từ CUKCUK...', 'info');
+  try {
+    const res = await syncCukcukMenuOnCloud();
+    if (res && res.success) {
+      showToast('Đồng bộ thực đơn CUKCUK thành công!', 'success');
+      auditsStore.addAudit('DRINK_MENU_SYNC', `Đồng bộ thực đơn từ CUKCUK`);
+      await syncProductsFromCloud();
+    } else {
+      showToast('Đồng bộ thất bại: ' + (res?.message || 'Lỗi không xác định'), 'error');
+    }
+  } catch (e: any) {
+    console.error('Menu sync error:', e);
+    showToast('Lỗi đồng bộ: ' + e.message, 'error');
+  } finally {
+    isSyncingMenu.value = false;
+  }
+}
+
 // ── Lifecycle ───────────────────────────────
-onMounted(() => {
+onMounted(async () => {
   loadFromLocalStorage();
   ensureSessionExists();
+  await syncProductsFromCloud();
 });
 </script>
 
@@ -1712,9 +1765,14 @@ onMounted(() => {
           <div class="space-y-3">
             <div class="flex justify-between items-center">
               <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">📋 Danh sách ({{ products.length }} sản phẩm)</h4>
-              <button class="btn btn-sm btn-outline text-rose-600 border-rose-200 hover:bg-rose-50" @click="handleResetProducts" title="Khôi phục mặc định">
-                <span class="material-symbols-rounded text-sm">restart_alt</span> Khôi phục gốc
-              </button>
+              <div class="flex gap-2">
+                <button class="btn btn-sm btn-outline text-blue-600 border-blue-200 hover:bg-blue-50 flex items-center gap-1" @click="handleSyncCukcukMenu" :disabled="isSyncingMenu" title="Đồng bộ thực đơn từ CUKCUK">
+                  <span class="material-symbols-rounded text-sm" :class="{ 'animate-spin': isSyncingMenu }">sync</span> Đồng bộ CUKCUK
+                </button>
+                <button class="btn btn-sm btn-outline text-rose-600 border-rose-200 hover:bg-rose-50 flex items-center gap-1" @click="handleResetProducts" title="Khôi phục mặc định">
+                  <span class="material-symbols-rounded text-sm">restart_alt</span> Khôi phục gốc
+                </button>
+              </div>
             </div>
             <div class="border border-slate-100 rounded-xl overflow-hidden max-h-[300px] overflow-y-auto space-y-4 p-3 bg-white">
               <div v-for="(items, catName) in categories" :key="catName" class="space-y-1.5">

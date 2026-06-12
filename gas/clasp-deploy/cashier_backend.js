@@ -130,7 +130,8 @@ function _validateMetadata(data, action) {
   try {
     const settingsRes = _getSettings();
     if (settingsRes && settingsRes.success && settingsRes.settings) {
-      allowDevWrite = settingsRes.settings.allowDevWrite === true;
+      allowDevWrite = settingsRes.settings.allowDevWrite === true || 
+                      String(settingsRes.settings.allowDevWrite).toUpperCase() === 'TRUE';
     }
   } catch(e) {
     allowDevWrite = false;
@@ -224,6 +225,7 @@ function _handleCashierRequest(e) {
       case 'saveCukcukSyncState': result = _saveCukcukSyncState(data); break;
       case 'syncCukcukToSheets': result = _syncCukcukInvoicesAction(data); break;
       case 'syncCukcukInvoices': result = _syncCukcukInvoicesAction(data); break;
+      case 'syncCukcukMenu':     result = _syncCukcukMenuAction(data); break;
       case 'loadCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
       case 'getCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
       case 'getCukcukItems':    result = _getCukcukItemsAction(data); break;
@@ -2990,6 +2992,57 @@ const CukcukService = {
     }
     return null;
   },
+
+  fetchCategories: function(loginInfo) {
+    const response = this._apiCall('/api/v1/categories/list?includeInactive=true', {
+      method: 'GET'
+    }, loginInfo);
+    if (response && response.Success && Array.isArray(response.Data)) {
+      return response.Data;
+    }
+    return [];
+  },
+
+  fetchInventoryItems: function(loginInfo) {
+    let page = 1;
+    let allItems = [];
+    let hasMore = true;
+    const limit = 100;
+    
+    while (hasMore) {
+      const body = {
+        Page: page,
+        Limit: limit,
+        includeInactive: true,
+        IncludeInactive: true
+      };
+      
+      const response = this._apiCall('/api/v1/inventoryitems/paging', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }, loginInfo);
+      
+      let items = [];
+      if (response && response.Success && response.Data) {
+        if (Array.isArray(response.Data)) items = response.Data;
+        else if (response.Data.PageData) items = response.Data.PageData;
+        else if (response.Data.Items) items = response.Data.Items;
+      }
+      
+      if (items.length > 0) {
+        allItems = allItems.concat(items);
+        if (items.length < limit) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+    
+    return allItems;
+  },
   
   normalizeInvoice: function(rawInvoice, rawDetail) {
     const refId = String(rawInvoice.RefId || rawInvoice.RefID || '');
@@ -3063,7 +3116,7 @@ const CukcukService = {
       vatAmount: rawInvoice.VATAmount || 0,
       finalAmount: finalAmount,
       paymentMethod: paymentMethodStr,
-      paymentStatus: (rawInvoice.IsPaid === true || String(rawInvoice.IsPaid).toLowerCase() === 'true') ? 'Thanh toán' : 'Chưa thanh toán',
+      paymentStatus: (rawInvoice.IsPaid === true || String(rawInvoice.IsPaid).toLowerCase() === 'true' || rawInvoice.PaymentStatus === 3 || String(rawInvoice.PaymentStatus) === '3') ? 'Thanh toán' : 'Chưa thanh toán',
       paymentRawJson: JSON.stringify(paymentJsonList),
       itemsJson: JSON.stringify(itemsJsonList),
       sourceRawJson: JSON.stringify(rawInvoice),
@@ -3106,22 +3159,49 @@ function _syncCukcukInvoicesAction(data) {
   const val = _validateMetadata(data, 'syncCukcukInvoices');
   if (val && !val.success) return val;
 
-  const lock = LockService.getScriptLock();
-  const hasLock = lock.tryLock(10000); // 10s wait timeout
-  if (!hasLock) {
-    return {
-      ok: false,
-      action: 'syncCukcukInvoices',
-      requestId: data.requestId || '',
-      syncBatchId: '',
-      message: 'Hệ thống đang bận đồng bộ hóa đơn CUKCUK từ một thiết bị khác. Vui lòng thử lại sau ít phút.',
-      error: { code: 'SYNC_ALREADY_RUNNING', detail: 'Lock could not be acquired within 10s', retryable: true }
-    };
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'cukcuk_sync_active_' + (data.workDate || 'today');
+  
+  // Wait loop if another sync is running for this workDate
+  let isRunning = cache.get(cacheKey);
+  if (isRunning) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      Utilities.sleep(1000);
+      isRunning = cache.get(cacheKey);
+      if (!isRunning) {
+        break;
+      }
+    }
+    if (isRunning) {
+      return {
+        ok: true,
+        action: 'syncCukcukInvoices',
+        requestId: data.requestId || '',
+        syncBatchId: 'skipped_concurrent',
+        message: 'Hệ thống đang thực hiện đồng bộ hóa đơn CUKCUK từ một thiết bị khác. Vui lòng đợi trong giây lát.',
+        data: {
+          totalFetched: 0,
+          totalInserted: 0,
+          totalUpdated: 0,
+          totalSkippedManualOverride: 0,
+          totalDeletedMarked: 0,
+          totalErrors: 0,
+          durationMs: 0
+        }
+      };
+    }
   }
+
+  // Set the cache lock
+  cache.put(cacheKey, 'true', 90); // 90 seconds timeout
 
   const startedAt = new Date();
   const syncBatchId = 'batch_' + Date.now().toString(36);
   const requestId = data.requestId || 'req_' + startedAt.getTime().toString(36);
+  const forceMode = data.forceMode === true || 
+                    data.forceDetail === true || 
+                    String(data.forceMode).toLowerCase() === 'true' || 
+                    String(data.forceDetail).toLowerCase() === 'true';
   const workDateStr = data.workDate || _getWorkingDayGas(startedAt);
   
   let totalFetched = 0;
@@ -3144,9 +3224,7 @@ function _syncCukcukInvoicesAction(data) {
     const loginInfo = CukcukService.refreshAccessTokenIfNeeded();
     if (loginInfo.refreshed) tokenRefreshed = true;
 
-    // 2. Setup date boundaries:
-    // Bắt đầu: 12:00:00 của workDate
-    // Kết thúc: 06:00:00 của ngày tiếp theo
+    // 2. Setup date boundaries
     const parts = workDateStr.split('-');
     const y = parseInt(parts[0]);
     const m = parseInt(parts[1]) - 1;
@@ -3163,104 +3241,236 @@ function _syncCukcukInvoicesAction(data) {
     // 3. Fetch Invoices from CUKCUK
     apiCallCount++;
     const invoices = CukcukService.fetchInvoicesByDateRange(fromTime, toTime, loginInfo);
-    totalFetched = invoices.length;
+
+    // Filter CUKCUK invoices strictly within the target date range to prevent processing historical database dumps (e.g. sandbox data)
+    const activeInvoices = invoices.filter(inv => {
+      const refDateStr = inv.RefDate || inv.CreatedDate || '';
+      if (!refDateStr) return false;
+      try {
+        const refTime = new Date(refDateStr.replace(' ', 'T')).getTime();
+        const fromTimeMs = new Date(fromTime.replace(' ', 'T')).getTime();
+        const toTimeMs = new Date(toTime.replace(' ', 'T')).getTime();
+        return refTime >= fromTimeMs && refTime <= toTimeMs;
+      } catch (e) {
+        return false;
+      }
+    });
+    totalFetched = activeInvoices.length;
 
     // 4. Initialize Sheets
     _getSheet('KG_CUKCUK_INVOICES', NEW_INVOICES_HEADERS);
     _getSheet('KG_CUKCUK_OVERRIDES', NEW_OVERRIDES_HEADERS);
     _getSheet('KG_CUKCUK_SYNC_LOGS', NEW_SYNC_LOGS_HEADERS);
 
-    // 5. Read existing invoices
-    const allInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
-    const headers = allInvoices[0] || NEW_INVOICES_HEADERS;
-    const colIndex = {};
-    headers.forEach((h, idx) => { colIndex[h] = idx; });
+    // 5. Pre-flight Read of existing invoices to determine which ones need detail fetches
+    const preAllInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
+    const preHeaders = preAllInvoices[0] || NEW_INVOICES_HEADERS;
+    const preColIndex = {};
+    preHeaders.forEach((h, idx) => { preColIndex[h] = idx; });
 
-    const invoiceMap = {};
-    for (let i = 1; i < allInvoices.length; i++) {
-      const key = String(allInvoices[i][colIndex['invoiceKey']] || '');
+    const preInvoiceMap = {};
+    for (let i = 1; i < preAllInvoices.length; i++) {
+      const key = String(preAllInvoices[i][preColIndex['invoiceKey']] || '');
       if (key) {
-        invoiceMap[key] = {
-          rowIndex: i + 1,
-          manualOverride: allInvoices[i][colIndex['manualOverride']] === true || String(allInvoices[i][colIndex['manualOverride']]).toLowerCase() === 'true',
-          row: allInvoices[i]
+        preInvoiceMap[key] = {
+          manualOverride: preAllInvoices[i][preColIndex['manualOverride']] === true || String(preAllInvoices[i][preColIndex['manualOverride']]).toLowerCase() === 'true',
+          modifiedTime: String(preAllInvoices[i][preColIndex['modifiedTime']] || ''),
+          paymentRawJson: String(preAllInvoices[i][preColIndex['paymentRawJson']] || '')
         };
       }
     }
 
-    const invoicesToAppend = [];
-    const invoicesToUpdate = [];
-
-    // 6. Process each fetched invoice
-    for (let i = 0; i < invoices.length; i++) {
-      const inv = invoices[i];
+    // Filter which invoices need details fetched
+    const invoicesToFetchDetails = [];
+    const keysSeenInCurrentLoop = {};
+    for (let i = 0; i < activeInvoices.length; i++) {
+      const inv = activeInvoices[i];
       const key = String(inv.RefId || inv.RefID || '');
       if (!key) continue;
 
-      const existing = invoiceMap[key];
+      if (keysSeenInCurrentLoop[key]) {
+        continue;
+      }
+      keysSeenInCurrentLoop[key] = true;
 
-      // If existing invoice is manually overridden, skip updating payment-related protected fields
-      if (existing && existing.manualOverride && !data.forceMode) {
+      const existing = preInvoiceMap[key];
+
+      // Skip manually overridden ones
+      if (existing && existing.manualOverride && !forceMode) {
         totalSkippedManualOverride++;
         continue;
       }
 
-      // Fetch invoice detail to retrieve payment and items breakdown
-      apiCallCount++;
-      let detail = null;
-      try {
-        detail = CukcukService.fetchInvoiceDetail(key, loginInfo);
-      } catch (err) {
-        Logger.log('[GAS CUKCUK] Fetch detail failed for ' + key + ': ' + err.toString());
-        totalErrors++;
+      // Check if unmodified
+      const extModified = existing ? existing.modifiedTime : '';
+      const apiModified = String(inv.ModifiedDate || inv.ModifiedTime || '');
+      const hasDetails = existing && existing.paymentRawJson && existing.paymentRawJson !== '{}' && existing.paymentRawJson !== '[]' && existing.paymentRawJson !== '';
+
+      if (existing && extModified === apiModified && hasDetails && !forceMode) {
         continue;
       }
 
-      if (!detail) {
-        totalErrors++;
-        continue;
-      }
+      invoicesToFetchDetails.push({ key: key, inv: inv });
+    }
 
-      const normalized = CukcukService.normalizeInvoice(inv, detail);
-      normalized.workDate = workDateStr;
-      normalized.syncBatchId = syncBatchId;
-      normalized.lastSyncedAt = new Date().toISOString();
-      
-      if (normalized.isDeleted) {
-        totalDeletedMarked++;
-      }
+    // Fetch invoice details in parallel chunks
+    const detailMap = {};
+    if (invoicesToFetchDetails.length > 0) {
+      const fetchHeaders = {
+        'Authorization': 'Bearer ' + loginInfo.token,
+        'CompanyCode': loginInfo.companyCode,
+        'Content-Type': 'application/json'
+      };
 
-      // Build row
-      const newRow = new Array(NEW_INVOICES_HEADERS.length).fill('');
-      NEW_INVOICES_HEADERS.forEach((h, idx) => {
-        newRow[idx] = normalized[h] !== undefined ? normalized[h] : '';
-      });
+      const requests = invoicesToFetchDetails.map(item => ({
+        url: 'https://graphapi.cukcuk.vn/api/v1/sainvoices/' + item.key,
+        method: 'GET',
+        headers: fetchHeaders,
+        muteHttpExceptions: true
+      }));
 
-      if (existing) {
-        // If forceMode is true or not manual overridden, we overwrite.
-        newRow[colIndex['createdAt']] = existing.row[colIndex['createdAt']] || normalized.createdAt || new Date().toISOString();
-        newRow[colIndex['updatedAt']] = new Date().toISOString();
+      // CHUNK_SIZE = 5, sleep 1000ms between chunks to prevent rate limit
+      const CHUNK_SIZE = 5;
+      const responses = [];
+      Logger.log('[GAS CUKCUK] Fetching ' + requests.length + ' details in chunks of 5 with 1s sleep...');
 
-        invoicesToUpdate.push({
-          rowIndex: existing.rowIndex,
-          rangeEndLetter: _colLetter(NEW_INVOICES_HEADERS.length),
-          rowData: newRow
+      for (let k = 0; k < requests.length; k += CHUNK_SIZE) {
+        const chunk = requests.slice(k, k + CHUNK_SIZE);
+        apiCallCount += chunk.length;
+        
+        if (k > 0) {
+          Utilities.sleep(1000); // 1s sleep to stay safe from urlfetch limit
+        }
+
+        const chunkResponses = UrlFetchApp.fetchAll(chunk);
+        chunkResponses.forEach(r => {
+          responses.push(r);
         });
-        totalUpdated++;
-      } else {
-        newRow[colIndex['createdAt']] = new Date().toISOString();
-        newRow[colIndex['updatedAt']] = new Date().toISOString();
-        invoicesToAppend.push(newRow);
-        totalInserted++;
+      }
+
+      for (let i = 0; i < invoicesToFetchDetails.length; i++) {
+        const item = invoicesToFetchDetails[i];
+        const resp = responses[i];
+        if (!resp) continue;
+        const code = resp.getResponseCode();
+        const text = resp.getContentText();
+
+        if (code === 200) {
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed && parsed.Success && parsed.Data) {
+              detailMap[item.key] = parsed.Data;
+            } else {
+              totalErrors++;
+              Logger.log('[GAS CUKCUK] API error in detail for ' + item.key + ': ' + text);
+            }
+          } catch (e) {
+            totalErrors++;
+            Logger.log('[GAS CUKCUK] Parse detail failed for ' + item.key + ': ' + e.toString());
+          }
+        } else {
+          totalErrors++;
+          Logger.log('[GAS CUKCUK] Fetch detail failed for ' + item.key + ' HTTP code: ' + code);
+        }
       }
     }
 
-    // 7. Write to Sheet in batches
-    if (invoicesToAppend.length > 0) {
-      _sheetsAppend('KG_CUKCUK_INVOICES', invoicesToAppend);
+    // Now we enter the WRITE LOCK PHASE
+    const lock = LockService.getScriptLock();
+    const hasLock = lock.tryLock(20000); // Wait up to 20 seconds for database write lock
+    if (!hasLock) {
+      throw new Error('Không thể ghi dữ liệu do hàng đợi ghi bảng tính đang bận. Vui lòng thử lại.');
     }
-    if (invoicesToUpdate.length > 0) {
-      _sheetsBatchUpdate('KG_CUKCUK_INVOICES', invoicesToUpdate);
+
+    try {
+      // Re-read existing invoices to get absolute latest row indices and prevent duplicates
+      const freshAllInvoices = _sheetsGet('KG_CUKCUK_INVOICES');
+      const freshHeaders = freshAllInvoices[0] || NEW_INVOICES_HEADERS;
+      const freshColIndex = {};
+      freshHeaders.forEach((h, idx) => { freshColIndex[h] = idx; });
+
+      const freshInvoiceMap = {};
+      for (let i = 1; i < freshAllInvoices.length; i++) {
+        const key = String(freshAllInvoices[i][freshColIndex['invoiceKey']] || '');
+        if (key) {
+          freshInvoiceMap[key] = {
+            rowIndex: i + 1,
+            manualOverride: freshAllInvoices[i][freshColIndex['manualOverride']] === true || String(freshAllInvoices[i][freshColIndex['manualOverride']]).toLowerCase() === 'true',
+            modifiedTime: String(freshAllInvoices[i][freshColIndex['modifiedTime']] || ''),
+            paymentRawJson: String(freshAllInvoices[i][freshColIndex['paymentRawJson']] || ''),
+            row: freshAllInvoices[i]
+          };
+        }
+      }
+
+      const invoicesToAppend = [];
+      const invoicesToUpdate = [];
+
+      for (let i = 0; i < invoicesToFetchDetails.length; i++) {
+        const item = invoicesToFetchDetails[i];
+        const inv = item.inv;
+        const key = item.key;
+        const detail = detailMap[key];
+
+        if (!detail) continue;
+
+        const existing = freshInvoiceMap[key];
+
+        // Double-check skip manual override
+        if (existing && existing.manualOverride && !forceMode) {
+          continue;
+        }
+
+        // Double-check duplicate avoidance
+        const extModified = existing ? existing.modifiedTime : '';
+        const apiModified = String(inv.ModifiedDate || inv.ModifiedTime || '');
+        const hasDetails = existing && existing.paymentRawJson && existing.paymentRawJson !== '{}' && existing.paymentRawJson !== '[]' && existing.paymentRawJson !== '';
+
+        if (existing && extModified === apiModified && hasDetails && !forceMode) {
+          continue;
+        }
+
+        const normalized = CukcukService.normalizeInvoice(inv, detail);
+        normalized.workDate = workDateStr;
+        normalized.syncBatchId = syncBatchId;
+        normalized.lastSyncedAt = new Date().toISOString();
+        
+        if (normalized.isDeleted) {
+          totalDeletedMarked++;
+        }
+
+        const newRow = new Array(freshHeaders.length).fill('');
+        freshHeaders.forEach((h, idx) => {
+          newRow[idx] = normalized[h] !== undefined ? normalized[h] : '';
+        });
+
+        if (existing) {
+          newRow[freshColIndex['createdAt']] = existing.row[freshColIndex['createdAt']] || normalized.createdAt || new Date().toISOString();
+          newRow[freshColIndex['updatedAt']] = new Date().toISOString();
+
+          invoicesToUpdate.push({
+            rowIndex: existing.rowIndex,
+            rangeEndLetter: _colLetter(freshHeaders.length),
+            rowData: newRow
+          });
+          totalUpdated++;
+        } else {
+          newRow[freshColIndex['createdAt']] = new Date().toISOString();
+          newRow[freshColIndex['updatedAt']] = new Date().toISOString();
+          invoicesToAppend.push(newRow);
+          totalInserted++;
+        }
+      }
+
+      // Write to Sheet
+      if (invoicesToAppend.length > 0) {
+        _sheetsAppend('KG_CUKCUK_INVOICES', invoicesToAppend);
+      }
+      if (invoicesToUpdate.length > 0) {
+        _sheetsBatchUpdate('KG_CUKCUK_INVOICES', invoicesToUpdate);
+      }
+    } finally {
+      lock.releaseLock();
     }
 
   } catch (e) {
@@ -3268,7 +3478,8 @@ function _syncCukcukInvoicesAction(data) {
     errorMessage = e.toString();
     Logger.log('[GAS CUKCUK Sync Error] ' + errorMessage);
   } finally {
-    lock.releaseLock();
+    // Clear the active cache lock
+    cache.remove(cacheKey);
   }
 
   const finishedAt = new Date();
@@ -3305,6 +3516,7 @@ function _syncCukcukInvoicesAction(data) {
   }
 
   return {
+    success: status === 'SUCCESS',
     ok: status === 'SUCCESS',
     action: 'syncCukcukInvoices',
     requestId: requestId,
@@ -3321,6 +3533,257 @@ function _syncCukcukInvoicesAction(data) {
     },
     error: status === 'FAILED' ? { code: 'UNKNOWN_ERROR', detail: errorMessage, retryable: true } : null
   };
+}
+
+/**
+ * Synchronizes categories and inventory items from CUKCUK into Google Sheets and configuration.
+ */
+function _syncCukcukMenuAction(data) {
+  const val = _validateMetadata(data, 'syncCukcukMenu');
+  if (val && !val.success) return val;
+
+  const lock = LockService.getScriptLock();
+  const hasLock = lock.tryLock(15000); // 15s wait timeout
+  if (!hasLock) {
+    return {
+      success: false,
+      message: 'Hệ thống đang bận đồng bộ dữ liệu CUKCUK. Vui lòng thử lại sau.'
+    };
+  }
+
+  try {
+    // 1. Refresh CUKCUK Token
+    const loginInfo = CukcukService.refreshAccessTokenIfNeeded();
+
+    // 2. Fetch categories
+    const categories = CukcukService.fetchCategories(loginInfo);
+    const catMap = {};
+    categories.forEach(c => {
+      catMap[String(c.InventoryItemCategoryID || c.Id || c.CategoryID || '')] = c.InventoryItemCategoryName || c.Name || '';
+    });
+
+    // 3. Fetch inventory items
+    const apiItems = CukcukService.fetchInventoryItems(loginInfo);
+
+    // 4. Update KG_ITEM_CATEGORY_MAP sheet
+    const catMapSheet = _getSheet('KG_ITEM_CATEGORY_MAP', CATEGORY_MAP_HEADERS);
+    const existingMapRows = _sheetsGet('KG_ITEM_CATEGORY_MAP');
+    const existingHeader = existingMapRows[0] || CATEGORY_MAP_HEADERS;
+    const itemColIndex = {};
+    existingHeader.forEach((h, idx) => { itemColIndex[h] = idx; });
+
+    const itemMap = {};
+    for (let i = 1; i < existingMapRows.length; i++) {
+      const itemId = String(existingMapRows[i][itemColIndex['ItemID']] || '');
+      if (itemId) {
+        itemMap[itemId] = {
+          rowIndex: i + 1,
+          row: existingMapRows[i]
+        };
+      }
+    }
+
+    const mapRowsToAppend = [];
+    const mapRowsToUpdate = [];
+    const nowStr = new Date().toISOString();
+
+    apiItems.forEach(item => {
+      const itemId = String(item.InventoryItemID || item.ItemID || item.Id || '');
+      if (!itemId) return;
+
+      const itemCode = item.InventoryItemCode || item.ItemCode || '';
+      const itemName = item.InventoryItemName || item.ItemName || '';
+      const categoryId = String(item.InventoryItemCategoryID || item.CategoryID || '');
+      const categoryName = item.InventoryItemCategoryName || catMap[categoryId] || item.CategoryName || '';
+      const inactive = item.Inactive === true || String(item.Inactive).toLowerCase() === 'true';
+
+      // Determine if drink or food
+      let isDrink = false;
+      let isFood = true;
+
+      const lowerName = itemName.toLowerCase();
+      const lowerCat = categoryName.toLowerCase();
+      if (lowerCat.indexOf('uống') > -1 || lowerCat.indexOf('nước') > -1 || lowerCat.indexOf('bia') > -1 || lowerCat.indexOf('ngọt') > -1 || lowerCat.indexOf('rượu') > -1 || lowerCat.indexOf('cà phê') > -1 || lowerCat.indexOf('cafe') > -1 || lowerCat.indexOf('sinh tố') > -1 || lowerCat.indexOf('trà') > -1) {
+        isDrink = true; isFood = false;
+      } else if (lowerName.indexOf('nước') > -1 || lowerName.indexOf('bia') > -1 || lowerName.indexOf('coca') > -1 || lowerName.indexOf('pepsi') > -1 || lowerName.indexOf('rượu') > -1 || lowerName.indexOf('redbull') > -1 || lowerName.indexOf('sting') > -1 || lowerName.indexOf('trà') > -1 || lowerName.indexOf('cafe') > -1 || lowerName.indexOf('chai') > -1 || lowerName.indexOf('lon') > -1) {
+        isDrink = true; isFood = false;
+      }
+
+      const existing = itemMap[itemId];
+      const newRow = new Array(CATEGORY_MAP_HEADERS.length).fill('');
+      
+      newRow[itemColIndex['ItemID']] = itemId;
+      newRow[itemColIndex['ItemCode']] = itemCode;
+      newRow[itemColIndex['ItemName']] = itemName;
+      newRow[itemColIndex['CategoryName']] = categoryName;
+      newRow[itemColIndex['IsDrink']] = isDrink ? 'TRUE' : 'FALSE';
+      newRow[itemColIndex['IsFood']] = isFood ? 'TRUE' : 'FALSE';
+      
+      if (existing) {
+        // Preserve manual fields
+        newRow[itemColIndex['InventoryProductId']] = existing.row[itemColIndex['InventoryProductId']] || '';
+        newRow[itemColIndex['Aliases']] = existing.row[itemColIndex['Aliases']] || '';
+        newRow[itemColIndex['UpdatedBy']] = existing.row[itemColIndex['UpdatedBy']] || 'SYSTEM';
+        newRow[itemColIndex['UpdatedAt']] = nowStr;
+
+        // Compare if we actually need to write updates to avoid slow updates
+        let changed = false;
+        for (let j = 0; j < newRow.length; j++) {
+          if (String(newRow[j]) !== String(existing.row[j])) {
+            changed = true;
+            break;
+          }
+        }
+        if (changed) {
+          mapRowsToUpdate.push({
+            rowIndex: existing.rowIndex,
+            rangeEndLetter: _colLetter(CATEGORY_MAP_HEADERS.length),
+            rowData: newRow
+          });
+        }
+      } else {
+        newRow[itemColIndex['InventoryProductId']] = '';
+        newRow[itemColIndex['Aliases']] = itemCode.toLowerCase() + ',' + itemName.toLowerCase();
+        newRow[itemColIndex['UpdatedBy']] = 'SYSTEM';
+        newRow[itemColIndex['UpdatedAt']] = nowStr;
+        mapRowsToAppend.push(newRow);
+      }
+    });
+
+    if (mapRowsToAppend.length > 0) {
+      _sheetsAppend('KG_ITEM_CATEGORY_MAP', mapRowsToAppend);
+    }
+    if (mapRowsToUpdate.length > 0) {
+      _sheetsBatchUpdate('KG_ITEM_CATEGORY_MAP', mapRowsToUpdate);
+    }
+
+    // 5. Merge items into KG_CONFIG's "products" JSON array
+    const configHeaders = ['key', 'jsonValue', 'updatedAt'];
+    const configSheet = _getSheet('KG_CONFIG', configHeaders);
+    const configRows = _getSheetData('KG_CONFIG');
+    
+    let productsList = [];
+    let productsRowIndex = -1;
+    for (let i = 0; i < configRows.length; i++) {
+      if (configRows[i].key === 'products') {
+        productsRowIndex = i + 2; // +1 header, +1 1-indexed
+        try {
+          productsList = JSON.parse(configRows[i].jsonValue);
+        } catch (e) {
+          productsList = [];
+        }
+        break;
+      }
+    }
+
+    if (!Array.isArray(productsList)) {
+      productsList = [];
+    }
+
+    apiItems.forEach(item => {
+      const itemId = String(item.InventoryItemID || item.ItemID || item.Id || '');
+      if (!itemId) return;
+
+      const inactive = item.Inactive === true || String(item.Inactive).toLowerCase() === 'true';
+      const itemName = item.InventoryItemName || item.ItemName || '';
+      const itemCode = item.InventoryItemCode || item.ItemCode || '';
+      const categoryId = String(item.InventoryItemCategoryID || item.CategoryID || '');
+      const categoryName = item.InventoryItemCategoryName || catMap[categoryId] || item.CategoryName || '';
+      const unitName = item.UnitName || 'lon';
+
+      // Check if it is a drink
+      let isDrink = false;
+      const lowerName = itemName.toLowerCase();
+      const lowerCat = categoryName.toLowerCase();
+      if (lowerCat.indexOf('uống') > -1 || lowerCat.indexOf('nước') > -1 || lowerCat.indexOf('bia') > -1 || lowerCat.indexOf('ngọt') > -1 || lowerCat.indexOf('rượu') > -1 || lowerCat.indexOf('cà phê') > -1 || lowerCat.indexOf('cafe') > -1 || lowerCat.indexOf('sinh tố') > -1 || lowerCat.indexOf('trà') > -1) {
+        isDrink = true;
+      } else if (lowerName.indexOf('nước') > -1 || lowerName.indexOf('bia') > -1 || lowerName.indexOf('coca') > -1 || lowerName.indexOf('pepsi') > -1 || lowerName.indexOf('rượu') > -1 || lowerName.indexOf('redbull') > -1 || lowerName.indexOf('sting') > -1 || lowerName.indexOf('trà') > -1 || lowerName.indexOf('cafe') > -1 || lowerName.indexOf('chai') > -1 || lowerName.indexOf('lon') > -1) {
+        isDrink = true;
+      }
+
+      // We only care about drinks for Drink Inventory catalog
+      if (!isDrink) return;
+
+      // Find matching product in current products list
+      let matchedProd = null;
+      for (let j = 0; j < productsList.length; j++) {
+        const p = productsList[j];
+        if (p.cukcukItemId === itemId || p.id === itemId || p.id === 'cuk_' + itemId) {
+          matchedProd = p;
+          break;
+        }
+        if (p.itemCode === itemCode && itemCode) {
+          matchedProd = p;
+          break;
+        }
+        const nameLower = p.name.toLowerCase();
+        if (nameLower === lowerName) {
+          matchedProd = p;
+          break;
+        }
+        if (Array.isArray(p.cukcukAliases) && p.cukcukAliases.some(a => a.toLowerCase() === lowerName)) {
+          matchedProd = p;
+          break;
+        }
+      }
+
+      if (matchedProd) {
+        // Update details from CUKCUK
+        matchedProd.name = itemName;
+        matchedProd.category = categoryName;
+        matchedProd.unit = unitName;
+        matchedProd.cukcukItemId = itemId;
+        matchedProd.itemCode = itemCode;
+        matchedProd.active = !inactive;
+        if (!Array.isArray(matchedProd.cukcukAliases)) {
+          matchedProd.cukcukAliases = [itemName.toLowerCase()];
+        } else if (!matchedProd.cukcukAliases.some(a => a.toLowerCase() === lowerName)) {
+          matchedProd.cukcukAliases.push(itemName.toLowerCase());
+        }
+      } else if (!inactive) {
+        // Create new product for active drinks
+        productsList.push({
+          id: 'cuk_' + itemId,
+          name: itemName,
+          category: categoryName,
+          unit: unitName,
+          emoji: lowerCat.indexOf('bia') > -1 ? '🍺' : (lowerCat.indexOf('rượu') > -1 ? '🍶' : '🥤'),
+          active: true,
+          sort: productsList.length + 1,
+          volume: '',
+          caseSize: 24,
+          caseSizeUnit: unitName,
+          cukcukAliases: [itemName.toLowerCase()],
+          cukcukItemId: itemId,
+          itemCode: itemCode
+        });
+      }
+    });
+
+    // Write back to KG_CONFIG
+    const configValueStr = JSON.stringify(productsList);
+    if (productsRowIndex > -1) {
+      configSheet.getRange(productsRowIndex, 2).setValue(configValueStr);
+      configSheet.getRange(productsRowIndex, 3).setValue(nowStr);
+    } else {
+      _sheetsAppend('KG_CONFIG', [['products', configValueStr, nowStr]]);
+    }
+
+    return {
+      success: true,
+      message: 'Đồng bộ thực đơn thành công',
+      products: productsList
+    };
+
+  } catch (e) {
+    Logger.log('[GAS CUKCUK Menu Sync Error] ' + e.toString());
+    return {
+      success: false,
+      message: 'Lỗi đồng bộ: ' + e.toString()
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**

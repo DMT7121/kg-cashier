@@ -482,7 +482,7 @@ export async function getStaffFromCloud(): Promise<any> {
   try {
     // ⚡ Try ultra-fast direct Spreadsheet read first (CORS-friendly via gviz/tq)
     const ssId = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
-    const url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_STAFF`;
+    const url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_STAFF&t=${Date.now()}`;
     
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 1800); // 1.8s timeout
@@ -586,6 +586,10 @@ export async function saveConfigToCloud(key: string, value: any): Promise<any> {
   return apiCall('saveConfig', { key: key, value: value });
 }
 
+export async function syncCukcukMenuOnCloud(): Promise<any> {
+  return apiCall('syncCukcukMenu');
+}
+
 // ── Health Check ─────────────────────────────
 export async function pingAPI(): Promise<any> {
   return apiCall('ping');
@@ -631,6 +635,115 @@ export async function saveCukcukOverrideOnCloud(overrideData: {
   return apiCall('saveCukcukOverride', overrideData);
 }
 
+function mapInvoiceRow(raw: any): any {
+  const obj: Record<string, any> = { ...raw };
+
+  const refId = raw.invoiceKey || raw.cukcukInvoiceId || raw.RefId || '';
+  obj.RefId = refId;
+  obj.refId = refId;
+
+  const refNo = raw.cukcukRefNo || raw.RefNo || '';
+  obj.RefNo = refNo;
+  obj.refNo = refNo;
+
+  const refDate = raw.invoiceTime || raw.businessDate || raw.RefDate || '';
+  obj.RefDate = refDate;
+  obj.refDate = refDate;
+
+  const workDate = raw.workDate || raw.WorkDate || '';
+  obj.WorkDate = workDate;
+  obj.workDate = workDate;
+
+  const tableName = raw.tableName || raw.TableName || '';
+  obj.TableName = tableName;
+  obj.tableName = tableName;
+
+  const employeeName = raw.cashierName || raw.EmployeeName || 'THU NGÂN';
+  obj.EmployeeName = employeeName;
+  obj.employeeName = employeeName;
+
+  const customerName = raw.customerName || raw.CustomerName || '';
+  obj.CustomerName = customerName;
+  obj.customerName = customerName;
+
+  const amount = Number(raw.finalAmount !== undefined ? raw.finalAmount : (raw.totalAmount !== undefined ? raw.totalAmount : raw.Amount)) || 0;
+  obj.Amount = amount;
+  obj.amount = amount;
+
+  const paymentJson = raw.paymentRawJson || raw.PaymentJson || '[]';
+  obj.PaymentJson = paymentJson;
+  obj.paymentJson = paymentJson;
+
+  let paymentsList = [];
+  try {
+    paymentsList = JSON.parse(paymentJson);
+  } catch(e) {}
+
+  let cashAmount = Number(raw.CashAmount) || 0;
+  let cardAmount = Number(raw.CardAmount) || 0;
+  let transferAmount = Number(raw.TransferAmount) || 0;
+
+  if (paymentsList && paymentsList.length > 0 && cashAmount === 0 && cardAmount === 0 && transferAmount === 0) {
+    paymentsList.forEach((p: any) => {
+      if (p.method === 'cash') cashAmount += Number(p.amount) || 0;
+      else if (p.method === 'card') cardAmount += Number(p.amount) || 0;
+      else if (p.method === 'transfer') transferAmount += Number(p.amount) || 0;
+    });
+  }
+  obj.CashAmount = cashAmount;
+  obj.CardAmount = cardAmount;
+  obj.TransferAmount = transferAmount;
+
+  const status = raw.paymentStatus || raw.Status || '';
+  obj.Status = status;
+  obj.status = status;
+
+  const isPaid = raw.paymentStatus !== undefined
+    ? (raw.paymentStatus === 'Thanh toán' || raw.paymentStatus === 'Đã thanh toán')
+    : (raw.IsPaid === true || String(raw.IsPaid).toLowerCase() === 'true');
+  obj.IsPaid = isPaid;
+  obj.isPaid = isPaid;
+
+  const isCancelled = raw.IsCancelled === true || String(raw.IsCancelled).toLowerCase() === 'true';
+  obj.IsCancelled = isCancelled;
+  obj.isCancelled = isCancelled;
+
+  const isDeleted = raw.isDeleted !== undefined
+    ? (raw.isDeleted === true || String(raw.isDeleted).toLowerCase() === 'true')
+    : (raw.IsDeleted === true || String(raw.IsDeleted).toLowerCase() === 'true');
+  obj.IsDeleted = isDeleted;
+  obj.isDeleted = isDeleted;
+
+  let itemsCount = Number(raw.ItemsCount) || 0;
+  if (!itemsCount && raw.itemsJson) {
+    try {
+      const itemsList = JSON.parse(raw.itemsJson);
+      if (Array.isArray(itemsList)) {
+        itemsCount = itemsList.length;
+      }
+    } catch(e) {}
+  }
+  obj.ItemsCount = itemsCount;
+  obj.itemsCount = itemsCount;
+
+  const manualLock = raw.manualOverride !== undefined
+    ? (raw.manualOverride === true || String(raw.manualOverride).toLowerCase() === 'true')
+    : (raw.ManualLock === true || String(raw.ManualLock).toLowerCase() === 'true');
+  obj.ManualLock = manualLock;
+  obj.manualLock = manualLock;
+  obj.manualOverride = manualLock;
+
+  const manualOverrideJson = raw.paymentRawJson || raw.ManualOverrideJson || '';
+  obj.ManualOverrideJson = manualOverrideJson;
+  obj.manualOverrideJson = manualOverrideJson;
+
+  const updatedAt = raw.updatedAt || raw.UpdatedAt || raw.lastSyncedAt || raw.LastFetchedAt || new Date().toISOString();
+  obj.UpdatedAt = updatedAt;
+  obj.updatedAt = updatedAt;
+
+  return obj;
+}
+
 export async function getCukcukInvoicesFromCloud(params: {
   workDate?: string;
   fromDate?: string;
@@ -640,14 +753,14 @@ export async function getCukcukInvoicesFromCloud(params: {
   limit?: number;
 }): Promise<any> {
   const ssId = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
-  let url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_CUKCUK_INVOICES`;
+  let url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_CUKCUK_INVOICES&t=${Date.now()}`;
   
   if (params.workDate) {
-    url += `&tq=${encodeURIComponent(`select * where D = '${params.workDate}'`)}`;
+    url += `&tq=${encodeURIComponent(`select * where F = '${params.workDate}'`)}`;
   } else if (params.fromDate && params.toDate) {
-    url += `&tq=${encodeURIComponent(`select * where C >= '${params.fromDate}' and C <= '${params.toDate}'`)}`;
+    url += `&tq=${encodeURIComponent(`select * where G >= '${params.fromDate}' and G <= '${params.toDate}'`)}`;
   } else if (params.fromDate) {
-    url += `&tq=${encodeURIComponent(`select * where C >= '${params.fromDate}'`)}`;
+    url += `&tq=${encodeURIComponent(`select * where G >= '${params.fromDate}'`)}`;
   }
 
   try {
@@ -664,21 +777,21 @@ export async function getCukcukInvoicesFromCloud(params: {
         const json = safeJsonParse<GVizResponse | null>(text.substring(start, end + 1), null);
         if (json && json.status === 'ok' && json.table && json.table.rows) {
           const INVOICES_HEADERS = [
-            'RefId', 'RefNo', 'RefDate', 'WorkDate', 'ShiftId', 'ShiftNumber', 'TableName', 'EmployeeName', 'CustomerName',
-            'Amount', 'CashAmount', 'CardAmount', 'TransferAmount', 'OtherAmount', 'PaymentInfo', 'PaymentJson',
-            'Status', 'IsPaid', 'IsCancelled', 'IsDeleted', 'SourceUpdatedAt', 'LastFetchedAt', 'RowHash', 'DetailHash',
-            'ItemsCount', 'ManualOverrideJson', 'ManualEditedAt', 'ManualEditedBy', 'ManualLock', 'SyncBatchId',
-            'CreatedAt', 'UpdatedAt'
+            'invoiceKey', 'cukcukInvoiceId', 'cukcukRefNo', 'branchId', 'branchName', 'workDate', 'businessDate', 
+            'invoiceTime', 'createdTime', 'modifiedTime', 'tableName', 'customerName', 'guestCount', 'totalAmount', 
+            'discountAmount', 'serviceCharge', 'vatAmount', 'finalAmount', 'paymentMethod', 'paymentStatus', 
+            'paymentRawJson', 'itemsJson', 'sourceRawJson', 'manualOverride', 'overrideAt', 'overrideBy', 
+            'overrideReason', 'overrideFieldsJson', 'syncBatchId', 'lastSyncedAt', 'syncStatus', 'syncError', 
+            'shiftId', 'sessionId', 'cashierName', 'isDeleted', 'deletedAt', 'note', 'createdAt', 'updatedAt'
           ];
           const headers = json.table.cols.map((c, idx) => c.label || INVOICES_HEADERS[idx] || '');
           const invoices = json.table.rows.map(r => {
-            const obj: Record<string, any> = {};
+            const raw: Record<string, any> = {};
             if (r.c) {
               r.c.forEach((cell, idx) => {
                 const header = headers[idx] || INVOICES_HEADERS[idx];
                 if (header) {
                   let val = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : '') : '';
-                  // Handle cell formatting/numbers
                   if (typeof val === 'string' && val.startsWith('Date(')) {
                     try {
                       const match = val.match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/);
@@ -693,11 +806,11 @@ export async function getCukcukInvoicesFromCloud(params: {
                       }
                     } catch(e) {}
                   }
-                  obj[header] = val;
+                  raw[header] = val;
                 }
               });
             }
-            return obj;
+            return mapInvoiceRow(raw);
           });
           
           console.log('[API] Ultra-fast invoices direct load success:', invoices.length);
@@ -710,5 +823,11 @@ export async function getCukcukInvoicesFromCloud(params: {
   }
 
   // Fallback to Apps Script
-  return apiCall('getCukcukInvoices', params);
+  const res = await apiCall('getCukcukInvoices', params);
+  if (res && (res.success || res.ok)) {
+    const rawInvoices = res.invoices || (res.data && res.data.invoices) || [];
+    const invoices = rawInvoices.map((raw: any) => mapInvoiceRow(raw));
+    return { success: true, invoices: invoices };
+  }
+  return { success: false, message: res?.message || 'Không thể tải hóa đơn từ Sheets' };
 }
