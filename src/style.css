@@ -850,9 +850,8 @@
     background: #1d4ed8;
   }
 
-  /* ── Table ── */
   .di-table-wrap {
-    @apply mx-6 bg-white border border-slate-200 rounded-2xl shadow-sm;
+    @apply mx-6 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto;
     /* Removed overflow-hidden to allow sticky headers to stick to .view-container */
   }
   .di-table {

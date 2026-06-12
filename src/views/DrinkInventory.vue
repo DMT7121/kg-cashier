@@ -1215,8 +1215,8 @@ onMounted(() => {
       >
         <!-- Card Top: Product Info and Status Badge -->
         <div class="space-y-4">
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
               <img 
                 v-if="productMap[row.productId]?.image" 
                 :src="productMap[row.productId].image" 
@@ -1227,7 +1227,7 @@ onMounted(() => {
               <span v-else class="di-card-emoji text-3xl w-12 h-12 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100 shrink-0">
                 {{ productMap[row.productId]?.emoji || '🥤' }}
               </span>
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <h4 class="text-sm font-extrabold text-slate-800 leading-snug truncate">{{ productMap[row.productId]?.name }}</h4>
                 <p class="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
                   {{ productMap[row.productId]?.category }} · {{ productMap[row.productId]?.unit }}
@@ -1238,7 +1238,7 @@ onMounted(() => {
 
             <!-- Chênh lệch badge -->
             <span 
-              class="di-card-diff-badge text-[10px] font-black px-2.5 py-1 rounded-full border flex items-center gap-0.5 shadow-2xs shrink-0 cursor-pointer"
+              class="di-card-diff-badge text-[10px] font-black px-2.5 py-1 rounded-full border flex items-center gap-0.5 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
               :class="'di-diff-' + row.differenceType.toLowerCase()"
               @click="toggleRowExpanded(row.id)"
             >
@@ -1342,7 +1342,7 @@ onMounted(() => {
     </div>
 
     <!-- ═══ TABLE VIEW ═══ -->
-    <div v-else-if="viewMode === 'table'" class="di-table-wrap overflow-hidden">
+    <div v-else-if="viewMode === 'table'" class="di-table-wrap overflow-x-auto">
       <table class="di-table" id="diTable">
         <thead>
           <tr class="di-thead-main">
