@@ -335,14 +335,14 @@ async function handleVatAdminLogin() {
           </label>
         </div>
 
-        <div class="flex gap-3 mt-2">
-          <button @click="saveSettings()" class="btn btn-primary flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors">
-            <span class="material-symbols-rounded text-sm">save</span>
+        <div class="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3 mt-2 w-full">
+          <button @click="saveSettings()" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-indigo-600/10 hover:shadow-md hover:shadow-indigo-600/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto lg:w-full xl:w-auto">
+            <span class="material-symbols-rounded text-base">save</span>
             Lưu cấu hình
           </button>
-          <button @click="handlePingApi" class="btn btn-outline flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold transition-colors">
-            <span class="material-symbols-rounded text-sm">wifi_tethering</span>
-            Kiểm tra Cloud Connection
+          <button @click="handlePingApi" class="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto lg:w-full xl:w-auto">
+            <span class="material-symbols-rounded text-base">wifi_tethering</span>
+            Kiểm tra kết nối Cloud
           </button>
         </div>
       </div>
@@ -378,14 +378,14 @@ async function handleVatAdminLogin() {
           <span class="text-sm text-slate-700 font-medium">Tự động đồng bộ khi thu ngân mở ca</span>
         </label>
 
-        <div class="flex gap-3 mt-2">
-          <button @click="handleTestConnection" :disabled="cukTestLoading" class="btn btn-outline flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50">
-            <span class="material-symbols-rounded text-sm" :class="{ 'animate-spin': cukTestLoading }">{{ cukTestLoading ? 'sync' : 'wifi_find' }}</span>
+        <div class="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3 mt-2 w-full">
+          <button @click="handleTestConnection" :disabled="cukTestLoading" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
+            <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': cukTestLoading }">{{ cukTestLoading ? 'sync' : 'wifi_find' }}</span>
             Kiểm tra kết nối
           </button>
-          <button @click="handleSyncInvoices" :disabled="cukSyncLoading" class="btn btn-primary flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50">
-            <span class="material-symbols-rounded text-sm" :class="{ 'animate-spin': cukSyncLoading }">{{ cukSyncLoading ? 'sync' : 'sync' }}</span>
-            Đồng bộ hóa đơn ngay
+          <button @click="handleSyncInvoices" :disabled="cukSyncLoading" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-emerald-600/10 hover:shadow-md hover:shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
+            <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': cukSyncLoading }">sync</span>
+            Đồng bộ hóa đơn
           </button>
         </div>
 
@@ -469,7 +469,7 @@ async function handleVatAdminLogin() {
 
         <div class="flex gap-2 items-center">
           <input type="password" v-model="adminPass" class="form-input px-3 py-1.5 border border-slate-200 rounded-lg text-xs" style="width:160px; letter-spacing: 2px;" placeholder="Mã truy cập...">
-          <button @click="handleVatAdminLogin" :disabled="vatLoading" class="btn btn-outline flex items-center gap-2 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
+          <button @click="handleVatAdminLogin" :disabled="vatLoading" class="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-xs hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer">
             <span class="material-symbols-rounded text-xs" :class="{ 'animate-spin': vatLoading }">sync</span>
             Lấy Keys
           </button>
@@ -540,8 +540,9 @@ async function handleVatAdminLogin() {
       </div>
 
       <div v-if="showVatKeys" class="flex gap-2">
-        <button @click="saveSettings()" class="btn btn-primary px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">
-          💾 Lưu API Keys
+        <button @click="saveSettings()" class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-indigo-600/10 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 cursor-pointer">
+          <span class="material-symbols-rounded text-sm">save</span>
+          Lưu API Keys
         </button>
       </div>
 
