@@ -392,7 +392,7 @@ async function execAction(act: any): Promise<{ ok: boolean; text: string }> {
     if (!sm) return { ok: false, text: '⚠️ Không có dữ liệu tóm tắt ca.' };
     return {
       ok: true,
-      text: `📊 Ca ${shift.shiftNumber} (${shift.cashierName}):\n• Tổng thu: ${(sm.totalIncome || 0).toLocaleString('vi-VN')} đ\n• Tổng chi: ${(sm.totalExpense || 0).toLocaleString('vi-VN')} đ\n• Số GD: ${sm.transactionCount || 0}`
+      text: `📊 Ca ${shift.shiftNumber} (${shift.cashierName}):\n• Tổng thu: ${(sm.totalIncome || 0).toLocaleString('vi-VN')} đ\n• Tổng chi: ${(sm.totalExpense || 0).toLocaleString('vi-VN')} đ\n• Số hóa đơn: ${sm.billCount || 0}\n• Giao dịch thu/chi: ${(shift.transactions?.length || 0) + (shift.otherTransactions?.length || 0)}`
     };
   }
 
@@ -617,7 +617,7 @@ onUnmounted(() => {
       <!-- Warnings/API Keys notice -->
       <div v-if="!hasApiKeys" class="cb-warn">
         ⚠️ Chưa cấu hình API Key. 
-        <a href="#vat" class="font-bold underline text-rose-700 ml-1" @click="isOpen = false">Nhấn vào đây để thiết lập</a>
+        <a href="#vat" class="font-bold underline text-rose-700 ml-1" @click.prevent="appStore.navigateTo('vat'); isOpen = false">Nhấn vào đây để thiết lập</a>
       </div>
 
       <!-- Quick Suggestion Chips -->
@@ -646,7 +646,7 @@ onUnmounted(() => {
         />
         <button 
           class="btn btn-primary cb-send" 
-          :disabled="isProcessing || !inputValue.trim() || !hasApiKeys"
+          :disabled="isProcessing || !inputValue.trim()"
           @click="handleSend"
         >
           <span class="material-symbols-rounded">send</span>

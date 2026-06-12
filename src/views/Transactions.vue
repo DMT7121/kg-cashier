@@ -826,7 +826,7 @@ onMounted(() => {
             <label class="block text-xs font-bold text-slate-500">Danh mục</label>
             <select 
               v-model="txCategory" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none cursor-pointer"
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all cursor-pointer"
               @change="onCategoryChange"
             >
               <option 
@@ -845,7 +845,7 @@ onMounted(() => {
             <input 
               type="text" 
               v-model="newCategoryName" 
-              class="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+              class="flex-1 px-3 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all"
               placeholder="Tên danh mục mới..."
               @keydown.enter.prevent="handleAddCategory"
             />
@@ -863,7 +863,7 @@ onMounted(() => {
             <input 
               type="text" 
               v-model="txAmountInput" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none"
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all"
               :placeholder="amountPlaceholder"
               autofocus
             />
@@ -884,7 +884,7 @@ onMounted(() => {
                 v-for="pm in ['cash', 'card', 'transfer'] as const"
                 :key="pm"
                 class="py-2 text-xs font-bold rounded-xl transition-all border cursor-pointer"
-                :class="txPaymentMethod === pm ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100'"
+                :class="txPaymentMethod === pm ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/10' : 'bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100'"
                 @click="txPaymentMethod = pm"
               >
                 {{ pm === 'cash' ? '💵 Mặt' : pm === 'card' ? '💳 Thẻ' : '🔄 CK' }}
@@ -898,7 +898,7 @@ onMounted(() => {
             <input 
               type="text" 
               v-model="txNote" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all"
               placeholder="VD: Bàn số 5, mua nước ngọt lẻ..."
             />
           </div>
@@ -943,7 +943,7 @@ onMounted(() => {
               <label class="block text-xs font-bold text-slate-500">Loại luồng</label>
               <select 
                 v-model="otherType" 
-                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none cursor-pointer"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 <option value="income">↑ Thu khác</option>
                 <option value="expense">↓ Chi khác</option>
@@ -955,7 +955,7 @@ onMounted(() => {
               <input 
                 type="number" 
                 v-model="otherAmount" 
-                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all"
                 placeholder="0"
               />
             </div>
@@ -966,7 +966,7 @@ onMounted(() => {
             <input 
               type="text" 
               v-model="otherCategory" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none"
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all"
               placeholder="VD: Tiền tip, Thu hồi nợ cũ, Đền bù..."
             />
           </div>
@@ -976,7 +976,7 @@ onMounted(() => {
             <input 
               type="text" 
               v-model="otherNote" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all"
               placeholder="Nhập chi tiết..."
             />
           </div>

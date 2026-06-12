@@ -142,7 +142,7 @@ async function handleTestConnection() {
   showToast('Đang kiểm tra kết nối CUKCUK...', 'info');
 
   try {
-    const { testConnection } = await import('../../integration/cukcuk.js');
+    const { testConnection } = await import('../../integration/cukcuk');
     const result = await testConnection();
     cukResultSuccess.value = result.success;
     if (result.success) {
@@ -167,7 +167,7 @@ async function handleSyncInvoices() {
   showToast('Đang đồng bộ hóa đơn CUKCUK...', 'info');
 
   try {
-    const { syncTransactions } = await import('../../integration/cukcuk.js');
+    const { syncTransactions } = await import('../../integration/cukcuk');
     const result = await syncTransactions(true);
     if (result && result.success) {
       let msg = '✅ Đồng bộ hoàn tất!\n';
@@ -179,7 +179,7 @@ async function handleSyncInvoices() {
         if (p.card > 0) msg += `💳 Quẹt thẻ: ${p.card.toLocaleString('vi-VN')}đ\n`;
         if (p.transfer > 0) msg += `🏦 Chuyển khoản: ${p.transfer.toLocaleString('vi-VN')}đ\n`;
       }
-      if (result.skipped > 0) msg += `⏭ Đã có từ trước: ${result.skipped}`;
+      if (result.skipped !== undefined && result.skipped > 0) msg += `⏭ Đã có từ trước: ${result.skipped}`;
       cukResultSuccess.value = true;
       cukResultMsg.value = msg;
       showToast('✅ Đồng bộ CUKCUK hoàn tất!', 'success');

@@ -169,8 +169,11 @@ function formatInputValue(val: string) {
     return;
   }
   
+  // Strip existing separators before formatting, so \d+ matches whole numbers
+  let withoutSeparators = raw.replace(/[.,]/g, '');
+  
   // Format visual look of standard digits
-  let formatted = raw.replace(/\d+/g, (match) => {
+  let formatted = withoutSeparators.replace(/\d+/g, (match) => {
     return match.replace(/\B(?=(\d{3})+(?!\d))/g, decimalSeparator.value);
   });
   

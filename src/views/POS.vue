@@ -1069,32 +1069,32 @@ function saveProduct() {
 
         <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
           <!-- 1. Editor panel -->
-          <div v-if="isCatalogEditMode" class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3.5">
+          <div v-if="isCatalogEditMode" class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3.5 animate-fade-in">
             <span class="text-xs font-bold text-slate-800">{{ catalogEditIndex === -1 ? 'Thêm món ăn mới' : 'Sửa món ăn' }}</span>
             
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-2">
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Tên món</label>
-                <input v-model="editProduct.name" type="text" class="w-full px-2.5 py-2 border rounded-xl text-xs font-bold" />
+                <input v-model="editProduct.name" type="text" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all" />
               </div>
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Biểu tượng</label>
-                <input v-model="editProduct.emoji" type="text" class="w-full px-2.5 py-2 border rounded-xl text-xs text-center" />
+                <input v-model="editProduct.emoji" type="text" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs text-center transition-all" />
               </div>
             </div>
 
             <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Danh mục</label>
-                <input v-model="editProduct.category" type="text" class="w-full px-2.5 py-2 border rounded-xl text-xs font-semibold" placeholder="VD: Nướng, Lẩu..." />
+                <input v-model="editProduct.category" type="text" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all" placeholder="VD: Nướng, Lẩu..." />
               </div>
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Giá bán (đ)</label>
-                <input v-model.number="editProduct.price" type="number" class="w-full px-2.5 py-2 border rounded-xl text-xs font-extrabold" />
+                <input v-model.number="editProduct.price" type="number" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-extrabold transition-all" />
               </div>
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Loại món</label>
-                <select v-model="editProduct.type" class="w-full px-2 py-2 border rounded-xl text-xs font-semibold">
+                <select v-model="editProduct.type" class="w-full px-2 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all cursor-pointer">
                   <option value="food">Món ăn (Bếp)</option>
                   <option value="drink">Đồ uống (Bar)</option>
                 </select>

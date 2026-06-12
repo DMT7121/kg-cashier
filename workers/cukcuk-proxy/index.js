@@ -11,9 +11,24 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
 ];
 
+function isAllowedOrigin(origin) {
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    const protocol = url.protocol;
+    if ((protocol === 'http:' || protocol === 'https:') && 
+        (hostname === 'localhost' || hostname === '127.0.0.1' || 
+         /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(hostname))) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 function getCorsHeaders(request) {
   const origin = request.headers.get('Origin') || '';
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -449,7 +464,7 @@ async function handleProxy(context) {
 
   // Origin check
   const origin = request.headers.get('Origin') || '';
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+  if (origin && !isAllowedOrigin(origin)) {
     return new Response('Forbidden', { status: 403 });
   }
 

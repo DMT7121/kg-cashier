@@ -6,7 +6,6 @@ import { useCategoriesStore } from '../stores/categories';
 import { useAppStore } from '../stores/app';
 import { getShiftsFromCloud } from '../services/api';
 import { getInvoicesByShiftTime } from '../services/invoiceStore';
-// @ts-expect-error - legacy JS module
 import { syncInvoicesForDate } from '../integration/cukcuk';
 import { 
   formatCurrency, 

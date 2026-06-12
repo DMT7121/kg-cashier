@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useShiftStore } from '../stores/shift';
 import { useSettingsStore } from '../stores/settings';
 import { getTodayRevenue, getRevenueSummary, RevenueSummaryResult, TodayRevenueResult } from '../services/invoiceStore';
-import { syncTransactions, getSyncStatus } from '../integration/cukcuk.js';
+import { syncTransactions, getSyncStatus } from '../integration/cukcuk';
 import { formatMoney, showToast } from '../utils';
 
 // Stores

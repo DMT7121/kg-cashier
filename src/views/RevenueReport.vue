@@ -24,7 +24,7 @@ import {
   syncTransactions, 
   syncSingleInvoice, 
   pushManualEditToSheets 
-} from '../integration/cukcuk.js';
+} from '../integration/cukcuk';
 import { SAInvoice, PaymentLine } from '../types/invoice';
 import { Shift, ShiftSummary } from '../types/shift';
 

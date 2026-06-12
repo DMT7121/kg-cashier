@@ -113,6 +113,9 @@ export const useSettingsStore = defineStore('settings', () => {
       settings.value = { ...DEFAULT_SETTINGS };
     }
     await settingsDb.setItem('kg-settings', JSON.parse(JSON.stringify(settings.value)));
+    
+    // Sync sandbox mode with allowDevWrite status
+    setSandbox(!settings.value.allowDevWrite);
   }
 
   async function updateSettings(newSettings: Partial<Settings>) {
@@ -154,6 +157,9 @@ export const useSettingsStore = defineStore('settings', () => {
     // Save locally
     const rawData = JSON.parse(JSON.stringify(settings.value));
     await settingsDb.setItem('kg-settings', rawData);
+    
+    // Sync sandbox mode with allowDevWrite status
+    setSandbox(!settings.value.allowDevWrite);
     
     // Save to Cloud asynchronously (fire and forget / error handled downstream)
     saveSettingsToCloud(rawData);

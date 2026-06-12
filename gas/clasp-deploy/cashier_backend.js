@@ -2855,33 +2855,11 @@ const CukcukService = {
         throw new Error('Thiếu cấu hình CUKCUK trong Script Properties (CUKCUK_DOMAIN, CUKCUK_APP_ID, CUKCUK_SECRET_KEY).');
       }
       
-      const loginUrl = 'https://' + domain.replace(/^https?:\/\//, '') + '/api/oauth/token';
-      const payload = {
-        AppID: appId,
-        SecretKey: secretKey
-      };
-      
-      const response = UrlFetchApp.fetch(loginUrl, {
-        method: 'POST',
-        contentType: 'application/json',
-        payload: JSON.stringify(payload),
-        muteHttpExceptions: true
-      });
-      
-      const code = response.getResponseCode();
-      const resText = response.getContentText();
-      if (code !== 200) {
-        throw new Error('CUKCUK Auth failed: HTTP ' + code + ' - ' + resText);
-      }
-      
-      const resData = JSON.parse(resText);
-      if (!resData.Success) {
-        throw new Error('CUKCUK API Auth error: ' + (resData.ErrorMessage || 'Chưa xác định'));
-      }
-      
-      const access_token = resData.Data.AccessToken;
-      const expires_in = resData.Data.ExpiresIn || 3600; // default 1 hour
-      const company_code = resData.Data.CompanyCode;
+      // Use the correct signature-signed login function targeting graphapi.cukcuk.vn
+      const loginRes = _loginCukcukInGas(appId, domain, secretKey);
+      const access_token = loginRes.accessToken;
+      const company_code = loginRes.companyCode;
+      const expires_in = 23 * 60 * 60; // 23 hours safety margin for CUKCUK's 24h token TTL
       
       this.saveTokenInfo(access_token, now + expires_in * 1000, company_code);
       return { token: access_token, companyCode: company_code, refreshed: true };
@@ -2891,9 +2869,8 @@ const CukcukService = {
   },
   
   _apiCall: function(path, options, loginInfo) {
-    const props = PropertiesService.getScriptProperties();
-    const domain = props.getProperty('CUKCUK_DOMAIN') || '';
-    const url = 'https://' + domain.replace(/^https?:\/\//, '') + path;
+    // Route CUKCUK API calls to the correct centralized domain
+    const url = 'https://graphapi.cukcuk.vn' + path;
     
     const headers = {
       'Authorization': 'Bearer ' + loginInfo.token,
@@ -3609,6 +3586,15 @@ function _rollbackCukcukInvoiceAction(data) {
       error: { code: 'SHEET_WRITE_FAILED', detail: e.toString() }
     };
   }
+}
+
+/**
+ * Hàm hỗ trợ test kết nối ngoài để kích hoạt popup cấp quyền UrlFetchApp
+ */
+function testExternalRequest() {
+  Logger.log("Testing connection...");
+  const response = UrlFetchApp.fetch("https://graphapi.cukcuk.vn");
+  Logger.log("Response code: " + response.getResponseCode());
 }
 
 

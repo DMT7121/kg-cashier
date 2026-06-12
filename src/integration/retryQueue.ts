@@ -6,39 +6,52 @@
    Triggers auto-retry on network recovery (online event).
    ══════════════════════════════════════════════════════════════ */
 
-var RETRY_KEY = 'kg_sheets_retry_queue';
-var MAX_RETRIES = 5;
-var BACKOFF_MS = [30000, 60000, 120000, 300000, 600000]; // 30s, 1m, 2m, 5m, 10m
-var _retryTimer = null;
-var _pushFn = null; // will be set via init()
+interface Batch {
+  sheetData: any[];
+  shiftId: string;
+  refIds: string[];
+  retries: number;
+  nextRetryAt: number;
+  createdAt: string;
+  failed?: boolean;
+}
 
-function _load() {
+interface Queue {
+  batches: Batch[];
+}
+
+const RETRY_KEY = 'kg_sheets_retry_queue';
+const MAX_RETRIES = 5;
+const BACKOFF_MS = [30000, 60000, 120000, 300000, 600000]; // 30s, 1m, 2m, 5m, 10m
+let _retryTimer: any = null;
+let _pushFn: ((sheetData: any[], shiftId: string) => Promise<{ success: boolean; message?: string }>) | null = null; // will be set via init()
+
+function _load(): Queue {
   try {
-    var saved = localStorage.getItem(RETRY_KEY);
+    const saved = localStorage.getItem(RETRY_KEY);
     if (saved) return JSON.parse(saved);
-  } catch(e) { /* ignore */ }
+  } catch (e) { /* ignore */ }
   return { batches: [] };
 }
 
-function _save(queue) {
+function _save(queue: Queue): void {
   try {
     localStorage.setItem(RETRY_KEY, JSON.stringify(queue));
-  } catch(e) { /* ignore */ }
+  } catch (e) { /* ignore */ }
 }
 
 /**
  * Initialize with the actual push function.
- * @param {Function} pushFn - async (sheetData, shiftId) => { success: boolean }
  */
-export function init(pushFn) {
+export function init(pushFn: (sheetData: any[], shiftId: string) => Promise<{ success: boolean; message?: string }>): void {
   _pushFn = pushFn;
   // Auto-retry on network recovery
-  window.addEventListener('online', function() {
+  window.addEventListener('online', () => {
     console.log('[RetryQueue] Network recovered, triggering retry...');
     processQueue();
   });
   // Check for pending items on init
-  var q = _load();
+  const q = _load();
   if (q.batches.length > 0) {
     console.log('[RetryQueue] Found ' + q.batches.length + ' pending batches on init');
     setTimeout(processQueue, 5000); // Delay to let app settle
@@ -48,8 +61,8 @@ export function init(pushFn) {
 /**
  * Enqueue a batch for push. Called after syncCukcukRevenueToCloud fails.
  */
-export function enqueue(sheetData, shiftId, refIds) {
-  var q = _load();
+export function enqueue(sheetData: any[], shiftId: string, refIds: string[]): void {
+  const q = _load();
   q.batches.push({
     sheetData: sheetData,
     shiftId: shiftId,
@@ -66,17 +79,17 @@ export function enqueue(sheetData, shiftId, refIds) {
 /**
  * Process all due batches.
  */
-export async function processQueue() {
+export async function processQueue(): Promise<void> {
   if (!_pushFn) return;
-  var q = _load();
+  const q = _load();
   if (q.batches.length === 0) return;
 
-  var now = Date.now();
-  var remaining = [];
-  var processed = 0;
+  const now = Date.now();
+  const remaining: Batch[] = [];
+  let processed = 0;
 
-  for (var i = 0; i < q.batches.length; i++) {
-    var batch = q.batches[i];
+  for (let i = 0; i < q.batches.length; i++) {
+    const batch = q.batches[i];
     
     // Not due yet
     if (batch.nextRetryAt > now) {
@@ -92,7 +105,7 @@ export async function processQueue() {
     }
 
     try {
-      var res = await _pushFn(batch.sheetData, batch.shiftId);
+      const res = await _pushFn(batch.sheetData, batch.shiftId);
       if (res && res.success) {
         processed++;
         console.log('[RetryQueue] ✅ Batch pushed: ' + batch.sheetData.length + ' invoices (retry #' + batch.retries + ')');
@@ -101,9 +114,9 @@ export async function processQueue() {
       } else {
         throw new Error(res && res.message || 'Push failed');
       }
-    } catch(e) {
+    } catch (e: any) {
       batch.retries++;
-      var delay = BACKOFF_MS[Math.min(batch.retries, BACKOFF_MS.length - 1)];
+      const delay = BACKOFF_MS[Math.min(batch.retries, BACKOFF_MS.length - 1)];
       batch.nextRetryAt = Date.now() + delay;
       remaining.push(batch);
       console.warn('[RetryQueue] ❌ Retry #' + batch.retries + ' failed, next in ' + (delay / 1000) + 's:', e.message);
@@ -120,25 +133,25 @@ export async function processQueue() {
   _scheduleNext();
 }
 
-function _markPushed(refIds) {
+function _markPushed(refIds: string[]): void {
   try {
-    import('../services/invoiceStore').then(function(store) {
+    import('../services/invoiceStore').then((store) => {
       store.markPushedToSheets(refIds);
     });
-  } catch(e) { /* ignore */ }
+  } catch (e) { /* ignore */ }
 }
 
-function _scheduleNext() {
+function _scheduleNext(): void {
   clearTimeout(_retryTimer);
-  var q = _load();
-  var earliest = Infinity;
-  for (var i = 0; i < q.batches.length; i++) {
+  const q = _load();
+  let earliest = Infinity;
+  for (let i = 0; i < q.batches.length; i++) {
     if (!q.batches[i].failed && q.batches[i].nextRetryAt < earliest) {
       earliest = q.batches[i].nextRetryAt;
     }
   }
   if (earliest < Infinity) {
-    var delay = Math.max(earliest - Date.now(), 1000);
+    const delay = Math.max(earliest - Date.now(), 1000);
     _retryTimer = setTimeout(processQueue, delay);
   }
 }
@@ -146,12 +159,12 @@ function _scheduleNext() {
 /**
  * Get queue status for UI display.
  */
-export function getStatus() {
-  var q = _load();
-  var pending = 0;
-  var failed = 0;
-  var totalInvoices = 0;
-  for (var i = 0; i < q.batches.length; i++) {
+export function getStatus(): { pending: number; failed: number; totalInvoices: number; total: number } {
+  const q = _load();
+  let pending = 0;
+  let failed = 0;
+  let totalInvoices = 0;
+  for (let i = 0; i < q.batches.length; i++) {
     totalInvoices += q.batches[i].sheetData.length;
     if (q.batches[i].failed) failed++;
     else pending++;
@@ -162,9 +175,9 @@ export function getStatus() {
 /**
  * Retry all failed batches (manual trigger from UI).
  */
-export function retryFailed() {
-  var q = _load();
-  for (var i = 0; i < q.batches.length; i++) {
+export function retryFailed(): void {
+  const q = _load();
+  for (let i = 0; i < q.batches.length; i++) {
     if (q.batches[i].failed) {
       q.batches[i].failed = false;
       q.batches[i].retries = 0;
@@ -178,7 +191,7 @@ export function retryFailed() {
 /**
  * Clear the entire queue (destructive, for admin use).
  */
-export function clearQueue() {
+export function clearQueue(): void {
   _save({ batches: [] });
   clearTimeout(_retryTimer);
 }

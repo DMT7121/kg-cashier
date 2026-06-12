@@ -16,10 +16,10 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
-    // CORS Proxy for CUKCUK API - routes /cukcuk-api/* to graphapi.cukcuk.vn
+    // CORS Proxy for CUKCUK API - routes /cukcuk-api/* to the central worker proxy
     proxy: {
       '/cukcuk-api': {
-        target: 'https://graphapi.cukcuk.vn',
+        target: 'https://kg-cukcuk-api.dmt-kgwork.workers.dev',
         changeOrigin: true,
         rewrite: function(path) { return path.replace(/^\/cukcuk-api/, ''); },
         secure: true
