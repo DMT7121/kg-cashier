@@ -30,8 +30,18 @@
   .sidebar-brand {
     @apply flex items-center gap-3 p-5 border-b border-slate-100;
   }
+  .brand-logo-container {
+    @apply w-10 h-10 rounded-2xl bg-white p-1 flex items-center justify-center transition-all duration-300;
+    box-shadow: 0 0 12px rgba(37, 99, 235, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04);
+  }
+  .brand-logo-container:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.15), 0 4px 12px rgba(0, 0, 0, 0.06);
+  }
   .brand-logo {
-    @apply w-10 h-10 rounded-2xl bg-blue-600 text-white shadow-md p-1 object-contain;
+    @apply w-full h-full object-contain;
+    filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.5)) drop-shadow(0 0 1px rgba(234, 179, 8, 0.2));
+    animation: logo-glow-pulse 2.5s ease-in-out infinite;
   }
   .sidebar-brand h1 {
     @apply text-lg font-bold text-slate-900 tracking-tight;
@@ -183,6 +193,14 @@
   @keyframes cb-pulse-glow {
     0%, 100% { box-shadow: 0 0 8px 2px rgba(37, 99, 235, 0.25), 0 4px 12px rgba(37, 99, 235, 0.15); }
     50% { box-shadow: 0 0 20px 6px rgba(37, 99, 235, 0.45), 0 4px 24px rgba(37, 99, 235, 0.25); }
+  }
+  @keyframes logo-glow-pulse {
+    0%, 100% {
+      filter: drop-shadow(0 0 2px rgba(234, 179, 8, 0.45)) drop-shadow(0 0 0.5px rgba(234, 179, 8, 0.2));
+    }
+    50% {
+      filter: drop-shadow(0 0 8px rgba(234, 179, 8, 0.85)) drop-shadow(0 0 1.5px rgba(234, 179, 8, 0.4));
+    }
   }
   .cb-fab {
     @apply fixed bottom-6 right-6 z-[999] w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-full flex items-center justify-center cursor-pointer transition-all border-2 border-blue-300 hover:scale-110;

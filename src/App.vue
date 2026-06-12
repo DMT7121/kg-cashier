@@ -160,7 +160,9 @@ onUnmounted(() => {
     <!-- Sidebar Panel -->
     <aside class="sidebar" :class="{ 'sidebar-visible': isMobileSidebarOpen }">
       <div class="sidebar-brand">
-        <img src="/android-chrome-192x192.png" alt="KG" class="brand-logo" />
+        <div class="brand-logo-container">
+          <img src="/android-chrome-192x192.png" alt="KG" class="brand-logo" />
+        </div>
         <div>
           <h1>KING's GRILL</h1>
           <small>Hệ thống thu ngân</small>
