@@ -5,6 +5,14 @@
 import { invoicesDb } from './db';
 import { SAInvoice, SAInvoiceDetail, PaymentLine } from '../types/invoice';
 import { getWorkingDayRange, toMoney, addMoney } from '../utils';
+import { 
+  getRevenueOverviewOnCloud,
+  getRevenueByDayOnCloud,
+  getRevenueByWeekOnCloud,
+  getRevenueByMonthOnCloud,
+  getRevenueByQuarterOnCloud,
+  getRevenueByYearOnCloud
+} from './api';
 
 const STORE_VERSION = 1;
 
@@ -265,12 +273,11 @@ function _isInBounds(inv: SAInvoice, bounds: PeriodBounds): boolean {
   return false;
 }
 
-/** Lọc hóa đơn theo kỳ — chính xác theo timestamp, loại trừ bill chưa thanh toán */
+/** Lọc hóa đơn theo kỳ — chính xác theo timestamp */
 export async function getInvoicesForPeriod(period: string, refDate?: string | Date): Promise<SAInvoice[]> {
   const bounds = getPeriodBounds(period, refDate);
   const all = await getAllInvoices();
   return all.filter((inv) => {
-    if ((inv as any).unpaid) return false;
     return _isInBounds(inv, bounds);
   });
 }
@@ -294,9 +301,178 @@ export interface RevenueSummaryResult {
 
 /** Tổng hợp doanh thu theo kỳ */
 export async function getRevenueSummary(period: string, refDate?: string | Date): Promise<RevenueSummaryResult> {
-  const invoices = await getInvoicesForPeriod(period, refDate);
   const bounds = getPeriodBounds(period, refDate);
-  
+  const startStr = _dateStr(bounds.start);
+  const endStr = _dateStr(bounds.end);
+
+  try {
+    if (period === 'day') {
+      const res = await getRevenueByDayOnCloud({ date: startStr });
+      if (res && (res.success || res.ok) && res.data) {
+        const d = res.data;
+        const total = Number(d.finalAmount) || 0;
+        const cash = Number(d.cashAmount) || 0;
+        const card = Number(d.cardAmount) || 0;
+        const transfer = Number(d.transferAmount) || 0;
+        const bills = Number(d.invoiceCount) || 0;
+        return {
+          period,
+          periodLabel: bounds.label,
+          totalRevenue: total,
+          totalCash: cash,
+          totalCard: card,
+          totalTransfer: transfer,
+          totalBills: bills,
+          avgPerBill: bills > 0 ? Math.round(total / bills) : 0,
+          avgDaily: total,
+          daysWithData: 1,
+          firstDate: startStr,
+          lastDate: startStr
+        };
+      }
+    } else if (period === 'week') {
+      const dateObj = new Date(bounds.start.getTime());
+      dateObj.setDate(dateObj.getDate() + 3 - (dateObj.getDay() + 6) % 7);
+      const week1 = new Date(dateObj.getFullYear(), 0, 4);
+      const weekNum = 1 + Math.round(((dateObj.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+      const weekKey = dateObj.getFullYear() + '-W' + String(weekNum).padStart(2, '0');
+
+      const res = await getRevenueByWeekOnCloud({ weekKey });
+      if (res && (res.success || res.ok) && res.data) {
+        const d = res.data;
+        const total = Number(d.finalAmount) || 0;
+        const cash = Number(d.cashAmount) || 0;
+        const card = Number(d.cardAmount) || 0;
+        const transfer = Number(d.transferAmount) || 0;
+        const bills = Number(d.invoiceCount) || 0;
+        
+        let daysCount = 0;
+        try {
+          const breakdown = JSON.parse(d.topDaysJson || '[]');
+          daysCount = breakdown.filter((item: any) => item.amount > 0).length;
+        } catch(e) {}
+        
+        return {
+          period,
+          periodLabel: bounds.label,
+          totalRevenue: total,
+          totalCash: cash,
+          totalCard: card,
+          totalTransfer: transfer,
+          totalBills: bills,
+          avgPerBill: bills > 0 ? Math.round(total / bills) : 0,
+          avgDaily: daysCount > 0 ? Math.round(total / daysCount) : 0,
+          daysWithData: daysCount,
+          firstDate: d.weekStart || startStr,
+          lastDate: d.weekEnd || endStr
+        };
+      }
+    } else if (period === 'month') {
+      const monthKey = startStr.substring(0, 7);
+      const res = await getRevenueByMonthOnCloud({ monthKey });
+      if (res && (res.success || res.ok) && res.data) {
+        const d = res.data;
+        const total = Number(d.finalAmount) || 0;
+        const cash = Number(d.cashAmount) || 0;
+        const card = Number(d.cardAmount) || 0;
+        const transfer = Number(d.transferAmount) || 0;
+        const bills = Number(d.invoiceCount) || 0;
+        
+        let daysCount = 0;
+        try {
+          const breakdown = JSON.parse(d.daysJson || '[]');
+          daysCount = breakdown.filter((item: any) => item.amount > 0).length;
+        } catch(e) {}
+
+        return {
+          period,
+          periodLabel: bounds.label,
+          totalRevenue: total,
+          totalCash: cash,
+          totalCard: card,
+          totalTransfer: transfer,
+          totalBills: bills,
+          avgPerBill: bills > 0 ? Math.round(total / bills) : 0,
+          avgDaily: daysCount > 0 ? Math.round(total / daysCount) : 0,
+          daysWithData: daysCount,
+          firstDate: startStr,
+          lastDate: endStr
+        };
+      }
+    } else if (period === 'quarter') {
+      const m = bounds.start.getMonth() + 1;
+      const qNum = Math.floor((m - 1) / 3) + 1;
+      const quarterKey = bounds.start.getFullYear() + '-Q' + qNum;
+
+      const res = await getRevenueByQuarterOnCloud({ quarterKey });
+      if (res && (res.success || res.ok) && res.data) {
+        const d = res.data;
+        const total = Number(d.finalAmount) || 0;
+        const cash = Number(d.cashAmount) || 0;
+        const card = Number(d.cardAmount) || 0;
+        const transfer = Number(d.transferAmount) || 0;
+        const bills = Number(d.invoiceCount) || 0;
+        
+        let daysCount = 0;
+        try {
+          const breakdown = JSON.parse(d.monthsJson || '[]');
+          daysCount = breakdown.filter((item: any) => item.amount > 0).length;
+        } catch(e) {}
+
+        return {
+          period,
+          periodLabel: bounds.label,
+          totalRevenue: total,
+          totalCash: cash,
+          totalCard: card,
+          totalTransfer: transfer,
+          totalBills: bills,
+          avgPerBill: bills > 0 ? Math.round(total / bills) : 0,
+          avgDaily: daysCount > 0 ? Math.round(total / daysCount) : 0,
+          daysWithData: daysCount,
+          firstDate: startStr,
+          lastDate: endStr
+        };
+      }
+    } else if (period === 'year') {
+      const year = bounds.start.getFullYear();
+      const res = await getRevenueByYearOnCloud({ year });
+      if (res && (res.success || res.ok) && res.data) {
+        const d = res.data;
+        const total = Number(d.finalAmount) || 0;
+        const cash = Number(d.cashAmount) || 0;
+        const card = Number(d.cardAmount) || 0;
+        const transfer = Number(d.transferAmount) || 0;
+        const bills = Number(d.invoiceCount) || 0;
+        
+        let daysCount = 0;
+        try {
+          const breakdown = JSON.parse(d.monthsJson || '[]');
+          daysCount = breakdown.filter((item: any) => item.amount > 0).length;
+        } catch(e) {}
+
+        return {
+          period,
+          periodLabel: bounds.label,
+          totalRevenue: total,
+          totalCash: cash,
+          totalCard: card,
+          totalTransfer: transfer,
+          totalBills: bills,
+          avgPerBill: bills > 0 ? Math.round(total / bills) : 0,
+          avgDaily: daysCount > 0 ? Math.round(total / daysCount) : 0,
+          daysWithData: daysCount,
+          firstDate: startStr,
+          lastDate: endStr
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[InvoiceStore] Cloud getRevenueSummary failed, falling back to IndexedDB scan:', err);
+  }
+
+  // FALLBACK: SCAN LOCAL INDEXEDDB
+  const invoices = await getInvoicesForPeriod(period, refDate);
   const result: RevenueSummaryResult = {
     period: period,
     periodLabel: bounds.label,
@@ -351,6 +527,20 @@ export interface DailyBreakdownItem {
 
 /** Phân tích doanh thu theo ngày làm việc, sắp xếp giảm dần */
 export async function getDailyBreakdown(period: string, refDate?: string | Date): Promise<DailyBreakdownItem[]> {
+  const bounds = getPeriodBounds(period, refDate);
+  const startStr = _dateStr(bounds.start);
+  const endStr = _dateStr(bounds.end);
+
+  try {
+    const res = await getRevenueOverviewOnCloud({ fromDate: startStr, toDate: endStr });
+    if (res && (res.success || res.ok) && res.data && Array.isArray(res.data.days)) {
+      return [...res.data.days].sort((a: any, b: any) => b.date.localeCompare(a.date));
+    }
+  } catch (err) {
+    console.warn('[InvoiceStore] Cloud getDailyBreakdown failed, falling back to IndexedDB scan:', err);
+  }
+
+  // FALLBACK: SCAN LOCAL INDEXEDDB
   const invoices = await getInvoicesForPeriod(period, refDate);
   const days: Record<string, DailyBreakdownItem> = {};
 

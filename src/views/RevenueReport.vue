@@ -23,10 +23,12 @@ import {
 import { 
   syncTransactions, 
   syncSingleInvoice, 
+  syncInvoicesForDate,
   pushManualEditToSheets 
 } from '../integration/cukcuk';
 import { SAInvoice, PaymentLine } from '../types/invoice';
 import { Shift, ShiftSummary } from '../types/shift';
+import { getCukcukInvoicesFromCloud } from '../services/api';
 
 // ── Types ──────────────────────────────────
 interface ItemSale {
@@ -48,10 +50,10 @@ const shiftStore = useShiftStore();
 const settingsStore = useSettingsStore();
 
 // ── Tab Management ──────────────────────────
-const activeTab = ref<'report' | 'invoices' | 'analytics'>('report');
+const activeTab = ref<'report' | 'invoices' | 'analytics' | 'audit'>('report');
 
 // ── Shared Date Range & Period (Reports) ────
-const selectedPeriod = ref<'day' | 'week' | 'month' | 'quarter'>('day');
+const selectedPeriod = ref<'day' | 'week' | 'month' | 'quarter' | 'year'>('day');
 const reportDate = ref<string>(todayStr());
 const reportWeek = ref<string>(''); // YYYY-Www format
 const reportMonth = ref<string>(toLocalMonthStr(new Date())); // YYYY-MM
@@ -72,7 +74,9 @@ const summaryData = ref({
   cash: 0,
   card: 0,
   transfer: 0,
-  bills: 0
+  bills: 0,
+  avgPerBill: 0,
+  unpaid: 0
 });
 
 // Analytics Comparison State
@@ -238,6 +242,9 @@ const activeDateRange = computed(() => {
     const range = getQuarterRange(reportQuarter.value, reportQuarterYear.value);
     start = range.start;
     end = range.end;
+  } else if (selectedPeriod.value === 'year') {
+    start = new Date(reportQuarterYear.value, 0, 1);
+    end = new Date(reportQuarterYear.value, 11, 31);
   }
   
   // Set boundaries from 00:00:00.000 to 23:59:59.999
@@ -264,6 +271,53 @@ function initDefaultDates() {
   reportWeek.value = `${year}-W${String(weekNum).padStart(2, '0')}`;
 }
 
+function applyQuickFilter(period: 'today' | 'yesterday' | 'week' | 'month' | 'lastMonth' | 'quarter' | 'year') {
+  const today = new Date();
+  if (period === 'today') {
+    selectedPeriod.value = 'day';
+    reportDate.value = toLocalDateStr(today);
+  } else if (period === 'yesterday') {
+    selectedPeriod.value = 'day';
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    reportDate.value = toLocalDateStr(yesterday);
+  } else if (period === 'week') {
+    selectedPeriod.value = 'week';
+    initDefaultDates();
+  } else if (period === 'month') {
+    selectedPeriod.value = 'month';
+    reportMonth.value = toLocalMonthStr(today);
+  } else if (period === 'lastMonth') {
+    selectedPeriod.value = 'month';
+    const lastM = new Date(today);
+    lastM.setMonth(today.getMonth() - 1);
+    reportMonth.value = toLocalMonthStr(lastM);
+  } else if (period === 'quarter') {
+    selectedPeriod.value = 'quarter';
+    reportQuarter.value = Math.floor((today.getMonth() + 3) / 3);
+    reportQuarterYear.value = today.getFullYear();
+  } else if (period === 'year') {
+    selectedPeriod.value = 'year';
+    reportQuarterYear.value = today.getFullYear();
+  }
+}
+
+function getOriginalPayments(inv: SAInvoice): PaymentLine[] {
+  try {
+    const auditStr = (inv as any).auditJson || '';
+    if (auditStr) {
+      const trail = JSON.parse(auditStr);
+      if (Array.isArray(trail) && trail.length > 0 && trail[0].before) {
+        if (typeof trail[0].before === 'string') {
+          return JSON.parse(trail[0].before);
+        }
+        return trail[0].before;
+      }
+    }
+  } catch (e) {}
+  return [];
+}
+
 // ── Refresh / Fetch Reports Data ────────────
 async function refreshReportData() {
   const { start, end } = activeDateRange.value;
@@ -276,7 +330,18 @@ async function refreshReportData() {
   const labelEnd = formatDate(endStr);
   periodBoundsLabel.value = selectedPeriod.value === 'day' ? labelStart : `${labelStart} đến ${labelEnd}`;
   
-  // 1. Fetch Invoices for this date range
+  // 1. Fetch Invoices from Cloud and merge to local IndexedDB for the date range
+  try {
+    const cloudRes = await getCukcukInvoicesFromCloud({ fromDate: startStr, toDate: endStr });
+    if (cloudRes && cloudRes.success && Array.isArray(cloudRes.invoices)) {
+      const { mergeCloudInvoices } = await import('../services/invoiceStore');
+      await mergeCloudInvoices(cloudRes.invoices);
+    }
+  } catch (err) {
+    console.warn('[RevenueReport] Failed to fetch and merge cloud invoices:', err);
+  }
+  
+  // 1b. Fetch Invoices for this date range
   const dbInvoices = await getInvoicesForPeriod(selectedPeriod.value, start);
   invoices.value = dbInvoices;
   
@@ -289,14 +354,21 @@ async function refreshReportData() {
   let cash = 0;
   let card = 0;
   let transfer = 0;
+  let unpaid = 0;
+  let paidBills = 0;
   
   dbInvoices.forEach(inv => {
-    total += inv.amount;
-    (inv.payments || []).forEach(p => {
-      if (p.method === 'cash') cash += p.amount;
-      else if (p.method === 'card') card += p.amount;
-      else if (p.method === 'transfer') transfer += p.amount;
-    });
+    if ((inv as any).unpaid) {
+      unpaid += inv.amount;
+    } else {
+      total += inv.amount;
+      paidBills++;
+      (inv.payments || []).forEach(p => {
+        if (p.method === 'cash') cash += p.amount;
+        else if (p.method === 'card') card += p.amount;
+        else if (p.method === 'transfer') transfer += p.amount;
+      });
+    }
   });
   
   summaryData.value = {
@@ -304,7 +376,9 @@ async function refreshReportData() {
     cash,
     card,
     transfer,
-    bills: dbInvoices.length
+    bills: dbInvoices.length,
+    avgPerBill: paidBills > 0 ? Math.round(total / paidBills) : 0,
+    unpaid
   };
   
   // 4. Update list of shifts if period is 'day'
@@ -442,14 +516,14 @@ function shortCurrency(val: number): string {
 async function triggerCukcukSync() {
   if (isSyncing.value) return;
   isSyncing.value = true;
-  showToast('🔄 Đang đồng bộ hóa hóa đơn từ CUKCUK...', 'info');
+  const targetDate = invoiceDate.value || reportDate.value || todayStr();
+  showToast(`🔄 Đang đồng bộ hóa hóa đơn từ CUKCUK ngày ${targetDate}...`, 'info');
   try {
-    const result = await syncTransactions(true);
+    const result = await syncInvoicesForDate(targetDate);
     if (result && result.success) {
-      showToast('✅ Đồng bộ CUKCUK hoàn tất!', 'success');
       await refreshReportData();
     } else {
-      showToast('⚠️ Không có hóa đơn mới hoặc đồng bộ lỗi', 'warning');
+      showToast('⚠️ Không có hóa đơn mới hoặc đồng bộ lỗi: ' + (result.message || ''), 'warning');
     }
   } catch (e: any) {
     console.error('CUKCUK sync failed:', e);
@@ -853,7 +927,7 @@ onMounted(async () => {
         <p class="text-xs md:text-sm text-slate-500 font-medium">Theo dõi kết quả bán hàng, hóa đơn POS CUKCUK và kết ca bàn giao.</p>
       </div>
       
-      <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner max-w-max border border-slate-200">
+      <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner max-w-max border border-slate-200 flex-wrap gap-1">
         <button 
           @click="activeTab = 'report'"
           class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200"
@@ -878,6 +952,14 @@ onMounted(async () => {
           <span class="material-symbols-rounded text-lg">bar_chart</span>
           Phân tích doanh thu
         </button>
+        <button 
+          @click="activeTab = 'audit'"
+          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200"
+          :class="activeTab === 'audit' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-600 hover:text-slate-900'"
+        >
+          <span class="material-symbols-rounded text-lg">history_toggle_off</span>
+          Đối soát & Sửa tay
+        </button>
       </div>
     </div>
 
@@ -886,6 +968,29 @@ onMounted(async () => {
       
       <!-- Left sidebar controls -->
       <div class="no-print lg:col-span-4 space-y-6">
+        <!-- Quick Filters -->
+        <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-3 no-print">
+          <h4 class="font-bold text-slate-800 text-sm tracking-wide uppercase">Lọc nhanh</h4>
+          <div class="flex flex-wrap gap-2">
+            <button 
+              v-for="f in [
+                { label: 'Hôm nay', value: 'today' },
+                { label: 'Hôm qua', value: 'yesterday' },
+                { label: '7 ngày qua', value: 'week' },
+                { label: 'Tháng này', value: 'month' },
+                { label: 'Tháng trước', value: 'lastMonth' },
+                { label: 'Quý này', value: 'quarter' },
+                { label: 'Năm nay', value: 'year' }
+              ]"
+              :key="f.value"
+              @click="applyQuickFilter(f.value as any)"
+              class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer"
+            >
+              {{ f.label }}
+            </button>
+          </div>
+        </div>
+
         <!-- Date Selector Card -->
         <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
           <div class="flex items-center justify-between">
@@ -893,15 +998,15 @@ onMounted(async () => {
             <button @click="selectToday" class="text-xs text-primary font-bold hover:underline">Hôm nay</button>
           </div>
           
-          <div class="grid grid-cols-4 gap-1 p-1 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-semibold">
+          <div class="grid grid-cols-5 gap-1 p-1 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-semibold">
             <button 
-              v-for="p in (['day', 'week', 'month', 'quarter'] as const)" 
+              v-for="p in (['day', 'week', 'month', 'quarter', 'year'] as const)" 
               :key="p"
               @click="selectedPeriod = p"
               class="py-1.5 rounded-lg transition-all duration-150"
               :class="selectedPeriod === p ? 'bg-white text-slate-900 shadow-sm border border-slate-200/40' : 'text-slate-500 hover:text-slate-900'"
             >
-              {{ p === 'day' ? 'Ngày' : p === 'week' ? 'Tuần' : p === 'month' ? 'Tháng' : 'Quý' }}
+              {{ p === 'day' ? 'Ngày' : p === 'week' ? 'Tuần' : p === 'month' ? 'Tháng' : p === 'quarter' ? 'Quý' : 'Năm' }}
             </button>
           </div>
           
@@ -944,6 +1049,14 @@ onMounted(async () => {
                   type="number" 
                   v-model="reportQuarterYear" 
                   class="form-input w-20 text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2 text-center"
+                />
+              </div>
+              <div v-else-if="selectedPeriod === 'year'" class="flex gap-2">
+                <input 
+                  type="number" 
+                  v-model="reportQuarterYear" 
+                  class="form-input w-full text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2 text-center"
+                  placeholder="Năm"
                 />
               </div>
             </div>
@@ -990,9 +1103,17 @@ onMounted(async () => {
               <span class="text-slate-500 font-medium text-xs md:text-sm">Quẹt thẻ</span>
               <span class="font-bold text-slate-700 text-sm">{{ formatCurrency(summaryData.card) }}</span>
             </div>
-            <div class="flex justify-between items-center py-2">
+            <div class="flex justify-between items-center py-2 border-b border-slate-100">
               <span class="text-slate-500 font-medium text-xs md:text-sm">Chuyển khoản</span>
               <span class="font-bold text-slate-700 text-sm">{{ formatCurrency(summaryData.transfer) }}</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-slate-100">
+              <span class="text-slate-500 font-medium text-xs md:text-sm">Trung bình / Bill</span>
+              <span class="font-bold text-slate-700 text-sm">{{ formatCurrency(summaryData.avgPerBill) }}</span>
+            </div>
+            <div class="flex justify-between items-center py-2">
+              <span class="text-slate-500 font-medium text-xs md:text-sm">Chưa thanh toán</span>
+              <span class="font-bold text-rose-600 text-sm">{{ formatCurrency(summaryData.unpaid) }}</span>
             </div>
           </div>
         </div>
@@ -1009,6 +1130,160 @@ onMounted(async () => {
       <!-- Right Handover Report Sheet / Item Sales Table -->
       <div class="lg:col-span-8 space-y-6">
         
+        <!-- Overview Aggregate Cards (when showing summary for the whole period) -->
+        <div v-if="selectedPeriod !== 'day' || selectedShiftId === 'all'" class="grid grid-cols-2 md:grid-cols-4 gap-4 no-print animate-fade-in">
+          <!-- Total Revenue Card -->
+          <div class="bg-gradient-to-tr from-emerald-50 to-teal-50 border border-emerald-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-emerald-600 uppercase tracking-wide">Tổng doanh thu</span>
+              <span class="material-symbols-rounded text-emerald-600 text-lg">trending_up</span>
+            </div>
+            <div>
+              <span class="text-lg font-black text-emerald-700 block">{{ formatCurrency(summaryData.total) }}</span>
+              <span class="text-[9px] text-slate-400 font-medium">Thực tế đã thu</span>
+            </div>
+          </div>
+
+          <!-- Cash Card -->
+          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Tiền mặt</span>
+              <span class="material-symbols-rounded text-slate-500 text-lg">payments</span>
+            </div>
+            <div>
+              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.cash) }}</span>
+              <span class="text-[9px] text-slate-400 font-medium">Doanh số mặt két</span>
+            </div>
+          </div>
+
+          <!-- Card Payment -->
+          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Quẹt thẻ</span>
+              <span class="material-symbols-rounded text-slate-500 text-lg">credit_card</span>
+            </div>
+            <div>
+              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.card) }}</span>
+              <span class="text-[9px] text-slate-400 font-medium">Qua cổng quẹt POS</span>
+            </div>
+          </div>
+
+          <!-- Transfer Payment -->
+          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Chuyển khoản</span>
+              <span class="material-symbols-rounded text-slate-500 text-lg">swap_horiz</span>
+            </div>
+            <div>
+              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.transfer) }}</span>
+              <span class="text-[9px] text-slate-400 font-medium">Chuyển khoản bank</span>
+            </div>
+          </div>
+
+          <!-- Bill Count Card -->
+          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Số bill</span>
+              <span class="material-symbols-rounded text-slate-500 text-lg">receipt_long</span>
+            </div>
+            <div>
+              <span class="text-base font-extrabold text-slate-800 block">{{ summaryData.bills }} bill</span>
+              <span class="text-[9px] text-slate-400 font-medium">Tổng số hóa đơn</span>
+            </div>
+          </div>
+
+          <!-- Avg per Bill Card -->
+          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Trung bình / Bill</span>
+              <span class="material-symbols-rounded text-slate-500 text-lg">analytics</span>
+            </div>
+            <div>
+              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.avgPerBill) }}</span>
+              <span class="text-[9px] text-slate-400 font-medium">Doanh thu / bill</span>
+            </div>
+          </div>
+
+          <!-- Unpaid Invoices Card -->
+          <div class="bg-gradient-to-tr from-rose-50 to-red-50 border border-rose-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-rose-600 uppercase tracking-wide">Chưa trả</span>
+              <span class="material-symbols-rounded text-rose-600 text-lg">money_off</span>
+            </div>
+            <div>
+              <span class="text-base font-extrabold text-rose-700 block">{{ formatCurrency(summaryData.unpaid) }}</span>
+              <span class="text-[9px] text-slate-400 font-medium">Hóa đơn công nợ</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily breakdown bar chart -->
+        <div v-if="dailyBreakdown && dailyBreakdown.length > 0 && (selectedPeriod !== 'day' || selectedShiftId === 'all')" class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4 no-print animate-fade-in">
+          <div class="flex items-center justify-between border-b border-slate-50 pb-3">
+            <h4 class="font-extrabold text-slate-800 text-base">📊 Biểu đồ xu hướng doanh thu</h4>
+            <span class="text-xs text-slate-400 font-medium">Doanh thu theo ngày làm việc</span>
+          </div>
+          
+          <div class="overflow-x-auto w-full pt-6">
+            <div class="flex items-end min-w-[600px] h-48 border-b border-slate-200 gap-2 px-4 pb-1">
+              <div 
+                v-for="day in [...dailyBreakdown].reverse()" 
+                :key="day.date"
+                class="flex flex-col items-center flex-1 group relative cursor-pointer"
+              >
+                <!-- Hover Card Details -->
+                <div class="absolute bottom-full mb-2 bg-slate-900 text-white rounded-lg text-[10px] p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 w-28 text-center space-y-1 shadow-md">
+                  <div class="font-bold border-b border-slate-800 pb-1 mb-1">{{ formatDate(day.date) }}</div>
+                  <div>Doanh thu: {{ formatCurrency(day.total) }}</div>
+                  <div>Tiền mặt: {{ formatCurrency(day.cash) }}</div>
+                  <div>Chuyển khoản: {{ formatCurrency(day.transfer) }}</div>
+                  <div>Quẹt thẻ: {{ formatCurrency(day.card) }}</div>
+                  <div>Số bill: {{ day.bills }} bill</div>
+                </div>
+
+                <!-- Value above bar -->
+                <span class="text-[9px] font-bold text-slate-500 mb-1 group-hover:text-slate-900">{{ shortCurrency(day.total) }}</span>
+                
+                <!-- Stacked Bar Fill for payment methods -->
+                <div class="w-full max-w-[24px] bg-slate-100 rounded-t-lg h-32 flex flex-col justify-end overflow-hidden border border-slate-200/50">
+                  <!-- Card amount segment (blue) -->
+                  <div 
+                    v-if="day.card > 0"
+                    class="w-full bg-blue-500 transition-all duration-500 ease-out" 
+                    :style="{ height: ((day.card / Math.max(...dailyBreakdown.map(d => d.total), 1)) * 100) + '%' }"
+                    title="Quẹt thẻ"
+                  ></div>
+                  <!-- Transfer amount segment (indigo) -->
+                  <div 
+                    v-if="day.transfer > 0"
+                    class="w-full bg-indigo-500 transition-all duration-500 ease-out" 
+                    :style="{ height: ((day.transfer / Math.max(...dailyBreakdown.map(d => d.total), 1)) * 100) + '%' }"
+                    title="Chuyển khoản"
+                  ></div>
+                  <!-- Cash amount segment (emerald) -->
+                  <div 
+                    v-if="day.cash > 0"
+                    class="w-full bg-emerald-500 transition-all duration-500 ease-out" 
+                    :style="{ height: ((day.cash / Math.max(...dailyBreakdown.map(d => d.total), 1)) * 100) + '%' }"
+                    title="Tiền mặt"
+                  ></div>
+                </div>
+                
+                <!-- Label below bar -->
+                <span class="text-[9px] font-bold text-slate-600 mt-2 truncate w-full text-center">
+                  {{ day.date.substring(8, 10) }}/{{ day.date.substring(5, 7) }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <!-- Legend -->
+          <div class="flex items-center gap-4 justify-center text-[10px] font-bold text-slate-500 pt-2">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-xs"></span> Tiền mặt</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-indigo-500 rounded-xs"></span> Chuyển khoản</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-blue-500 rounded-xs"></span> Quẹt thẻ</span>
+          </div>
+        </div>
+
         <!-- Shift Handover Report preview widget -->
         <div v-if="selectedPeriod === 'day' && selectedShiftId !== 'all'" class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
           <div class="no-print flex items-center justify-between pb-3 border-b border-slate-100">
@@ -1746,6 +2021,83 @@ onMounted(async () => {
         </div>
       </div>
 
+    </div>
+
+    <!-- TAB 4: ĐỐI SOÁT & SỬA TAY (AUDIT) -->
+    <div v-else-if="activeTab === 'audit'" class="space-y-6 animate-fade-in">
+      <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
+        <h3 class="font-extrabold text-slate-800 text-base">🔍 Nhật ký sửa tay và đối soát thanh toán</h3>
+        <p class="text-xs text-slate-500 font-semibold mt-1">Danh sách hóa đơn CUKCUK được sửa thủ công phương thức thanh toán.</p>
+      </div>
+
+      <div class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
+        <div class="flex justify-between items-center pb-2">
+          <h4 class="font-extrabold text-slate-800 text-sm">Hóa đơn đã sửa</h4>
+          <span class="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-1">
+            {{ invoices.filter(i => i.manualOverride || (i as any).isManuallyEdited).length }} bill sửa đổi
+          </span>
+        </div>
+
+        <div class="overflow-x-auto w-full border border-slate-150 rounded-xl">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-150">
+              <tr>
+                <th class="px-4 py-3">Mã Bill</th>
+                <th class="px-4 py-3">Bàn</th>
+                <th class="px-4 py-3">Người sửa</th>
+                <th class="px-4 py-3">Thời gian sửa</th>
+                <th class="px-4 py-3">Lý do sửa</th>
+                <th class="px-4 py-3 text-right">Phân bổ gốc (CUKCUK)</th>
+                <th class="px-4 py-3 text-right">Phân bổ mới</th>
+                <th class="px-4 py-3 text-right font-bold">Tổng tiền</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700 font-medium">
+              <tr 
+                v-for="inv in invoices.filter(i => i.manualOverride || (i as any).isManuallyEdited)" 
+                :key="'audit-' + inv.refId"
+                class="hover:bg-slate-50/60 transition-all duration-150"
+              >
+                <td class="px-4 py-3.5 font-bold text-slate-900">
+                  {{ inv.refNo || inv.refId.substring(0, 8) }}
+                </td>
+                <td class="px-4 py-3.5">{{ inv.tableName || '-' }}</td>
+                <td class="px-4 py-3.5 text-slate-600">
+                  {{ (inv as any).overrideBy || 'THU NGÂN' }}
+                </td>
+                <td class="px-4 py-3.5 text-slate-400">
+                  {{ (inv as any).overrideAt ? formatDateTime((inv as any).overrideAt) : '-' }}
+                </td>
+                <td class="px-4 py-3.5 text-amber-700 max-w-[200px] truncate" :title="(inv as any).overrideReason">
+                  {{ (inv as any).overrideReason || 'Sửa thủ công' }}
+                </td>
+                
+                <!-- Original Payments representation -->
+                <td class="px-4 py-3.5 text-right font-medium text-slate-400">
+                  <div v-for="p in getOriginalPayments(inv)" :key="p.method" class="text-[10px]">
+                    {{ p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦' }} {{ formatCurrency(p.amount) }}
+                  </div>
+                  <div v-if="getOriginalPayments(inv).length === 0" class="text-[10px] italic text-slate-300">Chưa ghi log</div>
+                </td>
+                
+                <!-- Current (Edited) Payments representation -->
+                <td class="px-4 py-3.5 text-right font-semibold text-slate-800">
+                  <div v-for="p in inv.payments" :key="p.method" class="text-[10px]">
+                    {{ p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦' }} {{ formatCurrency(p.amount) }}
+                  </div>
+                </td>
+                
+                <td class="px-4 py-3.5 text-right font-bold text-slate-900 bg-slate-50/20">
+                  {{ formatCurrency(inv.amount) }}
+                </td>
+              </tr>
+              <tr v-if="invoices.filter(i => i.manualOverride || (i as any).isManuallyEdited).length === 0">
+                <td colspan="8" class="px-4 py-8 text-center text-slate-400 italic">Không tìm thấy hóa đơn sửa tay nào trong kỳ này.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- CONFIG REPORT SECTIONS MODAL -->

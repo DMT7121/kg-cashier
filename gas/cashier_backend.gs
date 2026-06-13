@@ -218,21 +218,37 @@ function _handleCashierRequest(e) {
       case 'getConfig':       result = _getConfig(); break;
       case 'saveConfig':      result = _saveConfig(data); break;
       
-      // CUKCUK Revenue & Indexing
+      // CUKCUK Revenue & Indexing (Upgraded V4 Sheets API)
       case 'syncCukcukRevenue': result = _syncCukcukRevenue(data); break;
       case 'rebuildCukcukIndex': result = rebuildCukcukIndex(); break;
       case 'getCukcukSyncState': result = _getCukcukSyncState(); break;
       case 'saveCukcukSyncState': result = _saveCukcukSyncState(data); break;
-      case 'syncCukcukToSheets': result = _syncCukcukInvoicesAction(data); break;
-      case 'syncCukcukInvoices': result = _syncCukcukInvoicesAction(data); break;
+      case 'syncCukcukToSheets': result = apiRunCukcukSync(data); break;
+      case 'syncCukcukInvoices': result = apiRunCukcukSync(data); break;
       case 'syncCukcukMenu':     result = _syncCukcukMenuAction(data); break;
       case 'loadCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
       case 'getCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
       case 'getCukcukItems':    result = _getCukcukItemsAction(data); break;
       case 'getCukcukDailySales': result = _getCukcukDailySalesAction(data); break;
-      case 'saveCukcukOverride': result = _overrideCukcukInvoiceAction(data); break;
-      case 'overrideCukcukInvoice': result = _overrideCukcukInvoiceAction(data); break;
+      case 'saveCukcukOverride': result = apiManualOverridePayment(data); break;
+      case 'overrideCukcukInvoice': result = apiManualOverridePayment(data); break;
       case 'rollbackCukcukInvoice': result = _rollbackCukcukInvoiceAction(data); break;
+
+      // New Sheets API V4 Endpoints
+      case 'getRevenueOverview': result = apiGetRevenueOverview(data); break;
+      case 'getRevenueByDay': result = apiGetRevenueByDay(data); break;
+      case 'getRevenueByWeek': result = apiGetRevenueByWeek(data); break;
+      case 'getRevenueByMonth': result = apiGetRevenueByMonth(data); break;
+      case 'getRevenueByQuarter': result = apiGetRevenueByQuarter(data); break;
+      case 'getRevenueByYear': result = apiGetRevenueByYear(data); break;
+      case 'getInvoiceSearch': result = apiGetInvoiceSearch(data); break;
+      case 'getInvoiceDetail': result = apiGetInvoiceDetail(data); break;
+      case 'runCukcukSync': result = apiRunCukcukSync(data); break;
+      case 'rebuildAggregates': result = apiRebuildAggregates(data); break;
+      case 'rebuildMonthJson': result = apiRebuildMonthJson(data); break;
+      case 'manualOverridePayment': result = apiManualOverridePayment(data); break;
+      case 'migrateLegacyCukcukInvoices': result = migrateLegacyCukcukInvoicesToV4Architecture(data); break;
+      case 'runAllV4BackendTests': result = runAllV4BackendTests(); break;
 
       // POS Cloud Sync
       case 'getPosOrders':    result = _getPosOrdersAction(data); break;
@@ -3837,31 +3853,104 @@ function _syncCukcukMenuAction(data) {
  */
 function _loadCukcukInvoicesAction(data) {
   try {
-    _getSheet('KG_CUKCUK_INVOICES', NEW_INVOICES_HEADERS);
-    const rows = _getSheetData('KG_CUKCUK_INVOICES');
-    let filtered = rows;
-    
+    let invoices = [];
     if (data.workDate) {
-      filtered = filtered.filter(r => r.workDate === data.workDate);
+      const monthKey = data.workDate.substring(0, 7);
+      // Try to load from Month JSON chunks first
+      const cached = loadMonthJsonFast(monthKey);
+      if (cached && cached.invoices) {
+        invoices = cached.invoices.filter(function(r) { return r.workDate === data.workDate; });
+      } else {
+        // Fallback to monthly raw sheet
+        const sheetName = 'KG_CUKCUK_INV_' + monthKey.replace('-', '_');
+        const rows = _getSheetData(sheetName);
+        invoices = rows.filter(function(r) { return r.workDate === data.workDate; });
+      }
     } else {
+      // If we have fromDate/toDate
+      let startMonth = data.fromDate ? data.fromDate.substring(0, 7) : '';
+      let endMonth = data.toDate ? data.toDate.substring(0, 7) : '';
+      // Fallback to current month if not specified
+      if (!startMonth) startMonth = _getWorkingDayGas(new Date()).substring(0, 7);
+      if (!endMonth) endMonth = startMonth;
+      
+      // Get all month keys in range
+      const months = [];
+      let current = new Date(startMonth + '-01');
+      const end = new Date(endMonth + '-01');
+      while (current <= end) {
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        months.push(y + '-' + m);
+        current.setMonth(current.getMonth() + 1);
+      }
+      
+      months.forEach(function(mKey) {
+        const cached = loadMonthJsonFast(mKey);
+        if (cached && cached.invoices) {
+          invoices = invoices.concat(cached.invoices);
+        } else {
+          const sheetName = 'KG_CUKCUK_INV_' + mKey.replace('-', '_');
+          const rows = _getSheetData(sheetName);
+          invoices = invoices.concat(rows);
+        }
+      });
+      
       if (data.fromDate) {
-        filtered = filtered.filter(r => r.invoiceTime >= data.fromDate);
+        invoices = invoices.filter(function(r) { return r.invoiceTime >= data.fromDate || r.workDate >= data.fromDate; });
       }
       if (data.toDate) {
-        filtered = filtered.filter(r => r.invoiceTime <= data.toDate);
+        invoices = invoices.filter(function(r) { return r.invoiceTime <= data.toDate || r.workDate <= data.toDate; });
       }
     }
     
     // Sort from oldest to newest by invoiceTime
-    filtered.sort((a, b) => (a.invoiceTime || '').localeCompare(b.invoiceTime || ''));
+    invoices.sort(function(a, b) { return (a.invoiceTime || '').localeCompare(b.invoiceTime || ''); });
+    
+    // Map V4 invoice attributes to the format expected by the frontend
+    const mapped = invoices.map(function(r) {
+      return {
+        invoiceKey: r.invoiceKey || r.refId || '',
+        cukcukInvoiceId: r.cukcukInvoiceId || r.refId || '',
+        cukcukRefNo: r.cukcukRefNo || r.refNo || '',
+        branchId: r.branchId || '',
+        branchName: r.branchName || '',
+        workDate: r.workDate || '',
+        invoiceTime: r.invoiceTime || r.refDate || '',
+        tableName: r.tableName || '',
+        customerName: r.customerName || '',
+        totalAmount: Number(r.totalAmount || r.amount || 0),
+        discountAmount: Number(r.discountAmount || 0),
+        serviceCharge: Number(r.serviceCharge || 0),
+        vatAmount: Number(r.vatAmount || 0),
+        finalAmount: Number(r.finalAmount || r.amount || 0),
+        paidAmount: Number(r.paidAmount || r.amount || 0),
+        cashAmount: Number(r.cashAmount || 0),
+        transferAmount: Number(r.transferAmount || 0),
+        cardAmount: Number(r.cardAmount || 0),
+        otherAmount: Number(r.otherAmount || 0),
+        paymentMethod: r.paymentMethod || '',
+        paymentStatus: r.paymentStatus || (r.isPaid ? 'Thanh toán' : 'Chưa thanh toán'),
+        paymentRawJson: typeof r.paymentRawJson === 'string' ? r.paymentRawJson : JSON.stringify(r.payments || []),
+        itemsJson: typeof r.itemsJson === 'string' ? r.itemsJson : JSON.stringify(r.items || []),
+        sourceRawJson: r.sourceRawJson || '{}',
+        manualOverride: r.manualOverride === true || r.manualOverride === 'true',
+        overrideAt: r.overrideAt || '',
+        overrideBy: r.overrideBy || '',
+        overrideReason: r.overrideReason || '',
+        auditJson: typeof r.auditJson === 'string' ? r.auditJson : JSON.stringify(r.auditTrail || []),
+        createdAt: r.createdAt || '',
+        updatedAt: r.updatedAt || ''
+      };
+    });
     
     return {
       ok: true,
       action: 'loadCukcukInvoices',
       message: 'Tải hóa đơn thành công',
       data: {
-        invoices: filtered,
-        total: filtered.length
+        invoices: mapped,
+        total: mapped.length
       },
       error: null
     };
@@ -3869,7 +3958,7 @@ function _loadCukcukInvoicesAction(data) {
     return {
       ok: false,
       action: 'loadCukcukInvoices',
-      message: 'Không thể tải hóa đơn',
+      message: 'Không thể tải hóa đơn: ' + e.toString(),
       error: { code: 'SHEET_WRITE_FAILED', detail: e.toString(), retryable: true }
     };
   }

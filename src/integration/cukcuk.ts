@@ -70,7 +70,7 @@ if (!useRelativeProxy && location.protocol !== 'file:') {
 function _getCachedToken(): string | null {
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
-  if (!cukcuk || !cukcuk.domain || !cukcuk.appId || !cukcuk.key) return null;
+  if (!cukcuk || !cukcuk.domain || !cukcuk.appId || (!cukcuk.key && !cukcuk.hasKey)) return null;
   return localStorage.getItem('cukcuk_connected_flag') || 'proxy_managed_token';
 }
 
@@ -523,18 +523,14 @@ export async function pushManualEditToSheets(refId: string, oldPayments?: any[],
 // ══════════════════════════════════════════════════════════════
 export async function syncTransactions(force?: boolean): Promise<{ success: boolean; message?: string; synced?: number; total?: number; skipped?: number; amount?: number; payments?: any; date?: string; smart?: boolean }> {
   const shift = getCurrentShift();
-  if (!shift) {
-    return { success: false, message: 'Chưa mở ca' };
-  }
-
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
-  if (!cukcuk || !cukcuk.key) {
+  if (!cukcuk || (!cukcuk.key && !cukcuk.hasKey)) {
     return { success: false, message: 'Chưa cấu hình CUKCUK' };
   }
 
   try {
-    const shiftDate = shift.date || _getWorkingDayStr();
+    const shiftDate = shift?.date || _getWorkingDayStr();
     showToast('🔄 Đang đồng bộ hóa đơn CUKCUK lên Sheets...', 'info');
 
     // 1. Trigger Apps Script backend sync to fetch from CUKCUK and update sheets
@@ -633,7 +629,7 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
   if (!dateStr) return { success: false, message: 'Chưa chỉ định ngày' };
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
-  if (!cukcuk || !cukcuk.key) return { success: false, message: 'Chưa cấu hình CUKCUK' };
+  if (!cukcuk || (!cukcuk.key && !cukcuk.hasKey)) return { success: false, message: 'Chưa cấu hình CUKCUK' };
 
   try {
     showToast('🔄 Đang đồng bộ hóa đơn CUKCUK ngày ' + dateStr + '...', 'info');
@@ -705,7 +701,7 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
 export function getConnectionStatus(): { configured: boolean; connected: boolean; domain?: string; message: string } {
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
-  if (!cukcuk || !cukcuk.domain || !cukcuk.appId || !cukcuk.key) {
+  if (!cukcuk || !cukcuk.domain || !cukcuk.appId || (!cukcuk.key && !cukcuk.hasKey)) {
     return { configured: false, connected: false, message: 'Chưa cấu hình' };
   }
   const cached = _getCachedToken();

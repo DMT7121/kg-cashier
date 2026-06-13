@@ -127,7 +127,8 @@ async function apiCall(action: string, data: any = null, retries = 2): Promise<a
     'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
     'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
     'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts',
-    'syncPosOrders'
+    'syncPosOrders', 'runCukcukSync', 'rebuildAggregates', 'rebuildMonthJson',
+    'manualOverridePayment', 'migrateLegacyCukcukInvoices'
   ];
 
   if (writeActions.indexOf(action) !== -1) {
@@ -635,6 +636,209 @@ export async function saveCukcukOverrideOnCloud(overrideData: {
   return apiCall('saveCukcukOverride', overrideData);
 }
 
+const FALLBACK_HEADERS: Record<string, string[]> = {
+  'KG_CUKCUK_AGG_DAY': ['workDate', 'workMonth', 'workQuarter', 'workYear', 'invoiceCount', 'finalAmount', 'totalAmount', 'discountAmount', 'cashAmount', 'transferAmount', 'cardAmount', 'otherAmount', 'unpaidAmount', 'avgBill', 'firstInvoiceTime', 'lastInvoiceTime', 'topItemsJson', 'paymentJson', 'updatedAt'],
+  'KG_CUKCUK_AGG_WEEK': ['weekKey', 'weekStart', 'weekEnd', 'workMonth', 'workQuarter', 'workYear', 'invoiceCount', 'finalAmount', 'cashAmount', 'transferAmount', 'cardAmount', 'topDaysJson', 'topItemsJson', 'updatedAt'],
+  'KG_CUKCUK_AGG_MONTH': ['monthKey', 'workYear', 'workQuarter', 'invoiceCount', 'finalAmount', 'totalAmount', 'discountAmount', 'cashAmount', 'transferAmount', 'cardAmount', 'otherAmount', 'avgBill', 'bestDay', 'worstDay', 'daysJson', 'paymentJson', 'topItemsJson', 'updatedAt'],
+  'KG_CUKCUK_AGG_QUARTER': ['quarterKey', 'workYear', 'invoiceCount', 'finalAmount', 'cashAmount', 'transferAmount', 'cardAmount', 'monthsJson', 'updatedAt'],
+  'KG_CUKCUK_AGG_YEAR': ['year', 'invoiceCount', 'finalAmount', 'cashAmount', 'transferAmount', 'cardAmount', 'quartersJson', 'monthsJson', 'updatedAt'],
+  'KG_CUKCUK_INVOICE_INDEX': ['invoiceKey', 'workDate', 'workMonth', 'workQuarter', 'invoiceTime', 'cukcukRefNo', 'finalAmount', 'cashAmount', 'transferAmount', 'cardAmount', 'paymentMethod', 'paymentStatus', 'sourceSheet', 'sourceRow', 'manualOverride', 'updatedAt'],
+  'KG_STAFF': ['id', 'name', 'pin', 'role', 'status', 'createdAt']
+};
+
+export async function fetchGVizSheet(sheetName: string, query?: string): Promise<any[] | null> {
+  try {
+    const ssId = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
+    let url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+    if (query) {
+      url += `&tq=${encodeURIComponent(query)}`;
+    }
+    
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 3500); // 3.5s timeout
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    
+    if (response.ok) {
+      const text = await response.text();
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1) {
+        const json = safeJsonParse<GVizResponse | null>(text.substring(start, end + 1), null);
+        if (json && json.status === 'ok' && json.table && json.table.rows) {
+          const fallbackKey = Object.keys(FALLBACK_HEADERS).find(k => sheetName.startsWith(k)) || '';
+          const fallbackList = fallbackKey ? FALLBACK_HEADERS[fallbackKey] : [];
+          const headers = json.table.cols.map((c, idx) => c.label || fallbackList[idx] || `col${idx}`);
+          
+          return json.table.rows.map(r => {
+            const obj: Record<string, any> = {};
+            if (r.c) {
+              r.c.forEach((cell, idx) => {
+                const header = headers[idx];
+                if (header) {
+                  obj[header] = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : '') : '';
+                }
+              });
+            }
+            return obj;
+          });
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[API] fetchGVizSheet failed for ${sheetName}:`, e.message);
+  }
+  return null;
+}
+
+export async function getRevenueOverviewOnCloud(params: { fromDate: string; toDate: string }): Promise<any> {
+  try {
+    const data = await fetchGVizSheet('KG_CUKCUK_AGG_DAY', `select * where A >= '${params.fromDate}' and A <= '${params.toDate}'`);
+    if (data && data.length > 0) {
+      let totalRevenue = 0;
+      let totalCash = 0;
+      let totalCard = 0;
+      let totalTransfer = 0;
+      let totalBills = 0;
+      
+      const days = data.map(r => {
+        const amt = Number(r.finalAmount) || 0;
+        totalRevenue += amt;
+        totalCash += Number(r.cashAmount) || 0;
+        totalCard += Number(r.cardAmount) || 0;
+        totalTransfer += Number(r.transferAmount) || 0;
+        totalBills += Number(r.invoiceCount) || 0;
+        
+        return {
+          date: r.workDate,
+          bills: Number(r.invoiceCount) || 0,
+          total: amt,
+          cash: Number(r.cashAmount) || 0,
+          card: Number(r.cardAmount) || 0,
+          transfer: Number(r.transferAmount) || 0
+        };
+      });
+      
+      return {
+        ok: true,
+        success: true,
+        data: {
+          summary: {
+            totalRevenue,
+            totalCash,
+            totalCard,
+            totalTransfer,
+            totalBills
+          },
+          days
+        },
+        meta: {
+          source: 'AGG_DAY_GVIZ',
+          generatedAt: new Date().toISOString()
+        }
+      };
+    }
+  } catch (e: any) {
+    console.warn('[API] getRevenueOverviewOnCloud direct fetch failed, falling back to Apps Script:', e.message);
+  }
+  return apiCall('getRevenueOverview', params);
+}
+
+export async function getRevenueByDayOnCloud(params: { date: string }): Promise<any> {
+  try {
+    const data = await fetchGVizSheet('KG_CUKCUK_AGG_DAY', `select * where A = '${params.date}'`);
+    if (data && data.length > 0) {
+      return { ok: true, success: true, data: data[0] };
+    }
+  } catch (e) {}
+  return apiCall('getRevenueByDay', params);
+}
+
+export async function getRevenueByWeekOnCloud(params: { weekKey: string }): Promise<any> {
+  try {
+    const data = await fetchGVizSheet('KG_CUKCUK_AGG_WEEK', `select * where A = '${params.weekKey}'`);
+    if (data && data.length > 0) {
+      return { ok: true, success: true, data: data[0] };
+    }
+  } catch (e) {}
+  return apiCall('getRevenueByWeek', params);
+}
+
+export async function getRevenueByMonthOnCloud(params: { monthKey: string }): Promise<any> {
+  try {
+    const data = await fetchGVizSheet('KG_CUKCUK_AGG_MONTH', `select * where A = '${params.monthKey}'`);
+    if (data && data.length > 0) {
+      return { ok: true, success: true, data: data[0] };
+    }
+  } catch (e) {}
+  return apiCall('getRevenueByMonth', params);
+}
+
+export async function getRevenueByQuarterOnCloud(params: { quarterKey: string }): Promise<any> {
+  try {
+    const data = await fetchGVizSheet('KG_CUKCUK_AGG_QUARTER', `select * where A = '${params.quarterKey}'`);
+    if (data && data.length > 0) {
+      return { ok: true, success: true, data: data[0] };
+    }
+  } catch (e) {}
+  return apiCall('getRevenueByQuarter', params);
+}
+
+export async function getRevenueByYearOnCloud(params: { year: string | number }): Promise<any> {
+  try {
+    const data = await fetchGVizSheet('KG_CUKCUK_AGG_YEAR', `select * where A = ${params.year}`);
+    if (data && data.length > 0) {
+      return { ok: true, success: true, data: data[0] };
+    }
+  } catch (e) {}
+  return apiCall('getRevenueByYear', params);
+}
+
+export async function getInvoiceSearchOnCloud(params: {
+  keyword?: string;
+  fromDate?: string;
+  toDate?: string;
+  paymentMethod?: string;
+  year?: string | number;
+}): Promise<any> {
+  return apiCall('getInvoiceSearch', params);
+}
+
+export async function getInvoiceDetailOnCloud(params: { invoiceKey: string; monthKey?: string; workDate?: string }): Promise<any> {
+  return apiCall('getInvoiceDetail', params);
+}
+
+export async function runCukcukSyncOnCloud(params: { workDate?: string; forceRebuild?: boolean; triggeredBy?: string; triggerSource?: string }): Promise<any> {
+  return apiCall('runCukcukSync', params);
+}
+
+export async function rebuildAggregatesOnCloud(params: { date: string }): Promise<any> {
+  return apiCall('rebuildAggregates', params);
+}
+
+export async function rebuildMonthJsonOnCloud(params: { monthKey: string }): Promise<any> {
+  return apiCall('rebuildMonthJson', params);
+}
+
+export async function manualOverridePaymentOnCloud(params: {
+  invoiceKey: string;
+  workDate?: string;
+  paymentRawJson: string;
+  reason?: string;
+  user?: string;
+  year?: string | number;
+}): Promise<any> {
+  return apiCall('manualOverridePayment', params);
+}
+
+export async function migrateLegacyCukcukInvoicesOnCloud(params: { dryRun?: boolean; cashierName?: string }): Promise<any> {
+  return apiCall('migrateLegacyCukcukInvoices', params);
+}
+
+export async function runAllV4BackendTestsOnCloud(): Promise<any> {
+  return apiCall('runAllV4BackendTests');
+}
+
 function mapInvoiceRow(raw: any): any {
   const obj: Record<string, any> = { ...raw };
 
@@ -753,75 +957,99 @@ export async function getCukcukInvoicesFromCloud(params: {
   limit?: number;
 }): Promise<any> {
   const ssId = '1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ';
-  let url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_CUKCUK_INVOICES&t=${Date.now()}`;
   
+  // Determine target month keys
+  const months: string[] = [];
   if (params.workDate) {
-    url += `&tq=${encodeURIComponent(`select * where F = '${params.workDate}'`)}`;
-  } else if (params.fromDate && params.toDate) {
-    url += `&tq=${encodeURIComponent(`select * where G >= '${params.fromDate}' and G <= '${params.toDate}'`)}`;
-  } else if (params.fromDate) {
-    url += `&tq=${encodeURIComponent(`select * where G >= '${params.fromDate}'`)}`;
+    months.push(params.workDate.substring(0, 7));
+  } else {
+    let startMonth = params.fromDate ? params.fromDate.substring(0, 7) : '';
+    let endMonth = params.toDate ? params.toDate.substring(0, 7) : '';
+    if (!startMonth) {
+      const today = new Date();
+      startMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+    }
+    if (!endMonth) endMonth = startMonth;
+    
+    let current = new Date(startMonth + '-01');
+    const end = new Date(endMonth + '-01');
+    while (current <= end) {
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, '0');
+      months.push(y + '-' + m);
+      current.setMonth(current.getMonth() + 1);
+    }
   }
 
+  // Attempt direct gviz fetch for the monthly JSON chunks
   try {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 2500); // 2.5s timeout
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(id);
-
-    if (response.ok) {
+    let allInvoices: any[] = [];
+    
+    for (const mKey of months) {
+      const url = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=out:json&sheet=KG_CUKCUK_MONTH_JSON&tq=${encodeURIComponent(`select C, E where A = '${mKey}'`)}&t=${Date.now()}`;
+      
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 3000); // 3s timeout
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(id);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} fetching chunk for ${mKey}`);
+      }
+      
       const text = await response.text();
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}');
-      if (start !== -1 && end !== -1) {
-        const json = safeJsonParse<GVizResponse | null>(text.substring(start, end + 1), null);
-        if (json && json.status === 'ok' && json.table && json.table.rows) {
-          const INVOICES_HEADERS = [
-            'invoiceKey', 'cukcukInvoiceId', 'cukcukRefNo', 'branchId', 'branchName', 'workDate', 'businessDate', 
-            'invoiceTime', 'createdTime', 'modifiedTime', 'tableName', 'customerName', 'guestCount', 'totalAmount', 
-            'discountAmount', 'serviceCharge', 'vatAmount', 'finalAmount', 'paymentMethod', 'paymentStatus', 
-            'paymentRawJson', 'itemsJson', 'sourceRawJson', 'manualOverride', 'overrideAt', 'overrideBy', 
-            'overrideReason', 'overrideFieldsJson', 'syncBatchId', 'lastSyncedAt', 'syncStatus', 'syncError', 
-            'shiftId', 'sessionId', 'cashierName', 'isDeleted', 'deletedAt', 'note', 'createdAt', 'updatedAt'
-          ];
-          const headers = json.table.cols.map((c, idx) => c.label || INVOICES_HEADERS[idx] || '');
-          const invoices = json.table.rows.map(r => {
-            const raw: Record<string, any> = {};
-            if (r.c) {
-              r.c.forEach((cell, idx) => {
-                const header = headers[idx] || INVOICES_HEADERS[idx];
-                if (header) {
-                  let val = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : '') : '';
-                  if (typeof val === 'string' && val.startsWith('Date(')) {
-                    try {
-                      const match = val.match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/);
-                      if (match) {
-                        const y = parseInt(match[1]);
-                        const m = parseInt(match[2]);
-                        const d = parseInt(match[3]);
-                        const hr = match[4] ? parseInt(match[4]) : 0;
-                        const min = match[5] ? parseInt(match[5]) : 0;
-                        const sec = match[6] ? parseInt(match[6]) : 0;
-                        val = new Date(y, m, d, hr, min, sec).toISOString();
-                      }
-                    } catch(e) {}
-                  }
-                  raw[header] = val;
-                }
-              });
-            }
-            return mapInvoiceRow(raw);
-          });
-          
-          console.log('[API] Ultra-fast invoices direct load success:', invoices.length);
-          return { success: true, invoices: invoices, direct: true };
+      if (start === -1 || end === -1) {
+        throw new Error(`Invalid gviz response formatting for ${mKey}`);
+      }
+      
+      const json = safeJsonParse<GVizResponse | null>(text.substring(start, end + 1), null);
+      if (json && json.status === 'ok' && json.table && json.table.rows && json.table.rows.length > 0) {
+        // Sort rows by chunkIndex (column index 0 is C, column index 1 is E)
+        const sortedRows = [...json.table.rows].sort((a, b) => {
+          const idxA = a.c && a.c[0] ? Number(a.c[0].v) : 0;
+          const idxB = b.c && b.c[0] ? Number(b.c[0].v) : 0;
+          return idxA - idxB;
+        });
+        
+        let monthJsonStr = '';
+        sortedRows.forEach(r => {
+          if (r.c && r.c[1]) {
+            monthJsonStr += String(r.c[1].v || '');
+          }
+        });
+        
+        const parsed = JSON.parse(monthJsonStr);
+        if (parsed && Array.isArray(parsed.invoices)) {
+          allInvoices = allInvoices.concat(parsed.invoices);
         }
       }
     }
+    
+    if (allInvoices.length > 0) {
+      // Filter by workDate, fromDate, toDate
+      let filtered = allInvoices;
+      if (params.workDate) {
+        filtered = filtered.filter(r => r.workDate === params.workDate);
+      }
+      if (params.fromDate) {
+        const fromDate = params.fromDate;
+        filtered = filtered.filter(r => r.workDate >= fromDate || r.refDate >= fromDate);
+      }
+      if (params.toDate) {
+        const toDate = params.toDate;
+        filtered = filtered.filter(r => r.workDate <= toDate || r.refDate <= toDate);
+      }
+      
+      const mapped = filtered.map(r => mapInvoiceRow(r));
+      console.log('[API] Ultra-fast monthly JSON direct load success:', mapped.length);
+      return { success: true, invoices: mapped, direct: true };
+    }
   } catch (e: any) {
-    console.warn('[API] Direct spreadsheet invoices fetch failed/timeout, falling back to GAS:', e.message);
+    console.warn('[API] Direct spreadsheet JSON chunks fetch failed, falling back to Apps Script:', e.message);
   }
-
+  
   // Fallback to Apps Script
   const res = await apiCall('getCukcukInvoices', params);
   if (res && (res.success || res.ok)) {
