@@ -88,19 +88,114 @@ export const denominations: Denomination[] = [
 // ── Toast Notifications ──────────────────────
 let toastContainer: HTMLDivElement | null = null;
 
+function showCopySuccess(button: HTMLButtonElement): void {
+  const originalHtml = button.innerHTML;
+  button.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px;color:#10b981;">check</span> <span style="color:#10b981;">Đã copy!</span>';
+  setTimeout(() => {
+    button.innerHTML = originalHtml;
+  }, 2000);
+}
+
+function fallbackCopyTextToClipboard(text: string, button: HTMLButtonElement): void {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.position = "fixed";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const successful = document.execCommand('copy');
+    if (successful) {
+      showCopySuccess(button);
+    }
+  } catch (err) {
+    console.error('Fallback copy failed', err);
+  }
+
+  document.body.removeChild(textArea);
+}
+
 export function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', duration = 3500): void {
   if (typeof document === 'undefined') return;
   if (!toastContainer) {
     toastContainer = document.createElement('div');
     toastContainer.id = 'toastContainer';
-    toastContainer.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:360px;';
+    toastContainer.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:480px;width:calc(100vw - 40px);pointer-events:none;';
     document.body.appendChild(toastContainer);
   }
 
   const icons = { success: 'check_circle', error: 'error', warning: 'warning', info: 'info' };
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span class="material-symbols-rounded">${icons[type] || 'info'}</span><span>${escapeHtml(message)}</span>`;
+  toast.style.display = 'flex';
+  toast.style.alignItems = 'stretch';
+  toast.style.flexDirection = 'column';
+  toast.style.gap = '6px';
+  toast.style.pointerEvents = 'auto';
+  toast.style.width = '100%';
+
+  if (type === 'error' || type === 'warning') {
+    toast.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:8px;">
+        <span class="material-symbols-rounded" style="font-size:20px; flex-shrink:0;">${icons[type] || 'info'}</span>
+        <span style="font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; flex-grow:1;">
+          ${type === 'error' ? 'Lỗi hệ thống' : 'Cảnh báo'}
+        </span>
+        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+          <button class="toast-copy-btn" title="Copy toàn bộ lỗi" style="background:rgba(0,0,0,0.05); border:none; color:inherit; cursor:pointer; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; border-radius:8px; transition:all 0.2s; font-size:11px; font-weight:700; font-family:inherit;">
+            <span class="material-symbols-rounded" style="font-size:14px;">content_copy</span> Copy Lỗi
+          </button>
+          <button class="toast-close-btn" title="Đóng" style="background:none; border:none; color:inherit; cursor:pointer; padding:6px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; opacity:0.6; transition:opacity 0.2s;">
+            <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+          </button>
+        </div>
+      </div>
+      <div class="toast-error-details" style="max-height:160px; overflow-y:auto; font-family:monospace; font-size:11px; line-height:1.4; padding:8px 10px; background:rgba(0,0,0,0.06); border-radius:8px; border:1px solid rgba(0,0,0,0.08); text-align:left; word-break:break-word; white-space:pre-wrap; width:100%; box-sizing:border-box;">${escapeHtml(message)}</div>
+    `;
+  } else {
+    // Standard layout for success / info
+    toast.style.alignItems = 'center';
+    toast.style.flexDirection = 'row';
+    toast.innerHTML = `
+      <span class="material-symbols-rounded" style="flex-shrink:0;">${icons[type] || 'info'}</span>
+      <span style="flex-grow:1; word-break:break-word; font-size:13px; font-weight:600;">${escapeHtml(message)}</span>
+      <button class="toast-close-btn" title="Đóng" style="background:none; border:none; color:inherit; cursor:pointer; padding:4px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; opacity:0.6; transition:opacity 0.2s;">
+        <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+      </button>
+    `;
+  }
+
+  // Attach event handlers
+  const copyBtn = toast.querySelector('.toast-copy-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const textToCopy = message;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showCopySuccess(copyBtn as HTMLButtonElement);
+        }).catch(() => {
+          fallbackCopyTextToClipboard(textToCopy, copyBtn as HTMLButtonElement);
+        });
+      } else {
+        fallbackCopyTextToClipboard(textToCopy, copyBtn as HTMLButtonElement);
+      }
+    });
+  }
+
+  const closeBtn = toast.querySelector('.toast-close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissToast();
+    });
+  }
+
   toastContainer.appendChild(toast);
 
   // Limit max visible toasts to prevent overflow
@@ -110,10 +205,17 @@ export function showToast(message: string, type: 'success' | 'error' | 'warning'
 
   requestAnimationFrame(() => toast.classList.add('show'));
 
-  setTimeout(() => {
+  const toastDuration = (type === 'error' || type === 'warning') ? 20000 : duration;
+
+  const timeoutId = setTimeout(() => {
+    dismissToast();
+  }, toastDuration);
+
+  function dismissToast() {
+    clearTimeout(timeoutId);
     toast.classList.remove('show');
     toast.addEventListener('transitionend', () => toast.remove(), { once: true });
-  }, duration);
+  }
 }
 
 // ── Custom Confirm Modal ─────────────────────
