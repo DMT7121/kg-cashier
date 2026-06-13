@@ -186,8 +186,9 @@ async function handleSyncInvoices() {
       showToast('✅ Đồng bộ CUKCUK hoàn tất!', 'success');
     } else {
       cukResultSuccess.value = false;
-      cukResultMsg.value = '❌ ' + (result?.message || 'Lỗi không xác định');
-      showToast('❌ Đồng bộ thất bại', 'error');
+      const errMsg = result?.message || 'Lỗi không xác định';
+      cukResultMsg.value = '❌ ' + errMsg;
+      showToast('❌ Đồng bộ thất bại: ' + errMsg, 'error');
     }
   } catch (e: any) {
     cukResultSuccess.value = false;
@@ -217,8 +218,9 @@ async function handleSyncMenu() {
       showToast('✅ Đồng bộ thực đơn CUKCUK hoàn tất!', 'success');
     } else {
       cukResultSuccess.value = false;
-      cukResultMsg.value = '❌ ' + (result?.message || 'Lỗi không xác định');
-      showToast('❌ Đồng bộ thực đơn thất bại', 'error');
+      const errMsg = result?.message || 'Lỗi không xác định';
+      cukResultMsg.value = '❌ ' + errMsg;
+      showToast('❌ Đồng bộ thực đơn thất bại: ' + errMsg, 'error');
     }
   } catch (e: any) {
     cukResultSuccess.value = false;
