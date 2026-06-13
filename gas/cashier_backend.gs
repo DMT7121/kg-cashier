@@ -1163,14 +1163,60 @@ function _deleteFileFromDrive(data) {
 // ── Settings ─────────────────────────────────
 function _getSettings() {
   const headers = ['key','value'];
-  _getSheet('KG_SETTINGS', headers);
+  const sheet = _getSheet('KG_SETTINGS', headers);
   const rows = _getSheetData('KG_SETTINGS');
   const settings = {};
+  const seenKeys = {};
+  let hasDuplicates = false;
+
   rows.forEach(r => { 
+    if (!r.key) return;
     let val = r.value;
-    try { val = JSON.parse(val); } catch(e) {}
-    settings[r.key] = val; 
+    let parsedVal = val;
+    let isValidJson = false;
+
+    if (typeof val === 'string') {
+      try {
+        parsedVal = JSON.parse(val);
+        isValidJson = true;
+      } catch(e) {
+        // Skip Apps Script map representation strings like '{appId=..., domain=...}'
+        if (val.indexOf('{') === 0 && val.indexOf('=') > -1) {
+          return;
+        }
+      }
+    }
+
+    if (seenKeys[r.key] === undefined) {
+      settings[r.key] = parsedVal;
+      seenKeys[r.key] = { isValid: isValidJson, raw: val };
+    } else {
+      hasDuplicates = true;
+      // If the new value is valid JSON, or the previous one wasn't, overwrite with the better one
+      if (isValidJson || !seenKeys[r.key].isValid) {
+        settings[r.key] = parsedVal;
+        seenKeys[r.key] = { isValid: isValidJson, raw: val };
+      }
+    }
   });
+
+  // If duplicates were found, automatically clean up and de-duplicate the KG_SETTINGS sheet
+  if (hasDuplicates) {
+    try {
+      sheet.clearContents();
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      const uniqueRows = Object.entries(settings).map(([k, v]) => {
+        const strVal = typeof v === 'object' ? JSON.stringify(v) : String(v);
+        return [k, strVal];
+      });
+      if (uniqueRows.length > 0) {
+        sheet.getRange(2, 1, uniqueRows.length, 2).setValues(uniqueRows);
+      }
+      Logger.log('[GAS Settings] Successfully de-duplicated KG_SETTINGS sheet.');
+    } catch(err) {
+      Logger.log('[GAS Settings] De-duplication failed: ' + err.toString());
+    }
+  }
 
   // Auto-migrate legacy plain text CUKCUK secrets to ScriptProperties
   if (settings.cukcuk) {
