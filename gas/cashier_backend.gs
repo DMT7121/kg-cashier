@@ -3211,7 +3211,7 @@ function _syncCukcukInvoicesAction(data) {
   // Wait loop if another sync is running for this workDate
   let isRunning = cache.get(cacheKey);
   if (isRunning) {
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < 25; attempt++) {
       Utilities.sleep(1000);
       isRunning = cache.get(cacheKey);
       if (!isRunning) {
