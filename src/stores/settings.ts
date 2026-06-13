@@ -99,12 +99,15 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function loadSettings() {
     let local = await settingsDb.getItem<Settings>('kg-settings');
-    if (!local) {
-      // Fallback: try loading cloud settings
+    
+    // Always fetch latest settings from cloud to update cache
+    try {
       const cloud = await getSettingsFromCloud();
       if (cloud && cloud.success && cloud.settings) {
         local = cloud.settings;
       }
+    } catch (e) {
+      console.warn('[Settings Store] Cloud fetch failed, using cached settings:', e);
     }
     
     if (local) {
