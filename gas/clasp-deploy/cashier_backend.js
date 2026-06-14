@@ -3860,7 +3860,13 @@ function _loadCukcukInvoicesAction(data) {
     if (data.workDate) {
       const monthKey = data.workDate.substring(0, 7);
       // Try to load from Month JSON chunks first
-      const cached = loadMonthJsonFast(monthKey);
+      let cached = loadMonthJsonFast(monthKey);
+      if (!cached) {
+        // Automatically build monthly JSON cache if missing
+        buildMonthJsonFromRaw(monthKey);
+        cached = loadMonthJsonFast(monthKey);
+      }
+      
       if (cached && cached.invoices) {
         invoices = cached.invoices.filter(function(r) { return r.workDate === data.workDate; });
       } else {
@@ -3889,7 +3895,12 @@ function _loadCukcukInvoicesAction(data) {
       }
       
       months.forEach(function(mKey) {
-        const cached = loadMonthJsonFast(mKey);
+        let cached = loadMonthJsonFast(mKey);
+        if (!cached) {
+          // Automatically build monthly JSON cache if missing
+          buildMonthJsonFromRaw(mKey);
+          cached = loadMonthJsonFast(mKey);
+        }
         if (cached && cached.invoices) {
           invoices = invoices.concat(cached.invoices);
         } else {

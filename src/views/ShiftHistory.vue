@@ -4,8 +4,8 @@ import { useShiftStore } from '../stores/shift';
 import { useSettingsStore } from '../stores/settings';
 import { useCategoriesStore } from '../stores/categories';
 import { useAppStore } from '../stores/app';
-import { getShiftsFromCloud } from '../services/api';
-import { getInvoicesByShiftTime } from '../services/invoiceStore';
+import { getShiftsFromCloud, getCukcukInvoicesFromCloud } from '../services/api';
+import { getInvoicesByShiftTime, mergeCloudInvoices } from '../services/invoiceStore';
 import { syncInvoicesForDate } from '../integration/cukcuk';
 import { 
   formatCurrency, 
@@ -161,6 +161,16 @@ async function loadActiveInvoices() {
     activeInvoicesFromLive.value = false;
   } else if (sh.date) {
     try {
+      // Automatically pull invoices from cloud to ensure local DB has the latest data
+      try {
+        const cloudRes = await getCukcukInvoicesFromCloud({ workDate: sh.date });
+        if (cloudRes && cloudRes.success && Array.isArray(cloudRes.invoices)) {
+          await mergeCloudInvoices(cloudRes.invoices);
+        }
+      } catch (cloudErr) {
+        console.warn('[ShiftHistory] Failed to pull invoices from cloud:', cloudErr);
+      }
+
       const liveInvs = await getInvoicesByShiftTime(sh.date, sh.startTime, sh.endTime || undefined);
       if (liveInvs && liveInvs.length > 0) {
         activeInvoices.value = liveInvs;
