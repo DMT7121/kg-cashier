@@ -2039,3 +2039,59 @@ function runAllV4BackendTests() {
     return { ok: false, message: 'Test thất bại: ' + e.toString() };
   }
 }
+
+// ── AUTOMATED CLOUD TRIGGER SYNC FUNCTIONS ──
+
+function autoTriggerCukcukSync() {
+  const now = new Date();
+  const workDateStr = _getWorkingDayGas(now);
+  Logger.log('[Auto Trigger CUKCUK Sync] Starting sync for date: ' + workDateStr);
+  
+  try {
+    const result = apiRunCukcukSync({
+      workDate: workDateStr,
+      triggeredBy: 'TRIGGER_AUTO',
+      triggerSource: 'trigger_time'
+    });
+    Logger.log('[Auto Trigger CUKCUK Sync] Finished with result: ' + JSON.stringify(result));
+    return result;
+  } catch (e) {
+    Logger.log('[Auto Trigger CUKCUK Sync] Fatal Error: ' + e.toString());
+    return { success: false, error: e.toString() };
+  }
+}
+
+function setupCukcukAutoSyncTrigger() {
+  const triggerName = 'autoTriggerCukcukSync';
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === triggerName) {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  
+  // Create a time-driven trigger to run every 10 minutes
+  ScriptApp.newTrigger(triggerName)
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+    
+  Logger.log('[Auto Sync Trigger] Successfully setup time-driven trigger for ' + triggerName + ' every 10 minutes.');
+  return { success: true, message: 'Đã bật tự động đồng bộ hóa trên Cloud mỗi 10 phút.' };
+}
+
+function disableCukcukAutoSyncTrigger() {
+  const triggerName = 'autoTriggerCukcukSync';
+  const triggers = ScriptApp.getProjectTriggers();
+  let count = 0;
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === triggerName) {
+      ScriptApp.deleteTrigger(triggers[i]);
+      count++;
+    }
+  }
+  
+  Logger.log('[Auto Sync Trigger] Successfully disabled and deleted ' + count + ' triggers.');
+  return { success: true, message: 'Đã tắt tự động đồng bộ hóa trên Cloud (đã hủy ' + count + ' trigger).' };
+}
+

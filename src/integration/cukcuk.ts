@@ -770,3 +770,29 @@ export function getSyncStatus(): any {
     sheetsQueue: queueStatus
   };
 }
+
+/**
+ * Tải hóa đơn từ Cloud Sheets và gộp vào IndexedDB cục bộ ngầm.
+ * Trả về số lượng hóa đơn mới được thêm hoặc cập nhật.
+ */
+export async function pullAndMergeCukcukInvoices(dateStr: string): Promise<number> {
+  if (!dateStr) return 0;
+  const loadRes = await getCukcukInvoicesFromCloud({ workDate: dateStr });
+  if (loadRes && loadRes.success && Array.isArray(loadRes.invoices)) {
+    const mergedCount = await invoiceStore.mergeCloudInvoices(loadRes.invoices);
+    
+    // Update last sync metadata to avoid duplicate visual notifications
+    if (mergedCount > 0) {
+      try {
+        const meta = _getSyncMeta();
+        meta.lastSyncTime = new Date().toISOString();
+        meta.lastDate = dateStr;
+        _setSyncMeta(meta);
+      } catch (e) {}
+    }
+    
+    return mergedCount;
+  }
+  return 0;
+}
+

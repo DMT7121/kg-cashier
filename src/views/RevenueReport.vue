@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useShiftStore } from '../stores/shift';
 import { useSettingsStore } from '../stores/settings';
 import { 
@@ -915,6 +915,12 @@ onMounted(async () => {
   watch(() => settingsStore.settings, () => {
     loadLayoutConfig();
   }, { deep: true });
+
+  window.addEventListener('cukcuk-invoices-updated', refreshReportData);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('cukcuk-invoices-updated', refreshReportData);
 });
 </script>
 

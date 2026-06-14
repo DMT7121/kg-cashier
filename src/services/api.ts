@@ -624,6 +624,14 @@ export async function syncCukcukToSheetsOnCloud(params: {
   return apiCall('syncCukcukToSheets', params);
 }
 
+export async function setupCukcukAutoSyncTriggerOnCloud(): Promise<any> {
+  return apiCall('setupCukcukAutoSyncTrigger');
+}
+
+export async function disableCukcukAutoSyncTriggerOnCloud(): Promise<any> {
+  return apiCall('disableCukcukAutoSyncTrigger');
+}
+
 export async function saveCukcukOverrideOnCloud(overrideData: {
   refId: string;
   overrideType?: string;

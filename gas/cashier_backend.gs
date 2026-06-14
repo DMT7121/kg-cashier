@@ -226,6 +226,8 @@ function _handleCashierRequest(e) {
       case 'syncCukcukToSheets': result = apiRunCukcukSync(data); break;
       case 'syncCukcukInvoices': result = apiRunCukcukSync(data); break;
       case 'syncCukcukMenu':     result = _syncCukcukMenuAction(data); break;
+      case 'setupCukcukAutoSyncTrigger': result = setupCukcukAutoSyncTrigger(); break;
+      case 'disableCukcukAutoSyncTrigger': result = disableCukcukAutoSyncTrigger(); break;
       case 'loadCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
       case 'getCukcukInvoices': result = _loadCukcukInvoicesAction(data); break;
       case 'getCukcukItems':    result = _getCukcukItemsAction(data); break;

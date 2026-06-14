@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useSettingsStore } from '../../stores/settings';
 import { useCategoriesStore } from '../../stores/categories';
 import { useAppStore } from '../../stores/app';
-import { pingAPI } from '../../services/api';
+import { pingAPI, setupCukcukAutoSyncTriggerOnCloud, disableCukcukAutoSyncTriggerOnCloud } from '../../services/api';
 import { showToast } from '../../utils';
 
 const settingsStore = useSettingsStore();
@@ -122,6 +122,9 @@ async function saveSettings(silent = false) {
     };
   }
 
+  const oldAutoSync = settingsStore.settings?.cukcuk?.autoSync || false;
+  const newAutoSync = cukAutoSync.value;
+
   await settingsStore.updateSettings(newSettings);
 
   // Sync keys back to cloud sheet securely if password is provided
@@ -129,6 +132,32 @@ async function saveSettings(silent = false) {
     const VAT_API = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec";
     const payload = Object.assign({ action: 'save_system_keys', password: adminPass.value }, newSettings.vatKeys);
     fetch(VAT_API, { method: 'POST', body: JSON.stringify(payload) }).catch(() => {});
+  }
+
+  // Handle GAS background trigger auto-sync registration
+  if (oldAutoSync !== newAutoSync) {
+    try {
+      if (newAutoSync) {
+        showToast('Đang thiết lập tự động đồng bộ trên Cloud...', 'info');
+        const triggerRes = await setupCukcukAutoSyncTriggerOnCloud();
+        if (triggerRes && triggerRes.success) {
+          showToast('✅ Đã bật tự động đồng bộ hóa trên Cloud mỗi 10 phút!', 'success');
+        } else {
+          showToast('⚠️ Không thể bật trigger trên Cloud: ' + (triggerRes?.message || 'Lỗi không rõ'), 'warning');
+        }
+      } else {
+        showToast('Đang hủy tự động đồng bộ trên Cloud...', 'info');
+        const triggerRes = await disableCukcukAutoSyncTriggerOnCloud();
+        if (triggerRes && triggerRes.success) {
+          showToast('✅ Đã tắt tự động đồng bộ hóa trên Cloud!', 'success');
+        } else {
+          showToast('⚠️ Gặp lỗi khi tắt trigger trên Cloud: ' + (triggerRes?.message || 'Lỗi không rõ'), 'warning');
+        }
+      }
+    } catch (triggerErr: any) {
+      console.error('[Settings] Cloud trigger error:', triggerErr);
+      showToast('❌ Lỗi kết nối cấu hình Cloud: ' + triggerErr.message, 'error');
+    }
   }
 
   if (!silent) {
@@ -407,9 +436,12 @@ async function handleVatAdminLogin() {
           <input type="password" v-model="cukKey" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="••••••••••••••••">
         </div>
 
-        <label class="flex items-center gap-3 cursor-pointer mt-1">
-          <input type="checkbox" v-model="cukAutoSync" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4">
-          <span class="text-sm text-slate-700 font-medium">Tự động đồng bộ khi thu ngân mở ca</span>
+        <label class="flex items-start gap-3 cursor-pointer mt-1">
+          <input type="checkbox" v-model="cukAutoSync" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 mt-1">
+          <div class="flex flex-col">
+            <span class="text-sm text-slate-700 font-bold">Tự động đồng bộ hóa trên Cloud & Cập nhật Webapp</span>
+            <span class="text-[11px] text-slate-500 font-medium leading-relaxed mt-0.5">Tự động quét hóa đơn mới từ CUKCUK mỗi 10 phút trên Cloud và tự cập nhật giao diện mà không cần đồng bộ thủ công.</span>
+          </div>
         </label>
 
         <div class="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3 mt-2 w-full">

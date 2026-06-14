@@ -70,6 +70,20 @@ export const useAppStore = defineStore('app', () => {
       } catch (e) {
         console.warn('[SyncInterval] Auto-sync failed:', e);
       }
+
+      // CUKCUK Auto Pull & Merge (Only if configured and autoSync is enabled)
+      if (settingsStore.settings.cukcuk?.autoSync) {
+        try {
+          const shiftDate = shiftStore.currentShift?.date || new Date().toISOString().split('T')[0];
+          const { pullAndMergeCukcukInvoices } = await import('../integration/cukcuk');
+          const mergedCount = await pullAndMergeCukcukInvoices(shiftDate);
+          if (mergedCount > 0) {
+            window.dispatchEvent(new CustomEvent('cukcuk-invoices-updated', { detail: { mergedCount, date: shiftDate } }));
+          }
+        } catch (cukErr) {
+          console.warn('[SyncInterval] CUKCUK auto-pull failed:', cukErr);
+        }
+      }
     }, 60000);
   }
 

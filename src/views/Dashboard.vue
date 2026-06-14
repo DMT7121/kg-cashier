@@ -142,6 +142,14 @@ watch(revenuePeriod, () => {
   loadPeriodStats();
 });
 
+async function handleInvoicesUpdated(event: Event) {
+  const customEvent = event as CustomEvent;
+  console.log('[Dashboard] Auto-sync CUKCUK invoices update detected:', customEvent.detail);
+  await loadTodayCukcuk();
+  await loadShiftSummary();
+  await loadPeriodStats();
+}
+
 // Lifecycle
 onMounted(async () => {
   await shiftStore.loadShifts();
@@ -155,12 +163,15 @@ onMounted(async () => {
     calculateElapsedTime();
     refreshSyncStatus();
   }, 1000);
+
+  window.addEventListener('cukcuk-invoices-updated', handleInvoicesUpdated);
 });
 
 onUnmounted(() => {
   if (elapsedTimer) {
     clearInterval(elapsedTimer);
   }
+  window.removeEventListener('cukcuk-invoices-updated', handleInvoicesUpdated);
 });
 </script>
 
