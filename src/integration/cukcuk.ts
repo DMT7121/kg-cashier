@@ -1,11 +1,12 @@
 import { useShiftStore } from '../stores/shift';
 import { useSettingsStore } from '../stores/settings';
-import { showToast, formatCurrency, getWorkingDay, getWorkingDayRange } from '../utils';
+import { showToast, showConfirm, formatCurrency, getWorkingDay, getWorkingDayRange } from '../utils';
 import {
   syncCukcukRevenueToCloud,
   saveCukcukOverrideOnCloud,
   syncCukcukToSheetsOnCloud,
-  getCukcukInvoicesFromCloud
+  getCukcukInvoicesFromCloud,
+  clearCukcukSyncLockOnCloud
 } from '../services/api';
 import * as invoiceStore from '../services/invoiceStore';
 import * as retryQueue from './retryQueue';
@@ -529,8 +530,8 @@ export async function syncTransactions(force?: boolean): Promise<{ success: bool
     return { success: false, message: 'Chưa cấu hình CUKCUK' };
   }
 
+  const shiftDate = shift?.date || _getWorkingDayStr();
   try {
-    const shiftDate = shift?.date || _getWorkingDayStr();
     showToast('🔄 Đang đồng bộ hóa đơn CUKCUK lên Sheets...', 'info');
 
     // 1. Trigger Apps Script backend sync to fetch from CUKCUK and update sheets
@@ -620,6 +621,27 @@ export async function syncTransactions(force?: boolean): Promise<{ success: bool
     };
   } catch (e: any) {
     console.error('[CUKCUK Sync Error]', e);
+    if (e.message && e.message.includes('một thiết bị khác')) {
+      const confirmUnlock = await showConfirm(
+        'Hệ thống đang thực hiện đồng bộ hóa hóa đơn từ một thiết bị khác (hoặc khóa đồng bộ bị kẹt). Bạn có muốn cưỡng bức mở khóa đồng bộ và thử lại không?',
+        {
+          title: 'Giải phóng khóa đồng bộ',
+          confirmText: 'Mở khóa & Thử lại',
+          cancelText: 'Bỏ qua',
+          type: 'warning'
+        }
+      );
+      if (confirmUnlock) {
+        showToast('🔄 Đang giải phóng khóa đồng bộ...', 'info');
+        const unlockRes = await clearCukcukSyncLockOnCloud({ workDate: shiftDate });
+        if (unlockRes && (unlockRes.success || unlockRes.ok)) {
+          showToast('🔓 Đã mở khóa đồng bộ thành công. Đang đồng bộ lại...', 'success');
+          return syncTransactions(force);
+        } else {
+          showToast('❌ Không thể giải phóng khóa: ' + (unlockRes?.message || 'Lỗi không xác định'), 'error');
+        }
+      }
+    }
     showToast('❌ Lỗi đồng bộ: ' + e.message, 'error');
     return { success: false, message: e.message };
   }
@@ -640,7 +662,7 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
       mode: 'manual'
     });
 
-    if (!syncRes || !syncRes.success) {
+    if (!syncRes || (!syncRes.success && !syncRes.ok)) {
       throw new Error(syncRes?.message || 'Không thể đồng bộ CUKCUK sang Sheets');
     }
 
@@ -692,6 +714,27 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
     };
   } catch (e: any) {
     console.error('[CUKCUK] syncInvoicesForDate error:', e);
+    if (e.message && e.message.includes('một thiết bị khác')) {
+      const confirmUnlock = await showConfirm(
+        'Hệ thống đang thực hiện đồng bộ hóa hóa đơn từ một thiết bị khác (hoặc khóa đồng bộ bị kẹt). Bạn có muốn cưỡng bức mở khóa đồng bộ và thử lại không?',
+        {
+          title: 'Giải phóng khóa đồng bộ',
+          confirmText: 'Mở khóa & Thử lại',
+          cancelText: 'Bỏ qua',
+          type: 'warning'
+        }
+      );
+      if (confirmUnlock) {
+        showToast('🔄 Đang giải phóng khóa đồng bộ...', 'info');
+        const unlockRes = await clearCukcukSyncLockOnCloud({ workDate: dateStr });
+        if (unlockRes && (unlockRes.success || unlockRes.ok)) {
+          showToast('🔓 Đã mở khóa đồng bộ thành công. Đang đồng bộ lại...', 'success');
+          return syncInvoicesForDate(dateStr);
+        } else {
+          showToast('❌ Không thể giải phóng khóa: ' + (unlockRes?.message || 'Lỗi không xác định'), 'error');
+        }
+      }
+    }
     showToast('❌ Lỗi: ' + e.message, 'error');
     return { success: false, message: e.message };
   }

@@ -632,6 +632,10 @@ export async function disableCukcukAutoSyncTriggerOnCloud(): Promise<any> {
   return apiCall('disableCukcukAutoSyncTrigger');
 }
 
+export async function clearCukcukSyncLockOnCloud(params: { workDate?: string }): Promise<any> {
+  return apiCall('clearCukcukSyncLock', params);
+}
+
 export async function saveCukcukOverrideOnCloud(overrideData: {
   refId: string;
   overrideType?: string;
