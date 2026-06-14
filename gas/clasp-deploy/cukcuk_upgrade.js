@@ -1108,6 +1108,8 @@ function apiRunCukcukSync(data) {
   let tokenRefreshed = false;
   let status = 'SUCCESS';
   let errorMessage = '';
+  let fromTime = '';
+  let toTime = '';
 
   const cache = CacheService.getScriptCache();
   const cacheKey = 'cukcuk_sync_active_' + workDateStr;
@@ -1132,9 +1134,9 @@ function apiRunCukcukSync(data) {
     const m = parseInt(parts[1]) - 1;
     const d = parseInt(parts[2]);
     const pad = function(n) { return n < 10 ? '0' + n : String(n); };
-    const fromTime = y + '-' + pad(m + 1) + '-' + pad(d) + 'T12:00:00';
+    fromTime = y + '-' + pad(m + 1) + '-' + pad(d) + 'T12:00:00';
     const nextDay = new Date(y, m, d + 1);
-    const toTime = nextDay.getFullYear() + '-' + pad(nextDay.getMonth() + 1) + '-' + pad(nextDay.getDate()) + 'T06:00:00';
+    toTime = nextDay.getFullYear() + '-' + pad(nextDay.getMonth() + 1) + '-' + pad(nextDay.getDate()) + 'T06:00:00';
 
     // 3. Fetch invoices list
     apiCallCount++;
