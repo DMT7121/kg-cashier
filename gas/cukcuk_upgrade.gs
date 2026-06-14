@@ -2095,3 +2095,18 @@ function disableCukcukAutoSyncTrigger() {
   return { success: true, message: 'Đã tắt tự động đồng bộ hóa trên Cloud (đã hủy ' + count + ' trigger).' };
 }
 
+function apiClearCukcukSyncLock(data) {
+  const workDateStr = data.workDate || _getWorkingDayGas(new Date());
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'cukcuk_sync_active_' + workDateStr;
+  cache.remove(cacheKey);
+  
+  try {
+    const lock = LockService.getScriptLock();
+    lock.releaseLock();
+  } catch(e) {}
+  
+  return { success: true, message: 'Đã giải phóng khóa đồng bộ cho ngày: ' + workDateStr };
+}
+
+
