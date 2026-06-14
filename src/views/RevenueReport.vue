@@ -457,6 +457,21 @@ const filteredInvoices = computed(() => {
 // Watch changes on invoice filters and update
 watch([invoicePeriod, invoiceDate], async () => {
   const start = new Date(invoiceDate.value);
+  
+  // Fetch from cloud and merge first to ensure we display older dates immediately
+  try {
+    const bounds = getPeriodBounds(invoicePeriod.value, start);
+    const startStr = toLocalDateStr(bounds.start);
+    const endStr = toLocalDateStr(bounds.end);
+    const cloudRes = await getCukcukInvoicesFromCloud({ fromDate: startStr, toDate: endStr });
+    if (cloudRes && cloudRes.success && Array.isArray(cloudRes.invoices)) {
+      const { mergeCloudInvoices } = await import('../services/invoiceStore');
+      await mergeCloudInvoices(cloudRes.invoices);
+    }
+  } catch (err) {
+    console.warn('[RevenueReport InvoicesTab] Failed to fetch and merge cloud invoices:', err);
+  }
+  
   invoices.value = await getInvoicesForPeriod(invoicePeriod.value, start);
 });
 
