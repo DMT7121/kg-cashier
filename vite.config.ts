@@ -15,7 +15,8 @@ export default defineConfig({
     extensions: ['.ts', '.js', '.vue', '.json', '.mjs']
   },
   server: {
-    port: 3000,
+    host: true,
+    port: 5173,
     open: true,
     // CORS Proxy for CUKCUK API - routes /cukcuk-api/* to the central worker proxy
     proxy: {
