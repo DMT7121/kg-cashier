@@ -1081,7 +1081,15 @@ async function handleSyncCukcukMenu() {
   isSyncingMenu.value = true;
   showToast('Đang đồng bộ thực đơn từ CUKCUK...', 'info');
   try {
-    const res = await syncCukcukMenuOnCloud();
+    let res = await syncCukcukMenuOnCloud();
+
+    // Auto-recovery if blocked due to Local/LAN write permissions
+    if (!res?.success && res?.message?.includes('local/LAN')) {
+      showToast('Phát hiện môi trường Local/LAN: Đang kích hoạt quyền ghi và thử lại...', 'info');
+      await settingsStore.updateSettings({ allowDevWrite: true });
+      res = await syncCukcukMenuOnCloud();
+    }
+
     if (res && res.success) {
       showToast('Đồng bộ thực đơn CUKCUK thành công!', 'success');
       auditsStore.addAudit('DRINK_MENU_SYNC', `Đồng bộ thực đơn từ CUKCUK`);

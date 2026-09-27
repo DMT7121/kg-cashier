@@ -115,6 +115,12 @@ export const useSettingsStore = defineStore('settings', () => {
     } else {
       settings.value = { ...DEFAULT_SETTINGS };
     }
+
+    // Normalize boolean settings (avoid Apps Script "FALSE" / "TRUE" string bug)
+    settings.value.allowDevWrite = settings.value.allowDevWrite === true || String(settings.value.allowDevWrite).toLowerCase() === 'true';
+    settings.value.autoSync = settings.value.autoSync === true || String(settings.value.autoSync).toLowerCase() === 'true';
+    settings.value.requireLogin = settings.value.requireLogin === true || String(settings.value.requireLogin).toLowerCase() === 'true';
+
     await settingsDb.setItem('kg-settings', JSON.parse(JSON.stringify(settings.value)));
     
     // Sync sandbox mode with allowDevWrite status
@@ -156,6 +162,17 @@ export const useSettingsStore = defineStore('settings', () => {
         current[key] = val;
       }
     }
+
+    // Normalize boolean properties if updated
+    if (newSettings.allowDevWrite !== undefined) {
+      current.allowDevWrite = newSettings.allowDevWrite === true || String(newSettings.allowDevWrite).toLowerCase() === 'true';
+    }
+    if (newSettings.autoSync !== undefined) {
+      current.autoSync = newSettings.autoSync === true || String(newSettings.autoSync).toLowerCase() === 'true';
+    }
+    if (newSettings.requireLogin !== undefined) {
+      current.requireLogin = newSettings.requireLogin === true || String(newSettings.requireLogin).toLowerCase() === 'true';
+    }
     
     // Save locally
     const rawData = JSON.parse(JSON.stringify(settings.value));
@@ -164,9 +181,15 @@ export const useSettingsStore = defineStore('settings', () => {
     // Sync sandbox mode with allowDevWrite status
     setSandbox(!settings.value.allowDevWrite);
     
-    // Save to Cloud asynchronously (fire and forget / error handled downstream)
-    saveSettingsToCloud(rawData);
+    // Save to Cloud and await response so cloud state is consistent before proceeding
+    let cloudRes = null;
+    try {
+      cloudRes = await saveSettingsToCloud(rawData);
+    } catch (e) {
+      console.warn('[Settings Store] Cloud save failed:', e);
+    }
     addAuditLog({ type: 'UPDATE_SETTINGS', details: 'Cập nhật cấu hình hệ thống' });
+    return cloudRes;
   }
 
   function setSandbox(enabled: boolean) {

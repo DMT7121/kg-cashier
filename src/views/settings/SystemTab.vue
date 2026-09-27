@@ -47,7 +47,8 @@ const deepseekKeys = ref('');
 const mistralKeys = ref('');
 const nvidiaKeys = ref('');
 
-onMounted(() => {
+onMounted(async () => {
+  await settingsStore.loadSettings();
   loadFormValues();
 });
 
@@ -59,7 +60,7 @@ function loadFormValues() {
   shiftWarningHours.value = s.shiftWarningHours;
   autoSync.value = s.autoSync;
   requireLogin.value = s.requireLogin;
-  allowDevWrite.value = s.allowDevWrite || false;
+  allowDevWrite.value = s.allowDevWrite === true || String(s.allowDevWrite).toLowerCase() === 'true';
 
   if (s.cukcuk) {
     cukDomain.value = s.cukcuk.domain;
@@ -229,6 +230,18 @@ async function handleSyncInvoices() {
 }
 
 async function handleSyncMenu() {
+  const isLocalOrLan = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(window.location.hostname)
+  );
+
+  // If running on localhost/LAN and allowDevWrite is not yet active, auto-activate it
+  if (isLocalOrLan && !allowDevWrite.value) {
+    allowDevWrite.value = true;
+    showToast('⚡ Đã tự động kích hoạt quyền ghi Local/LAN...', 'info');
+  }
+
   await saveSettings(true);
   cukMenuLoading.value = true;
   cukResultMsg.value = '';
@@ -236,7 +249,16 @@ async function handleSyncMenu() {
 
   try {
     const { syncCukcukMenuOnCloud } = await import('../../services/api');
-    const result = await syncCukcukMenuOnCloud();
+    let result = await syncCukcukMenuOnCloud();
+
+    // Auto-recovery if GAS backend reported local/LAN permission block
+    if (!result?.success && result?.message?.includes('local/LAN')) {
+      showToast('Đang cấp quyền ghi Local/LAN lên Cloud và thử lại...', 'info');
+      allowDevWrite.value = true;
+      await saveSettings(true);
+      result = await syncCukcukMenuOnCloud();
+    }
+
     if (result && result.success) {
       let msg = '✅ Đồng bộ thực đơn hoàn tất!\n';
       if (result.products) {
@@ -392,9 +414,12 @@ async function handleVatAdminLogin() {
             <span class="text-sm text-slate-700 dark:text-slate-300 font-medium">Yêu cầu đăng nhập PIN thu ngân khi mở ca</span>
           </label>
 
-          <label class="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" v-model="allowDevWrite" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
-            <span class="text-sm text-slate-700 dark:text-slate-300 font-medium">Cho phép ghi dữ liệu thật từ thiết bị Local/LAN</span>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" v-model="allowDevWrite" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+            <div class="flex flex-col">
+              <span class="text-sm text-slate-700 dark:text-slate-300 font-medium">Cho phép ghi dữ liệu thật từ thiết bị Local/LAN</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">Bắt buộc bật khi chạy ở localhost hoặc IP mạng nội bộ để đồng bộ thực đơn và dữ liệu lên máy chủ Google Sheets.</span>
+            </div>
           </label>
         </div>
 

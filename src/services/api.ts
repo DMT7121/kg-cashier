@@ -125,7 +125,7 @@ interface SandboxRegistryItem {
 async function apiCall(action: string, data: any = null, retries = 2): Promise<any> {
   const writeActions = [
     'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
-    'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
+    'voidGhostShift', 'saveStaff', 'deleteStaff',
     'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts',
     'syncPosOrders', 'runCukcukSync', 'rebuildAggregates', 'rebuildMonthJson',
     'manualOverridePayment', 'migrateLegacyCukcukInvoices'
@@ -295,10 +295,6 @@ async function apiCall(action: string, data: any = null, retries = 2): Promise<a
 
       if (action === 'deleteStaff') {
         return { success: true, message: 'Sandbox: Đã xóa nhân viên.' };
-      }
-
-      if (action === 'saveSettings') {
-        return { success: true, message: 'Sandbox: Đã lưu cài đặt giả lập.' };
       }
 
       if (action === 'repairShifts') {

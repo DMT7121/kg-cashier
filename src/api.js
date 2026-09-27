@@ -95,7 +95,7 @@ export function getMetadata() {
 async function apiCall(action, data = null, retries = 2) {
   const writeActions = [
     'openShift', 'syncShift', 'closeShift', 'reopenShift', 'cancelShift',
-    'voidGhostShift', 'saveStaff', 'deleteStaff', 'saveSettings',
+    'voidGhostShift', 'saveStaff', 'deleteStaff',
     'syncCukcukRevenue', 'addAudit', 'saveCukcukSyncState', 'repairShifts',
     'syncPosOrders'
   ];
@@ -253,10 +253,6 @@ async function apiCall(action, data = null, retries = 2) {
 
       if (action === 'deleteStaff') {
         return { success: true, message: 'Sandbox: Đã xóa nhân viên.' };
-      }
-
-      if (action === 'saveSettings') {
-        return { success: true, message: 'Sandbox: Đã lưu cài đặt giả lập.' };
       }
 
       if (action === 'repairShifts') {
