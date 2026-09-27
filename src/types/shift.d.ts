@@ -10,6 +10,7 @@ export interface ShiftSummary {
   cashIncome: number;
   cardIncome: number;
   transferIncome: number;
+  depositIncome?: number;
   cashExpense: number;
   otherIncome: number;
   otherExpense: number;

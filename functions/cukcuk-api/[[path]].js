@@ -94,21 +94,27 @@ async function getCukcukConfig(context, request) {
   const pin = request.headers.get('X-Cukcuk-Pin') || '';
 
   if (gasUrl) {
+    if (globalThis.__cachedGasConfig && (Date.now() - globalThis.__cachedGasConfigTime < 3600000)) {
+      return globalThis.__cachedGasConfig;
+    }
     try {
       const response = await fetch(gasUrl + '?action=getCukcukConfigSecure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword, pin })
+        body: JSON.stringify({ action: 'getCukcukConfigSecure', adminPassword, pin })
       });
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.domain && result.appId && result.secretKey) {
-          return {
+          const cfg = {
             domain: result.domain,
             appId: result.appId,
             secretKey: result.secretKey,
             source: 'gas_properties'
           };
+          globalThis.__cachedGasConfig = cfg;
+          globalThis.__cachedGasConfigTime = Date.now();
+          return cfg;
         }
       }
     } catch(err) {

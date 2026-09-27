@@ -94,6 +94,7 @@ const summaryData = ref({
   cash: 0,
   card: 0,
   transfer: 0,
+  deposit: 0,
   bills: 0,
   avgPerBill: 0,
   unpaid: 0
@@ -122,7 +123,7 @@ const shiftsForDay = ref<Shift[]>([]);
 
 // ── Invoice Search & Filters ────────────────
 const invoiceSearchQuery = ref<string>('');
-const invoicePaymentFilter = ref<string>('all'); // all, cash, card, transfer, manually_edited
+const invoicePaymentFilter = ref<string>('all'); // all, cash, card, transfer, deposit, manually_edited
 
 // ── Custom Layout Config ────────────────────
 interface LayoutConfig {
@@ -156,6 +157,7 @@ const editingInvoice = ref<SAInvoice | null>(null);
 const editCash = ref<number>(0);
 const editCard = ref<number>(0);
 const editTransfer = ref<number>(0);
+const editDeposit = ref<number>(0);
 const isSavingPayment = ref<boolean>(false);
 
 // ── Load Report Layout Configurations ───────
@@ -339,7 +341,7 @@ function getOriginalPayments(inv: SAInvoice): PaymentLine[] {
 }
 
 // ── Refresh / Fetch Reports Data ────────────
-async function refreshReportData() {
+async function refreshReportData(forceCukcuk = false) {
   const { start, end } = activeDateRange.value;
   
   // Format boundaries for text matching
@@ -350,57 +352,47 @@ async function refreshReportData() {
   const labelEnd = formatDate(endStr);
   periodBoundsLabel.value = selectedPeriod.value === 'day' ? labelStart : `${labelStart} đến ${labelEnd}`;
   
-  // 1. Fetch Invoices from Cloud and merge to local IndexedDB for the date range
-  try {
-    const cloudRes = await getCukcukInvoicesFromCloud({ fromDate: startStr, toDate: endStr });
-    if (cloudRes && cloudRes.success && Array.isArray(cloudRes.invoices)) {
-      const { mergeCloudInvoices } = await import('../services/invoiceStore');
-      await mergeCloudInvoices(cloudRes.invoices);
-    }
-  } catch (err) {
-    console.warn('[RevenueReport] Failed to fetch and merge cloud invoices:', err);
-  }
-  
-  // 1b. Fetch Invoices for this date range
-  const dbInvoices = await getInvoicesForPeriod(selectedPeriod.value, start);
+  // 1. Instant Cache-First Display from IndexedDB (0ms)
+  let dbInvoices = await getInvoicesForPeriod(selectedPeriod.value, start);
   invoices.value = dbInvoices;
-  
-  // 2. Fetch daily breakdown for the table
-  const breakdown = await getDailyBreakdown(selectedPeriod.value, start);
-  dailyBreakdown.value = breakdown;
-  
-  // 3. Compute Summary Card Stats
-  let total = 0;
-  let cash = 0;
-  let card = 0;
-  let transfer = 0;
-  let unpaid = 0;
-  let paidBills = 0;
-  
-  dbInvoices.forEach(inv => {
-    if ((inv as any).unpaid) {
-      unpaid += inv.amount;
-    } else {
-      total += inv.amount;
-      paidBills++;
-      (inv.payments || []).forEach(p => {
-        if (p.method === 'cash') cash += p.amount;
-        else if (p.method === 'card') card += p.amount;
-        else if (p.method === 'transfer') transfer += p.amount;
-      });
+  recomputeSummaryForInvoices(dbInvoices);
+  dailyBreakdown.value = await getDailyBreakdown(selectedPeriod.value, start);
+
+  // 2. Direct Ultra-Fast CUKCUK Sync if empty, lacking item details, or forced
+  const hasItems = dbInvoices.some(i => i.items && i.items.length > 0);
+  const needSync = forceCukcuk || dbInvoices.length === 0 || !hasItems;
+  if (needSync) {
+    isSyncing.value = true;
+    try {
+      const toDate = selectedPeriod.value === 'day' ? undefined : endStr;
+      await syncInvoicesForDate(startStr, true, toDate);
+      dbInvoices = await getInvoicesForPeriod(selectedPeriod.value, start);
+      invoices.value = dbInvoices;
+      recomputeSummaryForInvoices(dbInvoices);
+      dailyBreakdown.value = await getDailyBreakdown(selectedPeriod.value, start);
+    } catch (cukErr) {
+      console.warn('[RevenueReport] Fast CUKCUK direct sync error:', cukErr);
+    } finally {
+      isSyncing.value = false;
     }
-  });
-  
-  summaryData.value = {
-    total,
-    cash,
-    card,
-    transfer,
-    bills: dbInvoices.length,
-    avgPerBill: paidBills > 0 ? Math.round(total / paidBills) : 0,
-    unpaid
-  };
-  
+  }
+
+  // 3. Background Cloud Invoices sync from Google Sheets (non-blocking)
+  getCukcukInvoicesFromCloud({ fromDate: startStr, toDate: endStr })
+    .then(async (cloudRes) => {
+      if (cloudRes && cloudRes.success && Array.isArray(cloudRes.invoices) && cloudRes.invoices.length > 0) {
+        const { mergeCloudInvoices } = await import('../services/invoiceStore');
+        await mergeCloudInvoices(cloudRes.invoices);
+        const updated = await getInvoicesForPeriod(selectedPeriod.value, start);
+        invoices.value = updated;
+        recomputeSummaryForInvoices(updated);
+        dailyBreakdown.value = await getDailyBreakdown(selectedPeriod.value, start);
+      }
+    })
+    .catch((err) => {
+      console.warn('[RevenueReport] Background cloud invoices fetch notice:', err);
+    });
+
   // 4. Update list of shifts if period is 'day'
   if (selectedPeriod.value === 'day') {
     const dateStr = startStr;
@@ -416,8 +408,6 @@ async function refreshReportData() {
     
     // Auto-select shift or default to 'all'
     if (dayShifts.length > 0) {
-      // If we already have a selected shift that is still available in dayShifts, keep it.
-      // Otherwise default to the first shift
       const exists = dayShifts.some(s => s.id === selectedShiftId.value);
       if (!exists && selectedShiftId.value !== 'all') {
         selectedShiftId.value = dayShifts[0].id;
@@ -449,6 +439,102 @@ async function updateShiftHandoverReport() {
 }
 
 // ── Invoices Tab - Filtering & Fetching ─────
+const isInvoiceLoading = ref<boolean>(false);
+
+// Payment breakdown helpers for table columns & summary
+function getInvoiceCash(inv: any): number {
+  if (!inv) return 0;
+  if (inv.cashAmount !== undefined && inv.cashAmount > 0) return inv.cashAmount;
+  if (inv.CashAmount !== undefined && inv.CashAmount > 0) return Number(inv.CashAmount);
+  const found = (inv.payments || []).filter((p: any) => (p.method || p.Method || '').toLowerCase() === 'cash');
+  const sum = found.reduce((acc: number, cur: any) => acc + (Number(cur.amount) || Number(cur.Amount) || 0), 0);
+  if (sum > 0) return sum;
+  return 0;
+}
+
+function getInvoiceCard(inv: any): number {
+  if (!inv) return 0;
+  if (inv.cardAmount !== undefined && inv.cardAmount > 0) return inv.cardAmount;
+  if (inv.CardAmount !== undefined && inv.CardAmount > 0) return Number(inv.CardAmount);
+  const found = (inv.payments || []).filter((p: any) => (p.method || p.Method || '').toLowerCase() === 'card');
+  const sum = found.reduce((acc: number, cur: any) => acc + (Number(cur.amount) || Number(cur.Amount) || 0), 0);
+  if (sum > 0) return sum;
+  return 0;
+}
+
+function getInvoiceTransfer(inv: any): number {
+  if (!inv) return 0;
+  // If invoice has manualOverride, trust the manually set transferAmount
+  if (inv.manualOverride || (inv as any).isManuallyEdited) {
+    if (inv.transferAmount !== undefined) return Number(inv.transferAmount) || 0;
+    if (inv.TransferAmount !== undefined) return Number(inv.TransferAmount) || 0;
+  }
+  
+  const found = (inv.payments || []).filter((p: any) => (p.method || p.Method || '').toLowerCase() === 'transfer');
+  let sum = found.reduce((acc: number, cur: any) => acc + (Number(cur.amount) || Number(cur.Amount) || 0), 0);
+  if (sum === 0) {
+    if (inv.transferAmount !== undefined && inv.transferAmount > 0) sum = Number(inv.transferAmount);
+    else if (inv.TransferAmount !== undefined && inv.TransferAmount > 0) sum = Number(inv.TransferAmount);
+  }
+
+  // Disentangle legacy merged deposit from transfer
+  const dep = getInvoiceDeposit(inv);
+  if (dep > 0 && sum >= dep && !inv.manualOverride && !(inv as any).isManuallyEdited) {
+    const cash = getInvoiceCash(inv);
+    const card = getInvoiceCard(inv);
+    const total = inv.amount || Number(inv.TotalAmount) || 0;
+    if (total > 0 && (cash + card + sum === total)) {
+      sum = Math.max(0, sum - dep);
+    }
+  }
+
+  return sum;
+}
+
+function getInvoiceDeposit(inv: any): number {
+  if (!inv) return 0;
+  if (inv.depositAmount !== undefined && inv.depositAmount > 0) return Number(inv.depositAmount);
+  if (inv.DepositAmount !== undefined && inv.DepositAmount > 0) return Number(inv.DepositAmount);
+  const found = (inv.payments || []).filter((p: any) => (p.method || p.Method || '').toLowerCase() === 'deposit');
+  const sum = found.reduce((acc: number, cur: any) => acc + (Number(cur.amount) || Number(cur.Amount) || 0), 0);
+  if (sum > 0) return sum;
+  return 0;
+}
+
+function recomputeSummaryForInvoices(invList: SAInvoice[]) {
+  let total = 0;
+  let cash = 0;
+  let card = 0;
+  let transfer = 0;
+  let deposit = 0;
+  let unpaid = 0;
+  let paidBills = 0;
+
+  invList.forEach(inv => {
+    if ((inv as any).unpaid) {
+      unpaid += inv.amount;
+    } else {
+      total += inv.amount;
+      paidBills++;
+      cash += getInvoiceCash(inv);
+      card += getInvoiceCard(inv);
+      transfer += getInvoiceTransfer(inv);
+      deposit += getInvoiceDeposit(inv);
+    }
+  });
+
+  summaryData.value = {
+    total,
+    cash,
+    card,
+    transfer,
+    deposit,
+    bills: invList.length,
+    avgPerBill: paidBills > 0 ? Math.round(total / paidBills) : 0,
+    unpaid
+  };
+}
+
 const filteredInvoices = computed(() => {
   let list = invoices.value;
   
@@ -456,8 +542,14 @@ const filteredInvoices = computed(() => {
   if (invoicePaymentFilter.value !== 'all') {
     if (invoicePaymentFilter.value === 'manually_edited') {
       list = list.filter(inv => inv.manualOverride || (inv as any).isManuallyEdited);
-    } else {
-      list = list.filter(inv => (inv.payments || []).some(p => p.method === invoicePaymentFilter.value && p.amount > 0));
+    } else if (invoicePaymentFilter.value === 'cash') {
+      list = list.filter(inv => getInvoiceCash(inv) > 0);
+    } else if (invoicePaymentFilter.value === 'card') {
+      list = list.filter(inv => getInvoiceCard(inv) > 0);
+    } else if (invoicePaymentFilter.value === 'transfer') {
+      list = list.filter(inv => getInvoiceTransfer(inv) > 0);
+    } else if (invoicePaymentFilter.value === 'deposit') {
+      list = list.filter(inv => getInvoiceDeposit(inv) > 0);
     }
   }
   
@@ -475,26 +567,39 @@ const filteredInvoices = computed(() => {
   return list;
 });
 
-// Watch changes on invoice filters and update
-watch([invoicePeriod, invoiceDate], async () => {
-  const start = new Date(invoiceDate.value);
-  
-  // Fetch from cloud and merge first to ensure we display older dates immediately
+// Load invoices for date with instant cache-first display + fast CUKCUK sync
+async function loadInvoicesForDate(targetDate: string, period = 'day', forceFresh = false) {
+  isInvoiceLoading.value = true;
   try {
-    const bounds = getPeriodBounds(invoicePeriod.value, start);
-    const startStr = toLocalDateStr(bounds.start);
-    const endStr = toLocalDateStr(bounds.end);
-    const cloudRes = await getCukcukInvoicesFromCloud({ fromDate: startStr, toDate: endStr });
-    if (cloudRes && cloudRes.success && Array.isArray(cloudRes.invoices)) {
-      const { mergeCloudInvoices } = await import('../services/invoiceStore');
-      await mergeCloudInvoices(cloudRes.invoices);
+    const start = new Date(targetDate);
+    
+    // 1. Instant local display from IndexedDB (0ms)
+    const localList = await getInvoicesForPeriod(period, start);
+    if (localList && localList.length > 0) {
+      invoices.value = localList;
+      recomputeSummaryForInvoices(localList);
+    }
+
+    // 2. Fetch fresh from CUKCUK if forceFresh or local cache is empty
+    if (forceFresh || !localList || localList.length === 0) {
+      await syncInvoicesForDate(targetDate, true);
+      const updatedList = await getInvoicesForPeriod(period, start);
+      invoices.value = updatedList;
+      recomputeSummaryForInvoices(updatedList);
     }
   } catch (err) {
-    console.warn('[RevenueReport InvoicesTab] Failed to fetch and merge cloud invoices:', err);
+    console.warn('[RevenueReport] loadInvoicesForDate error:', err);
+  } finally {
+    isInvoiceLoading.value = false;
   }
-  
-  invoices.value = await getInvoicesForPeriod(invoicePeriod.value, start);
-});
+}
+
+// Watch changes on invoice date/period and update INSTANTLY
+watch([invoicePeriod, invoiceDate], ([newPeriod, newDate]) => {
+  if (newDate) {
+    loadInvoicesForDate(newDate, newPeriod);
+  }
+}, { immediate: true });
 
 // ── Analytics Tab - Computations ────────────
 async function fetchAnalyticsData() {
@@ -552,14 +657,22 @@ function shortCurrency(val: number): string {
 async function triggerCukcukSync() {
   if (isSyncing.value) return;
   isSyncing.value = true;
-  const targetDate = invoiceDate.value || reportDate.value || todayStr();
-  showToast(`🔄 Đang đồng bộ hóa hóa đơn từ CUKCUK ngày ${targetDate}...`, 'info');
   try {
-    const result = await syncInvoicesForDate(targetDate);
-    if (result && result.success) {
-      await refreshReportData();
+    if (activeTab.value === 'invoices') {
+      const targetDate = invoiceDate.value || reportDate.value || todayStr();
+      const result = await syncInvoicesForDate(targetDate, false);
+      if (result && result.success) {
+        await loadInvoicesForDate(targetDate, invoicePeriod.value, true);
+      }
     } else {
-      showToast('⚠️ Không có hóa đơn mới hoặc đồng bộ lỗi: ' + (result.message || ''), 'warning');
+      const { start, end } = activeDateRange.value;
+      const startStr = toLocalDateStr(start);
+      const endStr = toLocalDateStr(end);
+      const toDate = selectedPeriod.value === 'day' ? undefined : endStr;
+      const result = await syncInvoicesForDate(startStr, false, toDate);
+      if (result && result.success) {
+        await refreshReportData(true);
+      }
     }
   } catch (e: any) {
     console.error('CUKCUK sync failed:', e);
@@ -591,22 +704,30 @@ function openEditPaymentModal(invoice: SAInvoice) {
   let cashAmt = 0;
   let cardAmt = 0;
   let transAmt = 0;
+  let depAmt = 0;
   
   (invoice.payments || []).forEach(p => {
     if (p.method === 'cash') cashAmt = p.amount;
     else if (p.method === 'card') cardAmt = p.amount;
     else if (p.method === 'transfer') transAmt = p.amount;
+    else if (p.method === 'deposit') depAmt = p.amount;
   });
+
+  if (depAmt === 0) depAmt = getInvoiceDeposit(invoice);
+  if (transAmt === 0 && !invoice.manualOverride) transAmt = getInvoiceTransfer(invoice);
+  if (cardAmt === 0 && !invoice.manualOverride) cardAmt = getInvoiceCard(invoice);
+  if (cashAmt === 0 && !invoice.manualOverride) cashAmt = getInvoiceCash(invoice);
   
   editCash.value = cashAmt;
   editCard.value = cardAmt;
   editTransfer.value = transAmt;
+  editDeposit.value = depAmt;
   
   showEditPaymentModal.value = true;
 }
 
 const editPaymentTotal = computed(() => {
-  return editCash.value + editCard.value + editTransfer.value;
+  return editCash.value + editCard.value + editTransfer.value + editDeposit.value;
 });
 
 const isEditPaymentValid = computed(() => {
@@ -622,12 +743,18 @@ async function savePaymentOverride() {
     const newPayments: PaymentLine[] = [
       { method: 'cash' as const, amount: editCash.value },
       { method: 'card' as const, amount: editCard.value },
-      { method: 'transfer' as const, amount: editTransfer.value }
+      { method: 'transfer' as const, amount: editTransfer.value },
+      { method: 'deposit' as const, amount: editDeposit.value }
     ].filter(p => p.amount > 0);
     
     // Save to IndexedDB
     const { oldPayments, newPayments: savedNewPayments } = await editInvoicePayment(editingInvoice.value.refId, newPayments);
     
+    (editingInvoice.value as any).depositAmount = editDeposit.value;
+    (editingInvoice.value as any).transferAmount = editTransfer.value;
+    (editingInvoice.value as any).cardAmount = editCard.value;
+    (editingInvoice.value as any).cashAmount = editCash.value;
+
     // Push manual edit to Google Sheets
     const pushResult = await pushManualEditToSheets(editingInvoice.value.refId, oldPayments, savedNewPayments);
     if (pushResult && pushResult.success) {
@@ -927,9 +1054,9 @@ function exportCSV() {
     return;
   }
   
-  let csv = 'Ngay,So ca,So bill,Doanh thu,Chi phi,Loi nhuan,Tien mat,The,Chuyen khoan\n';
+  let csv = 'Ngay,So ca,So bill,Doanh thu,Chi phi,Loi nhuan,Tien mat,The,Chuyen khoan,Dat coc\n';
   data.forEach((d: any) => {
-    csv += `"${d.date}",${d.shifts},${d.bills},${d.total},${d.totalExpense || 0},${d.total - (d.totalExpense || 0)},${d.cash || 0},${d.card || 0},${d.transfer || 0}\n`;
+    csv += `"${d.date}",${d.shifts},${d.bills},${d.total},${d.totalExpense || 0},${d.total - (d.totalExpense || 0)},${d.cash || 0},${d.card || 0},${d.transfer || 0},${d.deposit || 0}\n`;
   });
   
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -952,11 +1079,12 @@ onMounted(async () => {
     loadLayoutConfig();
   }, { deep: true });
 
-  window.addEventListener('cukcuk-invoices-updated', refreshReportData);
+  const handleCukcukUpdate = () => { refreshReportData(); };
+  window.addEventListener('cukcuk-invoices-updated', handleCukcukUpdate);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('cukcuk-invoices-updated', refreshReportData);
+  // Clean up global listeners
 });
 </script>
 
@@ -992,25 +1120,29 @@ onUnmounted(() => {
             <span class="material-symbols-rounded text-base">download</span>
             <span class="hidden md:inline">Xuất CSV</span>
           </button>
+          <button @click="triggerCukcukSync" class="btn btn-secondary btn-sm" :disabled="isSyncing" title="Đồng bộ trực tiếp từ CUKCUK">
+            <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': isSyncing }">sync</span>
+            <span class="hidden md:inline">{{ isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ CUKCUK' }}</span>
+          </button>
           <button @click="printHandover" class="btn btn-primary btn-sm shadow-xs" title="In phiếu bàn giao khổ A4">
             <span class="material-symbols-rounded text-base">print</span>
             <span>In phiếu A4</span>
           </button>
         </template>
         <template v-else-if="activeTab === 'invoices'">
-          <button @click="refreshReportData" class="btn btn-primary btn-sm shadow-xs" :disabled="isSyncing">
-            <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': isSyncing }">sync</span>
-            <span>{{ isSyncing ? 'Đang tải...' : 'Đồng bộ CUKCUK' }}</span>
+          <button @click="triggerCukcukSync" class="btn btn-primary btn-sm shadow-xs" :disabled="isSyncing || isInvoiceLoading">
+            <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': isSyncing || isInvoiceLoading }">sync</span>
+            <span>{{ (isSyncing || isInvoiceLoading) ? 'Đang tải...' : 'Đồng bộ CUKCUK' }}</span>
           </button>
         </template>
         <template v-else-if="activeTab === 'analytics'">
-          <button @click="refreshReportData" class="btn btn-secondary btn-sm">
+          <button @click="() => refreshReportData()" class="btn btn-secondary btn-sm">
             <span class="material-symbols-rounded text-base">refresh</span>
             <span>Làm mới biểu đồ</span>
           </button>
         </template>
         <template v-else-if="activeTab === 'audit'">
-          <button @click="refreshReportData" class="btn btn-secondary btn-sm">
+          <button @click="() => refreshReportData()" class="btn btn-secondary btn-sm">
             <span class="material-symbols-rounded text-base">sync</span>
             <span>Đối soát lại</span>
           </button>
@@ -1162,6 +1294,10 @@ onUnmounted(() => {
               <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Chuyển khoản</span>
               <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">{{ formatCurrency(summaryData.transfer) }}</span>
             </div>
+            <div v-if="summaryData.deposit > 0" class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Đặt cọc</span>
+              <span class="font-bold text-amber-600 dark:text-amber-400 text-sm">{{ formatCurrency(summaryData.deposit) }}</span>
+            </div>
             <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
               <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Trung bình / Bill</span>
               <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">{{ formatCurrency(summaryData.avgPerBill) }}</span>
@@ -1232,6 +1368,18 @@ onUnmounted(() => {
             <div>
               <span class="text-base font-extrabold text-slate-800 dark:text-slate-100 block">{{ formatCurrency(summaryData.transfer) }}</span>
               <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Chuyển khoản bank</span>
+            </div>
+          </div>
+
+          <!-- Deposit Payment Card -->
+          <div v-if="summaryData.deposit > 0" class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wide">Đặt cọc</span>
+              <span class="material-symbols-rounded text-amber-600 dark:text-amber-400 text-lg">savings</span>
+            </div>
+            <div>
+              <span class="text-base font-extrabold text-amber-600 dark:text-amber-400 block">{{ formatCurrency(summaryData.deposit) }}</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Tiền cọc đặt bàn</span>
             </div>
           </div>
 
@@ -1711,6 +1859,7 @@ onUnmounted(() => {
                   <th class="px-4 py-3 text-right">Tiền mặt</th>
                   <th class="px-4 py-3 text-right">Quẹt thẻ</th>
                   <th class="px-4 py-3 text-right">Chuyển khoản</th>
+                  <th class="px-4 py-3 text-right">Đặt cọc</th>
                   <th class="px-4 py-3 text-right font-bold">Doanh thu</th>
                 </tr>
               </thead>
@@ -1722,10 +1871,11 @@ onUnmounted(() => {
                   <td class="px-4 py-3.5 text-right text-emerald-600 dark:text-emerald-400">{{ formatCurrency(row.cash) }}</td>
                   <td class="px-4 py-3.5 text-right text-teal-600 dark:text-teal-400">{{ formatCurrency(row.card) }}</td>
                   <td class="px-4 py-3.5 text-right text-indigo-600 dark:text-indigo-400">{{ formatCurrency(row.transfer) }}</td>
+                  <td class="px-4 py-3.5 text-right text-amber-600 dark:text-amber-400">{{ formatCurrency(row.deposit || 0) }}</td>
                   <td class="px-4 py-3.5 text-right font-bold text-slate-900 dark:text-slate-100 bg-slate-50/20 dark:bg-slate-800/40">{{ formatCurrency(row.total) }}</td>
                 </tr>
                 <tr v-if="dailyBreakdown.length === 0">
-                  <td colspan="7" class="px-4 py-8 text-center text-slate-400 italic">Không tìm thấy dữ liệu doanh thu trong kỳ này.</td>
+                  <td colspan="8" class="px-4 py-8 text-center text-slate-400 italic">Không tìm thấy dữ liệu doanh thu trong kỳ này.</td>
                 </tr>
               </tbody>
             </table>
@@ -1791,6 +1941,7 @@ onUnmounted(() => {
               <option value="cash">Tiền mặt</option>
               <option value="card">Quẹt thẻ</option>
               <option value="transfer">Chuyển khoản</option>
+              <option value="deposit">Đặt cọc</option>
               <option value="manually_edited">Hóa đơn sửa tay ✎</option>
             </select>
           </div>
@@ -1836,6 +1987,18 @@ onUnmounted(() => {
             </div>
             <span class="w-32 text-right font-bold">{{ formatCurrency(summaryData.transfer) }} ({{ summaryData.total > 0 ? Math.round((summaryData.transfer / summaryData.total) * 100) : 0 }}%)</span>
           </div>
+
+          <!-- Deposit bar -->
+          <div v-if="summaryData.deposit > 0" class="flex justify-between items-center text-xs font-semibold text-slate-600 dark:text-slate-300 gap-4">
+            <span class="w-24 text-amber-600 dark:text-amber-400 flex items-center gap-1"><span class="material-symbols-rounded text-base">savings</span> Đặt cọc</span>
+            <div class="flex-1 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+              <div 
+                class="bg-amber-500 h-full rounded-full transition-all duration-300"
+                :style="{ width: (summaryData.total > 0 ? (summaryData.deposit / summaryData.total) * 100 : 0) + '%' }"
+              ></div>
+            </div>
+            <span class="w-32 text-right font-bold">{{ formatCurrency(summaryData.deposit) }} ({{ summaryData.total > 0 ? Math.round((summaryData.deposit / summaryData.total) * 100) : 0 }}%)</span>
+          </div>
         </div>
       </div>
 
@@ -1859,6 +2022,7 @@ onUnmounted(() => {
                 <th class="px-4 py-3 text-right">Tiền mặt</th>
                 <th class="px-4 py-3 text-right">Quẹt thẻ</th>
                 <th class="px-4 py-3 text-right">Chuyển khoản</th>
+                <th class="px-4 py-3 text-right">Đặt cọc</th>
                 <th class="px-4 py-3 text-right font-bold">Tổng thanh toán</th>
                 <th class="px-4 py-3 text-center">Thao tác</th>
               </tr>
@@ -1880,16 +2044,19 @@ onUnmounted(() => {
                 
                 <!-- Computed payment columns -->
                 <td class="px-4 py-3.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                  {{ formatCurrency(inv.payments?.find(p => p.method === 'cash')?.amount || 0) }}
+                  {{ formatCurrency(getInvoiceCash(inv)) }}
                 </td>
                 <td class="px-4 py-3.5 text-right font-semibold text-teal-600 dark:text-teal-400">
-                  {{ formatCurrency(inv.payments?.find(p => p.method === 'card')?.amount || 0) }}
+                  {{ formatCurrency(getInvoiceCard(inv)) }}
                 </td>
-                <td class="px-4 py-3.5 text-right font-semibold text-indigo-600">
-                  {{ formatCurrency(inv.payments?.find(p => p.method === 'transfer')?.amount || 0) }}
+                <td class="px-4 py-3.5 text-right font-semibold text-indigo-600 dark:text-indigo-400">
+                  {{ formatCurrency(getInvoiceTransfer(inv)) }}
+                </td>
+                <td class="px-4 py-3.5 text-right font-semibold text-amber-600 dark:text-amber-400">
+                  {{ formatCurrency(getInvoiceDeposit(inv)) }}
                 </td>
                 
-                <td class="px-4 py-3.5 text-right font-bold text-slate-900 bg-slate-50/20">{{ formatCurrency(inv.amount) }}</td>
+                <td class="px-4 py-3.5 text-right font-bold text-slate-900 dark:text-slate-100 bg-slate-50/20">{{ formatCurrency(inv.amount) }}</td>
                 <td class="px-4 py-3.5 text-center">
                   <div class="flex items-center justify-center gap-1.5">
                     <button 
@@ -1909,8 +2076,16 @@ onUnmounted(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredInvoices.length === 0">
-                <td colspan="9" class="px-4 py-8 text-center text-slate-400 italic">Không có hóa đơn nào khớp với bộ lọc tìm kiếm.</td>
+              <tr v-if="isInvoiceLoading && filteredInvoices.length === 0">
+                <td colspan="10" class="px-4 py-12 text-center text-slate-500">
+                  <div class="flex items-center justify-center gap-2">
+                    <span class="material-symbols-rounded animate-spin text-xl text-emerald-600">sync</span>
+                    <span class="font-medium text-xs">Đang tải và đồng bộ hóa đơn CUKCUK...</span>
+                  </div>
+                </td>
+              </tr>
+              <tr v-else-if="filteredInvoices.length === 0">
+                <td colspan="10" class="px-4 py-8 text-center text-slate-400 italic">Không có hóa đơn nào khớp với bộ lọc tìm kiếm.</td>
               </tr>
             </tbody>
           </table>
@@ -2245,6 +2420,16 @@ onUnmounted(() => {
               <input 
                 type="number" 
                 v-model.number="editTransfer"
+                class="form-input w-full text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3.5 py-2"
+              />
+            </div>
+
+            <!-- Deposit Input -->
+            <div class="space-y-1">
+              <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1"><span class="material-symbols-rounded text-sm text-amber-600">savings</span> Đặt cọc</label>
+              <input 
+                type="number" 
+                v-model.number="editDeposit"
                 class="form-input w-full text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3.5 py-2"
               />
             </div>

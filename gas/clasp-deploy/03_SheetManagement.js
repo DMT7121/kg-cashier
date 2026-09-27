@@ -39,6 +39,15 @@ function onEdit(e) {
       return;
     }
     
+    // Bỏ qua nếu đang thao tác trên sheet ngày làm việc (DD/MM/YYYY) để tránh xung đột với 02_DateSheetSync.gs
+    var activeSheet = e.source.getActiveSheet();
+    if (activeSheet) {
+      var sName = activeSheet.getName();
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(sName.trim())) {
+        return;
+      }
+    }
+    
     const properties = PropertiesService.getScriptProperties();
     
     // Kiểm tra auto rename

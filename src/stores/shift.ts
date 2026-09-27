@@ -129,6 +129,7 @@ export const useShiftStore = defineStore('shift', () => {
     let cashIncome = 0;
     let cardIncome = 0;
     let transferIncome = 0;
+    let depositIncome = 0;
     let cashExpense = 0;
     let otherIncome = 0;
     let otherExpense = 0;
@@ -156,6 +157,7 @@ export const useShiftStore = defineStore('shift', () => {
           if (payments[p].method === 'cash') cashIncome = addMoney(cashIncome, amt);
           else if (payments[p].method === 'card') cardIncome = addMoney(cardIncome, amt);
           else if (payments[p].method === 'transfer') transferIncome = addMoney(transferIncome, amt);
+          else if (payments[p].method === 'deposit') depositIncome = addMoney(depositIncome, amt);
         }
         const effectiveAmt = invTotal > 0 ? invTotal : toMoney(inv.amount);
         cukcukRevenue = addMoney(cukcukRevenue, effectiveAmt);
@@ -170,6 +172,7 @@ export const useShiftStore = defineStore('shift', () => {
       cashIncome = addMoney(cashIncome, toMoney(snap.cashIncome));
       cardIncome = addMoney(cardIncome, toMoney(snap.cardIncome));
       transferIncome = addMoney(transferIncome, toMoney(snap.transferIncome));
+      depositIncome = addMoney(depositIncome, toMoney(snap.depositIncome || 0));
       hasInvoiceStoreData = true;
     } else if (shift.date) {
       try {
@@ -187,6 +190,7 @@ export const useShiftStore = defineStore('shift', () => {
             if (payments[p].method === 'cash') cashIncome = addMoney(cashIncome, amt);
             else if (payments[p].method === 'card') cardIncome = addMoney(cardIncome, amt);
             else if (payments[p].method === 'transfer') transferIncome = addMoney(transferIncome, amt);
+            else if (payments[p].method === 'deposit') depositIncome = addMoney(depositIncome, amt);
           }
           const effectiveAmt = invTotal > 0 ? invTotal : toMoney(inv.amount);
           cukcukRevenue = addMoney(cukcukRevenue, effectiveAmt);
@@ -264,6 +268,7 @@ export const useShiftStore = defineStore('shift', () => {
       cashIncome,
       cardIncome,
       transferIncome,
+      depositIncome,
       cashExpense,
       otherIncome,
       otherExpense,

@@ -1,5 +1,5 @@
 export interface PaymentLine {
-  method: 'cash' | 'card' | 'transfer' | 'other';
+  method: 'cash' | 'card' | 'transfer' | 'other' | 'deposit';
   amount: number;
 }
 
@@ -40,4 +40,10 @@ export interface SAInvoice {
   manualOverrideJson?: string;
   manualLock?: boolean;
   manualOverride?: string | boolean;
+  depositAmount?: number;
+  cashAmount?: number;
+  cardAmount?: number;
+  transferAmount?: number;
+  otherAmount?: number;
 }
+

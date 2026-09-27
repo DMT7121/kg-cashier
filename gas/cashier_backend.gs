@@ -2143,14 +2143,14 @@ function _syncCukcukToSheetsAction(data) {
         ToDate: useToDate
       };
       
-      let response = _cukcukApiCallInGas('/api/v1/sainvoices/paging', {
+      let response = _cukcukApiCallInGas('/api/v1/sainvoices/paging-with-detail', {
         method: 'POST',
         body: JSON.stringify(body)
       }, loginRes.accessToken, loginRes.companyCode);
       
       if (response && response._authFailed) {
         loginRes = _loginCukcukInGas(appId, domain, secretKey);
-        response = _cukcukApiCallInGas('/api/v1/sainvoices/paging', {
+        response = _cukcukApiCallInGas('/api/v1/sainvoices/paging-with-detail', {
           method: 'POST',
           body: JSON.stringify(body)
         }, loginRes.accessToken, loginRes.companyCode);
@@ -2268,96 +2268,146 @@ function _syncCukcukToSheetsAction(data) {
         continue;
       }
 
-      let detail = null;
-      try {
-        detail = _cukcukApiCallInGas('/api/v1/sainvoices/' + refId, { method: 'GET' }, loginRes.accessToken, loginRes.companyCode);
-        detailFetched++;
-      } catch(detailErr) {
-        Logger.log('[GAS CUKCUK] Detail fetch failed for ' + refId + ': ' + detailErr.toString());
-        continue;
+      // In paging-with-detail, inv already contains SAInvoicePayments & SAInvoiceDetails!
+      let detailData = inv;
+      let payments = detailData.SAInvoicePayments || detailData.Payments || [];
+      let itemsList = detailData.SAInvoiceDetails || detailData.Details || [];
+
+      // Fallback single fetch only if details are missing completely and forceDetail requested
+      if (payments.length === 0 && itemsList.length === 0 && forceDetail) {
+        try {
+          const detailRes = _cukcukApiCallInGas('/api/v1/sainvoices/' + refId, { method: 'GET' }, loginRes.accessToken, loginRes.companyCode);
+          if (detailRes && detailRes.Success && detailRes.Data) {
+            detailData = detailRes.Data;
+            payments = detailData.SAInvoicePayments || detailData.Payments || [];
+            itemsList = detailData.SAInvoiceDetails || detailData.Details || [];
+            detailFetched++;
+          }
+        } catch(detailErr) {
+          Logger.log('[GAS CUKCUK] Fallback detail fetch failed for ' + refId + ': ' + detailErr.toString());
+        }
       }
 
-      if (detail && detail.Success && detail.Data) {
-        const detailData = detail.Data;
-        const payments = detailData.SAInvoicePayments || detailData.Payments || [];
-        const detailAmount = detailData.Amount || 0;
+      const totalBillAmount = Number(detailData.TotalAmount) || Number(detailData.Amount) || 0;
+      const depositAmount = Number(detailData.DepositAmount) || 0;
+      
+      let invCash = 0, invCard = 0, invTransfer = 0, invOther = 0;
+      const paymentInfoParts = [];
+      const paymentJsonList = [];
+
+      payments.forEach(pmt => {
+        const pmtAmount = Number(pmt.Amount) || 0;
+        if (pmtAmount <= 0) return;
         
-        let invCash = 0, invCard = 0, invTransfer = 0, invOther = 0;
-        const paymentInfoParts = [];
-        const paymentJsonList = [];
+        const name = (pmt.PaymentName || pmt.CardName || '').toLowerCase();
+        const type = pmt.PaymentType;
+        let method = 'cash';
+        let label = pmt.PaymentName || 'Tiền mặt';
 
-        payments.forEach(pmt => {
-          const pmtAmount = pmt.Amount || 0;
-          if (pmtAmount <= 0) return;
-          
-          const name = (pmt.PaymentName || '').toLowerCase();
-          const type = pmt.PaymentType;
-          let method = 'cash';
-          let label = 'Tiền mặt';
-
-          if (name.indexOf('mặt') !== -1 || name.indexOf('tiền mặt') !== -1 || name.indexOf('cash') !== -1) {
-            method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount;
-          } else if (name.indexOf('chuyển') !== -1 || name.indexOf('khoản') !== -1 || name.indexOf('ngân hàng') !== -1 || name.indexOf('bank') !== -1 || name.indexOf('transfer') !== -1) {
-            method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount;
-          } else if (name.indexOf('thẻ') !== -1 || name.indexOf('card') !== -1 || name.indexOf('visa') !== -1 || name.indexOf('master') !== -1) {
-            method = 'card'; label = 'Thẻ'; invCard += pmtAmount;
-          } else {
-            switch (type) {
-              case 1: method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount; break;
-              case 2: method = 'card'; label = 'Thẻ'; invCard += pmtAmount; break;
-              case 3: method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount; break;
-              default: method = 'other'; label = pmt.PaymentName || 'Khác'; invOther += pmtAmount; break;
-            }
+        if (name.indexOf('mặt') !== -1 || name.indexOf('tiền mặt') !== -1 || name.indexOf('cash') !== -1) {
+          method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount;
+        } else if (name.indexOf('chuyển') !== -1 || name.indexOf('khoản') !== -1 || name.indexOf('ck') !== -1 || name.indexOf('ngân hàng') !== -1 || name.indexOf('bank') !== -1 || name.indexOf('transfer') !== -1 || name.indexOf('qr') !== -1) {
+          method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount;
+        } else if (name.indexOf('thẻ') !== -1 || name.indexOf('card') !== -1 || name.indexOf('atm') !== -1 || name.indexOf('pos') !== -1 || name.indexOf('visa') !== -1 || name.indexOf('master') !== -1) {
+          method = 'card'; label = 'Quẹt thẻ'; invCard += pmtAmount;
+        } else {
+          switch (type) {
+            case 1: method = 'cash'; label = 'Tiền mặt'; invCash += pmtAmount; break;
+            case 2:
+              if (name.indexOf('khoản') !== -1 || name.indexOf('chuyển') !== -1) {
+                method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount;
+              } else {
+                method = 'card'; label = 'Quẹt thẻ'; invCard += pmtAmount;
+              }
+              break;
+            case 3: method = 'transfer'; label = 'Chuyển khoản'; invTransfer += pmtAmount; break;
+            default: method = 'other'; label = pmt.PaymentName || 'Khác'; invOther += pmtAmount; break;
           }
-          paymentInfoParts.push(label + ': ' + pmtAmount.toLocaleString('vi-VN'));
-          paymentJsonList.push({ method: method, amount: pmtAmount, label: label });
-        });
+        }
+        paymentInfoParts.push(label + ': ' + pmtAmount.toLocaleString('vi-VN'));
+        paymentJsonList.push({ method: method, amount: pmtAmount, label: label });
+      });
 
-        const effectiveAmount = (invCash + invCard + invTransfer + invOther) || detailAmount;
-        const paymentInfo = paymentInfoParts.join(' + ') || 'Chưa thanh toán';
+      // Handle deposit (Do NOT combine deposit with transfer / CK)
+      if (depositAmount > 0) {
+        paymentInfoParts.push('Cọc: ' + depositAmount.toLocaleString('vi-VN'));
+        paymentJsonList.push({ method: 'deposit', amount: depositAmount, label: 'Đặt cọc' });
+      }
 
-        const itemsList = detailData.SAInvoiceDetails || detailData.Details || [];
-        
-        const detailItemsStr = (itemsList || []).map(item => {
-          return [
-            item.InventoryItemName || item.ItemName || item.Name || '',
-            item.Quantity || item.Qty || 0,
-            item.UnitPrice || item.Price || 0,
-            item.Amount || 0
-          ].join(',');
-        }).join('|');
-        const detailHash = _md5Gas(detailItemsStr);
+      // If no payments recorded in SAInvoicePayments list, inspect direct invoice fields
+      const nonDepositPayments = paymentJsonList.filter(p => p.method !== 'deposit');
+      if (nonDepositPayments.length === 0) {
+        const cAmt = Number(detailData.CashAmount) || 0;
+        const cardAmt = Number(detailData.CardAmount) || 0;
+        const transAmt = Number(detailData.TransferAmount) || 0;
 
-        const workDate = _getWorkingDayGas(detailData.RefDate || inv.RefDate);
+        if (cAmt > 0) {
+          invCash = cAmt;
+          paymentInfoParts.push('Tiền mặt: ' + cAmt.toLocaleString('vi-VN'));
+          paymentJsonList.push({ method: 'cash', amount: cAmt, label: 'Tiền mặt' });
+        }
+        if (cardAmt > 0) {
+          invCard = cardAmt;
+          paymentInfoParts.push('Quẹt thẻ: ' + cardAmt.toLocaleString('vi-VN'));
+          paymentJsonList.push({ method: 'card', amount: cardAmt, label: 'Quẹt thẻ' });
+        }
+        if (transAmt > 0) {
+          invTransfer = transAmt;
+          paymentInfoParts.push('Chuyển khoản: ' + transAmt.toLocaleString('vi-VN'));
+          paymentJsonList.push({ method: 'transfer', amount: transAmt, label: 'Chuyển khoản' });
+        }
 
-        const newInvoiceRow = new Array(INVOICES_HEADERS.length).fill('');
-        newInvoiceRow[colIndex['RefId']] = refId;
-        newInvoiceRow[colIndex['RefNo']] = detailData.RefNo || inv.RefNo || '';
-        newInvoiceRow[colIndex['RefDate']] = detailData.RefDate || inv.RefDate || '';
-        newInvoiceRow[colIndex['WorkDate']] = workDate;
-        newInvoiceRow[colIndex['ShiftId']] = '';
-        newInvoiceRow[colIndex['ShiftNumber']] = '';
-        newInvoiceRow[colIndex['TableName']] = detailData.TableName || inv.TableName || '';
-        newInvoiceRow[colIndex['EmployeeName']] = detailData.EmployeeName || inv.EmployeeName || '';
-        newInvoiceRow[colIndex['CustomerName']] = detailData.CustomerName || inv.CustomerName || '';
-        newInvoiceRow[colIndex['Amount']] = effectiveAmount;
-        newInvoiceRow[colIndex['CashAmount']] = invCash;
-        newInvoiceRow[colIndex['CardAmount']] = invCard;
-        newInvoiceRow[colIndex['TransferAmount']] = invTransfer;
-        newInvoiceRow[colIndex['OtherAmount']] = invOther;
-        newInvoiceRow[colIndex['PaymentInfo']] = paymentInfo;
-        newInvoiceRow[colIndex['PaymentJson']] = JSON.stringify(paymentJsonList);
-        newInvoiceRow[colIndex['Status']] = detailData.Status !== undefined ? detailData.Status : (inv.Status || 0);
-        newInvoiceRow[colIndex['IsPaid']] = detailData.IsPaid !== undefined ? detailData.IsPaid : (inv.IsPaid || false);
-        newInvoiceRow[colIndex['IsCancelled']] = detailData.IsCancelled !== undefined ? detailData.IsCancelled : (inv.IsCancelled || false);
-        newInvoiceRow[colIndex['IsDeleted']] = detailData.IsDeleted !== undefined ? detailData.IsDeleted : (inv.IsDeleted || false);
-        newInvoiceRow[colIndex['SourceUpdatedAt']] = detailData.ModifiedDate || '';
-        newInvoiceRow[colIndex['LastFetchedAt']] = nowStr;
-        newInvoiceRow[colIndex['RowHash']] = lightHash;
-        newInvoiceRow[colIndex['DetailHash']] = detailHash;
-        newInvoiceRow[colIndex['ItemsCount']] = itemsList.length;
-        newInvoiceRow[colIndex['ManualOverrideJson']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualOverrideJson']] || '{}') : '{}';
-        newInvoiceRow[colIndex['ManualEditedAt']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualEditedAt']] || '') : '';
+        // Default to cash if everything is 0 but amount exists
+        if (invCash === 0 && invCard === 0 && invTransfer === 0 && (totalBillAmount - depositAmount) > 0) {
+          invCash = totalBillAmount - depositAmount;
+          paymentInfoParts.push('Tiền mặt: ' + invCash.toLocaleString('vi-VN'));
+          paymentJsonList.push({ method: 'cash', amount: invCash, label: 'Tiền mặt' });
+        }
+      }
+
+      const effectiveAmount = (invCash + invCard + invTransfer + invOther + depositAmount) || totalBillAmount;
+      const paymentInfo = paymentInfoParts.join(' + ') || 'Chưa thanh toán';
+
+      const detailItemsStr = (itemsList || []).map(item => {
+        return [
+          item.InventoryItemName || item.ItemName || item.Name || '',
+          item.Quantity || item.Qty || 0,
+          item.UnitPrice || item.Price || 0,
+          item.Amount || 0
+        ].join(',');
+      }).join('|');
+      const detailHash = _md5Gas(detailItemsStr);
+
+      const workDate = _getWorkingDayGas(detailData.RefDate || inv.RefDate);
+
+      const newInvoiceRow = new Array(INVOICES_HEADERS.length).fill('');
+      newInvoiceRow[colIndex['RefId']] = refId;
+      newInvoiceRow[colIndex['RefNo']] = detailData.RefNo || inv.RefNo || '';
+      newInvoiceRow[colIndex['RefDate']] = detailData.RefDate || inv.RefDate || '';
+      newInvoiceRow[colIndex['WorkDate']] = workDate;
+      newInvoiceRow[colIndex['ShiftId']] = '';
+      newInvoiceRow[colIndex['ShiftNumber']] = '';
+      newInvoiceRow[colIndex['TableName']] = detailData.TableName || inv.TableName || '';
+      newInvoiceRow[colIndex['EmployeeName']] = detailData.EmployeeName || inv.EmployeeName || '';
+      newInvoiceRow[colIndex['CustomerName']] = detailData.CustomerName || inv.CustomerName || '';
+      newInvoiceRow[colIndex['Amount']] = effectiveAmount;
+      newInvoiceRow[colIndex['CashAmount']] = invCash;
+      newInvoiceRow[colIndex['CardAmount']] = invCard;
+      newInvoiceRow[colIndex['TransferAmount']] = invTransfer;
+      newInvoiceRow[colIndex['OtherAmount']] = invOther;
+      newInvoiceRow[colIndex['PaymentInfo']] = paymentInfo;
+      newInvoiceRow[colIndex['PaymentJson']] = JSON.stringify(paymentJsonList);
+      newInvoiceRow[colIndex['Status']] = detailData.Status !== undefined ? detailData.Status : (inv.Status || 0);
+      newInvoiceRow[colIndex['IsPaid']] = detailData.IsPaid !== undefined ? detailData.IsPaid : (inv.IsPaid || false);
+      newInvoiceRow[colIndex['IsCancelled']] = detailData.IsCancelled !== undefined ? detailData.IsCancelled : (inv.IsCancelled || false);
+      newInvoiceRow[colIndex['IsDeleted']] = detailData.IsDeleted !== undefined ? detailData.IsDeleted : (inv.IsDeleted || false);
+      newInvoiceRow[colIndex['SourceUpdatedAt']] = detailData.ModifiedDate || '';
+      newInvoiceRow[colIndex['LastFetchedAt']] = nowStr;
+      newInvoiceRow[colIndex['RowHash']] = lightHash;
+      newInvoiceRow[colIndex['DetailHash']] = detailHash;
+      newInvoiceRow[colIndex['ItemsCount']] = itemsList.length;
+      newInvoiceRow[colIndex['ManualOverrideJson']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualOverrideJson']] || '{}') : '{}';
+      newInvoiceRow[colIndex['ManualEditedAt']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualEditedAt']] || '') : '';
         newInvoiceRow[colIndex['ManualEditedBy']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualEditedBy']] || '') : '';
         newInvoiceRow[colIndex['ManualLock']] = existingInv ? (allInvoices[existingInv.rowIndex - 1][colIndex['ManualLock']] === true || String(allInvoices[existingInv.rowIndex - 1][colIndex['ManualLock']]).toLowerCase() === 'true') : false;
         newInvoiceRow[colIndex['SyncBatchId']] = syncBatchId;
@@ -2456,7 +2506,6 @@ function _syncCukcukToSheetsAction(data) {
           skippedItems += itemsList.length;
         }
       }
-    }
 
     if (invoicesToAppend.length > 0) _sheetsAppend('KG_CUKCUK_INVOICES', invoicesToAppend);
     if (invoicesToUpdate.length > 0) _sheetsBatchUpdate('KG_CUKCUK_INVOICES', invoicesToUpdate);
@@ -2513,18 +2562,37 @@ function _syncCukcukToSheetsAction(data) {
   }
 }
 
+function _toYmdString(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    var pad = function(n) { return n < 10 ? '0' + n : String(n); };
+    return val.getFullYear() + '-' + pad(val.getMonth() + 1) + '-' + pad(val.getDate());
+  }
+  var str = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.substring(0, 10);
+  }
+  var parts = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (parts) {
+    var pad = function(n) { return n < 10 ? '0' + n : String(n); };
+    return parts[3] + '-' + pad(parseInt(parts[2])) + '-' + pad(parseInt(parts[1]));
+  }
+  return str.substring(0, 10);
+}
+
 function _getCukcukInvoicesAction(data) {
   const rows = _getSheetData('KG_CUKCUK_INVOICES');
   let filtered = rows;
   
   if (data.workDate) {
-    filtered = filtered.filter(r => r.WorkDate === data.workDate);
+    const target = String(data.workDate).trim();
+    filtered = filtered.filter(r => _toYmdString(r.WorkDate || r.RefDate) === target);
   } else {
     if (data.fromDate) {
-      filtered = filtered.filter(r => r.RefDate >= data.fromDate);
+      filtered = filtered.filter(r => _toYmdString(r.WorkDate || r.RefDate) >= data.fromDate);
     }
     if (data.toDate) {
-      filtered = filtered.filter(r => r.RefDate <= data.toDate);
+      filtered = filtered.filter(r => _toYmdString(r.WorkDate || r.RefDate) <= data.toDate);
     }
   }
   

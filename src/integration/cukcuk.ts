@@ -208,7 +208,9 @@ export async function testConnection(): Promise<{ success: boolean; message: str
 
 // ── Centralized API Call (Proxy handles token attachment & auto-retry) ──
 async function _cukcukApiCall(url: string, options: { method?: string; headers?: Record<string, string>; body?: string }): Promise<any> {
-  const reqHeaders: Record<string, string> = {};
+  const reqHeaders: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
   if (options.headers) {
     for (const hk in options.headers) reqHeaders[hk] = options.headers[hk];
   }
@@ -660,16 +662,247 @@ export async function syncTransactions(force?: boolean): Promise<{ success: bool
   }
 }
 
-export async function syncInvoicesForDate(dateStr: string): Promise<{ success: boolean; message?: string; synced?: number; total?: number; records?: any[] }> {
+export function parseCukcukPayments(inv: any): { 
+  payments: PaymentLine[]; 
+  cash: number; 
+  card: number; 
+  transfer: number; 
+  other: number;
+  deposit: number;
+} {
+  const rawPayments = inv.SAInvoicePayments || inv.Payments || [];
+  const totalAmount = Number(inv.TotalAmount) || Number(inv.Amount) || 0;
+  const deposit = Number(inv.DepositAmount) || 0;
+  
+  let cash = 0, card = 0, transfer = 0, other = 0;
+  const parsedPayments: PaymentLine[] = [];
+
+  if (Array.isArray(rawPayments) && rawPayments.length > 0) {
+    rawPayments.forEach((p: any) => {
+      const amt = Number(p.Amount) || 0;
+      if (amt <= 0) return;
+      
+      const name = String(p.PaymentName || p.CardName || '').toLowerCase();
+      const type = Number(p.PaymentType);
+
+      if (name.includes('mặt') || name.includes('cash')) {
+        cash += amt;
+        parsedPayments.push({ method: 'cash', amount: amt });
+      } else if (name.includes('chuyển') || name.includes('khoản') || name.includes('ck') || name.includes('ngân hàng') || name.includes('bank') || name.includes('transfer') || name.includes('qr')) {
+        transfer += amt;
+        parsedPayments.push({ method: 'transfer', amount: amt });
+      } else if (name.includes('thẻ') || name.includes('card') || name.includes('atm') || name.includes('pos') || name.includes('visa') || name.includes('master')) {
+        card += amt;
+        parsedPayments.push({ method: 'card', amount: amt });
+      } else {
+        if (type === 1) {
+          cash += amt;
+          parsedPayments.push({ method: 'cash', amount: amt });
+        } else if (type === 2) {
+          if (name.includes('khoản') || name.includes('chuyển')) {
+            transfer += amt;
+            parsedPayments.push({ method: 'transfer', amount: amt });
+          } else {
+            card += amt;
+            parsedPayments.push({ method: 'card', amount: amt });
+          }
+        } else if (type === 3) {
+          transfer += amt;
+          parsedPayments.push({ method: 'transfer', amount: amt });
+        } else {
+          other += amt;
+          parsedPayments.push({ method: 'cash', amount: amt });
+        }
+      }
+    });
+  }
+
+  // Handle deposit: Do NOT combine deposit with transfer (CK)
+  if (deposit > 0) {
+    parsedPayments.push({ method: 'deposit', amount: deposit });
+  }
+
+  // Fallback to direct amount fields if payments list was empty
+  const nonDepositPayments = parsedPayments.filter(p => p.method !== 'deposit');
+  if (nonDepositPayments.length === 0) {
+    const cAmt = Number(inv.CashAmount) || 0;
+    const cardAmt = Number(inv.CardAmount) || 0;
+    const transAmt = Number(inv.TransferAmount) || 0;
+
+    if (cAmt > 0) {
+      cash = cAmt;
+      parsedPayments.push({ method: 'cash', amount: cAmt });
+    }
+    if (cardAmt > 0) {
+      card = cardAmt;
+      parsedPayments.push({ method: 'card', amount: cardAmt });
+    }
+    if (transAmt > 0) {
+      transfer = transAmt;
+      parsedPayments.push({ method: 'transfer', amount: transAmt });
+    }
+    if (cash === 0 && card === 0 && transfer === 0 && (totalAmount - deposit) > 0) {
+      cash = totalAmount - deposit;
+      parsedPayments.push({ method: 'cash', amount: totalAmount - deposit });
+    }
+  }
+
+  return { payments: parsedPayments, cash, card, transfer, other, deposit };
+}
+
+export async function fetchInvoicesDirectFromCukcuk(dateStr: string, toDateStr?: string): Promise<SAInvoice[]> {
+  const fromDate = dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`;
+  const toDate = toDateStr ? (toDateStr.includes('T') ? toDateStr : `${toDateStr}T23:59:59`) : (dateStr.includes('T') ? dateStr : `${dateStr}T23:59:59`);
+  
+  let page = 1;
+  const limit = 100;
+  let allItems: any[] = [];
+  let hasMore = true;
+
+  while (hasMore) {
+    const res = await _cukcukApiCall('/api/v1/sainvoices/paging-with-detail', {
+      method: 'POST',
+      body: JSON.stringify({
+        FromDate: fromDate,
+        ToDate: toDate,
+        Page: page,
+        Limit: limit
+      })
+    });
+
+    if (res && res.Success && Array.isArray(res.Data)) {
+      allItems = allItems.concat(res.Data);
+      if (res.Data.length < limit) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  const invoices: SAInvoice[] = allItems.map((raw: any) => {
+    const paymentBreakdown = parseCukcukPayments(raw);
+    const effAmt = Number(raw.TotalAmount) || Number(raw.Amount) || (paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer);
+    const isPaid = raw.IsPaid !== undefined ? (raw.IsPaid === true || String(raw.IsPaid).toLowerCase() === 'true') : true;
+
+    const rawDate = String(raw.RefDate || raw.CreatedDate || '');
+    let wDate = dateStr;
+    if (rawDate && rawDate.length >= 10) {
+      wDate = rawDate.substring(0, 10);
+    }
+
+    const details = Array.isArray(raw.SAInvoiceDetails) ? raw.SAInvoiceDetails : [];
+    const mappedItems: any[] = details.map((d: any, idx: number) => {
+      const itemName = String(d.InventoryItemName || d.ItemName || d.InventoryItemCode || '');
+      const itemCode = String(d.InventoryItemCode || d.ItemCode || '');
+      const unitName = String(d.UnitName || '');
+      const quantity = Number(d.Quantity || 0);
+      const unitPrice = Number(d.UnitPrice || 0);
+      const amount = Number(d.Amount || 0);
+      const discountAmount = Number(d.DiscountAmount || 0);
+
+      return {
+        itemRowKey: String(d.RefDetailId || d.ItemId || `${raw.RefId}_${idx}`),
+        refId: String(raw.RefId || ''),
+        refNo: String(raw.RefNo || ''),
+        refDate: rawDate,
+        workDate: wDate,
+        itemId: String(d.InventoryItemId || d.ItemId || ''),
+        itemCode,
+        itemName,
+        name: itemName,
+        unitName,
+        quantity,
+        unitPrice,
+        amount,
+        discountAmount,
+        isDrink: false,
+        isFood: false
+      };
+    });
+
+    const invObj: SAInvoice = {
+      refId: String(raw.RefId || ''),
+      refNo: String(raw.RefNo || ''),
+      refDate: rawDate,
+      workDate: wDate,
+      tableName: String(raw.TableName || ''),
+      employeeName: String(raw.EmployeeName || ''),
+      amount: effAmt,
+      payments: paymentBreakdown.payments,
+      isPaid: isPaid,
+      isCancelled: !!raw.IsCancelled,
+      isDeleted: !!raw.IsDeleted,
+      rowHash: '',
+      itemsCount: details.length,
+      items: mappedItems
+    };
+
+    (invObj as any).cashAmount = paymentBreakdown.cash;
+    (invObj as any).cardAmount = paymentBreakdown.card;
+    (invObj as any).transferAmount = paymentBreakdown.transfer;
+    (invObj as any).depositAmount = paymentBreakdown.deposit;
+    (invObj as any).unpaid = !isPaid;
+    (invObj as any).syncedAt = new Date().toISOString();
+    
+    return invObj;
+  });
+
+  return invoices;
+}
+
+export async function syncInvoicesForDate(dateStr: string, silent = false, toDateStr?: string): Promise<{ success: boolean; message?: string; synced?: number; total?: number; records?: any[] }> {
   if (!dateStr) return { success: false, message: 'Chưa chỉ định ngày' };
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
   if (!cukcuk || !cukcuk.domain || !cukcuk.appId) return { success: false, message: 'Chưa cấu hình CUKCUK' };
 
   try {
-    showToast('🔄 Đang đồng bộ hóa đơn CUKCUK ngày ' + dateStr + '...', 'info');
+    const rangeLabel = toDateStr && toDateStr !== dateStr ? `${dateStr} đến ${toDateStr}` : dateStr;
+    if (!silent) showToast('🔄 Đang đồng bộ hóa đơn CUKCUK ngày ' + rangeLabel + '...', 'info');
 
-    // 1. Sync from CUKCUK to Sheets via GAS
+    // 1. Direct fetch from CUKCUK via proxy (instantaneous ~ 1s)
+    let fetchedInvoices: SAInvoice[] = [];
+    try {
+      fetchedInvoices = await fetchInvoicesDirectFromCukcuk(dateStr, toDateStr);
+    } catch (apiErr: any) {
+      console.warn('[CUKCUK] Direct API fetch failed, falling back to Sheets:', apiErr);
+    }
+
+    if (fetchedInvoices.length > 0) {
+      // Upsert into local IndexedDB
+      const mergedCount = await invoiceStore.bulkUpsert(fetchedInvoices);
+      
+      // Update legacy cukcuk_invoice_store cache
+      try {
+        const allLocal = await invoiceStore.getAllInvoices();
+        const localMap: Record<string, any> = {};
+        allLocal.forEach((inv) => { localMap[inv.refId] = inv; });
+        localStorage.setItem('cukcuk_invoice_store', JSON.stringify({ invoices: localMap }));
+      } catch (e) {}
+
+      // Trigger background Sheets sync so Google Sheets stays in sync without delaying UI
+      syncCukcukToSheetsOnCloud({ workDate: dateStr, mode: 'auto' }).catch(err => {
+        console.warn('[CUKCUK] Background sheets sync notice:', err);
+      });
+
+      if (!silent) showToast(`✅ Đã đồng bộ ${fetchedInvoices.length} hóa đơn (${rangeLabel}) từ CUKCUK!`, 'success');
+
+      if ((window as any).refreshView) {
+        try { (window as any).refreshView(); } catch (e) {}
+      }
+
+      return {
+        success: true,
+        synced: mergedCount,
+        total: fetchedInvoices.length,
+        records: fetchedInvoices
+      };
+    }
+
+    // 2. Fallback: Sync via GAS if direct fetch didn't return any records
     const syncRes = await syncCukcukToSheetsOnCloud({
       workDate: dateStr,
       mode: 'manual'
@@ -679,17 +912,12 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
       throw new Error(syncRes?.message || 'Không thể đồng bộ CUKCUK sang Sheets');
     }
 
-    showToast('📥 Đang tải hóa đơn ngày ' + dateStr + ' từ Sheets...', 'info');
-
-    // 2. Load from Sheets
     const loadRes = await getCukcukInvoicesFromCloud({ workDate: dateStr });
     if (!loadRes || !loadRes.success) {
       throw new Error(loadRes?.message || 'Không thể tải hóa đơn từ Sheets');
     }
 
     const cloudInvoices = loadRes.invoices || [];
-
-    // 3. Merge into local store
     const mergedCount = await invoiceStore.mergeCloudInvoices(cloudInvoices);
 
     // Update legacy cukcuk_invoice_store cache
@@ -702,7 +930,6 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
       localStorage.setItem('cukcuk_invoice_store', JSON.stringify({ invoices: localMap }));
     } catch (e) {}
 
-    // Calculate stats
     let paidCount = 0;
     let totalAmount = 0;
     cloudInvoices.forEach((inv: any) => {
@@ -713,7 +940,7 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
       }
     });
 
-    showToast('✅ Đã đồng bộ ' + paidCount + ' hóa đơn ngày ' + dateStr + ' từ Sheets', 'success');
+    if (!silent) showToast('✅ Đã đồng bộ ' + paidCount + ' hóa đơn ngày ' + dateStr + ' từ Sheets', 'success');
 
     if ((window as any).refreshView) {
       try { (window as any).refreshView(); } catch (e) {}

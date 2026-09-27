@@ -29,6 +29,81 @@
 
 var DEFAULT_SPREADSHEET_ID = "1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ";
 
+/**
+ * Kiểm tra xem một action có thuộc về nghiệp vụ Cashier Backend (nếu cashier_backend.js có trong project) hay không
+ */
+function isCashierBackendAction(action) {
+  if (!action) return false;
+  var cashierActions = [
+    'openShift', 'tryOpenShift', 'syncShift', 'closeShift', 'closeShiftAtomic',
+    'reopenShift', 'cancelShift', 'deleteShift', 'voidGhostShift', 'getShiftRegistry',
+    'repairShifts', 'getShifts', 'getCurrentShift', 'getStaff', 'saveStaff',
+    'deleteStaff', 'login', 'addAudit', 'getAudit', 'uploadFile', 'deleteFile',
+    'getSettings', 'saveSettings', 'getCukcukConfigSecure', 'getConfig', 'saveConfig',
+    'syncCukcukRevenue', 'rebuildCukcukIndex', 'getCukcukSyncState', 'saveCukcukSyncState',
+    'syncCukcukToSheets', 'syncCukcukInvoices', 'syncCukcukMenu',
+    'setupCukcukAutoSyncTrigger', 'disableCukcukAutoSyncTrigger',
+    'clearCukcukSyncLock', 'loadCukcukInvoices', 'getCukcukInvoices',
+    'getCukcukItems', 'getCukcukDailySales', 'saveCukcukOverride',
+    'overrideCukcukInvoice', 'rollbackCukcukInvoice', 'getRevenueOverview',
+    'getRevenueByDay', 'getRevenueByWeek', 'getRevenueByMonth',
+    'getRevenueByQuarter', 'getRevenueByYear', 'getInvoiceSearch',
+    'getInvoiceDetail', 'runCukcukSync', 'rebuildAggregates',
+    'rebuildMonthJson', 'manualOverridePayment', 'migrateLegacyCukcukInvoices',
+    'runAllV4BackendTests', 'getPosOrders', 'syncPosOrders'
+  ];
+  return cashierActions.indexOf(action) !== -1;
+}
+
+/**
+ * Global WebApp POST Handler
+ * Tự động tiếp nhận và xử lý mọi yêu cầu đồng bộ CK/ATM, sắp xếp sheet, trigger hoặc chuyển tiếp nghiệp vụ thu ngân
+ */
+function doPost(e) {
+  var data = {};
+  if (e && e.postData && e.postData.contents) {
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (parseErr) {
+      data = {};
+    }
+  }
+
+  // Merge URL query parameters into data if not already present
+  if (e && e.parameter) {
+    for (var p in e.parameter) {
+      if (e.parameter.hasOwnProperty(p) && data[p] === undefined) {
+        data[p] = e.parameter[p];
+      }
+    }
+  }
+
+  var action = (e && e.parameter && e.parameter.action) || data.action || "";
+
+  // 1. Nếu có cashier_backend.js trong dự án và action thuộc thu ngân, chuyển tiếp an toàn
+  if (typeof _handleCashierRequest === "function" && isCashierBackendAction(action)) {
+    return _handleCashierRequest(e);
+  }
+
+  // 2. Mặc định xử lý đồng bộ CK/ATM & Sheet Engine
+  return handleSyncWebappPost(e, data);
+}
+
+/**
+ * Global WebApp GET Handler
+ */
+function doGet(e) {
+  var action = (e && e.parameter && e.parameter.action) || "";
+
+  // 1. Nếu có cashier_backend.js trong dự án và action thuộc thu ngân
+  if (typeof _handleCashierRequest === "function" && isCashierBackendAction(action)) {
+    return _handleCashierRequest(e);
+  }
+
+  // 2. Mặc định xử lý GET của 01_SyncWebapp
+  return handleSyncWebappGet(e);
+}
+
 function handleSyncWebappPost(e, data) {
   var lock = LockService.getScriptLock();
   try {
@@ -44,17 +119,6 @@ function handleSyncWebappPost(e, data) {
       }, 429);
     }
 
-    if (!e || !e.postData || !e.postData.contents) {
-      return jsonResponse({ 
-        success: false, 
-        status: "failed", 
-        statusCode: 400, 
-        errorCode: "EMPTY_REQUEST", 
-        retryable: false, 
-        message: "Yêu cầu rỗng (Empty request body)" 
-      }, 400);
-    }
-
     if (!data) {
       if (e && e.postData && e.postData.contents) {
         try {
@@ -67,8 +131,23 @@ function handleSyncWebappPost(e, data) {
       }
     }
 
-    var ssId = data.spreadsheetId || "1drWBOfgTZ1nqgl-W_gb24P-7r4WRoxHxAfk657tvLQQ";
-    var rawSheetName = data.sheetName || data.date || data.workingDate || data.shiftDate;
+    var action = (e && e.parameter && e.parameter.action) || data.action || "";
+
+    // 0. Action ping / health check
+    if (action === "ping" || action === "health") {
+      return jsonResponse({
+        success: true,
+        status: "online",
+        statusCode: 200,
+        version: "v4.5",
+        message: "King's Grill CK/ATM Transaction Sync Engine đang hoạt động ổn định.",
+        serverTime: Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss"),
+        retryable: false
+      }, 200);
+    }
+
+    var ssId = data.spreadsheetId || (e && e.parameter && e.parameter.spreadsheetId) || DEFAULT_SPREADSHEET_ID;
+    var rawSheetName = data.sheetName || data.date || data.workingDate || data.shiftDate || (e && e.parameter && (e.parameter.sheetName || e.parameter.date || e.parameter.workingDate));
 
     if (!ssId) {
       return jsonResponse({ 
@@ -87,16 +166,16 @@ function handleSyncWebappPost(e, data) {
     var ss = SpreadsheetApp.openById(ssId);
 
     // 1. Action sắp xếp & chuẩn hóa toàn bộ sheet ngày giảm dần
-    if (data.action === "sort_sheets" || data.action === "sort") {
+    if (action === "sort_sheets" || action === "sort") {
       var sortRes = sortAndNormalizeDateSheets(ss);
-      sortRes.version = "v4.3";
+      sortRes.version = "v4.5";
       return jsonResponse(sortRes, 200);
     }
 
     // 2. Action cài đặt Time-driven Trigger tự động chạy lúc 00h hàng ngày
-    if (data.action === "setup_trigger" || data.action === "setup_daily_trigger") {
+    if (action === "setup_trigger" || action === "setup_daily_trigger") {
       var trigRes = setupDailyMidnightSortTrigger();
-      trigRes.version = "v4.3";
+      trigRes.version = "v4.5";
       return jsonResponse(trigRes, 200);
     }
     
@@ -104,17 +183,23 @@ function handleSyncWebappPost(e, data) {
     var sheet = getOrCreateWorkingSheet(ss, sheetName);
 
     var result;
-    if (data.action === "deduplicate" || data.action === "deduplicate_sheet") {
+    if (action === "deduplicate" || action === "deduplicate_sheet") {
       result = deduplicateSheet(sheet, ssId, sheetName, data);
-    } else if (data.action === "bulk" || data.action === "bulk_resync" || (data.transactions && Array.isArray(data.transactions))) {
-      result = handleBulkSync(sheet, ssId, sheetName, data);
-    } else if (data.action === "sync_vat_invoice") {
+    } else if (action === "bulk" || action === "bulk_resync" || (data.transactions && Array.isArray(data.transactions))) {
+      // Nếu là bulk_resync nhưng không truyền transactions (ví dụ chỉ truyền ngày), fallback sang deduplicateSheet để re-sort ổn định
+      if (!data.transactions || !Array.isArray(data.transactions) || data.transactions.length === 0) {
+        result = deduplicateSheet(sheet, ssId, sheetName, data);
+      } else {
+        result = handleBulkSync(sheet, ssId, sheetName, data);
+      }
+    } else if (action === "sync_vat_invoice" || action === "sync_invoice") {
       result = handleVatInvoiceSync(sheet, ssId, sheetName, data);
     } else {
+      // single_sync, sync_single, hoặc gọi trực tiếp hóa đơn đơn lẻ
       result = handleSingleSync(sheet, ssId, sheetName, data);
     }
 
-    result.version = "v4.3";
+    result.version = "v4.5";
     result.sheetName = sheetName;
     return jsonResponse(result, result.statusCode || (result.success ? 200 : 422));
 
@@ -125,7 +210,7 @@ function handleSyncWebappPost(e, data) {
       statusCode: 500, 
       errorCode: "INTERNAL_ERROR", 
       retryable: false, 
-      version: "v4.1", 
+      version: "v4.5", 
       message: "Lỗi xử lý hệ thống: " + (err.message || err.toString()) 
     }, 500);
   } finally {

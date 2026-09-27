@@ -540,6 +540,7 @@ export interface DailyBreakdownItem {
   cash: number;
   card: number;
   transfer: number;
+  deposit?: number;
   bills: number;
 }
 
@@ -551,7 +552,7 @@ export async function getDailyBreakdown(period: string, refDate?: string | Date)
 
   try {
     const res = await getRevenueOverviewOnCloud({ fromDate: startStr, toDate: endStr });
-    if (res && (res.success || res.ok) && res.data && Array.isArray(res.data.days)) {
+    if (res && (res.success || res.ok) && res.data && Array.isArray(res.data.days) && res.data.days.length > 0) {
       return [...res.data.days].sort((a: any, b: any) => b.date.localeCompare(a.date));
     }
   } catch (err) {
@@ -567,19 +568,38 @@ export async function getDailyBreakdown(period: string, refDate?: string | Date)
     const wDay = inv.refDate ? _workingDayDate(inv.refDate) : (inv.workDate || (inv as any).date || 'unknown');
     
     if (!days[wDay]) {
-      days[wDay] = { date: wDay, total: 0, cash: 0, card: 0, transfer: 0, bills: 0 };
+      days[wDay] = { date: wDay, total: 0, cash: 0, card: 0, transfer: 0, deposit: 0, bills: 0 };
     }
     days[wDay].total += _effectiveTotal(inv);
     days[wDay].bills++;
 
+    let pCash = 0, pCard = 0, pTransfer = 0, pDeposit = 0;
     const payments = inv.payments || [];
     for (let j = 0; j < payments.length; j++) {
       switch (payments[j].method) {
-        case 'cash': days[wDay].cash += payments[j].amount || 0; break;
-        case 'card': days[wDay].card += payments[j].amount || 0; break;
-        case 'transfer': days[wDay].transfer += payments[j].amount || 0; break;
+        case 'cash': pCash += payments[j].amount || 0; break;
+        case 'card': pCard += payments[j].amount || 0; break;
+        case 'transfer': pTransfer += payments[j].amount || 0; break;
+        case 'deposit': pDeposit += payments[j].amount || 0; break;
       }
     }
+    const invDeposit = pDeposit > 0 ? pDeposit : Number((inv as any).depositAmount || (inv as any).DepositAmount || 0);
+    let invTransfer = (pTransfer > 0 ? pTransfer : Number((inv as any).transferAmount || 0));
+    
+    // Disentangle legacy merged deposit from transfer
+    if (invDeposit > 0 && invTransfer >= invDeposit && !inv.manualOverride && !(inv as any).isManuallyEdited) {
+      const invCash = pCash > 0 ? pCash : Number((inv as any).cashAmount || 0);
+      const invCard = pCard > 0 ? pCard : Number((inv as any).cardAmount || 0);
+      const effTot = _effectiveTotal(inv);
+      if (effTot > 0 && (invCash + invCard + invTransfer === effTot)) {
+        invTransfer = Math.max(0, invTransfer - invDeposit);
+      }
+    }
+
+    days[wDay].cash += (pCash > 0 ? pCash : Number((inv as any).cashAmount || 0));
+    days[wDay].card += (pCard > 0 ? pCard : Number((inv as any).cardAmount || 0));
+    days[wDay].transfer += invTransfer;
+    days[wDay].deposit = (days[wDay].deposit || 0) + invDeposit;
   }
 
   return Object.values(days).sort((a, b) => (a.date > b.date ? -1 : 1));
@@ -591,6 +611,7 @@ export interface TodayRevenueResult {
   cash: number;
   card: number;
   transfer: number;
+  deposit?: number;
   bills: number;
   lastSync: string;
 }
@@ -607,6 +628,7 @@ export async function getTodayRevenue(): Promise<TodayRevenueResult> {
     cash: 0,
     card: 0,
     transfer: 0,
+    deposit: 0,
     bills: invoices.length,
     lastSync: ''
   };
@@ -618,13 +640,17 @@ export async function getTodayRevenue(): Promise<TodayRevenueResult> {
     if (syncedAt > result.lastSync) result.lastSync = syncedAt;
 
     const payments = inv.payments || [];
+    let pDeposit = 0;
     for (let j = 0; j < payments.length; j++) {
       switch (payments[j].method) {
         case 'cash': result.cash += payments[j].amount || 0; break;
         case 'card': result.card += payments[j].amount || 0; break;
         case 'transfer': result.transfer += payments[j].amount || 0; break;
+        case 'deposit': pDeposit += payments[j].amount || 0; break;
       }
     }
+    const invDep = pDeposit > 0 ? pDeposit : Number((inv as any).depositAmount || (inv as any).DepositAmount || 0);
+    result.deposit = (result.deposit || 0) + invDep;
   }
 
   return result;
@@ -848,18 +874,48 @@ export async function mergeCloudInvoices(cloudInvoices: any[]): Promise<number> 
     // Parse payments list from Sheet row
     let payments: PaymentLine[] = [];
     const manualLock = raw.ManualLock === true || String(raw.ManualLock).toLowerCase() === 'true';
-    const jsonStr = manualLock ? (raw.ManualOverrideJson || raw.PaymentJson) : raw.PaymentJson;
+    const jsonStr = manualLock ? (raw.ManualOverrideJson || raw.PaymentJson) : (raw.PaymentJson || raw.PaymentRawJson);
     
     if (jsonStr) {
       try {
-        payments = JSON.parse(jsonStr);
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed)) {
+          payments = parsed.map((p: any) => ({
+            method: (p.method || p.Method || 'cash').toLowerCase() as ('cash' | 'card' | 'transfer' | 'deposit'),
+            amount: Number(p.amount) || Number(p.Amount) || 0
+          })).filter(p => p.amount > 0);
+        }
       } catch (e) {
         payments = [];
       }
     }
 
+    const cashAmt = Number(raw.CashAmount) || 0;
+    const cardAmt = Number(raw.CardAmount) || 0;
+    let transAmt = Number(raw.TransferAmount) || 0;
+    const depositAmt = Number(raw.DepositAmount) || 0;
+
+    // Disentangle legacy merged deposit from transfer
+    if (depositAmt > 0 && transAmt >= depositAmt && !manualLock) {
+      const totalAmt = Number(raw.Amount) || Number(raw.TotalAmount) || 0;
+      if (totalAmt > 0 && (cashAmt + cardAmt + transAmt === totalAmt)) {
+        transAmt = Math.max(0, transAmt - depositAmt);
+      }
+    }
+
+    // Fallback if payments array is empty
+    if (payments.length === 0) {
+      if (cashAmt > 0) payments.push({ method: 'cash', amount: cashAmt });
+      if (cardAmt > 0) payments.push({ method: 'card', amount: cardAmt });
+      if (transAmt > 0) payments.push({ method: 'transfer', amount: transAmt });
+      if (depositAmt > 0) payments.push({ method: 'deposit', amount: depositAmt });
+    }
+    if (payments.length === 0 && existing && existing.payments && existing.payments.length > 0) {
+      payments = existing.payments;
+    }
+
     // Determine values
-    const amount = Number(raw.Amount) || 0;
+    const amount = Number(raw.Amount) || Number(raw.TotalAmount) || (cashAmt + cardAmt + transAmt + depositAmt) || (existing?.amount || 0);
     const isPaid = raw.IsPaid === true || String(raw.IsPaid).toLowerCase() === 'true';
     const isCancelled = raw.IsCancelled === true || String(raw.IsCancelled).toLowerCase() === 'true';
     const isDeleted = raw.IsDeleted === true || String(raw.IsDeleted).toLowerCase() === 'true';
@@ -869,6 +925,8 @@ export async function mergeCloudInvoices(cloudInvoices: any[]): Promise<number> 
     if (existing && (existing.manualOverride || (existing as any).isManuallyEdited) && !manualLock) {
       continue; 
     }
+
+    let items = Array.isArray(raw.items) ? raw.items : (existing && existing.items ? existing.items : []);
 
     const newInv: SAInvoice = {
       refId: refId,
@@ -883,8 +941,13 @@ export async function mergeCloudInvoices(cloudInvoices: any[]): Promise<number> 
       isCancelled: isCancelled,
       isDeleted: isDeleted,
       rowHash: String(raw.RowHash || raw.rowHash || ''),
-      itemsCount: Number(raw.ItemsCount || raw.itemsCount) || 0
+      itemsCount: items.length || Number(raw.ItemsCount || raw.itemsCount) || 0,
+      items: items
     };
+    (newInv as any).cashAmount = cashAmt || (payments.find(p => p.method === 'cash')?.amount || (existing as any)?.cashAmount || 0);
+    (newInv as any).cardAmount = cardAmt || (payments.find(p => p.method === 'card')?.amount || (existing as any)?.cardAmount || 0);
+    (newInv as any).transferAmount = transAmt || (payments.find(p => p.method === 'transfer')?.amount || (existing as any)?.transferAmount || 0);
+    (newInv as any).depositAmount = depositAmt || (existing as any)?.depositAmount || 0;
     (newInv as any).unpaid = !isPaid;
     (newInv as any).syncedAt = String(raw.UpdatedAt || raw.LastFetchedAt || new Date().toISOString());
     (newInv as any).pushedToSheets = true; // Loaded from Sheets, so it is already on Sheets
