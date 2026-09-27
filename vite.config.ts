@@ -18,12 +18,11 @@ export default defineConfig({
     host: true,
     port: 5173,
     open: true,
-    // CORS Proxy for CUKCUK API - routes /cukcuk-api/* to the central worker proxy
+    // CORS Proxy for CUKCUK API - routes /cukcuk-api/* to canonical Cloudflare Pages backend
     proxy: {
       '/cukcuk-api': {
-        target: 'https://kg-cukcuk-api.dmt-kgwork.workers.dev',
+        target: 'https://kg-cashier.pages.dev',
         changeOrigin: true,
-        rewrite: function(path) { return path.replace(/^\/cukcuk-api/, ''); },
         secure: true
       }
     }

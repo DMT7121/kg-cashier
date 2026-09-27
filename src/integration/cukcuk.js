@@ -38,7 +38,7 @@ var useRelativeProxy =
   /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(location.hostname);
 
 if (!useRelativeProxy && location.protocol !== 'file:') {
-  CUKCUK_API_BASE = 'https://kg-cukcuk-api.dmt-kgwork.workers.dev';
+  CUKCUK_API_BASE = 'https://kg-cashier.pages.dev/cukcuk-api';
 }
 
 // ── Token Cache ──
@@ -139,7 +139,14 @@ export async function testConnection() {
     if (settings && settings.adminPassword) {
       reqHeaders['X-Admin-Password'] = settings.adminPassword;
     }
-    reqHeaders['X-Cukcuk-Pin'] = '712121';
+    var cuk = settings && settings.cukcuk;
+    if (cuk) {
+      if (cuk.domain) reqHeaders['X-Cukcuk-Domain'] = cuk.domain;
+      if (cuk.appId) reqHeaders['X-Cukcuk-App-Id'] = cuk.appId;
+      if (cuk.key && !cuk.key.includes('*') && !cuk.key.includes('•')) {
+        reqHeaders['X-Cukcuk-Secret-Key'] = cuk.key;
+      }
+    }
 
     var response = await fetch(CUKCUK_API_BASE + '/auth/refresh', {
       method: 'POST',
@@ -1128,8 +1135,8 @@ export function getLastSyncInfo() {
 export async function syncInvoicesForDate(dateStr) {
   if (!dateStr) return { success: false, message: 'Chưa chỉ định ngày' };
   var settings = getSettings();
-  var cukcuk = settings.cukcuk;
-  if (!cukcuk || !cukcuk.key) return { success: false, message: 'Chưa cấu hình CUKCUK' };
+  var cukcuk = settings && settings.cukcuk;
+  if (!cukcuk || !cukcuk.domain || !cukcuk.appId) return { success: false, message: 'Chưa cấu hình CUKCUK' };
 
   try {
     var range = _getWorkingDayRange(dateStr);

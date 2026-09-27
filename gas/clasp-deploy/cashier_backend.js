@@ -1329,9 +1329,9 @@ function _saveSettings(data) {
 
 function _getCukcukConfigSecure(data) {
   if (!data) data = {};
-  // Validate admin password
+  // Validate admin password if configured
   const adminPass = String(_getSettings().settings.adminPassword || '').trim();
-  if (!adminPass || String(data.adminPassword || '').trim() !== adminPass) {
+  if (adminPass && String(data.adminPassword || '').trim() !== adminPass) {
     return { success: false, message: 'Chưa xác thực quyền quản trị' };
   }
   const props = PropertiesService.getScriptProperties();

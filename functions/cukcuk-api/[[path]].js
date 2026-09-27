@@ -80,7 +80,15 @@ async function getCukcukConfig(context, request) {
     return { domain, appId, secretKey, source: 'environment' };
   }
 
-  // 2. Fallback to GAS ScriptProperties via client header instructions
+  // 2. Direct client headers (if provided by client app)
+  const headerDomain = request.headers.get('X-Cukcuk-Domain') || '';
+  const headerAppId = request.headers.get('X-Cukcuk-App-Id') || '';
+  const headerKey = request.headers.get('X-Cukcuk-Secret-Key') || '';
+  if (headerDomain && headerAppId && headerKey) {
+    return { domain: headerDomain, appId: headerAppId, secretKey: headerKey, source: 'client_header' };
+  }
+
+  // 3. Fallback to GAS ScriptProperties via client header instructions
   const gasUrl = request.headers.get('X-Gas-Url') || '';
   const adminPassword = request.headers.get('X-Admin-Password') || '';
   const pin = request.headers.get('X-Cukcuk-Pin') || '';

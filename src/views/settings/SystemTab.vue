@@ -106,7 +106,8 @@ async function saveSettings(silent = false) {
       domain: cukDomain.value,
       appId: cukAppId.value,
       key: finalKey,
-      autoSync: cukAutoSync.value
+      autoSync: cukAutoSync.value,
+      hasKey: true
     }
   };
 

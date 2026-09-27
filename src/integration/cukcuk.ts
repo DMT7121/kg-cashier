@@ -65,13 +65,13 @@ const useRelativeProxy =
   /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(location.hostname);
 
 if (!useRelativeProxy && location.protocol !== 'file:') {
-  CUKCUK_API_BASE = 'https://kg-cukcuk-api.dmt-kgwork.workers.dev';
+  CUKCUK_API_BASE = 'https://kg-cashier.pages.dev/cukcuk-api';
 }
 
 function _getCachedToken(): string | null {
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
-  if (!cukcuk || !cukcuk.domain || !cukcuk.appId || (!cukcuk.key && !cukcuk.hasKey)) return null;
+  if (!cukcuk || !cukcuk.domain || !cukcuk.appId) return null;
   return localStorage.getItem('cukcuk_connected_flag') || 'proxy_managed_token';
 }
 
@@ -168,6 +168,14 @@ export async function testConnection(): Promise<{ success: boolean; message: str
     if (settings && settings.adminPassword) {
       reqHeaders['X-Admin-Password'] = settings.adminPassword;
     }
+    const cuk = settings?.cukcuk;
+    if (cuk) {
+      if (cuk.domain) reqHeaders['X-Cukcuk-Domain'] = cuk.domain;
+      if (cuk.appId) reqHeaders['X-Cukcuk-App-Id'] = cuk.appId;
+      if (cuk.key && !cuk.key.includes('*') && !cuk.key.includes('•')) {
+        reqHeaders['X-Cukcuk-Secret-Key'] = cuk.key;
+      }
+    }
 
     const response = await fetch(CUKCUK_API_BASE + '/auth/refresh', {
       method: 'POST',
@@ -214,6 +222,14 @@ async function _cukcukApiCall(url: string, options: { method?: string; headers?:
   const settings = getSettings();
   if (settings && settings.adminPassword) {
     reqHeaders['X-Admin-Password'] = settings.adminPassword;
+  }
+  const cuk = settings?.cukcuk;
+  if (cuk) {
+    if (cuk.domain) reqHeaders['X-Cukcuk-Domain'] = cuk.domain;
+    if (cuk.appId) reqHeaders['X-Cukcuk-App-Id'] = cuk.appId;
+    if (cuk.key && !cuk.key.includes('*') && !cuk.key.includes('•')) {
+      reqHeaders['X-Cukcuk-Secret-Key'] = cuk.key;
+    }
   }
 
   const fetchOpts: RequestInit = { 
@@ -523,7 +539,7 @@ export async function syncTransactions(force?: boolean): Promise<{ success: bool
   const shift = getCurrentShift();
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
-  if (!cukcuk || (!cukcuk.key && !cukcuk.hasKey)) {
+  if (!cukcuk || !cukcuk.domain || !cukcuk.appId) {
     return { success: false, message: 'Chưa cấu hình CUKCUK' };
   }
 
@@ -648,7 +664,7 @@ export async function syncInvoicesForDate(dateStr: string): Promise<{ success: b
   if (!dateStr) return { success: false, message: 'Chưa chỉ định ngày' };
   const settings = getSettings();
   const cukcuk = settings?.cukcuk;
-  if (!cukcuk || (!cukcuk.key && !cukcuk.hasKey)) return { success: false, message: 'Chưa cấu hình CUKCUK' };
+  if (!cukcuk || !cukcuk.domain || !cukcuk.appId) return { success: false, message: 'Chưa cấu hình CUKCUK' };
 
   try {
     showToast('🔄 Đang đồng bộ hóa đơn CUKCUK ngày ' + dateStr + '...', 'info');
