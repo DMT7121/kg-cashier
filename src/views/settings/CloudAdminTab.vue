@@ -32,10 +32,68 @@ const onlineStatus = ref(isOnline());
 const queueLength = ref(getQueueSize());
 const metadata = ref<any>(null);
 
-// Shift Registry states
+// Shift Registry states & display controls
 const registryList = ref<any[]>([]);
 const registryLoading = ref(false);
 const registryError = ref('');
+const registryFilter = ref<'active' | 'all' | 'history'>('active');
+const registrySearch = ref('');
+const registryCurrentPage = ref(1);
+const registryPageSize = ref(5);
+const isRegistryExpanded = ref(true);
+
+const openRegistryCount = computed(() => registryList.value.filter(i => i.status === 'open').length);
+const closedRegistryCount = computed(() => registryList.value.filter(i => i.status === 'closed').length);
+const voidedRegistryCount = computed(() => registryList.value.filter(i => i.status !== 'open' && i.status !== 'closed').length);
+
+const filteredRegistryList = computed(() => {
+  let list = registryList.value;
+
+  // Filter by status tab
+  if (registryFilter.value === 'active') {
+    list = list.filter(i => i.status === 'open');
+  } else if (registryFilter.value === 'history') {
+    list = list.filter(i => i.status !== 'open');
+  }
+
+  // Filter by search query
+  if (registrySearch.value.trim()) {
+    const q = registrySearch.value.trim().toLowerCase();
+    list = list.filter(i => 
+      (i.id && String(i.id).toLowerCase().includes(q)) ||
+      (i.date && String(i.date).toLowerCase().includes(q)) ||
+      (i.workDay && String(i.workDay).toLowerCase().includes(q)) ||
+      (i.cashierName && String(i.cashierName).toLowerCase().includes(q)) ||
+      (i.shiftNumber && String(i.shiftNumber).toLowerCase().includes(q))
+    );
+  }
+
+  return list;
+});
+
+const registryTotalPages = computed(() => Math.ceil(filteredRegistryList.value.length / registryPageSize.value) || 1);
+
+const paginatedRegistryList = computed(() => {
+  const start = (registryCurrentPage.value - 1) * registryPageSize.value;
+  return filteredRegistryList.value.slice(start, start + registryPageSize.value);
+});
+
+function setRegistryFilter(filter: 'active' | 'all' | 'history') {
+  registryFilter.value = filter;
+  registryCurrentPage.value = 1;
+}
+
+function nextRegistryPage() {
+  if (registryCurrentPage.value < registryTotalPages.value) {
+    registryCurrentPage.value++;
+  }
+}
+
+function prevRegistryPage() {
+  if (registryCurrentPage.value > 1) {
+    registryCurrentPage.value--;
+  }
+}
 
 // Index rebuild states
 const rebuildRunning = ref(false);
@@ -469,69 +527,261 @@ function handleImportFile(event: Event) {
       </div>
 
       <!-- Cloud Shift registry management card -->
-      <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
-        <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <h4 class="text-md font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <span class="material-symbols-rounded text-amber-500">dns</span>
-              Đăng ký Ca & Kiểm soát đa thiết bị (Cloud Registry)
-            </h4>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Registry giám sát các ca đang hoạt động thực tế trên đám mây.</p>
+      <div class="card p-5 md:p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
+        <!-- Card Header with Title, Collapse Toggle & Action Buttons -->
+        <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex justify-between items-center flex-wrap gap-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <span class="material-symbols-rounded text-xl">dns</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="text-sm md:text-base font-bold text-slate-800 dark:text-white">
+                  Đăng ký Ca & Kiểm soát đa thiết bị (Cloud Registry)
+                </h4>
+                <span v-if="openRegistryCount > 0" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 animate-pulse">
+                  {{ openRegistryCount }} ca đang mở
+                </span>
+                <span v-else class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  0 ca mở
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Registry giám sát các ca đang hoạt động thực tế trên đám mây.</p>
+            </div>
           </div>
 
-          <div class="flex gap-2">
-            <button @click="loadRegistryAndSyncStates" :disabled="registryLoading" class="btn-secondary flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs disabled:opacity-50">
+          <div class="flex items-center gap-2 flex-wrap">
+            <button 
+              @click="loadRegistryAndSyncStates" 
+              :disabled="registryLoading" 
+              class="btn-secondary flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs disabled:opacity-50"
+              title="Quét lại trạng thái registry từ máy chủ"
+            >
               <span class="material-symbols-rounded text-sm" :class="{ 'animate-spin': registryLoading }">refresh</span>
-              Quét lại
+              <span>Quét lại</span>
             </button>
-            <button @click="handleRepairRegistry" class="btn-ghost flex items-center justify-center gap-1.5 px-3 py-1.5 border border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-semibold transition-colors">
+            <button 
+              @click="handleRepairRegistry" 
+              class="btn-ghost flex items-center justify-center gap-1.5 px-3 py-1.5 border border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-semibold transition-colors shadow-xs"
+              title="Tự động hủy các ca bị treo hoặc lệch trạng thái"
+            >
               <span class="material-symbols-rounded text-sm">healing</span>
-              Tự sửa lỗi Treo Ca
+              <span>Tự sửa lỗi Treo Ca</span>
+            </button>
+            <button 
+              @click="isRegistryExpanded = !isRegistryExpanded" 
+              class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              :title="isRegistryExpanded ? 'Thu gọn bảng' : 'Mở rộng bảng'"
+            >
+              <span class="material-symbols-rounded text-lg">
+                {{ isRegistryExpanded ? 'expand_less' : 'expand_more' }}
+              </span>
             </button>
           </div>
         </div>
 
-        <div v-if="registryError" class="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-800 dark:text-rose-300 text-center">
-          Không thể tải Cloud Registry: {{ registryError }}
+        <!-- Quick KPI Summary Strip -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div 
+            @click="setRegistryFilter('active')"
+            class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between"
+            :class="registryFilter === 'active' ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 font-bold' : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100/60'"
+          >
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full" :class="openRegistryCount > 0 ? 'bg-emerald-500 animate-ping' : 'bg-slate-300 dark:bg-slate-600'"></span>
+              <span class="text-xs">Đang mở:</span>
+            </div>
+            <span class="text-sm font-black" :class="openRegistryCount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'">{{ openRegistryCount }}</span>
+          </div>
+
+          <div 
+            @click="setRegistryFilter('history')"
+            class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between"
+            :class="registryFilter === 'history' ? 'bg-sky-50/50 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800 text-sky-900 dark:text-sky-200 font-bold' : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100/60'"
+          >
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span class="text-xs">Đã đóng:</span>
+            </div>
+            <span class="text-sm font-black text-slate-700 dark:text-slate-300">{{ closedRegistryCount }}</span>
+          </div>
+
+          <div 
+            @click="setRegistryFilter('history')"
+            class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between"
+            :class="registryFilter === 'history' ? 'bg-rose-50/50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 font-bold' : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100/60'"
+          >
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+              <span class="text-xs">Đã hủy:</span>
+            </div>
+            <span class="text-sm font-black text-rose-600 dark:text-rose-400">{{ voidedRegistryCount }}</span>
+          </div>
+
+          <div 
+            @click="setRegistryFilter('all')"
+            class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between"
+            :class="registryFilter === 'all' ? 'bg-slate-200/60 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-bold' : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100/60'"
+          >
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-rounded text-sm">database</span>
+              <span class="text-xs">Tổng cộng:</span>
+            </div>
+            <span class="text-sm font-black text-slate-800 dark:text-slate-100">{{ registryList.length }}</span>
+          </div>
         </div>
 
-        <!-- Shift registry tables -->
-        <div v-else class="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-100 dark:border-slate-800">
-                  <th class="p-3">ID Ca</th>
-                  <th class="p-3">Ngày Làm Việc</th>
-                  <th class="p-3">Số Ca</th>
-                  <th class="p-3">Thu Ngân</th>
-                  <th class="p-3">Trạng Thái</th>
-                  <th class="p-3 text-center">Hành Động</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="registryList.length === 0" class="text-center text-slate-400 dark:text-slate-500">
-                  <td colspan="6" class="p-6">Hiện không có ca nào được đăng ký trên Cloud.</td>
-                </tr>
-                <tr v-else v-for="item in registryList" :key="item.id" class="border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
-                  <td class="p-3 font-mono font-bold text-slate-800 dark:text-slate-200">{{ item.id }}</td>
-                  <td class="p-3 text-slate-600 dark:text-slate-300">{{ item.date || item.workDay }}</td>
-                  <td class="p-3 font-semibold text-slate-800 dark:text-slate-200">Ca {{ item.shiftNumber }}</td>
-                  <td class="p-3 text-slate-600 dark:text-slate-300">{{ item.cashierName }}</td>
-                  <td class="p-3">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold border" :class="item.status === 'open' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800' : item.status === 'closed' ? 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-700' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-100 dark:border-rose-800'">
-                      {{ item.status === 'open' ? 'Đang Mở' : item.status === 'closed' ? 'Đã Đóng' : 'Đã Hủy' }}
-                    </span>
-                  </td>
-                  <td class="p-3 text-center">
-                    <button v-if="item.status === 'open'" @click="handleVoidShift(item.id)" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-xs">
-                      Hủy ca (Void)
-                    </button>
-                    <span v-else class="text-slate-400 dark:text-slate-600">—</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <!-- Collapsible Content Section -->
+        <div v-show="isRegistryExpanded" class="flex flex-col gap-3 animate-fadeIn">
+          <!-- Filter Controls & Search Bar -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
+            <!-- Filter segmented tabs -->
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 text-xs">
+              <button 
+                @click="setRegistryFilter('active')" 
+                class="px-3 py-1 rounded-lg font-bold transition-all cursor-pointer"
+                :class="registryFilter === 'active' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'"
+              >
+                Đang mở ({{ openRegistryCount }})
+              </button>
+              <button 
+                @click="setRegistryFilter('all')" 
+                class="px-3 py-1 rounded-lg font-bold transition-all cursor-pointer"
+                :class="registryFilter === 'all' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'"
+              >
+                Tất cả ({{ registryList.length }})
+              </button>
+              <button 
+                @click="setRegistryFilter('history')" 
+                class="px-3 py-1 rounded-lg font-bold transition-all cursor-pointer"
+                :class="registryFilter === 'history' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'"
+              >
+                Lịch sử đã đóng ({{ closedRegistryCount + voidedRegistryCount }})
+              </button>
+            </div>
+
+            <!-- Search input -->
+            <div class="relative flex-1 sm:max-w-xs">
+              <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 pointer-events-none">
+                <span class="material-symbols-rounded text-sm">search</span>
+              </span>
+              <input 
+                type="text" 
+                v-model="registrySearch"
+                @input="registryCurrentPage = 1"
+                placeholder="Tìm mã ca, ngày, thu ngân..."
+                class="form-input w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          <!-- Error Alert if any -->
+          <div v-if="registryError" class="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-800 dark:text-rose-300 text-center">
+            Không thể tải Cloud Registry: {{ registryError }}
+          </div>
+
+          <!-- Compact Fixed-Height DataGrid with Sticky Header -->
+          <div v-else class="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
+            <div class="max-h-[300px] overflow-y-auto scrollbar-thin">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="sticky top-0 bg-slate-50 dark:bg-slate-800 z-10 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700 shadow-2xs">
+                  <tr>
+                    <th class="p-2.5">ID Ca</th>
+                    <th class="p-2.5">Ngày Làm Việc</th>
+                    <th class="p-2.5">Số Ca</th>
+                    <th class="p-2.5">Thu Ngân</th>
+                    <th class="p-2.5">Trạng Thái</th>
+                    <th class="p-2.5 text-center">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  <tr v-if="filteredRegistryList.length === 0" class="text-center text-slate-400 dark:text-slate-500">
+                    <td colspan="6" class="p-8">
+                      <div class="flex flex-col items-center justify-center gap-1.5">
+                        <span class="material-symbols-rounded text-2xl text-slate-300 dark:text-slate-600">check_circle</span>
+                        <span class="text-xs font-semibold">
+                          {{ registryFilter === 'active' ? 'Không có ca nào đang mở hoặc bị treo trên Cloud.' : 'Không tìm thấy dữ liệu ca phù hợp bộ lọc.' }}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr 
+                    v-else 
+                    v-for="item in paginatedRegistryList" 
+                    :key="item.id" 
+                    class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                  >
+                    <td class="p-2.5 font-mono font-bold text-slate-800 dark:text-slate-200 text-[11px]">{{ item.id }}</td>
+                    <td class="p-2.5 text-slate-600 dark:text-slate-300">{{ item.date || item.workDay }}</td>
+                    <td class="p-2.5 font-semibold text-slate-800 dark:text-slate-200">Ca {{ item.shiftNumber }}</td>
+                    <td class="p-2.5 text-slate-600 dark:text-slate-300">{{ item.cashierName }}</td>
+                    <td class="p-2.5">
+                      <span 
+                        class="px-2 py-0.5 rounded text-[10px] font-bold border inline-flex items-center gap-1"
+                        :class="item.status === 'open' 
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
+                          : item.status === 'closed' 
+                            ? 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' 
+                            : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'"
+                      >
+                        <span class="w-1.5 h-1.5 rounded-full" :class="item.status === 'open' ? 'bg-emerald-500 animate-pulse' : item.status === 'closed' ? 'bg-slate-400' : 'bg-rose-500'"></span>
+                        {{ item.status === 'open' ? 'Đang Mở' : item.status === 'closed' ? 'Đã Đóng' : 'Đã Hủy' }}
+                      </span>
+                    </td>
+                    <td class="p-2.5 text-center">
+                      <button 
+                        v-if="item.status === 'open'" 
+                        @click="handleVoidShift(item.id)" 
+                        class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-xs cursor-pointer"
+                      >
+                        Hủy ca (Void)
+                      </button>
+                      <span v-else class="text-slate-400 dark:text-slate-600">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="px-4 py-2 bg-slate-50 dark:bg-slate-800/70 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <span>Hiển thị {{ filteredRegistryList.length > 0 ? (registryCurrentPage - 1) * registryPageSize + 1 : 0 }} - {{ Math.min(registryCurrentPage * registryPageSize, filteredRegistryList.length) }} trên {{ filteredRegistryList.length }} ca</span>
+                <span class="text-slate-300 dark:text-slate-700">|</span>
+                <div class="flex items-center gap-1">
+                  <span>Mỗi trang:</span>
+                  <select 
+                    v-model="registryPageSize" 
+                    @change="registryCurrentPage = 1"
+                    class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs font-semibold cursor-pointer"
+                  >
+                    <option :value="5">5</option>
+                    <option :value="10">10</option>
+                    <option :value="20">20</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <button 
+                  @click="prevRegistryPage" 
+                  :disabled="registryCurrentPage <= 1"
+                  class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  ◀ Trước
+                </button>
+                <span class="font-bold px-1 text-slate-700 dark:text-slate-300">
+                  {{ registryCurrentPage }} / {{ registryTotalPages }}
+                </span>
+                <button 
+                  @click="nextRegistryPage" 
+                  :disabled="registryCurrentPage >= registryTotalPages"
+                  class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Sau ▶
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
