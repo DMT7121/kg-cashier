@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useShiftStore } from '../stores/shift';
 import { useCategoriesStore } from '../stores/categories';
 import { useSettingsStore } from '../stores/settings';
+import { useAppStore } from '../stores/app';
 import { uploadFileToCloud, deleteFileFromCloud } from '../services/api';
 import { formatMoney, showToast, showConfirm, parseMathExpression } from '../utils';
 
@@ -10,8 +11,23 @@ import { formatMoney, showToast, showConfirm, parseMathExpression } from '../uti
 const shiftStore = useShiftStore();
 const categoriesStore = useCategoriesStore();
 const settingsStore = useSettingsStore();
+const appStore = useAppStore();
 
 const activeTab = ref<'transactions' | 'invoices'>('transactions');
+
+watch(() => appStore.currentSubView, (sub) => {
+  if (!sub) return;
+  if (sub === 'transactions' || sub === 'tx' || sub === 'ledger') {
+    activeTab.value = 'transactions';
+  } else if (sub === 'invoices' || sub === 'docs' || sub === 'receipts') {
+    activeTab.value = 'invoices';
+  }
+}, { immediate: true });
+
+function switchTab(tab: 'transactions' | 'invoices') {
+  activeTab.value = tab;
+  appStore.currentSubView = tab;
+}
 
 // Filters
 const filterSearch = ref('');
@@ -392,24 +408,38 @@ onMounted(() => {
 <template>
   <div class="view-content p-6">
     
-    <!-- Tab Controls -->
-    <div class="flex border border-slate-200/60 dark:border-slate-700/60 mb-6 gap-2 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl max-w-xs shadow-xs">
-      <button 
-        class="flex-1 py-2 text-xs font-black rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1.5"
-        :class="activeTab === 'transactions' ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent'"
-        @click="activeTab = 'transactions'"
-      >
-        <span class="material-symbols-rounded text-base">receipt_long</span>
-        Thu Chi
-      </button>
-      <button 
-        class="flex-1 py-2 text-xs font-black rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1.5"
-        :class="activeTab === 'invoices' ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent'"
-        @click="activeTab = 'invoices'"
-      >
-        <span class="material-symbols-rounded text-base">description</span>
-        Chứng từ
-      </button>
+    <!-- Sub-Module Navigation Header -->
+    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+            <span class="material-symbols-rounded text-xl">payments</span>
+          </span>
+          <h3 class="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Sổ Quỹ Thu Chi & Chứng Từ</h3>
+          <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Quỹ tiền ca</span>
+        </div>
+        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">Theo dõi các khoản thu chi phát sinh ngoài POS và hóa đơn chứng từ kèm theo.</p>
+      </div>
+
+      <!-- Sub-module Navigation Pills -->
+      <nav aria-label="Phân hệ thu chi" class="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex-wrap gap-1.5 shadow-inner">
+        <button 
+          @click="switchTab('transactions')"
+          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'transactions' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
+        >
+          <span class="material-symbols-rounded text-lg">account_balance_wallet</span>
+          <span>Sổ Thu Chi Ca</span>
+        </button>
+        <button 
+          @click="switchTab('invoices')"
+          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'invoices' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
+        >
+          <span class="material-symbols-rounded text-lg">receipt_long</span>
+          <span>Hồ Sơ Chứng Từ</span>
+        </button>
+      </nav>
     </div>
 
     <!-- If no shift is open -->

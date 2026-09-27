@@ -11,6 +11,7 @@ import { showToast } from '../utils';
 export const useAppStore = defineStore('app', () => {
   const isInitialized = ref(false);
   const currentView = ref('dashboard');
+  const currentSubView = ref('');
   const syncIntervalId = ref<number | null>(null);
 
   const settingsStore = useSettingsStore();
@@ -98,16 +99,38 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function navigateTo(viewName: string) {
-    // ── Redirect legacy hashes to consolidated views ──
-    if (viewName === 'staff' || viewName === 'audit' || viewName === 'print-forms') {
+  function navigateTo(target: string, subView?: string) {
+    let viewName = target;
+    let explicitSub = subView || '';
+
+    // Handle hash paths like "revenue/hourly" or "settings/printer"
+    if (viewName.includes('/')) {
+      const parts = viewName.split('/');
+      viewName = parts[0];
+      explicitSub = parts[1];
+    }
+
+    // ── Redirect legacy hashes to consolidated views and sub-views ──
+    if (viewName === 'staff') {
       viewName = 'settings';
-    }
-    if (viewName === 'invoices') {
+      explicitSub = 'staff';
+    } else if (viewName === 'audit') {
+      viewName = 'settings';
+      explicitSub = 'audit';
+    } else if (viewName === 'print-forms') {
+      viewName = 'settings';
+      explicitSub = 'print-forms';
+    } else if (viewName === 'invoices') {
       viewName = 'transactions';
-    }
-    if (viewName === 'report' || viewName === 'analytics' || viewName === 'cukcuk') {
+    } else if (viewName === 'report' || viewName === 'analytics') {
       viewName = 'revenue';
+    } else if (viewName === 'vat-invoices') {
+      viewName = 'vat';
+    } else if (viewName === 'extensions') {
+      viewName = 'extension';
+    } else if (viewName === 'cukcuk') {
+      viewName = 'revenue';
+      explicitSub = 'cukcuk';
     }
 
     // ── Shift Protection Logic ──
@@ -117,15 +140,18 @@ export const useAppStore = defineStore('app', () => {
     // If shift is open but not validated, force 'shift' view (Unlock screen)
     if (shift && !isValidated && viewName !== 'shift' && viewName !== 'settings' && viewName !== 'vat') {
       viewName = 'shift';
+      explicitSub = '';
     }
 
     currentView.value = viewName;
-    window.location.hash = viewName;
+    currentSubView.value = explicitSub;
+    window.location.hash = explicitSub ? `${viewName}/${explicitSub}` : viewName;
   }
 
   return {
     isInitialized,
     currentView,
+    currentSubView,
     initializeApp,
     startSyncInterval,
     stopSyncInterval,

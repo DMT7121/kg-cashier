@@ -1,18 +1,39 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useSettingsStore } from '../stores/settings';
+import { useAppStore } from '../stores/app';
 import { formatMoney, showToast } from '../utils';
 
 // Store & Settings
 const settingsStore = useSettingsStore();
+const appStore = useAppStore();
 
 // Tab state
 const activeTab = ref<'calc' | 'qr' | 'tts' | 'tools'>('calc');
+
+watch(() => appStore.currentSubView, (sub) => {
+  if (!sub) return;
+  if (sub === 'calc' || sub === 'tax') {
+    activeTab.value = 'calc';
+  } else if (sub === 'qr' || sub === 'vietqr') {
+    activeTab.value = 'qr';
+  } else if (sub === 'tts' || sub === 'voice' || sub === 'speaker') {
+    activeTab.value = 'tts';
+  } else if (sub === 'tools' || sub === 'business' || sub === 'mst') {
+    activeTab.value = 'tools';
+  }
+}, { immediate: true });
+
+function switchTab(key: 'calc' | 'qr' | 'tts' | 'tools') {
+  activeTab.value = key;
+  appStore.currentSubView = key;
+}
+
 const tabs = [
-  { key: 'calc', icon: 'calculate', label: 'Tính thuế VAT', colorClass: 'text-blue-600', bgClass: 'bg-blue-50/50' },
-  { key: 'qr', icon: 'qr_code_2', label: 'Tạo mã VietQR', colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50/50' },
-  { key: 'tts', icon: 'volume_up', label: 'Phát loa thông báo', colorClass: 'text-purple-600', bgClass: 'bg-purple-50/50' },
-  { key: 'tools', icon: 'construction', label: 'Tiện ích nghiệp vụ', colorClass: 'text-orange-600', bgClass: 'bg-orange-50/50' }
+  { key: 'calc', icon: 'calculate', label: 'Tính thuế VAT (8% / 10%)', sub: 'Tính xuôi / ngược tiền thuế', colorClass: 'text-blue-600', bgClass: 'bg-blue-50/50' },
+  { key: 'qr', icon: 'qr_code_2', label: 'Tạo mã VietQR Napas', sub: 'Mã QR thanh toán nhanh', colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50/50' },
+  { key: 'tts', icon: 'volume_up', label: 'Loa thông báo & AI Voice', sub: 'Phát âm thanh thông báo', colorClass: 'text-purple-600', bgClass: 'bg-purple-50/50' },
+  { key: 'tools', icon: 'construction', label: 'Tiện ích MST & Tỷ giá', sub: 'Tra cứu MST & Đổi ngoại tệ', colorClass: 'text-amber-600', bgClass: 'bg-amber-50/50' }
 ] as const;
 
 // Helper - Vietnamese number to words translation
@@ -851,24 +872,30 @@ onMounted(async () => {
       <div class="flex flex-col lg:flex-row gap-6 items-start">
         
         <!-- Sidebar Navigation -->
-        <aside class="w-full lg:w-64 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs p-3 shrink-0">
-          <nav class="flex flex-row lg:flex-col overflow-x-auto lg:overflow-visible gap-1 pb-2 lg:pb-0 scrollbar-none">
+        <aside class="w-full lg:w-72 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs p-3 shrink-0">
+          <div class="px-3 py-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider hidden lg:block">
+            Phân hệ tiện ích
+          </div>
+          <nav aria-label="Menu tiện ích" class="flex flex-row lg:flex-col overflow-x-auto lg:overflow-visible gap-1.5 pb-2 lg:pb-0 scrollbar-none">
             <button 
               v-for="tab in tabs" 
               :key="tab.key"
-              @click="activeTab = tab.key"
-              class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 select-none group w-full text-left"
+              @click="switchTab(tab.key)"
+              class="flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-all duration-200 select-none group w-full cursor-pointer"
               :class="activeTab === tab.key 
-                ? 'bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold border-l-2 border-emerald-500' 
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'"
+                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-l-4 border-emerald-500 shadow-xs' 
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'"
             >
-              <span 
-                class="material-symbols-rounded text-xl transition-transform duration-200 group-hover:scale-105"
-                :class="activeTab === tab.key ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'"
+              <div 
+                class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                :class="activeTab === tab.key ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-200'"
               >
-                {{ tab.icon }}
-              </span>
-              <span>{{ tab.label }}</span>
+                <span class="material-symbols-rounded text-xl">{{ tab.icon }}</span>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs md:text-sm font-bold truncate">{{ tab.label }}</div>
+                <div class="text-[11px] text-slate-400 dark:text-slate-500 truncate hidden lg:block">{{ tab.sub }}</div>
+              </div>
             </button>
           </nav>
         </aside>

@@ -176,6 +176,40 @@
     color: #ffffff;
     border-color: transparent;
   }
+  
+  /* Sub-module Sidebar Items */
+  .nav-group {
+    @apply flex flex-col space-y-0.5;
+  }
+  .nav-sub-list {
+    @apply pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-slate-200/80 dark:border-slate-800 ml-5 my-0.5 transition-all;
+  }
+  .nav-sub-item {
+    color: var(--text-muted);
+    @apply flex items-center gap-2 px-2.5 py-1.5 font-medium text-[11px] rounded-lg transition-all no-underline cursor-pointer;
+  }
+  .nav-sub-item:hover:not(.active) {
+    color: var(--text-primary);
+    background: var(--bg-mint-tint);
+  }
+  .nav-sub-item.active {
+    color: #10b981;
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.12);
+  }
+  .dark .nav-sub-item.active {
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.15);
+  }
+  .nav-sub-item .material-symbols-rounded {
+    @apply text-[15px];
+  }
+  .nav-chevron {
+    @apply ml-auto text-base transition-transform duration-200 text-slate-400 dark:text-slate-500;
+  }
+  .nav-chevron.rotated {
+    transform: rotate(90deg);
+  }
   .sidebar-footer {
     border-top: 1px solid var(--border-subtle);
     background: var(--bg-card);
@@ -297,16 +331,36 @@
   .stat-value { @apply text-xl font-extrabold text-slate-900 tracking-tight block mt-0.5; }
   .stat-sub { @apply text-[10px] text-slate-500 mt-0.5 block; }
 
-  /* Buttons */
+  /* Unified Button Hierarchy */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all focus:ring-2 outline-none cursor-pointer whitespace-nowrap;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 outline-none cursor-pointer whitespace-nowrap active:scale-[0.98] select-none;
   }
-  .btn-primary { @apply bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-xs focus:ring-amber-200 border-none active:scale-[0.98]; }
-  .btn-success { @apply bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs focus:ring-emerald-200 border-none active:scale-[0.98]; }
-  .btn-danger { @apply bg-rose-600 hover:bg-rose-700 text-white shadow-xs focus:ring-rose-200 border-none active:scale-[0.98]; }
-  .btn-outline { @apply bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 focus:ring-slate-100 active:scale-[0.98]; }
-  .btn-sm { @apply px-2.5 py-1 text-[11px] rounded-lg; }
-  .btn-icon { @apply p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors bg-transparent border-none cursor-pointer; }
+  .btn-primary {
+    @apply text-white border-0 shadow-sm hover:shadow-md hover:brightness-105 active:scale-[0.97] transition-all;
+    background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  }
+  .btn-secondary {
+    @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white shadow-xs active:scale-[0.97] transition-all;
+  }
+  .btn-ghost {
+    @apply bg-transparent border-0 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all;
+  }
+  .btn-danger {
+    @apply bg-rose-600 hover:bg-rose-700 text-white shadow-xs border-0 active:scale-[0.97] transition-all;
+  }
+  .btn-amber, .btn-warning {
+    @apply text-slate-950 border-0 shadow-xs active:scale-[0.97] font-bold transition-all;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  }
+  .btn-outline {
+    @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white active:scale-[0.98] transition-all;
+  }
+  .btn-sm { @apply px-3 py-1.5 text-[11px] rounded-lg gap-1.5; }
+  .btn-xs { @apply px-2 py-1 text-[10px] rounded-md gap-1; }
+  .btn-lg { @apply px-5 py-3 text-sm rounded-2xl gap-2.5; }
+  .btn-icon {
+    @apply p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors bg-transparent border-0 cursor-pointer flex items-center justify-center;
+  }
 
   /* Forms */
   .form-group { @apply mb-4; }

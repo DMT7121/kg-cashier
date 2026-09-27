@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useShiftStore } from '../stores/shift';
 import { useSettingsStore } from '../stores/settings';
+import { useAppStore } from '../stores/app';
 import { 
   formatCurrency, 
   formatDate, 
@@ -48,9 +49,28 @@ const toLocalMonthStr = (d: Date) => {
 // ── Stores ──────────────────────────────────
 const shiftStore = useShiftStore();
 const settingsStore = useSettingsStore();
+const appStore = useAppStore();
 
 // ── Tab Management ──────────────────────────
 const activeTab = ref<'report' | 'invoices' | 'analytics' | 'audit'>('report');
+
+watch(() => appStore.currentSubView, (sub) => {
+  if (!sub) return;
+  if (sub === 'report' || sub === 'summary') {
+    activeTab.value = 'report';
+  } else if (sub === 'invoices' || sub === 'cukcuk') {
+    activeTab.value = 'invoices';
+  } else if (sub === 'analytics' || sub === 'hourly' || sub === 'table' || sub === 'item') {
+    activeTab.value = 'analytics';
+  } else if (sub === 'audit') {
+    activeTab.value = 'audit';
+  }
+}, { immediate: true });
+
+function switchTab(tab: 'report' | 'invoices' | 'analytics' | 'audit') {
+  activeTab.value = tab;
+  appStore.currentSubView = tab;
+}
 
 // ── Shared Date Range & Period (Reports) ────
 const selectedPeriod = ref<'day' | 'week' | 'month' | 'quarter' | 'year'>('day');
@@ -942,47 +962,54 @@ onUnmounted(() => {
 
 <template>
   <div class="view-content p-4 md:p-6" :class="{ 'printing-active': printingA4 }">
-    <!-- Header with tab pills -->
-    <div class="no-print flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <!-- Sub-Module Navigation Header -->
+    <div class="no-print flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs">
       <div>
-        <h3 class="text-xl md:text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">📊 Doanh thu & Báo cáo</h3>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+            <span class="material-symbols-rounded text-xl">analytics</span>
+          </span>
+          <h3 class="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Doanh thu & Báo cáo</h3>
+          <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">CUKCUK Sync</span>
+        </div>
         <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">Theo dõi kết quả bán hàng, hóa đơn POS CUKCUK và kết ca bàn giao.</p>
       </div>
       
-      <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shadow-inner max-w-max border border-slate-200 dark:border-slate-700 flex-wrap gap-1">
+      <!-- Sub-module Navigation Pills -->
+      <nav aria-label="Phân hệ báo cáo doanh thu" class="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex-wrap gap-1.5 shadow-inner">
         <button 
-          @click="activeTab = 'report'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'report' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+          @click="switchTab('report')"
+          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'report' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
         >
           <span class="material-symbols-rounded text-lg">summarize</span>
-          Báo cáo ca
+          <span>Báo cáo ca & Bàn giao</span>
         </button>
         <button 
-          @click="activeTab = 'invoices'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'invoices' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+          @click="switchTab('invoices')"
+          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'invoices' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
         >
           <span class="material-symbols-rounded text-lg">receipt_long</span>
-          Hóa đơn POS
+          <span>Hóa đơn POS CUKCUK</span>
         </button>
         <button 
-          @click="activeTab = 'analytics'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'analytics' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+          @click="switchTab('analytics')"
+          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'analytics' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
         >
           <span class="material-symbols-rounded text-lg">bar_chart</span>
-          Phân tích doanh thu
+          <span>Phân tích & Biểu đồ</span>
         </button>
         <button 
-          @click="activeTab = 'audit'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'audit' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+          @click="switchTab('audit')"
+          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'audit' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
         >
-          <span class="material-symbols-rounded text-lg">history_toggle_off</span>
-          Đối soát & Sửa tay
+          <span class="material-symbols-rounded text-lg">fact_check</span>
+          <span>Đối soát & Sửa tay</span>
         </button>
-      </div>
+      </nav>
     </div>
 
     <!-- TAB 1: BÁO CÁO DOANH THU & PHIẾU BÀN GIAO CA -->

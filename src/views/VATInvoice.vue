@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useSettingsStore } from '../stores/settings';
+import { useAppStore } from '../stores/app';
 import { 
   formatCurrency, 
   showConfirm, 
@@ -41,6 +42,7 @@ interface ActivityLog {
 
 // Stores
 const settingsStore = useSettingsStore();
+const appStore = useAppStore();
 
 // Constants
 const API_URL = ENDPOINTS.vat;
@@ -59,6 +61,22 @@ const PROVIDER_MAP: Record<string, { label: string; runner: (key: string, prompt
 
 // State
 const activeTab = ref<'upload' | 'search' | 'history'>('upload');
+
+watch(() => appStore.currentSubView, (sub) => {
+  if (!sub) return;
+  if (sub === 'upload' || sub === 'scan') {
+    activeTab.value = 'upload';
+  } else if (sub === 'search' || sub === 'manage' || sub === 'invoices') {
+    activeTab.value = 'search';
+  } else if (sub === 'history' || sub === 'report' || sub === 'tax') {
+    activeTab.value = 'history';
+  }
+}, { immediate: true });
+
+function switchTab(tab: 'upload' | 'search' | 'history') {
+  activeTab.value = tab;
+  appStore.currentSubView = tab;
+}
 const driveCount = ref<number | string>('...');
 const uploadQueue = ref<UploadItem[]>([]);
 const aiScanQueue = ref<string[]>([]);
@@ -987,29 +1005,53 @@ function copyLink(url: string) {
 </script>
 
 <template>
-  <div class="view-content p-6">
-    <!-- Header tabs dashboard bar -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-      <div class="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 p-1 rounded-xl w-fit">
-        <button 
-          v-for="t in [
-            { key: 'upload', icon: 'cloud_upload', label: 'Upload Hóa Đơn' },
-            { key: 'search', icon: 'search', label: 'Tra Cứu & Kho' },
-            { key: 'history', icon: 'history', label: 'Lịch Sử hoạt động' }
-          ]" 
-          :key="t.key"
-          class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-          :class="activeTab === t.key ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'"
-          @click="activeTab = t.key as any"
-        >
-          <span class="material-symbols-rounded text-lg">{{ t.icon }}</span>
-          <span>{{ t.label }}</span>
-        </button>
+  <div class="view-content p-4 md:p-6">
+    <!-- Sub-Module Navigation Header -->
+    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+            <span class="material-symbols-rounded text-xl">receipt_long</span>
+          </span>
+          <h3 class="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Hóa Đơn Điện Tử VAT</h3>
+          <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Drive Cloud</span>
+        </div>
+        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">Trích xuất thông minh AI, lưu trữ đám mây và đồng bộ hóa đơn GTGT.</p>
       </div>
 
-      <div class="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 px-4 py-2.5 rounded-2xl flex items-center gap-1.5 shadow-sm">
-        <span class="material-symbols-rounded text-emerald-500 dark:text-emerald-400 text-sm">cloud_done</span>
-        <span>Có <strong class="text-emerald-600 dark:text-emerald-400 font-semibold">{{ driveCount }}</strong> hóa đơn trên Google Drive</span>
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Sub-module Navigation Pills -->
+        <nav aria-label="Phân hệ hóa đơn VAT" class="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex-wrap gap-1.5 shadow-inner">
+          <button 
+            @click="switchTab('upload')"
+            class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+            :class="activeTab === 'upload' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
+          >
+            <span class="material-symbols-rounded text-lg">document_scanner</span>
+            <span>AI Scan & Tải PDF</span>
+          </button>
+          <button 
+            @click="switchTab('search')"
+            class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+            :class="activeTab === 'search' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
+          >
+            <span class="material-symbols-rounded text-lg">inventory_2</span>
+            <span>Kho Lưu Trữ & Tra Cứu</span>
+          </button>
+          <button 
+            @click="switchTab('history')"
+            class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
+            :class="activeTab === 'history' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
+          >
+            <span class="material-symbols-rounded text-lg">history_edu</span>
+            <span>Báo Cáo & Nhật Ký Gửi Thuế</span>
+          </button>
+        </nav>
+
+        <div class="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/60 px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-xs">
+          <span class="material-symbols-rounded text-emerald-500 dark:text-emerald-400 text-sm">cloud_done</span>
+          <span>Google Drive: <strong class="text-emerald-600 dark:text-emerald-400 font-bold">{{ driveCount }}</strong> file</span>
+        </div>
       </div>
     </div>
 
