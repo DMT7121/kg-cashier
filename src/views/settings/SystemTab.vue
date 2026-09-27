@@ -350,60 +350,60 @@ async function handleVatAdminLogin() {
 <template>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Store Info & General Settings -->
-    <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-6">
-      <div class="border-b border-slate-100 pb-4">
-        <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <span class="material-symbols-rounded text-indigo-500">store</span>
+    <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-6">
+      <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+        <h4 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">store</span>
           Thông tin cửa hàng & Cấu hình chung
         </h4>
       </div>
 
       <div class="flex flex-col gap-4">
         <div class="form-group">
-          <label class="form-label font-semibold text-slate-700 mb-1 block">Tên nhà hàng/quán</label>
-          <input type="text" v-model="storeName" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Tên cửa hàng...">
+          <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Tên nhà hàng/quán</label>
+          <input type="text" v-model="storeName" class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm" placeholder="Tên cửa hàng...">
         </div>
 
         <div class="form-group">
-          <label class="form-label font-semibold text-slate-700 mb-1 block">Địa chỉ hiển thị</label>
-          <input type="text" v-model="storeAddress" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Địa chỉ...">
+          <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Địa chỉ hiển thị</label>
+          <input type="text" v-model="storeAddress" class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm" placeholder="Địa chỉ...">
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="form-group">
-            <label class="form-label font-semibold text-slate-700 mb-1 block">Mức chênh lệch tiền tối đa (đ)</label>
-            <input type="number" v-model.number="discrepancyThreshold" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+            <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Mức chênh lệch tiền tối đa (đ)</label>
+            <input type="number" v-model.number="discrepancyThreshold" class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm">
           </div>
           <div class="form-group">
-            <label class="form-label font-semibold text-slate-700 mb-1 block">Số giờ cảnh báo ca quá giờ</label>
-            <input type="number" v-model.number="shiftWarningHours" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+            <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Số giờ cảnh báo ca quá giờ</label>
+            <input type="number" v-model.number="shiftWarningHours" class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm">
           </div>
         </div>
 
         <!-- Automation Switch & Checkboxes -->
-        <div class="bg-slate-50 p-4 rounded-xl flex flex-col gap-3">
+        <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl flex flex-col gap-3 border border-slate-100 dark:border-slate-800">
           <label class="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" v-model="autoSync" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4">
-            <span class="text-sm text-slate-700 font-medium">Tự động đồng bộ hóa lên Cloud (mỗi 60 giây)</span>
+            <input type="checkbox" v-model="autoSync" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+            <span class="text-sm text-slate-700 dark:text-slate-300 font-medium">Tự động đồng bộ hóa lên Cloud (mỗi 60 giây)</span>
           </label>
 
           <label class="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" v-model="requireLogin" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4">
-            <span class="text-sm text-slate-700 font-medium">Yêu cầu đăng nhập PIN thu ngân khi mở ca</span>
+            <input type="checkbox" v-model="requireLogin" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+            <span class="text-sm text-slate-700 dark:text-slate-300 font-medium">Yêu cầu đăng nhập PIN thu ngân khi mở ca</span>
           </label>
 
           <label class="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" v-model="allowDevWrite" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4">
-            <span class="text-sm text-slate-700 font-medium">Cho phép ghi dữ liệu thật từ thiết bị Local/LAN</span>
+            <input type="checkbox" v-model="allowDevWrite" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+            <span class="text-sm text-slate-700 dark:text-slate-300 font-medium">Cho phép ghi dữ liệu thật từ thiết bị Local/LAN</span>
           </label>
         </div>
 
         <div class="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3 mt-2 w-full">
-          <button @click="saveSettings()" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-indigo-600/10 hover:shadow-md hover:shadow-indigo-600/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto lg:w-full xl:w-auto">
+          <button @click="saveSettings()" class="btn-primary flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm w-full sm:w-auto lg:w-full xl:w-auto cursor-pointer">
             <span class="material-symbols-rounded text-base">save</span>
             Lưu cấu hình
           </button>
-          <button @click="handlePingApi" class="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 cursor-pointer w-full sm:w-auto lg:w-full xl:w-auto">
+          <button @click="handlePingApi" class="btn-secondary flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm w-full sm:w-auto lg:w-full xl:w-auto cursor-pointer">
             <span class="material-symbols-rounded text-base">wifi_tethering</span>
             Kiểm tra kết nối Cloud
           </button>
@@ -412,9 +412,9 @@ async function handleVatAdminLogin() {
     </div>
 
     <!-- MISA CUKCUK API Integration -->
-    <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-6">
-      <div class="border-b border-slate-100 pb-4">
-        <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+    <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-6">
+      <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+        <h4 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <span class="material-symbols-rounded text-emerald-500">sync_alt</span>
           Tích hợp MISA CUKCUK API
         </h4>
@@ -422,54 +422,54 @@ async function handleVatAdminLogin() {
 
       <div class="flex flex-col gap-4">
         <div class="form-group">
-          <label class="form-label font-semibold text-slate-700 mb-1 block">Tên miền CUKCUK (Domain)</label>
-          <input type="text" v-model="cukDomain" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="https://example.cukcuk.vn">
+          <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Tên miền CUKCUK (Domain)</label>
+          <input type="text" v-model="cukDomain" class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm" placeholder="https://example.cukcuk.vn">
         </div>
 
         <div class="form-group">
-          <label class="form-label font-semibold text-slate-700 mb-1 block">App ID (Tên kết nối)</label>
-          <input type="text" v-model="cukAppId" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Nhập App ID...">
+          <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">App ID (Tên kết nối)</label>
+          <input type="text" v-model="cukAppId" class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm" placeholder="Nhập App ID...">
         </div>
 
         <div class="form-group">
-          <label class="form-label font-semibold text-slate-700 mb-1 block">Secret Key (Mã bảo mật)</label>
-          <input type="password" v-model="cukKey" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="••••••••••••••••">
+          <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Secret Key (Mã bảo mật)</label>
+          <input type="password" v-model="cukKey" class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm" placeholder="••••••••••••••••">
         </div>
 
         <label class="flex items-start gap-3 cursor-pointer mt-1">
-          <input type="checkbox" v-model="cukAutoSync" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 mt-1">
+          <input type="checkbox" v-model="cukAutoSync" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 mt-1">
           <div class="flex flex-col">
-            <span class="text-sm text-slate-700 font-bold">Tự động đồng bộ hóa trên Cloud & Cập nhật Webapp</span>
-            <span class="text-[11px] text-slate-500 font-medium leading-relaxed mt-0.5">Tự động quét hóa đơn mới từ CUKCUK mỗi 10 phút trên Cloud và tự cập nhật giao diện mà không cần đồng bộ thủ công.</span>
+            <span class="text-sm text-slate-700 dark:text-slate-200 font-bold">Tự động đồng bộ hóa trên Cloud & Cập nhật Webapp</span>
+            <span class="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed mt-0.5">Tự động quét hóa đơn mới từ CUKCUK mỗi 10 phút trên Cloud và tự cập nhật giao diện mà không cần đồng bộ thủ công.</span>
           </div>
         </label>
 
         <div class="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3 mt-2 w-full">
-          <button @click="handleTestConnection" :disabled="cukTestLoading" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
+          <button @click="handleTestConnection" :disabled="cukTestLoading" class="btn-secondary flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
             <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': cukTestLoading }">{{ cukTestLoading ? 'sync' : 'wifi_find' }}</span>
             Kiểm tra kết nối
           </button>
-          <button @click="handleSyncInvoices" :disabled="cukSyncLoading" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-emerald-600/10 hover:shadow-md hover:shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
+          <button @click="handleSyncInvoices" :disabled="cukSyncLoading" class="btn-primary flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
             <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': cukSyncLoading }">sync</span>
             Đồng bộ hóa đơn
           </button>
-          <button @click="handleSyncMenu" :disabled="cukMenuLoading" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-600/10 hover:shadow-md hover:shadow-blue-600/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
+          <button @click="handleSyncMenu" :disabled="cukMenuLoading" class="btn-secondary flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-800/60 rounded-xl text-sm font-bold shadow-sm disabled:opacity-50 disabled:pointer-events-none cursor-pointer w-full">
             <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': cukMenuLoading }">restaurant_menu</span>
             Đồng bộ thực đơn
           </button>
         </div>
 
         <!-- CUKCUK result messages -->
-        <div v-if="cukResultMsg" class="p-4 rounded-xl border text-sm font-mono whitespace-pre-wrap" :class="cukResultSuccess ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'">
+        <div v-if="cukResultMsg" class="p-4 rounded-xl border text-sm font-mono whitespace-pre-wrap" :class="cukResultSuccess ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300'">
           {{ cukResultMsg }}
         </div>
       </div>
     </div>
 
     <!-- Category Management (Income / Expense tags) -->
-    <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-6 lg:col-span-2">
-      <div class="border-b border-slate-100 pb-4">
-        <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+    <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-6 lg:col-span-2">
+      <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+        <h4 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <span class="material-symbols-rounded text-amber-500">sell</span>
           Quản lý danh mục thu chi thu ngân
         </h4>
@@ -478,20 +478,20 @@ async function handleVatAdminLogin() {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- Income Categories -->
         <div class="flex flex-col gap-4">
-          <h5 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+          <h5 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
             DANH MỤC THU
           </h5>
 
           <!-- Add income -->
           <div class="flex gap-2">
-            <input type="text" v-model="newIncomeCat" @keydown.enter="handleAddIncomeCat" class="form-input flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Tên danh mục thu mới...">
-            <button @click="handleAddIncomeCat" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg transition-colors">Thêm</button>
+            <input type="text" v-model="newIncomeCat" @keydown.enter="handleAddIncomeCat" class="form-input flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm" placeholder="Tên danh mục thu mới...">
+            <button @click="handleAddIncomeCat" class="btn-primary px-4 py-2 text-sm font-semibold rounded-lg">Thêm</button>
           </div>
 
           <!-- Tags list -->
           <div class="flex flex-wrap gap-2 mt-2">
-            <div v-for="cat in categoriesStore.categories.income" :key="cat" class="flex items-center gap-2 bg-slate-100 text-slate-800 px-3 py-1.5 rounded-full text-xs font-semibold">
+            <div v-for="cat in categoriesStore.categories.income" :key="cat" class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-full text-xs font-semibold">
               {{ cat }}
               <button @click="handleRemoveCat('income', cat)" class="text-slate-400 hover:text-rose-500 font-bold transition-colors">
                 <span class="material-symbols-rounded text-xs block">close</span>
@@ -502,20 +502,20 @@ async function handleVatAdminLogin() {
 
         <!-- Expense Categories -->
         <div class="flex flex-col gap-4">
-          <h5 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+          <h5 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
             DANH MỤC CHI
           </h5>
 
           <!-- Add expense -->
           <div class="flex gap-2">
-            <input type="text" v-model="newExpenseCat" @keydown.enter="handleAddExpenseCat" class="form-input flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Tên danh mục chi mới...">
-            <button @click="handleAddExpenseCat" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg transition-colors">Thêm</button>
+            <input type="text" v-model="newExpenseCat" @keydown.enter="handleAddExpenseCat" class="form-input flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-sm" placeholder="Tên danh mục chi mới...">
+            <button @click="handleAddExpenseCat" class="btn-danger px-4 py-2 text-sm font-semibold rounded-lg">Thêm</button>
           </div>
 
           <!-- Tags list -->
           <div class="flex flex-wrap gap-2 mt-2">
-            <div v-for="cat in categoriesStore.categories.expense" :key="cat" class="flex items-center gap-2 bg-slate-100 text-slate-800 px-3 py-1.5 rounded-full text-xs font-semibold">
+            <div v-for="cat in categoriesStore.categories.expense" :key="cat" class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-full text-xs font-semibold">
               {{ cat }}
               <button @click="handleRemoveCat('expense', cat)" class="text-slate-400 hover:text-rose-500 font-bold transition-colors">
                 <span class="material-symbols-rounded text-xs block">close</span>
@@ -527,19 +527,19 @@ async function handleVatAdminLogin() {
     </div>
 
     <!-- API Keys (Encrypted Cloud Admin Storage) -->
-    <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-6 lg:col-span-2">
-      <div class="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+    <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-6 lg:col-span-2">
+      <div class="border-b border-slate-100 dark:border-slate-800 pb-4 flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <span class="material-symbols-rounded text-indigo-600">vpn_key</span>
+          <h4 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">vpn_key</span>
             Cấu hình API Keys (Hệ thống AI & Trợ lý ảo)
           </h4>
-          <p class="text-xs text-slate-500 mt-1">Các khóa API được mã hóa và lưu trữ tập trung trên Cloud Sheet của Admin</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Các khóa API được mã hóa và lưu trữ tập trung trên Cloud Sheet của Admin</p>
         </div>
 
         <div class="flex gap-2 items-center">
-          <input type="password" v-model="adminPass" class="form-input px-3 py-1.5 border border-slate-200 rounded-lg text-xs" style="width:160px; letter-spacing: 2px;" placeholder="Mã truy cập...">
-          <button @click="handleVatAdminLogin" :disabled="vatLoading" class="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-xs hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none cursor-pointer">
+          <input type="password" v-model="adminPass" class="form-input px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs" style="width:160px; letter-spacing: 2px;" placeholder="Mã truy cập...">
+          <button @click="handleVatAdminLogin" :disabled="vatLoading" class="btn-secondary flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-50 disabled:pointer-events-none cursor-pointer">
             <span class="material-symbols-rounded text-xs" :class="{ 'animate-spin': vatLoading }">sync</span>
             Lấy Keys
           </button>
@@ -549,74 +549,74 @@ async function handleVatAdminLogin() {
       <!-- Keys Container -->
       <div v-if="showVatKeys" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>Gemini Keys</span>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-600 hover:underline">Lấy Key</a>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-emerald-600 dark:text-emerald-400 hover:underline">Lấy Key</a>
           </label>
-          <textarea v-model="geminiKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="geminiKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
 
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>DeepSeek Keys</span>
-            <a href="https://platform.deepseek.com/" target="_blank" class="text-indigo-600 hover:underline">Lấy Key</a>
+            <a href="https://platform.deepseek.com/" target="_blank" class="text-emerald-600 dark:text-emerald-400 hover:underline">Lấy Key</a>
           </label>
-          <textarea v-model="deepseekKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="deepseekKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
 
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>Groq Keys</span>
-            <a href="https://console.groq.com/keys" target="_blank" class="text-indigo-600 hover:underline">Lấy Key</a>
+            <a href="https://console.groq.com/keys" target="_blank" class="text-emerald-600 dark:text-emerald-400 hover:underline">Lấy Key</a>
           </label>
-          <textarea v-model="groqKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="groqKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
 
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>SambaNova Keys</span>
-            <a href="https://cloud.sambanova.ai/" target="_blank" class="text-indigo-600 hover:underline">Lấy Key</a>
+            <a href="https://cloud.sambanova.ai/" target="_blank" class="text-emerald-600 dark:text-emerald-400 hover:underline">Lấy Key</a>
           </label>
-          <textarea v-model="sambanovaKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="sambanovaKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
 
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>Cerebras Keys</span>
           </label>
-          <textarea v-model="cerebrasKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="cerebrasKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
 
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>HuggingFace Keys</span>
           </label>
-          <textarea v-model="hfKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="hfKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
 
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>Mistral Keys</span>
           </label>
-          <textarea v-model="mistralKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="mistralKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
 
         <div class="form-group flex flex-col gap-1">
-          <label class="text-xs font-bold text-slate-700 flex justify-between">
+          <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between">
             <span>NVIDIA Keys</span>
           </label>
-          <textarea v-model="nvidiaKeys" class="form-input w-full p-2 border border-slate-200 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
+          <textarea v-model="nvidiaKeys" class="form-input w-full p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg text-xs font-mono" rows="3" placeholder="Một key mỗi dòng..."></textarea>
         </div>
       </div>
 
       <div v-if="showVatKeys" class="flex gap-2">
-        <button @click="saveSettings()" class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-indigo-600/10 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 cursor-pointer">
+        <button @click="saveSettings()" class="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm cursor-pointer">
           <span class="material-symbols-rounded text-sm">save</span>
           Lưu API Keys
         </button>
       </div>
 
-      <div v-else class="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+      <div v-else class="text-center py-6 text-slate-400 dark:text-slate-500 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
         🔓 Vui lòng nhập mã truy cập của Admin ở góc phải trên và nhấn "Lấy Keys" để cấu hình API Keys.
       </div>
     </div>

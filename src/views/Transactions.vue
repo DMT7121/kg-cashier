@@ -393,10 +393,10 @@ onMounted(() => {
   <div class="view-content p-6">
     
     <!-- Tab Controls -->
-    <div class="flex border-b border-slate-100 mb-6 gap-2 bg-slate-50/50 p-1.5 rounded-2xl max-w-xs">
+    <div class="flex border border-slate-200/60 dark:border-slate-700/60 mb-6 gap-2 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl max-w-xs shadow-xs">
       <button 
         class="flex-1 py-2 text-xs font-black rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1.5"
-        :class="activeTab === 'transactions' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800 bg-transparent'"
+        :class="activeTab === 'transactions' ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent'"
         @click="activeTab = 'transactions'"
       >
         <span class="material-symbols-rounded text-base">receipt_long</span>
@@ -404,7 +404,7 @@ onMounted(() => {
       </button>
       <button 
         class="flex-1 py-2 text-xs font-black rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1.5"
-        :class="activeTab === 'invoices' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800 bg-transparent'"
+        :class="activeTab === 'invoices' ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent'"
         @click="activeTab = 'invoices'"
       >
         <span class="material-symbols-rounded text-base">description</span>
@@ -413,16 +413,16 @@ onMounted(() => {
     </div>
 
     <!-- If no shift is open -->
-    <div v-if="!shiftStore.currentShift" class="max-w-md mx-auto mt-12 text-center bg-white p-8 rounded-3xl border border-slate-100 shadow-xs space-y-6">
-      <div class="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+    <div v-if="!shiftStore.currentShift" class="max-w-md mx-auto mt-12 text-center bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-6 transition-colors">
+      <div class="w-16 h-16 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-200/60 dark:border-amber-800/60">
         <span class="material-symbols-rounded text-3xl">lock</span>
       </div>
       <div>
-        <h2 class="text-xl font-bold text-slate-800">Chưa mở ca làm việc</h2>
-        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">Bạn cần mở ca làm việc trước khi thực hiện thu chi hay quản lý chứng từ.</p>
+        <h2 class="text-xl font-extrabold text-slate-800 dark:text-white">Chưa mở ca làm việc</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">Bạn cần mở ca làm việc trước khi thực hiện thu chi hay quản lý chứng từ.</p>
       </div>
       <button 
-        class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all cursor-pointer shadow-md shadow-blue-500/15"
+        class="btn-primary w-full py-3.5 text-xs uppercase tracking-wider font-extrabold shadow-sm cursor-pointer transition-all"
         @click="shiftStore.loadShifts()"
       >
         Kiểm tra trạng thái ca
@@ -434,37 +434,37 @@ onMounted(() => {
       
       <div class="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h3 class="text-lg font-black text-slate-800">Quản lý Thu Chi</h3>
-          <p class="text-xs text-slate-400 font-semibold mt-0.5">Ghi nhận các luồng tiền thu chi phát sinh thủ công</p>
+          <h3 class="text-lg font-extrabold text-slate-900 dark:text-white">Quản lý Thu Chi</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">Ghi nhận các luồng tiền thu chi phát sinh thủ công</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2.5">
           <button 
-            class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl border border-emerald-500 transition-all flex items-center gap-1.5 cursor-pointer"
+            class="btn-primary px-4 py-2.5 text-xs uppercase tracking-wider font-extrabold flex items-center gap-1.5 cursor-pointer shadow-sm"
             @click="triggerAddIncome"
           >
-            <span class="material-symbols-rounded text-sm">add</span> Thêm khoản Thu
+            <span class="material-symbols-rounded text-base">add</span> Thêm khoản Thu
           </button>
           <button 
-            class="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl border border-rose-500 transition-all flex items-center gap-1.5 cursor-pointer"
+            class="px-4 py-2.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-200/60 dark:border-rose-900/50 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             @click="triggerAddExpense"
           >
-            <span class="material-symbols-rounded text-sm">remove</span> Thêm khoản Chi
+            <span class="material-symbols-rounded text-base">remove</span> Thêm khoản Chi
           </button>
         </div>
       </div>
 
       <!-- Filters Ribbon -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between flex-wrap gap-4 shadow-xs">
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between flex-wrap gap-4 shadow-xs transition-colors">
         <div class="flex items-center gap-3 flex-wrap flex-1">
           <input 
             type="text" 
             v-model="filterSearch" 
-            class="px-3 py-2 bg-slate-50 border border-slate-200/70 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full sm:max-w-xs"
+            class="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-full sm:max-w-xs"
             placeholder="🔍 Tìm danh mục, ghi chú, số tiền..."
           />
           <select 
             v-model="filterType" 
-            class="px-3 py-2 bg-slate-50 border border-slate-200/70 rounded-xl text-xs font-bold focus:outline-none cursor-pointer"
+            class="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
           >
             <option value="all">📋 Tất cả luồng</option>
             <option value="income">↑ Khoản Thu</option>
@@ -472,7 +472,7 @@ onMounted(() => {
           </select>
           <select 
             v-model="filterPayment" 
-            class="px-3 py-2 bg-slate-50 border border-slate-200/70 rounded-xl text-xs font-bold focus:outline-none cursor-pointer"
+            class="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
           >
             <option value="all">💳 Tất cả PTTT</option>
             <option value="cash">💵 Tiền mặt</option>
@@ -480,18 +480,18 @@ onMounted(() => {
             <option value="transfer">🔄 Chuyển khoản</option>
           </select>
         </div>
-        <div class="text-xs font-black text-slate-500 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-100">
-          Lọc: <span class="text-slate-800">{{ filteredTransactions.length }} mục</span> · Tổng: 
-          <span :class="totalFiltered >= 0 ? 'text-emerald-600' : 'text-rose-600'">
+        <div class="text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-200/60 dark:border-slate-700">
+          Lọc: <span class="text-slate-800 dark:text-slate-100">{{ filteredTransactions.length }} mục</span> · Tổng: 
+          <span :class="totalFiltered >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
             {{ totalFiltered >= 0 ? '+' : '' }}{{ formatMoney(totalFiltered) }}
           </span>
         </div>
       </div>
 
       <!-- Transaction List Table Card -->
-      <div class="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-xs">
-        <div class="p-4 border-b border-slate-50 flex items-center justify-between">
-          <h4 class="font-extrabold text-xs text-slate-400 uppercase tracking-wider">Danh sách giao dịch</h4>
+      <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs transition-colors">
+        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <h4 class="font-extrabold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Danh sách giao dịch</h4>
         </div>
 
         <div v-if="filteredTransactions.length === 0" class="p-12 text-center text-slate-400 text-xs font-semibold">
@@ -500,7 +500,7 @@ onMounted(() => {
         <div v-else class="overflow-x-auto">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
-              <tr class="bg-slate-50 text-slate-400 font-bold border-b border-slate-50">
+              <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">
                 <th class="p-4">Thời gian</th>
                 <th class="p-4">Nguồn</th>
                 <th class="p-4">Loại</th>
@@ -511,23 +511,23 @@ onMounted(() => {
                 <th class="p-4 text-center">Thao tác</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-50 font-semibold text-slate-700">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-semibold text-slate-700 dark:text-slate-300">
               <tr 
                 v-for="tx in filteredTransactions.slice().reverse()" 
                 :key="tx.id"
-                class="hover:bg-slate-50/50 transition-all"
+                class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-all"
               >
-                <td class="p-4 font-mono text-[11px]">{{ formatTime(tx.timestamp) }}</td>
+                <td class="p-4 font-mono text-[11px] text-slate-400 dark:text-slate-500">{{ formatTime(tx.timestamp) }}</td>
                 <td class="p-4">
                   <span 
                     v-if="tx.note && tx.note.includes('[CUKCUK]')"
-                    class="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100/40"
+                    class="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-800/40"
                   >
                     🔗 POS
                   </span>
                   <span 
                     v-else 
-                    class="px-2 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100/40"
+                    class="px-2 py-0.5 rounded-md text-[10px] font-black bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 border border-cyan-200/40 dark:border-cyan-800/40"
                   >
                     ✍️ Thủ công
                   </span>
@@ -535,30 +535,30 @@ onMounted(() => {
                 <td class="p-4">
                   <span 
                     class="px-2 py-0.5 rounded-md text-[10px] font-black"
-                    :class="tx.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'"
+                    :class="tx.type === 'income' ? 'bg-emerald-100/70 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300' : 'bg-rose-100/70 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300'"
                   >
                     {{ tx.type === 'income' ? 'Thu' : 'Chi' }}
                   </span>
                 </td>
-                <td class="p-4 font-bold text-slate-800">{{ tx.category }}</td>
+                <td class="p-4 font-bold text-slate-800 dark:text-slate-100">{{ tx.category }}</td>
                 <td class="p-4">
                   <span 
                     class="px-2 py-0.5 rounded-md text-[10px] font-black"
                     :class="{
-                      'bg-emerald-50 text-emerald-700 border border-emerald-100/40': tx.paymentMethod === 'cash',
-                      'bg-blue-50 text-blue-700 border border-blue-100/40': tx.paymentMethod === 'card',
-                      'bg-indigo-50 text-indigo-700 border border-indigo-100/40': tx.paymentMethod === 'transfer'
+                      'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/40 dark:border-emerald-800/40': tx.paymentMethod === 'cash',
+                      'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200/40 dark:border-sky-800/40': tx.paymentMethod === 'card',
+                      'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border border-cyan-200/40 dark:border-cyan-800/40': tx.paymentMethod === 'transfer'
                     }"
                   >
                     {{ tx.paymentMethod === 'cash' ? '💵 Tiền mặt' : tx.paymentMethod === 'card' ? '💳 Cà thẻ' : '🔄 CK' }}
                   </span>
                 </td>
-                <td class="p-4 text-slate-400 font-medium">
+                <td class="p-4 text-slate-400 dark:text-slate-500 font-medium">
                   {{ tx.note ? tx.note.replace('[CUKCUK]', '').trim() : '—' }}
                 </td>
                 <td 
                   class="p-4 text-right font-black tabular-nums"
-                  :class="tx.type === 'income' ? 'text-emerald-600' : 'text-rose-600'"
+                  :class="tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'"
                 >
                   {{ tx.type === 'income' ? '+' : '−' }}{{ formatMoney(tx.amount) }}
                 </td>
@@ -566,14 +566,14 @@ onMounted(() => {
                   <div class="inline-flex gap-1.5">
                     <button 
                       v-if="!(tx.note && tx.note.includes('[CUKCUK]'))"
-                      class="p-1 hover:bg-slate-100 text-indigo-600 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
+                      class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-cyan-600 dark:text-cyan-400 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
                       title="Sửa"
                       @click="triggerEditTx(tx)"
                     >
                       <span class="material-symbols-rounded text-lg">edit</span>
                     </button>
                     <button 
-                      class="p-1 hover:bg-slate-100 text-rose-600 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
+                      class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-rose-500 hover:text-rose-700 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
                       title="Xóa"
                       @click="handleDeleteTx(tx.id)"
                     >
@@ -591,25 +591,25 @@ onMounted(() => {
       <div class="space-y-4">
         <div class="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h4 class="text-sm font-extrabold text-slate-800">Các Khoản Thu Chi Khác</h4>
+            <h4 class="text-sm font-extrabold text-slate-800 dark:text-slate-100">Các Khoản Thu Chi Khác</h4>
             <p class="text-[11px] text-slate-400 font-semibold">Thu chi không tính vào doanh thu bán hàng trực tiếp</p>
           </div>
           <button 
-            class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200/30 transition-all flex items-center gap-1.5 cursor-pointer"
+            class="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200/50 dark:border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             @click="triggerAddOtherTx"
           >
             <span class="material-symbols-rounded text-sm">add</span> Thêm mới
           </button>
         </div>
 
-        <div class="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-xs">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs transition-colors">
           <div v-if="!shiftStore.currentShift.otherTransactions?.length" class="p-8 text-center text-slate-400 text-xs font-semibold">
             Chưa có khoản thu chi khác nào trong ca hiện tại.
           </div>
           <div v-else class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
               <thead>
-                <tr class="bg-slate-50 text-slate-400 font-bold border-b border-slate-50">
+                <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">
                   <th class="p-4">Thời gian</th>
                   <th class="p-4">Loại</th>
                   <th class="p-4">Danh mục</th>
@@ -618,32 +618,32 @@ onMounted(() => {
                   <th class="p-4 text-center">Thao tác</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-50 font-semibold text-slate-700">
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-semibold text-slate-700 dark:text-slate-300">
                 <tr 
                   v-for="ot in shiftStore.currentShift.otherTransactions.slice().reverse()" 
                   :key="ot.id"
-                  class="hover:bg-slate-50/50 transition-all"
+                  class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-all"
                 >
-                  <td class="p-4 font-mono text-[11px]">{{ formatTime(ot.timestamp) }}</td>
+                  <td class="p-4 font-mono text-[11px] text-slate-400 dark:text-slate-500">{{ formatTime(ot.timestamp) }}</td>
                   <td class="p-4">
                     <span 
                       class="px-2 py-0.5 rounded-md text-[10px] font-black"
-                      :class="ot.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'"
+                      :class="ot.type === 'income' ? 'bg-emerald-100/70 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300' : 'bg-rose-100/70 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300'"
                     >
                       {{ ot.type === 'income' ? 'Thu khác' : 'Chi khác' }}
                     </span>
                   </td>
-                  <td class="p-4 font-bold text-slate-800">{{ ot.category }}</td>
-                  <td class="p-4 text-slate-400 font-medium">{{ ot.note || '—' }}</td>
+                  <td class="p-4 font-bold text-slate-800 dark:text-slate-100">{{ ot.category }}</td>
+                  <td class="p-4 text-slate-400 dark:text-slate-500 font-medium">{{ ot.note || '—' }}</td>
                   <td 
                     class="p-4 text-right font-black tabular-nums"
-                    :class="ot.type === 'income' ? 'text-emerald-600' : 'text-rose-600'"
+                    :class="ot.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'"
                   >
                     {{ ot.type === 'income' ? '+' : '−' }}{{ formatMoney(ot.amount) }}
                   </td>
                   <td class="p-4 text-center">
                     <button 
-                      class="p-1 hover:bg-slate-100 text-rose-600 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
+                      class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-rose-500 hover:text-rose-700 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
                       @click="handleDeleteOtherTx(ot.id)"
                     >
                       <span class="material-symbols-rounded text-lg">delete</span>
@@ -662,22 +662,24 @@ onMounted(() => {
     <div v-else-if="activeTab === 'invoices'" class="space-y-6 animate-fade-in">
       
       <div>
-        <h3 class="text-lg font-black text-slate-800">📑 Chứng từ / Hóa đơn đính kèm</h3>
+        <h3 class="text-lg font-extrabold text-slate-900 dark:text-white">📑 Chứng từ / Hóa đơn đính kèm</h3>
         <p class="text-xs text-slate-400 font-semibold mt-0.5">Lưu trữ ảnh hóa đơn mua hàng, biên lai lên Google Drive</p>
       </div>
 
       <!-- Drag and drop zone -->
       <div 
-        class="border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-3"
-        :class="isDragging ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-200 bg-white hover:border-indigo-400'"
+        class="border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-3 bg-white dark:bg-slate-900"
+        :class="isDragging ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-500'"
         @click="triggerFileSelect"
         @dragover="onDragOver"
         @dragleave="onDragLeave"
         @drop="onDrop"
       >
-        <span class="material-symbols-rounded text-4xl text-indigo-500">cloud_upload</span>
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/60 dark:border-emerald-800/60 shadow-xs">
+          <span class="material-symbols-rounded text-3xl">cloud_upload</span>
+        </div>
         <div>
-          <h4 class="font-bold text-sm text-slate-800">Kéo thả file hình ảnh hoặc PDF vào đây</h4>
+          <h4 class="font-bold text-sm text-slate-800 dark:text-slate-100">Kéo thả file hình ảnh hoặc PDF vào đây</h4>
           <p class="text-[11px] text-slate-400 mt-1">Hoặc nhấp chuột để chọn tệp từ thiết bị (Tối đa 5MB)</p>
         </div>
         <input 
@@ -692,10 +694,10 @@ onMounted(() => {
 
       <!-- Settings zone selection -->
       <div class="max-w-xs">
-        <label class="block text-xs font-black text-slate-500 mb-2 uppercase tracking-wide">📂 Danh mục lưu trữ trên Cloud</label>
+        <label class="block text-xs font-black text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">📂 Danh mục lưu trữ trên Cloud</label>
         <select 
           v-model="uploadCategory" 
-          class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none cursor-pointer"
+          class="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-bold focus:border-emerald-500 cursor-pointer"
         >
           <option value="income">📂 KHOẢN THU (Income Receipt)</option>
           <option value="expense">📂 KHOẢN CHI (Expense Receipt)</option>
@@ -704,19 +706,19 @@ onMounted(() => {
       </div>
 
       <!-- Uploading progress indicator -->
-      <div v-if="isUploading" class="bg-white p-4 rounded-2xl border border-slate-100 space-y-2.5 animate-pulse">
-        <div class="flex items-center justify-between text-xs font-bold text-slate-600">
+      <div v-if="isUploading" class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2.5 animate-pulse shadow-xs">
+        <div class="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300">
           <span>{{ uploadStatusText }}</span>
           <span>{{ uploadPercent }}%</span>
         </div>
-        <div class="w-full bg-slate-50 h-2 rounded-full overflow-hidden border border-slate-100/50">
-          <div class="h-full bg-indigo-600 transition-all duration-300" :style="{ width: `${uploadPercent}%` }"></div>
+        <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
+          <div class="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-300" :style="{ width: `${uploadPercent}%` }"></div>
         </div>
       </div>
 
       <!-- Stored file Grid -->
-      <div class="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
-        <h4 class="font-extrabold text-xs text-slate-400 uppercase tracking-wider">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 space-y-4 shadow-xs transition-colors">
+        <h4 class="font-extrabold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
           Chứng từ đã lưu ({{ shiftStore.currentShift.invoices?.length || 0 }})
         </h4>
 
@@ -727,11 +729,11 @@ onMounted(() => {
           <div 
             v-for="inv in shiftStore.currentShift.invoices" 
             :key="inv.id"
-            class="group border border-slate-100 rounded-2xl overflow-hidden hover:shadow-md transition-all flex flex-col bg-slate-50/20"
+            class="group border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden hover:shadow-md transition-all flex flex-col bg-slate-50/30 dark:bg-slate-800/40"
           >
             <!-- Preview Box -->
             <div 
-              class="aspect-square bg-slate-50 border-b border-slate-100 relative cursor-pointer overflow-hidden flex items-center justify-center group-hover:opacity-90"
+              class="aspect-square bg-slate-100 dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700/60 relative cursor-pointer overflow-hidden flex items-center justify-center group-hover:opacity-90"
               @click="viewPreview(inv)"
             >
               <img 
@@ -741,7 +743,7 @@ onMounted(() => {
                 class="w-full h-full object-cover"
                 loading="lazy"
               />
-              <span v-else class="material-symbols-rounded text-3xl text-indigo-500">
+              <span v-else class="material-symbols-rounded text-3xl text-emerald-500">
                 {{ inv.fileType === 'pdf' ? 'picture_as_pdf' : 'description' }}
               </span>
 
@@ -753,28 +755,28 @@ onMounted(() => {
             <!-- Card Info -->
             <div class="p-3 flex-1 flex flex-col justify-between gap-2.5">
               <div>
-                <span class="block text-[11px] font-black text-slate-800 truncate" :title="inv.name">{{ inv.name }}</span>
+                <span class="block text-[11px] font-black text-slate-800 dark:text-slate-100 truncate" :title="inv.name">{{ inv.name }}</span>
                 <div class="flex items-center justify-between text-[9px] text-slate-400 font-bold mt-1">
                   <span>{{ formatTime(inv.timestamp) }}</span>
-                  <span class="uppercase tracking-wider px-1 bg-slate-100 text-slate-500 rounded">{{ inv.note || 'khác' }}</span>
+                  <span class="uppercase tracking-wider px-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded">{{ inv.note || 'khác' }}</span>
                 </div>
               </div>
               
               <!-- Action Button Row -->
-              <div class="flex items-center justify-between border-t border-slate-100/60 pt-2 shrink-0">
+              <div class="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 shrink-0">
                 <span class="text-[10px]">{{ inv.driveUrl ? '☁️ Cloud' : '💾 Local' }}</span>
                 <div class="flex gap-1">
                   <a 
                     v-if="inv.driveUrl" 
                     :href="inv.driveUrl" 
                     target="_blank" 
-                    class="p-1 hover:bg-slate-100 text-indigo-600 rounded-lg transition-all"
+                    class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-cyan-600 dark:text-cyan-400 rounded-lg transition-all"
                     title="Mở Google Drive"
                   >
                     <span class="material-symbols-rounded text-base">open_in_new</span>
                   </a>
                   <button 
-                    class="p-1 hover:bg-slate-100 text-rose-600 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
+                    class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-rose-500 hover:text-rose-700 rounded-lg transition-all border-0 bg-transparent cursor-pointer"
                     title="Xóa"
                     @click="handleDeleteInvoice(inv)"
                   >
@@ -791,20 +793,20 @@ onMounted(() => {
     </div>
 
     <!-- MODAL 1: ADD/EDIT TRANSACTION -->
-    <div v-if="showTxModal" class="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
-      <div class="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in p-6 space-y-4">
+    <div v-if="showTxModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-fade-in p-6 space-y-4 border border-slate-200/80 dark:border-slate-800 transition-colors">
         
-        <div class="flex items-center gap-3 border-b border-slate-50 pb-3">
+        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           <div 
             class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            :class="txModalType === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'"
+            :class="txModalType === 'income' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400'"
           >
             <span class="material-symbols-rounded text-xl">
               {{ editingTxId ? 'edit' : (txModalType === 'income' ? 'add_circle' : 'remove_circle') }}
             </span>
           </div>
           <div>
-            <h4 class="font-extrabold text-sm text-slate-800">
+            <h4 class="font-extrabold text-sm text-slate-800 dark:text-slate-100">
               {{ editingTxId ? 'Sửa giao dịch' : (txModalType === 'income' ? 'Thêm khoản Thu' : 'Thêm khoản Chi') }}
             </h4>
             <p class="text-[10px] text-slate-400 font-semibold">Nhập các chi tiết liên quan đến lượng tiền mặt</p>
@@ -814,10 +816,10 @@ onMounted(() => {
         <div class="space-y-4">
           <!-- Category -->
           <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-500">Danh mục</label>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Danh mục</label>
             <select 
               v-model="txCategory" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all cursor-pointer"
+              class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-bold transition-all cursor-pointer"
               @change="onCategoryChange"
             >
               <option 
@@ -827,21 +829,21 @@ onMounted(() => {
               >
                 {{ cat }}
               </option>
-              <option value="__new__" class="text-amber-600 font-bold">➕ Thêm danh mục mới...</option>
+              <option value="__new__" class="text-amber-500 font-bold">➕ Thêm danh mục mới...</option>
             </select>
           </div>
 
           <!-- New Category Inline Input -->
-          <div v-if="showNewCategoryInput" class="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex gap-2">
+          <div v-if="showNewCategoryInput" class="p-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700 rounded-2xl flex gap-2">
             <input 
               type="text" 
               v-model="newCategoryName" 
-              class="flex-1 px-3 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all"
+              class="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-semibold transition-all"
               placeholder="Tên danh mục mới..."
               @keydown.enter.prevent="handleAddCategory"
             />
             <button 
-              class="px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl border border-indigo-600 transition-all cursor-pointer"
+              class="px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer border-0"
               @click="handleAddCategory"
             >
               Thêm
@@ -850,18 +852,18 @@ onMounted(() => {
 
           <!-- Input Amount -->
           <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-500">Số tiền (VNĐ)</label>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Số tiền (VNĐ)</label>
             <input 
               type="text" 
               v-model="txAmountInput" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all"
+              class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-bold transition-all"
               :placeholder="amountPlaceholder"
               autofocus
             />
             <!-- Math parse preview indicator -->
             <div 
               v-if="parsedAmountPreview > 0" 
-              class="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/50 inline-block mt-1"
+              class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50 inline-block mt-1"
             >
               = {{ formatMoney(parsedAmountPreview) }}
             </div>
@@ -869,13 +871,13 @@ onMounted(() => {
 
           <!-- Payment Method -->
           <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-500">Phương thức thanh toán</label>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Phương thức thanh toán</label>
             <div class="grid grid-cols-3 gap-2">
               <button 
                 v-for="pm in ['cash', 'card', 'transfer'] as const"
                 :key="pm"
                 class="py-2 text-xs font-bold rounded-xl transition-all border cursor-pointer"
-                :class="txPaymentMethod === pm ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/10' : 'bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100'"
+                :class="txPaymentMethod === pm ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white border-transparent shadow-xs font-black' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'"
                 @click="txPaymentMethod = pm"
               >
                 {{ pm === 'cash' ? '💵 Mặt' : pm === 'card' ? '💳 Thẻ' : '🔄 CK' }}
@@ -885,11 +887,11 @@ onMounted(() => {
 
           <!-- Note -->
           <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-500">Ghi chú</label>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Ghi chú</label>
             <input 
               type="text" 
               v-model="txNote" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all"
+              class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-semibold transition-all"
               placeholder="VD: Bàn số 5, mua nước ngọt lẻ..."
             />
           </div>
@@ -897,14 +899,14 @@ onMounted(() => {
 
         <div class="flex gap-2 pt-2">
           <button 
-            class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-transparent cursor-pointer"
+            class="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-transparent cursor-pointer"
             @click="showTxModal = false"
           >
             Hủy
           </button>
           <button 
             class="flex-1 py-2.5 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
-            :class="txModalType === 'income' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'"
+            :class="txModalType === 'income' ? 'btn-primary' : 'bg-rose-600 hover:bg-rose-700'"
             @click="saveTxModal"
           >
             {{ editingTxId ? 'Cập nhật' : 'Lưu giao dịch' }}
@@ -915,15 +917,15 @@ onMounted(() => {
     </div>
 
     <!-- MODAL 2: ADD OTHER TRANSACTION -->
-    <div v-if="showOtherTxModal" class="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
-      <div class="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in p-6 space-y-4">
+    <div v-if="showOtherTxModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-fade-in p-6 space-y-4 border border-slate-200/80 dark:border-slate-800 transition-colors">
         
-        <div class="flex items-center gap-3 border-b border-slate-50 pb-3">
-          <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
             <span class="material-symbols-rounded text-xl">note_add</span>
           </div>
           <div>
-            <h4 class="font-extrabold text-sm text-slate-800">Thêm khoản Thu/Chi Khác</h4>
+            <h4 class="font-extrabold text-sm text-slate-800 dark:text-slate-100">Thêm khoản Thu/Chi Khác</h4>
             <p class="text-[10px] text-slate-400 font-semibold">Thu chi nằm ngoài nguồn doanh thu dịch vụ trực tiếp</p>
           </div>
         </div>
@@ -931,10 +933,10 @@ onMounted(() => {
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
-              <label class="block text-xs font-bold text-slate-500">Loại luồng</label>
+              <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Loại luồng</label>
               <select 
                 v-model="otherType" 
-                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all cursor-pointer"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 <option value="income">↑ Thu khác</option>
                 <option value="expense">↓ Chi khác</option>
@@ -942,32 +944,32 @@ onMounted(() => {
             </div>
             
             <div class="space-y-1">
-              <label class="block text-xs font-bold text-slate-500">Số tiền</label>
+              <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Số tiền</label>
               <input 
                 type="number" 
                 v-model="otherAmount" 
-                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-bold transition-all"
                 placeholder="0"
               />
             </div>
           </div>
 
           <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-500">Danh mục</label>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Danh mục</label>
             <input 
               type="text" 
               v-model="otherCategory" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all"
+              class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-bold transition-all"
               placeholder="VD: Tiền tip, Thu hồi nợ cũ, Đền bù..."
             />
           </div>
 
           <div class="space-y-1">
-            <label class="block text-xs font-bold text-slate-500">Ghi chú chi tiết</label>
+            <label class="block text-xs font-bold text-slate-500 dark:text-slate-400">Ghi chú chi tiết</label>
             <input 
               type="text" 
               v-model="otherNote" 
-              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all"
+              class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-semibold transition-all"
               placeholder="Nhập chi tiết..."
             />
           </div>
@@ -975,13 +977,13 @@ onMounted(() => {
 
         <div class="flex gap-2 pt-2">
           <button 
-            class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-transparent cursor-pointer"
+            class="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-transparent cursor-pointer"
             @click="showOtherTxModal = false"
           >
             Hủy
           </button>
           <button 
-            class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+            class="btn-primary flex-1 py-2.5 text-white text-xs font-bold rounded-xl cursor-pointer"
             @click="saveOtherTxModal"
           >
             Lưu giao dịch
@@ -992,23 +994,23 @@ onMounted(() => {
     </div>
 
     <!-- MODAL 3: PREVIEW DOCUMENT OVERLAY -->
-    <div v-if="showPreviewModal && previewInvoice" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-      <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-fade-in p-6 space-y-4">
+    <div v-if="showPreviewModal && previewInvoice" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-fade-in p-6 space-y-4 border border-slate-200/80 dark:border-slate-800 transition-colors">
         
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <div>
-            <h4 class="font-extrabold text-sm text-slate-800">{{ previewInvoice.name }}</h4>
+            <h4 class="font-extrabold text-sm text-slate-800 dark:text-slate-100">{{ previewInvoice.name }}</h4>
             <p class="text-[10px] text-slate-400 font-semibold">Tải lên lúc: {{ new Date(previewInvoice.timestamp).toLocaleString('vi-VN') }}</p>
           </div>
           <button 
-            class="p-1 hover:bg-slate-100 text-slate-500 rounded-lg border-0 bg-transparent cursor-pointer"
+            class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 rounded-lg border-0 bg-transparent cursor-pointer"
             @click="showPreviewModal = false"
           >
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>
 
-        <div class="flex items-center justify-center bg-slate-50 p-2 rounded-2xl border border-slate-100/60 min-h-[300px]">
+        <div class="flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-2xl border border-slate-100/60 dark:border-slate-700 min-h-[300px]">
           <iframe 
             v-if="previewInvoice.fileType === 'pdf'" 
             :src="previewInvoice.driveUrl || previewInvoice.data" 
@@ -1022,17 +1024,17 @@ onMounted(() => {
           />
         </div>
 
-        <div class="flex justify-end gap-2 pt-2 border-t border-slate-50">
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
           <a 
             v-if="previewInvoice.driveUrl"
             :href="previewInvoice.driveUrl" 
             target="_blank" 
-            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all text-decoration-none"
+            class="btn-primary px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all text-decoration-none"
           >
             <span class="material-symbols-rounded text-sm">open_in_new</span> Mở trên Drive
           </a>
           <button 
-            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-transparent cursor-pointer"
+            class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-transparent cursor-pointer"
             @click="showPreviewModal = false"
           >
             Đóng

@@ -945,39 +945,39 @@ onUnmounted(() => {
     <!-- Header with tab pills -->
     <div class="no-print flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
-        <h3 class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight">📊 Doanh thu & Báo cáo</h3>
-        <p class="text-xs md:text-sm text-slate-500 font-medium">Theo dõi kết quả bán hàng, hóa đơn POS CUKCUK và kết ca bàn giao.</p>
+        <h3 class="text-xl md:text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">📊 Doanh thu & Báo cáo</h3>
+        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">Theo dõi kết quả bán hàng, hóa đơn POS CUKCUK và kết ca bàn giao.</p>
       </div>
       
-      <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner max-w-max border border-slate-200 flex-wrap gap-1">
+      <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shadow-inner max-w-max border border-slate-200 dark:border-slate-700 flex-wrap gap-1">
         <button 
           @click="activeTab = 'report'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200"
-          :class="activeTab === 'report' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-600 hover:text-slate-900'"
+          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'report' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
         >
           <span class="material-symbols-rounded text-lg">summarize</span>
           Báo cáo ca
         </button>
         <button 
           @click="activeTab = 'invoices'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200"
-          :class="activeTab === 'invoices' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-600 hover:text-slate-900'"
+          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'invoices' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
         >
           <span class="material-symbols-rounded text-lg">receipt_long</span>
           Hóa đơn POS
         </button>
         <button 
           @click="activeTab = 'analytics'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200"
-          :class="activeTab === 'analytics' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-600 hover:text-slate-900'"
+          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'analytics' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
         >
           <span class="material-symbols-rounded text-lg">bar_chart</span>
           Phân tích doanh thu
         </button>
         <button 
           @click="activeTab = 'audit'"
-          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200"
-          :class="activeTab === 'audit' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-600 hover:text-slate-900'"
+          class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer"
+          :class="activeTab === 'audit' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
         >
           <span class="material-symbols-rounded text-lg">history_toggle_off</span>
           Đối soát & Sửa tay
@@ -991,8 +991,8 @@ onUnmounted(() => {
       <!-- Left sidebar controls -->
       <div class="no-print lg:col-span-4 space-y-6">
         <!-- Quick Filters -->
-        <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-3 no-print">
-          <h4 class="font-bold text-slate-800 text-sm tracking-wide uppercase">Lọc nhanh</h4>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-3 no-print">
+          <h4 class="font-bold text-slate-800 dark:text-slate-200 text-sm tracking-wide uppercase">Lọc nhanh</h4>
           <div class="flex flex-wrap gap-2">
             <button 
               v-for="f in [
@@ -1006,7 +1006,7 @@ onUnmounted(() => {
               ]"
               :key="f.value"
               @click="applyQuickFilter(f.value as any)"
-              class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer"
+              class="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
             >
               {{ f.label }}
             </button>
@@ -1014,19 +1014,19 @@ onUnmounted(() => {
         </div>
 
         <!-- Date Selector Card -->
-        <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
           <div class="flex items-center justify-between">
-            <h4 class="font-bold text-slate-800 text-sm tracking-wide uppercase">Chọn kỳ báo cáo</h4>
-            <button @click="selectToday" class="text-xs text-primary font-bold hover:underline">Hôm nay</button>
+            <h4 class="font-bold text-slate-800 dark:text-slate-200 text-sm tracking-wide uppercase">Chọn kỳ báo cáo</h4>
+            <button @click="selectToday" class="text-xs text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer">Hôm nay</button>
           </div>
           
-          <div class="grid grid-cols-5 gap-1 p-1 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-semibold">
+          <div class="grid grid-cols-5 gap-1 p-1 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-xl text-xs font-semibold">
             <button 
               v-for="p in (['day', 'week', 'month', 'quarter', 'year'] as const)" 
               :key="p"
               @click="selectedPeriod = p"
-              class="py-1.5 rounded-lg transition-all duration-150"
-              :class="selectedPeriod === p ? 'bg-white text-slate-900 shadow-sm border border-slate-200/40' : 'text-slate-500 hover:text-slate-900'"
+              class="py-1.5 rounded-lg transition-all duration-150 cursor-pointer"
+              :class="selectedPeriod === p ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-emerald-400 shadow-xs border border-slate-200/40 dark:border-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
             >
               {{ p === 'day' ? 'Ngày' : p === 'week' ? 'Tuần' : p === 'month' ? 'Tháng' : p === 'quarter' ? 'Quý' : 'Năm' }}
             </button>
@@ -1034,7 +1034,7 @@ onUnmounted(() => {
           
           <!-- Period picker inputs -->
           <div class="flex items-center gap-2">
-            <button @click="navigatePeriod('prev')" class="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600">
+            <button @click="navigatePeriod('prev')" class="p-2 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer">
               <span class="material-symbols-rounded text-base flex">chevron_left</span>
             </button>
             
@@ -1043,24 +1043,24 @@ onUnmounted(() => {
                 v-if="selectedPeriod === 'day'"
                 type="date" 
                 v-model="reportDate" 
-                class="form-input w-full text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2"
+                class="form-input w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2"
               />
               <input 
                 v-else-if="selectedPeriod === 'week'"
                 type="week" 
                 v-model="reportWeek"
-                class="form-input w-full text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2"
+                class="form-input w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2"
               />
               <input 
                 v-else-if="selectedPeriod === 'month'"
                 type="month" 
                 v-model="reportMonth"
-                class="form-input w-full text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2"
+                class="form-input w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2"
               />
               <div v-else-if="selectedPeriod === 'quarter'" class="flex gap-2">
                 <select 
                   v-model="reportQuarter" 
-                  class="form-select flex-1 text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2"
+                  class="form-select flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2"
                 >
                   <option :value="1">Quý I</option>
                   <option :value="2">Quý II</option>
@@ -1070,37 +1070,37 @@ onUnmounted(() => {
                 <input 
                   type="number" 
                   v-model="reportQuarterYear" 
-                  class="form-input w-20 text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2 text-center"
+                  class="form-input w-20 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2 text-center"
                 />
               </div>
               <div v-else-if="selectedPeriod === 'year'" class="flex gap-2">
                 <input 
                   type="number" 
                   v-model="reportQuarterYear" 
-                  class="form-input w-full text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2 text-center"
+                  class="form-input w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2 text-center"
                   placeholder="Năm"
                 />
               </div>
             </div>
             
-            <button @click="navigatePeriod('next')" class="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600">
+            <button @click="navigatePeriod('next')" class="p-2 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer">
               <span class="material-symbols-rounded text-base flex">chevron_right</span>
             </button>
           </div>
         </div>
 
         <!-- Shift Selector (only for Day period) -->
-        <div v-if="selectedPeriod === 'day'" class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-3">
-          <h4 class="font-bold text-slate-800 text-sm tracking-wide uppercase">Chọn ca bàn giao</h4>
+        <div v-if="selectedPeriod === 'day'" class="card p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-3">
+          <h4 class="font-bold text-slate-800 dark:text-slate-200 text-sm tracking-wide uppercase">Chọn ca bàn giao</h4>
           
-          <div v-if="shiftsForDay.length === 0" class="text-xs text-slate-500 italic p-3 bg-slate-50 border border-slate-100 rounded-xl">
+          <div v-if="shiftsForDay.length === 0" class="text-xs text-slate-500 dark:text-slate-400 italic p-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl">
             Không có ca làm việc nào được mở trong ngày này.
           </div>
           
           <select 
             v-else
             v-model="selectedShiftId" 
-            class="form-select w-full text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:border-primary px-3 py-2"
+            class="form-select w-full text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2"
           >
             <option value="all">Tổng hợp cả ngày ({{ shiftsForDay.length }} ca)</option>
             <option v-for="s in shiftsForDay" :key="s.id" :value="s.id">
@@ -1110,39 +1110,39 @@ onUnmounted(() => {
         </div>
 
         <!-- Card Stats summary -->
-        <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
-          <h4 class="font-bold text-slate-800 text-sm tracking-wide uppercase">Doanh thu tổng hợp</h4>
+        <div class="card p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
+          <h4 class="font-bold text-slate-800 dark:text-slate-200 text-sm tracking-wide uppercase">Doanh thu tổng hợp</h4>
           <div class="space-y-3">
-            <div class="flex justify-between items-center py-2 border-b border-slate-100">
-              <span class="text-slate-500 font-medium text-xs md:text-sm">Tổng doanh thu</span>
-              <span class="font-extrabold text-emerald-600 text-base md:text-lg">{{ formatCurrency(summaryData.total) }}</span>
+            <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Tổng doanh thu</span>
+              <span class="font-extrabold text-emerald-600 dark:text-emerald-400 text-base md:text-lg">{{ formatCurrency(summaryData.total) }}</span>
             </div>
-            <div class="flex justify-between items-center py-2 border-b border-slate-100">
-              <span class="text-slate-500 font-medium text-xs md:text-sm">Tiền mặt</span>
-              <span class="font-bold text-slate-700 text-sm">{{ formatCurrency(summaryData.cash) }}</span>
+            <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Tiền mặt</span>
+              <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">{{ formatCurrency(summaryData.cash) }}</span>
             </div>
-            <div class="flex justify-between items-center py-2 border-b border-slate-100">
-              <span class="text-slate-500 font-medium text-xs md:text-sm">Quẹt thẻ</span>
-              <span class="font-bold text-slate-700 text-sm">{{ formatCurrency(summaryData.card) }}</span>
+            <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Quẹt thẻ</span>
+              <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">{{ formatCurrency(summaryData.card) }}</span>
             </div>
-            <div class="flex justify-between items-center py-2 border-b border-slate-100">
-              <span class="text-slate-500 font-medium text-xs md:text-sm">Chuyển khoản</span>
-              <span class="font-bold text-slate-700 text-sm">{{ formatCurrency(summaryData.transfer) }}</span>
+            <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Chuyển khoản</span>
+              <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">{{ formatCurrency(summaryData.transfer) }}</span>
             </div>
-            <div class="flex justify-between items-center py-2 border-b border-slate-100">
-              <span class="text-slate-500 font-medium text-xs md:text-sm">Trung bình / Bill</span>
-              <span class="font-bold text-slate-700 text-sm">{{ formatCurrency(summaryData.avgPerBill) }}</span>
+            <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Trung bình / Bill</span>
+              <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">{{ formatCurrency(summaryData.avgPerBill) }}</span>
             </div>
             <div class="flex justify-between items-center py-2">
-              <span class="text-slate-500 font-medium text-xs md:text-sm">Chưa thanh toán</span>
-              <span class="font-bold text-rose-600 text-sm">{{ formatCurrency(summaryData.unpaid) }}</span>
+              <span class="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm">Chưa thanh toán</span>
+              <span class="font-bold text-rose-600 dark:text-rose-400 text-sm">{{ formatCurrency(summaryData.unpaid) }}</span>
             </div>
           </div>
         </div>
 
         <!-- CSV Export & Details -->
         <div class="flex gap-2">
-          <button @click="exportCSV" class="btn btn-outline flex-1 flex justify-center items-center gap-2 border border-slate-200 text-slate-700 font-bold py-2 px-4 rounded-xl hover:bg-slate-50 text-sm">
+          <button @click="exportCSV" class="btn btn-secondary flex-1 flex justify-center items-center gap-2 py-2 px-4 rounded-xl text-sm">
             <span class="material-symbols-rounded text-lg">download</span>
             Xuất CSV
           </button>
@@ -1155,107 +1155,107 @@ onUnmounted(() => {
         <!-- Overview Aggregate Cards (when showing summary for the whole period) -->
         <div v-if="selectedPeriod !== 'day' || selectedShiftId === 'all'" class="grid grid-cols-2 md:grid-cols-4 gap-4 no-print animate-fade-in">
           <!-- Total Revenue Card -->
-          <div class="bg-gradient-to-tr from-emerald-50 to-teal-50 border border-emerald-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+          <div class="bg-gradient-to-tr from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/30 border border-emerald-100 dark:border-emerald-900/40 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-black text-emerald-600 uppercase tracking-wide">Tổng doanh thu</span>
-              <span class="material-symbols-rounded text-emerald-600 text-lg">trending_up</span>
+              <span class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Tổng doanh thu</span>
+              <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400 text-lg">trending_up</span>
             </div>
             <div>
-              <span class="text-lg font-black text-emerald-700 block">{{ formatCurrency(summaryData.total) }}</span>
-              <span class="text-[9px] text-slate-400 font-medium">Thực tế đã thu</span>
+              <span class="text-lg font-black text-emerald-700 dark:text-emerald-300 block">{{ formatCurrency(summaryData.total) }}</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Thực tế đã thu</span>
             </div>
           </div>
 
           <!-- Cash Card -->
-          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+          <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Tiền mặt</span>
               <span class="material-symbols-rounded text-slate-500 text-lg">payments</span>
             </div>
             <div>
-              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.cash) }}</span>
-              <span class="text-[9px] text-slate-400 font-medium">Doanh số mặt két</span>
+              <span class="text-base font-extrabold text-slate-800 dark:text-slate-100 block">{{ formatCurrency(summaryData.cash) }}</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Doanh số mặt két</span>
             </div>
           </div>
 
           <!-- Card Payment -->
-          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+          <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Quẹt thẻ</span>
               <span class="material-symbols-rounded text-slate-500 text-lg">credit_card</span>
             </div>
             <div>
-              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.card) }}</span>
-              <span class="text-[9px] text-slate-400 font-medium">Qua cổng quẹt POS</span>
+              <span class="text-base font-extrabold text-slate-800 dark:text-slate-100 block">{{ formatCurrency(summaryData.card) }}</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Qua cổng quẹt POS</span>
             </div>
           </div>
 
           <!-- Transfer Payment -->
-          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+          <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Chuyển khoản</span>
               <span class="material-symbols-rounded text-slate-500 text-lg">swap_horiz</span>
             </div>
             <div>
-              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.transfer) }}</span>
-              <span class="text-[9px] text-slate-400 font-medium">Chuyển khoản bank</span>
+              <span class="text-base font-extrabold text-slate-800 dark:text-slate-100 block">{{ formatCurrency(summaryData.transfer) }}</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Chuyển khoản bank</span>
             </div>
           </div>
 
           <!-- Bill Count Card -->
-          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+          <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Số bill</span>
               <span class="material-symbols-rounded text-slate-500 text-lg">receipt_long</span>
             </div>
             <div>
-              <span class="text-base font-extrabold text-slate-800 block">{{ summaryData.bills }} bill</span>
-              <span class="text-[9px] text-slate-400 font-medium">Tổng số hóa đơn</span>
+              <span class="text-base font-extrabold text-slate-800 dark:text-slate-100 block">{{ summaryData.bills }} bill</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Tổng số hóa đơn</span>
             </div>
           </div>
 
           <!-- Avg per Bill Card -->
-          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+          <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-black text-slate-400 uppercase tracking-wide">Trung bình / Bill</span>
               <span class="material-symbols-rounded text-slate-500 text-lg">analytics</span>
             </div>
             <div>
-              <span class="text-base font-extrabold text-slate-800 block">{{ formatCurrency(summaryData.avgPerBill) }}</span>
-              <span class="text-[9px] text-slate-400 font-medium">Doanh thu / bill</span>
+              <span class="text-base font-extrabold text-slate-800 dark:text-slate-100 block">{{ formatCurrency(summaryData.avgPerBill) }}</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Doanh thu / bill</span>
             </div>
           </div>
 
           <!-- Unpaid Invoices Card -->
-          <div class="bg-gradient-to-tr from-rose-50 to-red-50 border border-rose-100 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
+          <div class="bg-gradient-to-tr from-rose-50 to-red-50 dark:from-rose-950/40 dark:to-red-950/30 border border-rose-100 dark:border-rose-900/40 p-4 rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-black text-rose-600 uppercase tracking-wide">Chưa trả</span>
-              <span class="material-symbols-rounded text-rose-600 text-lg">money_off</span>
+              <span class="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wide">Chưa trả</span>
+              <span class="material-symbols-rounded text-rose-600 dark:text-rose-400 text-lg">money_off</span>
             </div>
             <div>
-              <span class="text-base font-extrabold text-rose-700 block">{{ formatCurrency(summaryData.unpaid) }}</span>
-              <span class="text-[9px] text-slate-400 font-medium">Hóa đơn công nợ</span>
+              <span class="text-base font-extrabold text-rose-700 dark:text-rose-300 block">{{ formatCurrency(summaryData.unpaid) }}</span>
+              <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Hóa đơn công nợ</span>
             </div>
           </div>
         </div>
 
         <!-- Daily breakdown bar chart -->
-        <div v-if="dailyBreakdown && dailyBreakdown.length > 0 && (selectedPeriod !== 'day' || selectedShiftId === 'all')" class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4 no-print animate-fade-in">
-          <div class="flex items-center justify-between border-b border-slate-50 pb-3">
-            <h4 class="font-extrabold text-slate-800 text-base">📊 Biểu đồ xu hướng doanh thu</h4>
-            <span class="text-xs text-slate-400 font-medium">Doanh thu theo ngày làm việc</span>
+        <div v-if="dailyBreakdown && dailyBreakdown.length > 0 && (selectedPeriod !== 'day' || selectedShiftId === 'all')" class="card p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4 no-print animate-fade-in">
+          <div class="flex items-center justify-between border-b border-slate-50 dark:border-slate-800 pb-3">
+            <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">📊 Biểu đồ xu hướng doanh thu</h4>
+            <span class="text-xs text-slate-400 dark:text-slate-500 font-medium">Doanh thu theo ngày làm việc</span>
           </div>
           
           <div class="overflow-x-auto w-full pt-6">
-            <div class="flex items-end min-w-[600px] h-48 border-b border-slate-200 gap-2 px-4 pb-1">
+            <div class="flex items-end min-w-[600px] h-48 border-b border-slate-200 dark:border-slate-800 gap-2 px-4 pb-1">
               <div 
                 v-for="day in [...dailyBreakdown].reverse()" 
                 :key="day.date"
                 class="flex flex-col items-center flex-1 group relative cursor-pointer"
               >
                 <!-- Hover Card Details -->
-                <div class="absolute bottom-full mb-2 bg-slate-900 text-white rounded-lg text-[10px] p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 w-28 text-center space-y-1 shadow-md">
-                  <div class="font-bold border-b border-slate-800 pb-1 mb-1">{{ formatDate(day.date) }}</div>
+                <div class="absolute bottom-full mb-2 bg-slate-900 dark:bg-slate-800 text-white rounded-lg text-[10px] p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 w-28 text-center space-y-1 shadow-md border border-slate-700">
+                  <div class="font-bold border-b border-slate-800 dark:border-slate-700 pb-1 mb-1">{{ formatDate(day.date) }}</div>
                   <div>Doanh thu: {{ formatCurrency(day.total) }}</div>
                   <div>Tiền mặt: {{ formatCurrency(day.cash) }}</div>
                   <div>Chuyển khoản: {{ formatCurrency(day.transfer) }}</div>
@@ -1264,10 +1264,10 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Value above bar -->
-                <span class="text-[9px] font-bold text-slate-500 mb-1 group-hover:text-slate-900">{{ shortCurrency(day.total) }}</span>
+                <span class="text-[9px] font-bold text-slate-500 dark:text-slate-400 mb-1 group-hover:text-slate-900 dark:group-hover:text-slate-100">{{ shortCurrency(day.total) }}</span>
                 
                 <!-- Stacked Bar Fill for payment methods -->
-                <div class="w-full max-w-[24px] bg-slate-100 rounded-t-lg h-32 flex flex-col justify-end overflow-hidden border border-slate-200/50">
+                <div class="w-full max-w-[24px] bg-slate-100 dark:bg-slate-800 rounded-t-lg h-32 flex flex-col justify-end overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
                   <!-- Card amount segment (blue) -->
                   <div 
                     v-if="day.card > 0"
@@ -1292,14 +1292,14 @@ onUnmounted(() => {
                 </div>
                 
                 <!-- Label below bar -->
-                <span class="text-[9px] font-bold text-slate-600 mt-2 truncate w-full text-center">
+                <span class="text-[9px] font-bold text-slate-600 dark:text-slate-400 mt-2 truncate w-full text-center">
                   {{ day.date.substring(8, 10) }}/{{ day.date.substring(5, 7) }}
                 </span>
               </div>
             </div>
           </div>
           <!-- Legend -->
-          <div class="flex items-center gap-4 justify-center text-[10px] font-bold text-slate-500 pt-2">
+          <div class="flex items-center gap-4 justify-center text-[10px] font-bold text-slate-500 dark:text-slate-400 pt-2">
             <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-xs"></span> Tiền mặt</span>
             <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-indigo-500 rounded-xs"></span> Chuyển khoản</span>
             <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-blue-500 rounded-xs"></span> Quẹt thẻ</span>
@@ -1307,31 +1307,31 @@ onUnmounted(() => {
         </div>
 
         <!-- Shift Handover Report preview widget -->
-        <div v-if="selectedPeriod === 'day' && selectedShiftId !== 'all'" class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
-          <div class="no-print flex items-center justify-between pb-3 border-b border-slate-100">
+        <div v-if="selectedPeriod === 'day' && selectedShiftId !== 'all'" class="card p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
+          <div class="no-print flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div class="flex items-center gap-2">
               <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-              <h4 class="font-bold text-slate-800 text-sm">Xem trước phiếu bàn giao</h4>
+              <h4 class="font-bold text-slate-800 dark:text-slate-100 text-sm">Xem trước phiếu bàn giao</h4>
             </div>
             
             <div class="flex gap-2">
               <button 
                 @click="showConfigModal = true" 
-                class="btn btn-outline btn-sm text-xs border border-slate-200 text-slate-600 font-bold py-1.5 px-3 rounded-lg hover:bg-slate-50"
+                class="btn btn-secondary btn-sm text-xs flex items-center gap-1"
               >
-                <span class="material-symbols-rounded text-sm align-middle mr-1">tune</span>Cấu hình
+                <span class="material-symbols-rounded text-sm">tune</span>Cấu hình
               </button>
               <button 
                 @click="isA4Preview = !isA4Preview" 
-                class="btn btn-outline btn-sm text-xs border border-slate-200 text-slate-600 font-bold py-1.5 px-3 rounded-lg hover:bg-slate-50"
+                class="btn btn-secondary btn-sm text-xs flex items-center gap-1"
               >
-                <span class="material-symbols-rounded text-sm align-middle mr-1">preview</span>Xem A4
+                <span class="material-symbols-rounded text-sm">preview</span>Xem A4
               </button>
               <button 
                 @click="printHandover" 
-                class="btn btn-primary btn-sm text-xs bg-slate-900 text-white font-bold py-1.5 px-3 rounded-lg hover:bg-slate-800"
+                class="btn btn-primary btn-sm text-xs flex items-center gap-1"
               >
-                <span class="material-symbols-rounded text-sm align-middle mr-1">print</span>In phiếu
+                <span class="material-symbols-rounded text-sm">print</span>In phiếu
               </button>
             </div>
           </div>
@@ -1665,11 +1665,11 @@ onUnmounted(() => {
         </div>
 
         <!-- Table displaying revenue daily details -->
-        <div class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
-          <h4 class="font-extrabold text-slate-800 text-base">📅 Chi tiết doanh thu theo ngày</h4>
-          <div class="overflow-x-auto border border-slate-150 rounded-xl">
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
+          <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">📅 Chi tiết doanh thu theo ngày</h4>
+          <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
             <table class="w-full text-left text-xs">
-              <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-150">
+              <thead class="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th class="px-4 py-3">Ngày</th>
                   <th class="px-4 py-3 text-center">Ca bán</th>
@@ -1680,15 +1680,15 @@ onUnmounted(() => {
                   <th class="px-4 py-3 text-right font-bold">Doanh thu</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-100 text-slate-700 font-medium">
-                <tr v-for="row in dailyBreakdown" :key="row.date" class="hover:bg-slate-50/60 transition-all duration-150">
-                  <td class="px-4 py-3.5 font-bold text-slate-900">{{ formatDate(row.date) }}</td>
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-200 font-medium">
+                <tr v-for="row in dailyBreakdown" :key="row.date" class="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 transition-all duration-150">
+                  <td class="px-4 py-3.5 font-bold text-slate-900 dark:text-slate-100">{{ formatDate(row.date) }}</td>
                   <td class="px-4 py-3.5 text-center">{{ row.shifts }}</td>
-                  <td class="px-4 py-3.5 text-center text-slate-500">{{ row.bills }}</td>
-                  <td class="px-4 py-3.5 text-right text-emerald-600">{{ formatCurrency(row.cash) }}</td>
-                  <td class="px-4 py-3.5 text-right text-blue-600">{{ formatCurrency(row.card) }}</td>
-                  <td class="px-4 py-3.5 text-right text-indigo-600">{{ formatCurrency(row.transfer) }}</td>
-                  <td class="px-4 py-3.5 text-right font-bold text-slate-900 bg-slate-50/20">{{ formatCurrency(row.total) }}</td>
+                  <td class="px-4 py-3.5 text-center text-slate-500 dark:text-slate-400">{{ row.bills }}</td>
+                  <td class="px-4 py-3.5 text-right text-emerald-600 dark:text-emerald-400">{{ formatCurrency(row.cash) }}</td>
+                  <td class="px-4 py-3.5 text-right text-teal-600 dark:text-teal-400">{{ formatCurrency(row.card) }}</td>
+                  <td class="px-4 py-3.5 text-right text-indigo-600 dark:text-indigo-400">{{ formatCurrency(row.transfer) }}</td>
+                  <td class="px-4 py-3.5 text-right font-bold text-slate-900 dark:text-slate-100 bg-slate-50/20 dark:bg-slate-800/40">{{ formatCurrency(row.total) }}</td>
                 </tr>
                 <tr v-if="dailyBreakdown.length === 0">
                   <td colspan="7" class="px-4 py-8 text-center text-slate-400 italic">Không tìm thấy dữ liệu doanh thu trong kỳ này.</td>
@@ -1706,14 +1706,14 @@ onUnmounted(() => {
     <div v-else-if="activeTab === 'invoices'" class="space-y-6">
       
       <!-- Top actions & filter bar -->
-      <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
+      <div class="card p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="flex items-center gap-3">
-            <h4 class="font-extrabold text-slate-800 text-base">Hóa đơn POS CUKCUK</h4>
+            <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">Hóa đơn POS CUKCUK</h4>
             <button 
               @click="triggerCukcukSync"
               :disabled="isSyncing"
-              class="btn btn-outline flex items-center gap-1.5 border border-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-lg hover:bg-slate-50 text-xs disabled:opacity-50"
+              class="btn btn-secondary flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs disabled:opacity-50"
             >
               <span class="material-symbols-rounded text-sm flex" :class="{ 'animate-spin': isSyncing }">sync</span>
               Đồng bộ CUKCUK
@@ -1724,7 +1724,7 @@ onUnmounted(() => {
             <!-- Period Selector -->
             <select 
               v-model="invoicePeriod"
-              class="form-select text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:ring-primary focus:border-primary px-3 py-1.5"
+              class="form-select text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 px-3 py-1.5"
             >
               <option value="day">Hôm nay</option>
               <option value="week">7 ngày qua</option>
@@ -1736,7 +1736,7 @@ onUnmounted(() => {
             <input 
               type="date"
               v-model="invoiceDate"
-              class="form-input text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:ring-primary focus:border-primary px-3 py-1.5"
+              class="form-input text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 px-3 py-1.5"
             />
           </div>
         </div>
@@ -1751,7 +1751,7 @@ onUnmounted(() => {
               type="text" 
               v-model="invoiceSearchQuery" 
               placeholder="Tìm theo mã bill, tên bàn, thu ngân..."
-              class="form-input pl-10 pr-4 py-2 w-full text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:ring-primary-500"
+              class="form-input pl-10 pr-4 py-2 w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 text-slate-800 dark:text-slate-100"
             />
           </div>
           
@@ -1759,7 +1759,7 @@ onUnmounted(() => {
           <div class="md:col-span-5 select-wrapper">
             <select 
               v-model="invoicePaymentFilter" 
-              class="form-select w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:ring-primary focus:ring-primary px-3 py-2"
+              class="form-select w-full text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-emerald-500 px-3 py-2"
             >
               <option value="all">Hình thức: Tất cả</option>
               <option value="cash">Tiền mặt</option>
@@ -1772,13 +1772,13 @@ onUnmounted(() => {
       </div>
 
       <!-- Payment percentage distribution bars -->
-      <div class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
-        <h5 class="font-extrabold text-slate-800 text-sm">Hình thức thanh toán của kỳ đang chọn</h5>
+      <div class="card p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
+        <h5 class="font-extrabold text-slate-800 dark:text-slate-100 text-sm">Hình thức thanh toán của kỳ đang chọn</h5>
         <div class="space-y-3">
           <!-- Cash bar -->
-          <div class="flex justify-between items-center text-xs font-semibold text-slate-600 gap-4">
-            <span class="w-24 text-emerald-600 flex items-center gap-1"><span class="material-symbols-rounded text-base">payments</span> Tiền mặt</span>
-            <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+          <div class="flex justify-between items-center text-xs font-semibold text-slate-600 dark:text-slate-300 gap-4">
+            <span class="w-24 text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><span class="material-symbols-rounded text-base">payments</span> Tiền mặt</span>
+            <div class="flex-1 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div 
                 class="bg-emerald-500 h-full rounded-full transition-all duration-300"
                 :style="{ width: (summaryData.total > 0 ? (summaryData.cash / summaryData.total) * 100 : 0) + '%' }"
@@ -1788,11 +1788,11 @@ onUnmounted(() => {
           </div>
 
           <!-- Card bar -->
-          <div class="flex justify-between items-center text-xs font-semibold text-slate-600 gap-4">
-            <span class="w-24 text-blue-600 flex items-center gap-1"><span class="material-symbols-rounded text-base">credit_card</span> Quẹt thẻ</span>
-            <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+          <div class="flex justify-between items-center text-xs font-semibold text-slate-600 dark:text-slate-300 gap-4">
+            <span class="w-24 text-teal-600 dark:text-teal-400 flex items-center gap-1"><span class="material-symbols-rounded text-base">credit_card</span> Quẹt thẻ</span>
+            <div class="flex-1 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div 
-                class="bg-blue-500 h-full rounded-full transition-all duration-300"
+                class="bg-teal-500 h-full rounded-full transition-all duration-300"
                 :style="{ width: (summaryData.total > 0 ? (summaryData.card / summaryData.total) * 100 : 0) + '%' }"
               ></div>
             </div>
@@ -1800,9 +1800,9 @@ onUnmounted(() => {
           </div>
 
           <!-- Transfer bar -->
-          <div class="flex justify-between items-center text-xs font-semibold text-slate-600 gap-4">
-            <span class="w-24 text-indigo-600 flex items-center gap-1"><span class="material-symbols-rounded text-base">swap_horiz</span> Chuyển khoản</span>
-            <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+          <div class="flex justify-between items-center text-xs font-semibold text-slate-600 dark:text-slate-300 gap-4">
+            <span class="w-24 text-indigo-600 dark:text-indigo-400 flex items-center gap-1"><span class="material-symbols-rounded text-base">swap_horiz</span> Chuyển khoản</span>
+            <div class="flex-1 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div 
                 class="bg-indigo-500 h-full rounded-full transition-all duration-300"
                 :style="{ width: (summaryData.total > 0 ? (summaryData.transfer / summaryData.total) * 100 : 0) + '%' }"
@@ -1814,17 +1814,17 @@ onUnmounted(() => {
       </div>
 
       <!-- Invoices List Table -->
-      <div class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
+      <div class="card p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
         <div class="flex justify-between items-center">
-          <h4 class="font-extrabold text-slate-800 text-base">Danh sách hóa đơn</h4>
-          <span class="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-1">
+          <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">Danh sách hóa đơn</h4>
+          <span class="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-2.5 py-1">
             Hiển thị {{ filteredInvoices.length }} / {{ invoices.length }} bill
           </span>
         </div>
 
-        <div class="overflow-x-auto border border-slate-150 rounded-xl">
+        <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-150">
+            <thead class="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th class="px-4 py-3">Mã Bill</th>
                 <th class="px-4 py-3">Bàn</th>
@@ -1837,26 +1837,26 @@ onUnmounted(() => {
                 <th class="px-4 py-3 text-center">Thao tác</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 text-slate-700 font-medium">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-200 font-medium">
               <tr 
                 v-for="inv in filteredInvoices" 
                 :key="inv.refId"
-                class="hover:bg-slate-50/60 transition-all duration-150"
-                :class="{ 'bg-amber-50/40 border-l-4 border-l-amber-500': inv.manualOverride || (inv as any).isManuallyEdited }"
+                class="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 transition-all duration-150"
+                :class="{ 'bg-amber-50/40 dark:bg-amber-950/20 border-l-4 border-l-amber-500': inv.manualOverride || (inv as any).isManuallyEdited }"
               >
-                <td class="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-1">
+                <td class="px-4 py-3.5 font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1">
                   <span>{{ inv.refNo || inv.refId.substring(0, 8) }}</span>
-                  <span v-if="inv.manualOverride || (inv as any).isManuallyEdited" class="text-amber-600 text-xs flex" title="Hóa đơn sửa tay"><span class="material-symbols-rounded text-sm">edit_note</span></span>
+                  <span v-if="inv.manualOverride || (inv as any).isManuallyEdited" class="text-amber-600 dark:text-amber-400 text-xs flex" title="Hóa đơn sửa tay"><span class="material-symbols-rounded text-sm">edit_note</span></span>
                 </td>
                 <td class="px-4 py-3.5">{{ inv.tableName || '-' }}</td>
-                <td class="px-4 py-3.5 text-slate-500">{{ inv.employeeName }}</td>
+                <td class="px-4 py-3.5 text-slate-500 dark:text-slate-400">{{ inv.employeeName }}</td>
                 <td class="px-4 py-3.5 text-center">{{ formatDateTime(inv.refDate) }}</td>
                 
                 <!-- Computed payment columns -->
-                <td class="px-4 py-3.5 text-right font-semibold text-emerald-600">
+                <td class="px-4 py-3.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                   {{ formatCurrency(inv.payments?.find(p => p.method === 'cash')?.amount || 0) }}
                 </td>
-                <td class="px-4 py-3.5 text-right font-semibold text-blue-600">
+                <td class="px-4 py-3.5 text-right font-semibold text-teal-600 dark:text-teal-400">
                   {{ formatCurrency(inv.payments?.find(p => p.method === 'card')?.amount || 0) }}
                 </td>
                 <td class="px-4 py-3.5 text-right font-semibold text-indigo-600">

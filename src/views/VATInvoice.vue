@@ -990,7 +990,7 @@ function copyLink(url: string) {
   <div class="view-content p-6">
     <!-- Header tabs dashboard bar -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-      <div class="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl w-fit">
+      <div class="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 p-1 rounded-xl w-fit">
         <button 
           v-for="t in [
             { key: 'upload', icon: 'cloud_upload', label: 'Upload Hóa Đơn' },
@@ -999,7 +999,7 @@ function copyLink(url: string) {
           ]" 
           :key="t.key"
           class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-          :class="activeTab === t.key ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'"
+          :class="activeTab === t.key ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'"
           @click="activeTab = t.key as any"
         >
           <span class="material-symbols-rounded text-lg">{{ t.icon }}</span>
@@ -1007,9 +1007,9 @@ function copyLink(url: string) {
         </button>
       </div>
 
-      <div class="text-xs text-slate-500 bg-slate-50 border border-slate-200/80 px-4 py-2.5 rounded-2xl flex items-center gap-1.5 shadow-sm">
-        <span class="material-symbols-rounded text-indigo-500 text-sm">cloud_done</span>
-        <span>Có <strong class="text-indigo-600 font-semibold">{{ driveCount }}</strong> hóa đơn trên Google Drive</span>
+      <div class="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 px-4 py-2.5 rounded-2xl flex items-center gap-1.5 shadow-sm">
+        <span class="material-symbols-rounded text-emerald-500 dark:text-emerald-400 text-sm">cloud_done</span>
+        <span>Có <strong class="text-emerald-600 dark:text-emerald-400 font-semibold">{{ driveCount }}</strong> hóa đơn trên Google Drive</span>
       </div>
     </div>
 
@@ -1018,24 +1018,24 @@ function copyLink(url: string) {
       
       <!-- ── UPLOAD TAB ── -->
       <div v-if="activeTab === 'upload'" class="space-y-6 animate-fade-in">
-        <div class="card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-          <div class="flex items-center gap-3 pb-3 border-b border-slate-50">
-            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+        <div class="card bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
               <span class="material-symbols-rounded">psychology</span>
             </div>
             <div>
-              <h4 class="text-lg font-bold text-slate-800">Hệ Thống Scan Hóa Đơn VAT Đa Kênh AI</h4>
-              <p class="text-xs text-slate-500 mt-0.5">
+              <h4 class="text-lg font-bold text-slate-800 dark:text-slate-100">Hệ Thống Scan Hóa Đơn VAT Đa Kênh AI</h4>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Tự động trích xuất bằng mắt thần Gemini Vision hoặc 7 loại mô hình ngôn ngữ lớn chạy song song.
-                <span v-if="geminiKeys.length > 0" class="text-emerald-600 font-semibold ml-1">🔬 Gemini Vision: Đang bật</span>
-                <span v-else class="text-amber-500 ml-1">⚠️ Chưa có Gemini key (Sử dụng trích xuất văn bản pdf.js)</span>
+                <span v-if="geminiKeys.length > 0" class="text-emerald-600 dark:text-emerald-400 font-semibold ml-1">🔬 Gemini Vision: Đang bật</span>
+                <span v-else class="text-amber-500 dark:text-amber-400 ml-1">⚠️ Chưa có Gemini key (Sử dụng trích xuất văn bản pdf.js)</span>
               </p>
             </div>
           </div>
 
           <!-- Drag and drop zone -->
           <div 
-            class="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-10 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[220px]"
+            class="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl p-10 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[220px]"
             @dragover.prevent
             @drop.prevent="handleFileDrop"
             @click="triggerFileSelect"
@@ -1048,40 +1048,40 @@ function copyLink(url: string) {
               multiple 
               @change="handleFileInput"
             />
-            <div class="w-14 h-14 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
+            <div class="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3">
               <span class="material-symbols-rounded text-3xl">upload_file</span>
             </div>
-            <h5 class="text-sm font-semibold text-slate-700">Kéo & thả các file PDF hóa đơn VAT tại đây</h5>
-            <p class="text-xs text-slate-400 mt-1">hoặc nhấn để duyệt file từ máy tính của bạn</p>
-            <span class="mt-3 text-[10px] text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">Hỗ trợ PDF hóa đơn điện tử</span>
+            <h5 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Kéo & thả các file PDF hóa đơn VAT tại đây</h5>
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">hoặc nhấn để duyệt file từ máy tính của bạn</p>
+            <span class="mt-3 text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700">Hỗ trợ PDF hóa đơn điện tử</span>
           </div>
 
           <!-- Queue layout list -->
           <div v-if="uploadQueue.length > 0" class="space-y-3 mt-4">
-            <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Danh sách hàng đợi ({{ uploadQueue.length }} file)</h5>
+            <h5 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Danh sách hàng đợi ({{ uploadQueue.length }} file)</h5>
             <div class="space-y-3">
               <div 
                 v-for="item in uploadQueue" 
                 :key="item.id" 
-                class="border border-slate-100 rounded-xl bg-white p-4 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all"
+                class="border border-slate-100 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all"
               >
                 <div class="flex items-center gap-3.5 min-w-[240px] flex-1">
-                  <div class="w-11 h-11 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center shrink-0">
+                  <div class="w-11 h-11 bg-rose-50 dark:bg-rose-950/40 text-rose-500 rounded-xl flex items-center justify-center shrink-0">
                     <span class="material-symbols-rounded text-xl">picture_as_pdf</span>
                   </div>
                   <div class="overflow-hidden">
-                    <h6 class="text-xs font-bold text-slate-800 truncate max-w-[200px]" :title="item.file.name">
+                    <h6 class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[200px]" :title="item.file.name">
                       {{ item.file.name }}
                     </h6>
                     <span 
                       class="inline-block text-[10px] px-2 py-0.5 mt-1 rounded font-medium border"
                       :class="{
-                        'bg-slate-100 border-slate-200 text-slate-600': item.status === 'pending',
-                        'bg-amber-50 border-amber-200 text-amber-600 animate-pulse': item.status === 'scanning',
-                        'bg-sky-50 border-sky-200 text-sky-600': item.status === 'ready',
-                        'bg-indigo-50 border-indigo-200 text-indigo-600 animate-pulse': item.status === 'uploading',
-                        'bg-emerald-50 border-emerald-200 text-emerald-600': item.status === 'done',
-                        'bg-rose-50 border-rose-200 text-rose-600': item.status === 'error'
+                        'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300': item.status === 'pending',
+                        'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 text-amber-600 dark:text-amber-400 animate-pulse': item.status === 'scanning',
+                        'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800/60 text-teal-600 dark:text-teal-400': item.status === 'ready',
+                        'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400 animate-pulse': item.status === 'uploading',
+                        'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400': item.status === 'done',
+                        'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400': item.status === 'error'
                       }"
                     >
                       {{ item.statusText || 'Đang chờ...' }}
@@ -1092,37 +1092,37 @@ function copyLink(url: string) {
                 <!-- Manual values edit form fields -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-[3]">
                   <div class="flex flex-col gap-1">
-                    <span class="text-[10px] font-medium text-slate-400">Đơn vị mua</span>
+                    <span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">Đơn vị mua</span>
                     <input 
                       type="text" 
-                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 focus:border-indigo-500 w-full"
+                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-emerald-500 w-full"
                       placeholder="Tên đơn vị..."
                       v-model="item.data.tenDonVi"
                     />
                   </div>
                   <div class="flex flex-col gap-1">
-                    <span class="text-[10px] font-medium text-slate-400">Mã số thuế</span>
+                    <span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">Mã số thuế</span>
                     <input 
                       type="text" 
-                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 focus:border-indigo-500 w-full font-mono text-indigo-600"
+                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-emerald-500 w-full font-mono text-teal-600 dark:text-teal-400 font-bold"
                       placeholder="MST..."
                       v-model="item.data.mst"
                     />
                   </div>
                   <div class="flex flex-col gap-1">
-                    <span class="text-[10px] font-medium text-slate-400">Địa chỉ</span>
+                    <span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">Địa chỉ</span>
                     <input 
                       type="text" 
-                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 focus:border-indigo-500 w-full"
+                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-emerald-500 w-full"
                       placeholder="Địa chỉ..."
                       v-model="item.data.diaChi"
                     />
                   </div>
                   <div class="flex flex-col gap-1">
-                    <span class="text-[10px] font-medium text-slate-400">Tổng tiền</span>
+                    <span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">Tổng tiền</span>
                     <input 
                       type="text" 
-                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 focus:border-indigo-500 w-full font-bold text-emerald-600"
+                      class="form-input text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-emerald-500 w-full font-bold text-emerald-600 dark:text-emerald-400"
                       placeholder="Số tiền..."
                       :value="formatCurrencyVN(item.data.tongTien)"
                       @input="(e) => item.data.tongTien = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '')"
@@ -1134,26 +1134,26 @@ function copyLink(url: string) {
                 <div class="flex sm:flex-col lg:flex-row items-center gap-1.5 shrink-0 justify-end">
                   <template v-if="['ready', 'error'].includes(item.status)">
                     <button 
-                      class="btn btn-outline btn-sm px-2.5 text-xs text-amber-500 border-amber-200 hover:bg-amber-50 hover:border-amber-400"
+                      class="btn-secondary btn-sm px-2.5 text-xs text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                       @click="retryQueueItem(item.id)"
                     >
                       <span class="material-symbols-rounded text-base">refresh</span>
                     </button>
                     <button 
-                      class="btn btn-primary btn-sm text-xs px-3"
+                      class="btn-primary btn-sm text-xs px-3"
                       @click="saveUploadItem(item.id)"
                     >
                       Lưu
                     </button>
                   </template>
                   <template v-else-if="item.status === 'done'">
-                    <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1 px-3 py-1">
+                    <span class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 px-3 py-1">
                       <span class="material-symbols-rounded text-base">check_circle</span> Đã lưu
                     </span>
                   </template>
                   <button 
                     v-if="item.status !== 'done'"
-                    class="btn btn-outline btn-sm px-2 border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-200"
+                    class="btn-secondary btn-sm px-2 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400"
                     @click="removeQueueItem(item.id)"
                   >
                     <span class="material-symbols-rounded text-base">delete</span>
@@ -1169,21 +1169,21 @@ function copyLink(url: string) {
       <div v-if="activeTab === 'search'" class="space-y-4 animate-fade-in">
         
         <!-- Search bar -->
-        <div class="card bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-3">
+        <div class="card bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-3">
           <div class="relative flex-1">
-            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
               <span class="material-symbols-rounded text-lg">search</span>
             </span>
             <input 
               type="text" 
-              class="form-input pl-9.5 pr-4 py-2 w-full border border-slate-200 rounded-xl focus:border-indigo-500 text-sm"
+              class="form-input pl-9.5 pr-4 py-2 w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-xl focus:border-emerald-500 text-sm"
               placeholder="Nhập MST, tên đơn vị mua, số tiền hoặc ngày ký hóa đơn (DD/MM)..."
               v-model="searchQuery"
               @keyup.enter="doSearch"
             />
           </div>
           <button 
-            class="btn btn-primary px-6 flex items-center justify-center gap-2 text-sm h-[38px] rounded-xl"
+            class="btn-primary px-6 flex items-center justify-center gap-2 text-sm h-[38px] rounded-xl"
             @click="doSearch"
             :disabled="isSearching"
           >
@@ -1195,17 +1195,17 @@ function copyLink(url: string) {
         </div>
 
         <!-- Filter bar stats & dynamic quick buttons -->
-        <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-          <div class="flex items-center gap-3.5">
-            <span>Đang hiển thị <strong class="text-slate-800 font-semibold">{{ currentSearchData.length }}</strong> kết quả</span>
+        <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <div class="flex items-center gap-3.5 flex-wrap">
+            <span>Đang hiển thị <strong class="text-slate-800 dark:text-slate-200 font-semibold">{{ currentSearchData.length }}</strong> kết quả</span>
             <button 
-              class="btn btn-outline btn-xs px-2.5 py-1 text-sky-600 border-sky-100 hover:bg-sky-50 flex items-center gap-1"
+              class="btn-secondary btn-xs px-2.5 py-1 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-800/60 hover:bg-teal-50 dark:hover:bg-teal-950/30 flex items-center gap-1"
               @click="syncDriveData"
             >
               <span class="material-symbols-rounded text-sm">sync</span> Đồng bộ Drive
             </button>
             <button 
-              class="btn btn-outline btn-xs px-2.5 py-1 text-amber-600 border-amber-100 hover:bg-amber-50 flex items-center gap-1"
+              class="btn-secondary btn-xs px-2.5 py-1 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-1"
               @click="rescanAllWithAI"
               :disabled="isRescanning"
             >
@@ -1217,18 +1217,18 @@ function copyLink(url: string) {
           </div>
 
           <!-- Selection & Bulk actions bar -->
-          <div class="flex items-center gap-2">
-            <div v-if="selectedInvoices.size > 0" class="flex items-center gap-2 border-r border-slate-200 pr-3 mr-1">
-              <span class="text-slate-700 font-medium">Đã chọn <strong class="text-indigo-600">{{ selectedInvoices.size }}</strong></span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div v-if="selectedInvoices.size > 0" class="flex items-center gap-2 border-r border-slate-200 dark:border-slate-700 pr-3 mr-1">
+              <span class="text-slate-700 dark:text-slate-300 font-medium">Đã chọn <strong class="text-emerald-600 dark:text-emerald-400">{{ selectedInvoices.size }}</strong></span>
               <button 
-                class="btn btn-outline btn-xs text-rose-500 border-rose-100 hover:bg-rose-50"
+                class="btn-danger btn-xs"
                 @click="bulkDelete"
               >
                 Xóa tất cả đã chọn
               </button>
             </div>
             <button 
-              class="btn btn-outline btn-xs text-slate-600 border-slate-200"
+              class="btn-secondary btn-xs text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
               @click="toggleSelectAll"
             >
               {{ pagedResults.every(d => selectedInvoices.has(d.fileName)) ? 'Bỏ chọn hết' : 'Chọn trang này' }}
@@ -1237,15 +1237,15 @@ function copyLink(url: string) {
             <!-- Pagination buttons -->
             <div v-if="totalPages > 1" class="flex items-center gap-1.5 ml-2">
               <button 
-                class="w-6 h-6 rounded-md border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-50"
+                class="w-6 h-6 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 disabled:opacity-50"
                 @click="changePage(-1)"
                 :disabled="currentPage === 1"
               >
                 <span class="material-symbols-rounded text-base">chevron_left</span>
               </button>
-              <span class="text-[11px] font-semibold text-slate-700">Trang {{ currentPage }}/{{ totalPages }}</span>
+              <span class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Trang {{ currentPage }}/{{ totalPages }}</span>
               <button 
-                class="w-6 h-6 rounded-md border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-50"
+                class="w-6 h-6 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 disabled:opacity-50"
                 @click="changePage(1)"
                 :disabled="currentPage === totalPages"
               >
@@ -1256,23 +1256,23 @@ function copyLink(url: string) {
         </div>
 
         <!-- Invoices List Grid -->
-        <div v-if="pagedResults.length === 0" class="card bg-white py-16 text-center border border-slate-100 rounded-2xl shadow-sm">
-          <span class="material-symbols-rounded text-slate-300 text-5xl">search_off</span>
-          <h4 class="text-sm font-semibold text-slate-700 mt-2">Không tìm thấy dữ liệu hóa đơn</h4>
-          <p class="text-xs text-slate-400 mt-1">Hãy thử tìm kiếm với MST, Tên Đơn Vị hoặc Ngày Ký khác</p>
+        <div v-if="pagedResults.length === 0" class="card bg-white dark:bg-slate-900 py-16 text-center border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm">
+          <span class="material-symbols-rounded text-slate-300 dark:text-slate-600 text-5xl">search_off</span>
+          <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-200 mt-2">Không tìm thấy dữ liệu hóa đơn</h4>
+          <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Hãy thử tìm kiếm với MST, Tên Đơn Vị hoặc Ngày Ký khác</p>
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div 
             v-for="d in pagedResults" 
             :key="d.fileName"
-            class="card bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col relative"
+            class="card bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col relative"
           >
             <!-- Checkbox select floating button -->
             <div class="absolute top-3.5 right-3.5 z-10">
               <input 
                 type="checkbox" 
-                class="w-4 h-4 cursor-pointer rounded text-indigo-600 focus:ring-indigo-500"
+                class="w-4 h-4 cursor-pointer rounded text-emerald-600 focus:ring-emerald-500"
                 :checked="selectedInvoices.has(d.fileName)"
                 @change="(e) => toggleSelectInvoice(d.fileName, (e.target as HTMLInputElement).checked)"
               />
@@ -1281,31 +1281,31 @@ function copyLink(url: string) {
             <!-- Content -->
             <div class="flex-1 space-y-3 pb-3">
               <div class="pr-6 space-y-1">
-                <h5 class="text-xs font-bold text-slate-800 line-clamp-2 leading-relaxed" :title="d.tenDonVi">
+                <h5 class="text-xs font-bold text-slate-800 dark:text-slate-100 line-clamp-2 leading-relaxed" :title="d.tenDonVi">
                   {{ d.tenDonVi || '(Chưa xác định đơn vị)' }}
                 </h5>
-                <span class="inline-block text-[10px] font-semibold text-indigo-600 bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100/50 font-mono">
+                <span class="inline-block text-[10px] font-semibold text-teal-700 dark:text-teal-300 bg-teal-50/70 dark:bg-teal-950/40 px-2 py-0.5 rounded border border-teal-100/50 dark:border-teal-800/40 font-mono">
                   MST: {{ d.mst || '...' }}
                 </span>
               </div>
 
-              <div class="text-[11px] text-slate-400 flex items-start gap-1">
-                <span class="material-symbols-rounded text-sm text-slate-300 shrink-0">location_on</span>
+              <div class="text-[11px] text-slate-400 dark:text-slate-500 flex items-start gap-1">
+                <span class="material-symbols-rounded text-sm text-slate-300 dark:text-slate-600 shrink-0">location_on</span>
                 <span class="line-clamp-2 leading-normal" :title="d.diaChi">{{ d.diaChi || 'Không có địa chỉ' }}</span>
               </div>
 
               <!-- Price & Date box breakdown -->
-              <div class="grid grid-cols-2 gap-2 bg-slate-50/60 p-2.5 rounded-xl border border-slate-100/50">
+              <div class="grid grid-cols-2 gap-2 bg-slate-50/60 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100/50 dark:border-slate-800">
                 <div class="flex flex-col gap-0.5">
-                  <span class="text-[9px] text-slate-400 uppercase tracking-wider">Ngày ký</span>
-                  <span class="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <span class="material-symbols-rounded text-xs text-slate-400">calendar_today</span>
+                  <span class="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider">Ngày ký</span>
+                  <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                    <span class="material-symbols-rounded text-xs text-slate-400 dark:text-slate-500">calendar_today</span>
                     {{ formatDateVN(d.ngayKy) }}
                   </span>
                 </div>
-                <div class="flex flex-col gap-0.5 text-right border-l border-slate-200/60 pl-2">
-                  <span class="text-[9px] text-slate-400 uppercase tracking-wider">Tổng tiền</span>
-                  <strong class="text-xs font-bold text-emerald-600">
+                <div class="flex flex-col gap-0.5 text-right border-l border-slate-200/60 dark:border-slate-700/60 pl-2">
+                  <span class="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tổng tiền</span>
+                  <strong class="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                     {{ formatCurrency(d.tongTien) }}
                   </strong>
                 </div>
@@ -1313,29 +1313,29 @@ function copyLink(url: string) {
             </div>
 
             <!-- Detail quick action bar -->
-            <div class="pt-3 border-t border-slate-100 flex items-center gap-1.5 justify-between">
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 justify-between">
               <button 
-                class="btn btn-outline btn-xs flex-1 text-slate-600 border-slate-200 hover:bg-slate-50"
+                class="btn-secondary btn-xs flex-1 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                 @click="previewFile(d.linkView)"
               >
                 Xem PDF
               </button>
               <button 
-                class="btn btn-outline btn-xs px-2 border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200"
+                class="btn-secondary btn-xs px-2 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400"
                 title="Gửi Email"
                 @click="openMailModal(d)"
               >
                 <span class="material-symbols-rounded text-base">mail</span>
               </button>
               <button 
-                class="btn btn-outline btn-xs px-2 border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-200"
+                class="btn-secondary btn-xs px-2 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400"
                 title="Thay thế / Xóa"
                 @click="deleteInvoice(d.fileName)"
               >
                 <span class="material-symbols-rounded text-base">delete</span>
               </button>
               <button 
-                class="btn btn-outline btn-xs px-2 border-slate-200 text-slate-400 hover:text-slate-800"
+                class="btn-secondary btn-xs px-2 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 title="Sao chép liên kết"
                 @click="copyLink(d.linkView)"
               >
@@ -1348,14 +1348,14 @@ function copyLink(url: string) {
 
       <!-- ── LỊCH SỬ HOẠT ĐỘNG TAB ── -->
       <div v-if="activeTab === 'history'" class="space-y-4 animate-fade-in">
-        <div class="card bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h5 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-indigo-500">list_alt</span>
+        <div class="card bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <h5 class="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+              <span class="material-symbols-rounded text-emerald-500 dark:text-emerald-400">list_alt</span>
               Nhật Ký Xử Lý Hệ Thống
             </h5>
             <button 
-              class="btn btn-outline btn-xs px-2.5 py-1 flex items-center gap-1 text-slate-600 border-slate-200 hover:bg-slate-50"
+              class="btn-secondary btn-xs px-2.5 py-1 flex items-center gap-1 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
               @click="loadHistory"
               :disabled="isLoadingHistory"
             >
@@ -1366,28 +1366,28 @@ function copyLink(url: string) {
 
           <div class="p-0">
             <div class="overflow-x-auto">
-              <table class="report-table text-xs text-slate-700 w-full text-left">
+              <table class="report-table text-xs text-slate-700 dark:text-slate-200 w-full text-left">
                 <thead>
-                  <tr class="bg-slate-50 border-b border-slate-100">
-                    <th class="px-4 py-3 font-semibold text-slate-500">Thời gian ghi nhận</th>
-                    <th class="px-4 py-3 font-semibold text-slate-500">Chi tiết hoạt động hệ thống</th>
+                  <tr class="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-800">
+                    <th class="px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">Thời gian ghi nhận</th>
+                    <th class="px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">Chi tiết hoạt động hệ thống</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-if="activityLogs.length === 0" class="border-b border-slate-50">
-                    <td colspan="2" class="px-4 py-8 text-center text-slate-400">
+                  <tr v-if="activityLogs.length === 0" class="border-b border-slate-50 dark:border-slate-800">
+                    <td colspan="2" class="px-4 py-8 text-center text-slate-400 dark:text-slate-500">
                       {{ isLoadingHistory ? 'Đang tải nhật ký từ Google Sheets...' : 'Chưa ghi nhận hoạt động nào.' }}
                     </td>
                   </tr>
                   <tr 
                     v-for="(log, idx) in activityLogs" 
                     :key="idx"
-                    class="border-b border-slate-50 hover:bg-slate-50/50"
+                    class="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-800/40"
                   >
-                    <td class="px-4 py-3 text-slate-400 font-mono">
+                    <td class="px-4 py-3 text-slate-400 dark:text-slate-500 font-mono">
                       {{ new Date(log[0]).toLocaleString('vi-VN') }}
                     </td>
-                    <td class="px-4 py-3 font-medium text-slate-700">
+                    <td class="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">
                       {{ log[1] }}
                     </td>
                   </tr>
@@ -1406,26 +1406,26 @@ function copyLink(url: string) {
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
       @click.self="showEmailModal = false"
     >
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 animate-scale-in space-y-4">
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl max-w-md w-full p-6 animate-scale-in space-y-4">
         <div class="flex justify-center">
-          <div class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner">
+          <div class="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
             <span class="material-symbols-rounded text-2xl">mail</span>
           </div>
         </div>
         
         <div class="text-center space-y-1">
-          <h3 class="text-base font-bold text-slate-800">Gửi Hóa Đơn VAT</h3>
-          <p class="text-xs text-slate-500">{{ emailForm.tenDonVi }}</p>
-          <strong class="text-base font-extrabold text-emerald-600 block mt-1">
+          <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Gửi Hóa Đơn VAT</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">{{ emailForm.tenDonVi }}</p>
+          <strong class="text-base font-extrabold text-emerald-600 dark:text-emerald-400 block mt-1">
             {{ formatCurrency(emailForm.tongTien) }}
           </strong>
         </div>
 
         <div class="form-group space-y-1.5">
-          <label class="text-xs font-semibold text-slate-600 block">Email khách hàng</label>
+          <label class="text-xs font-semibold text-slate-600 dark:text-slate-300 block">Email khách hàng</label>
           <input 
             type="email" 
-            class="form-input w-full px-3 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-sm text-center"
+            class="form-input w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-xl focus:border-emerald-500 text-sm text-center"
             placeholder="Nhập địa chỉ email của khách hàng..."
             v-model="emailForm.email"
             @keyup.enter="sendEmailInvoice"
@@ -1434,13 +1434,13 @@ function copyLink(url: string) {
 
         <div class="flex gap-3 pt-2">
           <button 
-            class="btn btn-outline flex-1 border-slate-200 text-slate-600 rounded-xl py-2"
+            class="btn-secondary flex-1 rounded-xl py-2"
             @click="showEmailModal = false"
           >
             Hủy
           </button>
           <button 
-            class="btn btn-primary flex-1 rounded-xl py-2 flex items-center justify-center gap-1.5"
+            class="btn-primary flex-1 rounded-xl py-2 flex items-center justify-center gap-1.5"
             @click="sendEmailInvoice"
             :disabled="isSendingEmail"
           >

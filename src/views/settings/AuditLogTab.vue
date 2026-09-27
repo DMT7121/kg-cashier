@@ -94,24 +94,24 @@ function handleExportCsv() {
 
 <template>
   <div class="flex flex-col gap-6">
-    <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
+    <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
       <!-- Section Header -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
-          <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <span class="material-symbols-rounded text-slate-600">assignment</span>
+          <h3 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">assignment</span>
             Nhật ký hoạt động (Audit Logs)
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">Ghi lại toàn bộ lịch sử thao tác của các tài khoản thu ngân.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ghi lại toàn bộ lịch sử thao tác của các tài khoản thu ngân.</p>
         </div>
         
         <div class="flex gap-2">
-          <button @click="loadLogs" :disabled="loading" class="btn btn-outline flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
+          <button @click="loadLogs" :disabled="loading" class="btn-secondary flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs disabled:opacity-50">
             <span class="material-symbols-rounded text-sm" :class="{ 'animate-spin': loading }">refresh</span>
             Làm mới
           </button>
-          <button @click="handleExportCsv" class="btn btn-outline flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition-colors">
-            <span class="material-symbols-rounded text-sm text-indigo-500">download</span>
+          <button @click="handleExportCsv" class="btn-secondary flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs">
+            <span class="material-symbols-rounded text-sm text-cyan-600 dark:text-cyan-400">download</span>
             Xuất CSV
           </button>
         </div>
@@ -122,17 +122,17 @@ function handleExportCsv() {
         <input 
           type="text" 
           v-model="searchQuery" 
-          class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" 
+          class="form-input w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm" 
           placeholder="🔍 Tìm kiếm nhanh theo hành động, người dùng, chi tiết..."
         >
       </div>
 
       <!-- Logs Table -->
-      <div class="border border-slate-100 rounded-xl overflow-hidden">
+      <div class="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
         <div class="overflow-x-auto max-h-[500px]">
           <table class="w-full text-left text-xs border-collapse">
             <thead>
-              <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-100">
+              <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-100 dark:border-slate-800">
                 <th class="p-3 w-40">Thời gian</th>
                 <th class="p-3 w-32">Người dùng</th>
                 <th class="p-3 w-48">Hành động</th>
@@ -140,30 +140,30 @@ function handleExportCsv() {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="filteredLogs.length === 0" class="text-center text-slate-400">
+              <tr v-if="filteredLogs.length === 0" class="text-center text-slate-400 dark:text-slate-500">
                 <td colspan="4" class="p-8">Không tìm thấy dữ liệu nhật ký nào.</td>
               </tr>
               <tr 
                 v-else 
                 v-for="(log, idx) in filteredLogs.slice(0, 300)" 
                 :key="idx" 
-                class="border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
+                class="border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
               >
-                <td class="p-3 font-mono text-slate-500 whitespace-nowrap">{{ formatDateTime(log.timestamp) }}</td>
-                <td class="p-3 font-semibold text-slate-700">{{ log.user || 'SYSTEM' }}</td>
+                <td class="p-3 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ formatDateTime(log.timestamp) }}</td>
+                <td class="p-3 font-semibold text-slate-700 dark:text-slate-200">{{ log.user || 'SYSTEM' }}</td>
                 <td class="p-3 whitespace-nowrap">
                   <span class="inline-flex items-center gap-1.5">
                     <span>{{ actionIcons[log.action] || '📌' }}</span>
-                    <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600 font-bold">{{ log.action }}</span>
+                    <span class="font-mono bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-slate-300 font-bold">{{ log.action }}</span>
                   </span>
                 </td>
-                <td class="p-3 text-slate-500 whitespace-pre-wrap leading-relaxed">{{ log.details || '—' }}</td>
+                <td class="p-3 text-slate-500 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">{{ log.details || '—' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
-      <div class="text-xxs text-slate-400 text-right mt-1" v-if="filteredLogs.length > 0">
+      <div class="text-xxs text-slate-400 dark:text-slate-500 text-right mt-1" v-if="filteredLogs.length > 0">
         Hiển thị tối đa 300 dòng nhật ký mới nhất.
       </div>
     </div>

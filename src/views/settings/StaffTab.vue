@@ -279,9 +279,9 @@ function getRoleLabel(role: string) {
 }
 
 function getRoleBadgeClass(role: string) {
-  if (role === 'admin') return 'bg-indigo-50 text-indigo-700 border-indigo-100';
-  if (role === 'manager') return 'bg-sky-50 text-sky-700 border-sky-100';
-  return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  if (role === 'admin') return 'bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800';
+  if (role === 'manager') return 'bg-sky-50 text-sky-700 border-sky-100 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800';
+  return 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800';
 }
 </script>
 
@@ -289,21 +289,23 @@ function getRoleBadgeClass(role: string) {
   <div>
     <!-- AUTHENTICATION PASS GATE -->
     <div v-if="!isStaffAuthed" class="flex flex-col items-center justify-center text-center max-w-md mx-auto py-16 px-4">
-      <span class="material-symbols-rounded text-indigo-600 text-6xl mb-4">lock</span>
-      <h3 class="text-xl font-bold text-slate-800">Yêu cầu quyền Admin</h3>
-      <p class="text-sm text-slate-500 mt-2">Vui lòng nhập mật khẩu quản trị để truy cập trang quản lý tài khoản nhân viên.</p>
+      <div class="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 shadow-sm">
+        <span class="material-symbols-rounded text-3xl">lock</span>
+      </div>
+      <h3 class="text-xl font-bold text-slate-800 dark:text-white">Yêu cầu quyền Admin</h3>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">Vui lòng nhập mật khẩu quản trị để truy cập trang quản lý tài khoản nhân viên.</p>
       
       <div class="mt-6 w-full flex flex-col gap-3">
         <input 
           type="password" 
           v-model="adminPassword" 
           @keydown.enter="verifyAdminPassword" 
-          class="form-input text-center text-2xl tracking-[8px] py-3 border border-slate-200 rounded-xl" 
+          class="form-input text-center text-2xl tracking-[8px] py-3 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl" 
           placeholder="••••••" 
           maxlength="8"
           autofocus
         >
-        <button @click="verifyAdminPassword" class="btn btn-primary w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition-colors">
+        <button @click="verifyAdminPassword" class="btn-primary w-full py-3.5 rounded-xl font-semibold shadow-md transition-all">
           Xác nhận truy cập
         </button>
       </div>
@@ -311,41 +313,41 @@ function getRoleBadgeClass(role: string) {
 
     <!-- STAFF MANAGEMENT AREA -->
     <div v-else class="flex flex-col gap-6">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
-          <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <span class="material-symbols-rounded text-indigo-500">group</span>
+          <h3 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">group</span>
             Quản lý nhân viên thu ngân
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">Tạo tài khoản, phân quyền, và quản lý mã PIN đăng nhập nhanh.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tạo tài khoản, phân quyền, và quản lý mã PIN đăng nhập nhanh.</p>
         </div>
         <div class="flex gap-2">
-          <button @click="loadStaff()" class="btn btn-outline flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition-colors">
+          <button @click="loadStaff()" class="btn-secondary flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs">
             <span class="material-symbols-rounded text-sm">refresh</span> Làm mới
           </button>
-          <button @click="triggerAddStaff" class="btn btn-primary flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">
+          <button @click="triggerAddStaff" class="btn-primary flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm">
             <span class="material-symbols-rounded text-sm">person_add</span> Thêm nhân viên
           </button>
         </div>
       </div>
 
       <!-- Realtime status indicator -->
-      <div class="flex items-center gap-2 px-4 py-2.5 bg-emerald-50/50 border border-emerald-100 rounded-xl text-xs text-slate-600">
-        <span class="material-symbols-rounded text-base text-emerald-600 animate-pulse">cloud_sync</span>
+      <div class="flex items-center gap-2 px-4 py-2.5 bg-emerald-50/50 dark:bg-slate-800/60 border border-emerald-100 dark:border-slate-700 rounded-xl text-xs text-slate-600 dark:text-slate-300">
+        <span class="material-symbols-rounded text-base text-emerald-600 dark:text-emerald-400 animate-pulse">cloud_sync</span>
         <span>{{ syncStatus }}</span>
-        <span v-if="syncTime" class="ml-auto text-xxs text-slate-400">Đồng bộ lúc: {{ syncTime }}</span>
+        <span v-if="syncTime" class="ml-auto text-xxs text-slate-400 dark:text-slate-500">Đồng bộ lúc: {{ syncTime }}</span>
       </div>
 
       <!-- Staff Grid -->
-      <div v-if="staffList.length === 0" class="flex flex-col items-center justify-center text-center py-16 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-        <span class="material-symbols-rounded text-slate-400 text-5xl mb-3">group_off</span>
-        <h4 class="font-bold text-slate-700">Chưa có nhân viên</h4>
-        <p class="text-xs text-slate-400 mt-1">Bấm "Thêm nhân viên" ở góc trên bên phải để tạo tài khoản đầu tiên.</p>
+      <div v-if="staffList.length === 0" class="flex flex-col items-center justify-center text-center py-16 px-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+        <span class="material-symbols-rounded text-slate-400 dark:text-slate-600 text-5xl mb-3">group_off</span>
+        <h4 class="font-bold text-slate-700 dark:text-slate-300">Chưa có nhân viên</h4>
+        <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Bấm "Thêm nhân viên" ở góc trên bên phải để tạo tài khoản đầu tiên.</p>
       </div>
 
       <div v-else class="staff-grid">
         <div v-for="staff in staffList" :key="staff.id" class="staff-card">
-          <div class="staff-avatar" :class="staff.role === 'admin' ? 'bg-indigo-50 text-indigo-600' : staff.role === 'manager' ? 'bg-sky-50 text-sky-600' : 'bg-emerald-50 text-emerald-600'">
+          <div class="staff-avatar" :class="staff.role === 'admin' ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400' : staff.role === 'manager' ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'">
             <span class="material-symbols-rounded text-xl">
               {{ staff.role === 'admin' ? 'admin_panel_settings' : staff.role === 'manager' ? 'supervisor_account' : 'person' }}
             </span>
@@ -357,17 +359,17 @@ function getRoleBadgeClass(role: string) {
               <span class="px-2 py-0.5 text-xxs font-semibold border rounded-full" :class="getRoleBadgeClass(staff.role)">
                 {{ getRoleLabel(staff.role) }}
               </span>
-              <span class="px-2 py-0.5 text-xxs font-semibold rounded-full border" :class="staff.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'">
+              <span class="px-2 py-0.5 text-xxs font-semibold rounded-full border" :class="staff.status === 'active' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'">
                 {{ staff.status === 'active' ? 'Hoạt động' : 'Đã khóa' }}
               </span>
             </div>
           </div>
 
           <div class="staff-actions">
-            <button @click="triggerEditStaff(staff)" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors" title="Sửa">
+            <button @click="triggerEditStaff(staff)" class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-colors" title="Sửa">
               <span class="material-symbols-rounded text-lg">edit</span>
             </button>
-            <button @click="handleDeleteStaff(staff)" class="w-8 h-8 rounded-lg hover:bg-rose-50 flex items-center justify-center text-rose-500 transition-colors" title="Xóa">
+            <button @click="handleDeleteStaff(staff)" class="w-8 h-8 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center text-rose-500 transition-colors" title="Xóa">
               <span class="material-symbols-rounded text-lg">delete</span>
             </button>
           </div>
@@ -376,29 +378,29 @@ function getRoleBadgeClass(role: string) {
     </div>
 
     <!-- MODAL DIALOG (ADD/EDIT STAFF) -->
-    <div v-if="showModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 flex flex-col gap-4 animate-scaleUp">
-        <h3 class="text-md font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
-          <span class="material-symbols-rounded text-indigo-500">{{ editingStaff ? 'edit' : 'person_add' }}</span>
+    <div v-if="showModal" class="modal-overlay">
+      <div class="modal-content max-w-md w-full p-6 animate-scaleUp">
+        <h3 class="modal-title flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">{{ editingStaff ? 'edit' : 'person_add' }}</span>
           {{ modalTitle }}
         </h3>
 
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4 mt-4">
           <div class="form-group">
-            <label class="form-label font-semibold text-slate-700 mb-1 block">Họ và tên nhân viên *</label>
-            <input type="text" v-model="modalName" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Nhập họ tên...">
+            <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Họ và tên nhân viên *</label>
+            <input type="text" v-model="modalName" class="form-input w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm" placeholder="Nhập họ tên...">
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div class="form-group">
-              <label class="form-label font-semibold text-slate-700 mb-1 block">Mã PIN đăng nhập *</label>
-              <input type="password" v-model="modalPin" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-center tracking-[4px]" placeholder="••••" maxlength="6" inputmode="numeric">
-              <span class="text-[10px] text-slate-400 mt-1 block" v-if="editingStaff">Để trống nếu không đổi PIN</span>
+              <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Mã PIN đăng nhập *</label>
+              <input type="password" v-model="modalPin" class="form-input w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm text-center tracking-[4px]" placeholder="••••" maxlength="6" inputmode="numeric">
+              <span class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block" v-if="editingStaff">Để trống nếu không đổi PIN</span>
             </div>
 
             <div class="form-group">
-              <label class="form-label font-semibold text-slate-700 mb-1 block">Vai trò hệ thống</label>
-              <select v-model="modalRole" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+              <label class="form-label font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Vai trò hệ thống</label>
+              <select v-model="modalRole" class="form-input w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm">
                 <option value="cashier">Thu ngân</option>
                 <option value="manager">Quản lý</option>
                 <option value="admin">Admin hệ thống</option>
@@ -406,18 +408,18 @@ function getRoleBadgeClass(role: string) {
             </div>
           </div>
 
-          <div v-if="editingStaff" class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <span class="text-sm font-semibold text-slate-700">Trạng thái hoạt động</span>
+          <div v-if="editingStaff" class="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-100 dark:border-slate-700">
+            <span class="text-sm font-semibold text-slate-700 dark:text-slate-300">Trạng thái hoạt động</span>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" v-model="modalActive" class="sr-only peer">
-              <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              <div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
             </label>
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 border-t border-slate-100 pt-4 mt-2">
-          <button @click="showModal = false" class="btn px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold transition-colors">Hủy</button>
-          <button @click="handleSaveStaff" class="btn px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
+        <div class="modal-footer border-t border-slate-100 dark:border-slate-800 pt-4 mt-2 flex justify-end gap-2">
+          <button @click="showModal = false" class="btn-ghost px-4 py-2 rounded-xl text-sm font-semibold">Hủy</button>
+          <button @click="handleSaveStaff" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm flex items-center gap-1.5">
             <span class="material-symbols-rounded text-sm">save</span>
             Lưu nhân viên
           </button>

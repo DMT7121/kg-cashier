@@ -1106,7 +1106,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="di-wrapper text-slate-800">
+  <div class="di-wrapper text-slate-800 dark:text-slate-100">
     <!-- ═══ TOOLBAR ═══ -->
     <div class="di-toolbar">
       <div class="di-toolbar-left">
@@ -1133,10 +1133,10 @@ onMounted(async () => {
         </div>
       </div>
       <div class="di-toolbar-right flex gap-2">
-        <button class="btn btn-sm btn-outline flex items-center gap-1" @click="showProductManager = true">
+        <button class="btn btn-sm btn-secondary flex items-center gap-1.5" @click="showProductManager = true">
           <span class="material-symbols-rounded text-base">tune</span> Sản phẩm
         </button>
-        <button class="btn btn-sm btn-success flex items-center gap-1" @click="showReport = true">
+        <button class="btn btn-sm btn-primary flex items-center gap-1.5" @click="showReport = true">
           <span class="material-symbols-rounded text-base">summarize</span> Báo cáo
         </button>
       </div>
@@ -1193,7 +1193,7 @@ onMounted(async () => {
           v-for="cat in categoryTabs" 
           :key="cat"
           class="di-cat-tab flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border shrink-0 cursor-pointer select-none"
-          :class="selectedCategory === cat ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'"
+          :class="selectedCategory === cat ? 'bg-gradient-to-r from-emerald-500 to-teal-500 border-transparent text-white shadow-xs' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 hover:dark:bg-slate-800'"
           @click="selectedCategory = cat"
         >
           <span class="di-cat-emoji text-sm">{{ getCategoryEmoji(cat) }}</span>
@@ -1227,10 +1227,10 @@ onMounted(async () => {
       </div>
       <div class="di-filter-right flex items-center gap-4">
         <!-- View switcher -->
-        <div class="flex bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/50 shrink-0">
+        <div class="flex bg-slate-100/80 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/50 dark:border-slate-700 shrink-0">
           <button 
             class="px-2.5 py-1 text-[10px] font-black rounded-lg transition-all border-none bg-transparent cursor-pointer flex items-center gap-1"
-            :class="viewMode === 'cards' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-700'"
+            :class="viewMode === 'cards' ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
             @click="viewMode = 'cards'"
           >
             <span class="material-symbols-rounded text-xs">grid_view</span>
@@ -1238,7 +1238,7 @@ onMounted(async () => {
           </button>
           <button 
             class="px-2.5 py-1 text-[10px] font-black rounded-lg transition-all border-none bg-transparent cursor-pointer flex items-center gap-1"
-            :class="viewMode === 'table' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-700'"
+            :class="viewMode === 'table' ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
             @click="viewMode = 'table'"
           >
             <span class="material-symbols-rounded text-xs">table_chart</span>
@@ -1246,7 +1246,7 @@ onMounted(async () => {
           </button>
         </div>
 
-        <span class="text-slate-400 text-[11px] font-bold">
+        <span class="text-slate-400 dark:text-slate-500 text-[11px] font-bold">
           Hiển thị {{ filteredRows.length }}/{{ stats.total }} sản phẩm
         </span>
       </div>
@@ -1254,7 +1254,7 @@ onMounted(async () => {
 
     <!-- ═══ TOUCH CARD GRID ═══ -->
     <div v-if="viewMode === 'cards'" class="di-cards-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-6 mb-6">
-      <div v-if="filteredRows.length === 0" class="col-span-full py-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-xs">
+      <div v-if="filteredRows.length === 0" class="col-span-full py-16 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
         <span class="material-symbols-rounded text-[40px] opacity-30 mb-2">local_bar</span>
         <p>{{ showOnlyDiff ? 'Không có sản phẩm chênh lệch 🎉' : 'Chưa có sản phẩm nào' }}</p>
       </div>
@@ -1263,8 +1263,8 @@ onMounted(async () => {
         v-else 
         v-for="row in filteredRows" 
         :key="row.id" 
-        class="di-inventory-card bg-white border border-slate-100 rounded-3xl p-5 shadow-xs flex flex-col justify-between transition-all hover:shadow-md hover:border-blue-100 relative overflow-hidden"
-        :class="row.differenceType !== 'MATCH' ? 'border-l-4 border-l-orange-500' : ''"
+        class="di-inventory-card bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex flex-col justify-between transition-all hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800/60 relative overflow-hidden"
+        :class="row.differenceType !== 'MATCH' ? 'border-l-4 border-l-amber-500' : ''"
       >
         <!-- Card Top: Product Info and Status Badge -->
         <div class="space-y-4">
@@ -1274,14 +1274,14 @@ onMounted(async () => {
                 v-if="productMap[row.productId]?.image" 
                 :src="productMap[row.productId].image" 
                 :alt="productMap[row.productId].name" 
-                class="di-card-image w-12 h-12 object-contain rounded-xl bg-slate-50 border border-slate-100 p-1 shrink-0"
+                class="di-card-image w-12 h-12 object-contain rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-1 shrink-0"
                 :style="{ '--scale-factor': getScaleFactor(productMap[row.productId]) }"
               />
-              <span v-else class="di-card-emoji text-3xl w-12 h-12 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100 shrink-0">
+              <span v-else class="di-card-emoji text-3xl w-12 h-12 flex items-center justify-center bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shrink-0">
                 {{ productMap[row.productId]?.emoji || '🥤' }}
               </span>
               <div class="min-w-0 flex-1">
-                <h4 class="text-sm font-extrabold text-slate-800 leading-snug truncate">{{ productMap[row.productId]?.name }}</h4>
+                <h4 class="text-sm font-extrabold text-slate-800 dark:text-slate-100 leading-snug truncate">{{ productMap[row.productId]?.name }}</h4>
                 <p class="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
                   {{ productMap[row.productId]?.category }} · {{ productMap[row.productId]?.unit }}
                   <span v-if="productMap[row.productId]?.volume"> · {{ productMap[row.productId].volume }}</span>
@@ -1301,29 +1301,29 @@ onMounted(async () => {
           </div>
 
           <!-- Card Mid: Quick Stats (Tồn đầu, Nhập, Tổng) -->
-          <div class="grid grid-cols-3 gap-2 py-2.5 px-3 bg-slate-50/50 border border-slate-100/50 rounded-2xl text-center text-[10px] font-bold text-slate-500">
+          <div class="grid grid-cols-3 gap-2 py-2.5 px-3 bg-slate-50/70 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl text-center text-[10px] font-bold text-slate-500">
             <div>
-              <span class="block text-slate-400 text-[9px] uppercase tracking-wider">Đầu ca</span>
-              <span class="text-slate-700 text-xs font-extrabold">{{ formatNum(row.openingStock) }}</span>
+              <span class="block text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-wider">Đầu ca</span>
+              <span class="text-slate-700 dark:text-slate-200 text-xs font-extrabold">{{ formatNum(row.openingStock) }}</span>
             </div>
             <div>
-              <span class="block text-slate-400 text-[9px] uppercase tracking-wider">Nhập mới</span>
-              <span class="text-blue-600 text-xs font-extrabold">+{{ formatNum(row.newImport) }}</span>
+              <span class="block text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-wider">Nhập mới</span>
+              <span class="text-teal-600 dark:text-teal-400 text-xs font-extrabold">+{{ formatNum(row.newImport) }}</span>
             </div>
             <div>
-              <span class="block text-slate-400 text-[9px] uppercase tracking-wider">Tổng có</span>
-              <span class="text-slate-800 text-xs font-black">{{ formatNum(row.openingStock + row.newImport) }}</span>
+              <span class="block text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-wider">Tổng có</span>
+              <span class="text-slate-800 dark:text-slate-100 text-xs font-black">{{ formatNum(row.openingStock + row.newImport) }}</span>
             </div>
           </div>
 
           <!-- Card Input: TỒN CUỐI (with Slider and Steppers) -->
-          <div class="space-y-2 pt-2 border-t border-slate-100/60">
+          <div class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
             <div class="flex items-center justify-between">
-              <span class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Tồn cuối ca</span>
+              <span class="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tồn cuối ca</span>
               <!-- Direct numeric typing input -->
               <input 
                 type="number" 
-                class="w-16 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 text-center text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none"
+                class="w-16 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-1.5 py-1 text-center text-xs font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/50 outline-none"
                 v-model.number="row.closingStock"
                 @input="updateRowValues(row)"
                 placeholder="0"
@@ -1334,7 +1334,7 @@ onMounted(async () => {
             <!-- Stepper slider control -->
             <div class="flex items-center gap-3">
               <button 
-                class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center transition-all select-none border border-slate-200/30 cursor-pointer active:scale-90"
+                class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-black text-sm flex items-center justify-center transition-all select-none border border-slate-200/40 dark:border-slate-700 cursor-pointer active:scale-90"
                 @click="decrementStock(row)"
               >
                 ➖
@@ -1345,10 +1345,10 @@ onMounted(async () => {
                 :max="Math.max(48, row.openingStock + row.newImport + 12)" 
                 v-model.number="row.closingStock" 
                 @input="updateRowValues(row)"
-                class="flex-1 accent-blue-600 cursor-pointer h-1.5 bg-slate-100 rounded-lg appearance-none"
+                class="flex-1 accent-emerald-600 cursor-pointer h-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none"
               />
               <button 
-                class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center transition-all select-none border border-slate-200/30 cursor-pointer active:scale-90"
+                class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-black text-sm flex items-center justify-center transition-all select-none border border-slate-200/40 dark:border-slate-700 cursor-pointer active:scale-90"
                 @click="incrementStock(row)"
               >
                 ➕
@@ -1358,14 +1358,14 @@ onMounted(async () => {
         </div>
 
         <!-- Card Bottom: Sales Comparison -->
-        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold">
+        <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] font-bold">
           <div class="flex gap-4">
-            <span class="text-slate-400">Thực bán: <strong class="text-orange-600 text-xs font-extrabold">{{ formatNum(row.actualSold) }}</strong></span>
-            <span class="text-slate-400">CUKCUK: <strong class="text-teal-600 text-xs font-extrabold">{{ formatNum(row.cukcukSold) }}</strong></span>
+            <span class="text-slate-400 dark:text-slate-500">Thực bán: <strong class="text-amber-600 dark:text-amber-400 text-xs font-extrabold">{{ formatNum(row.actualSold) }}</strong></span>
+            <span class="text-slate-400 dark:text-slate-500">CUKCUK: <strong class="text-emerald-600 dark:text-emerald-400 text-xs font-extrabold">{{ formatNum(row.cukcukSold) }}</strong></span>
           </div>
           
           <button 
-            class="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 bg-transparent border-0 cursor-pointer"
+            class="text-[10px] text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-0.5 bg-transparent border-0 cursor-pointer"
             @click="toggleRowExpanded(row.id)"
           >
             <span>Chi tiết</span>
@@ -1376,18 +1376,18 @@ onMounted(async () => {
         </div>
 
         <!-- Expanded Detail panel inside Card layout -->
-        <div v-if="expandedRow === row.id" class="mt-4 pt-3 border-t border-slate-100 space-y-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100 text-xs text-left">
+        <div v-if="expandedRow === row.id" class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3 bg-slate-50/70 dark:bg-slate-800 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs text-left">
           <div>
-            <span class="block font-bold text-slate-700">Lý do chênh lệch / Ghi chú:</span>
+            <span class="block font-bold text-slate-700 dark:text-slate-200">Lý do chênh lệch / Ghi chú:</span>
             <input 
               type="text" 
-              class="w-full mt-1.5 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-xl"
+              class="w-full mt-1.5 px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100"
               v-model="row.notes" 
               @blur="saveSessionsToLocalStorage"
               placeholder="Nhập lý do chênh lệch..."
             />
           </div>
-          <div class="text-[10px] text-slate-400 font-medium leading-relaxed">
+          <div class="text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-relaxed">
             * <strong>Công thức tính:</strong> Tồn đầu ({{ formatNum(row.openingStock) }}) + Nhập ({{ formatNum(row.newImport) }}) - Tồn cuối ({{ formatNum(row.closingStock) }}) = Thực bán ({{ formatNum(row.actualSold) }}).
           </div>
         </div>
@@ -1683,52 +1683,52 @@ onMounted(async () => {
     </div>
 
     <!-- ═══ BOTTOM ACTIONS ═══ -->
-    <div class="di-bottom-bar flex items-center justify-between gap-4 px-6 py-4 border-t border-slate-100 bg-slate-50/50 mt-auto">
+    <div class="di-bottom-bar flex items-center justify-between gap-4 px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 mt-auto">
       <div class="flex gap-2">
-        <button class="btn btn-outline btn-sm flex items-center gap-1 bg-white" @click="triggerForceSave">
+        <button class="btn btn-secondary btn-sm flex items-center gap-1.5" @click="triggerForceSave">
           <span class="material-symbols-rounded text-base">save</span> Lưu tất cả
         </button>
-        <button class="btn btn-outline btn-sm flex items-center gap-1 text-rose-600 hover:bg-rose-50 border-rose-200 bg-white" @click="handleClearCurrentSession">
+        <button class="btn btn-danger btn-sm flex items-center gap-1.5" @click="handleClearCurrentSession">
           <span class="material-symbols-rounded text-base">delete_sweep</span> Xóa ca này
         </button>
       </div>
-      <button class="btn btn-sm flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-bold" @click="handlePrintReport">
+      <button class="btn btn-primary btn-sm flex items-center gap-1.5" @click="handlePrintReport">
         <span class="material-symbols-rounded text-base">print</span> In báo cáo A4
       </button>
     </div>
 
     <!-- ═══ PRODUCT MANAGER MODAL ═══ -->
     <div v-if="showProductManager" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" @click.self="showProductManager = false">
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-2xl w-full p-6 animate-scale-in flex flex-col max-h-[85vh]">
-        <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-          <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl max-w-2xl w-full p-6 animate-scale-in flex flex-col max-h-[85vh]">
+        <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 class="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
             <span class="material-symbols-rounded text-amber-500">local_bar</span>
             <span>Quản lý sản phẩm nước uống</span>
           </h3>
-          <button class="text-slate-400 hover:text-slate-600" @click="showProductManager = false">
+          <button class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" @click="showProductManager = false">
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>
 
         <div class="overflow-y-auto pr-1 space-y-5 flex-1">
           <!-- Add New Product Form -->
-          <div class="bg-slate-50/50 rounded-xl border border-slate-200/60 p-4 space-y-3">
-            <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">➕ Thêm sản phẩm mới</h4>
+          <div class="bg-slate-50/70 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-800 p-4 space-y-3">
+            <h4 class="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">➕ Thêm sản phẩm mới</h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div class="space-y-1">
-                <label class="font-semibold text-slate-600">Tên sản phẩm</label>
-                <input type="text" class="form-input w-full border border-slate-200 rounded-lg p-2" v-model="newProduct.name" placeholder="VD: Trà Sữa Matcha" />
+                <label class="font-semibold text-slate-600 dark:text-slate-300">Tên sản phẩm</label>
+                <input type="text" class="form-input w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg p-2 text-slate-800 dark:text-slate-100" v-model="newProduct.name" placeholder="VD: Trà Sữa Matcha" />
               </div>
               <div class="space-y-1">
-                <label class="font-semibold text-slate-600">Phân loại</label>
-                <input type="text" class="form-input w-full border border-slate-200 rounded-lg p-2" v-model="newProduct.category" placeholder="VD: Bia, Rượu, Nước ngọt..." list="diCatDatalist" />
+                <label class="font-semibold text-slate-600 dark:text-slate-300">Phân loại</label>
+                <input type="text" class="form-input w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg p-2 text-slate-800 dark:text-slate-100" v-model="newProduct.category" placeholder="VD: Bia, Rượu, Nước ngọt..." list="diCatDatalist" />
                 <datalist id="diCatDatalist">
                   <option v-for="(cat, name) in categories" :key="name" :value="name" />
                 </datalist>
               </div>
               <div class="space-y-1">
-                <label class="font-semibold text-slate-600">Đơn vị</label>
-                <select class="form-input w-full border border-slate-200 rounded-lg p-2" v-model="newProduct.unit">
+                <label class="font-semibold text-slate-600 dark:text-slate-300">Đơn vị</label>
+                <select class="form-input w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg p-2 text-slate-800 dark:text-slate-100" v-model="newProduct.unit">
                   <option value="lon">Lon</option>
                   <option value="chai">Chai</option>
                   <option value="ly">Ly</option>
@@ -1739,21 +1739,21 @@ onMounted(async () => {
                 </select>
               </div>
               <div class="space-y-1">
-                <label class="font-semibold text-slate-600">Emoji đại diện</label>
-                <input type="text" class="form-input w-full border border-slate-200 rounded-lg p-2 text-center text-lg" v-model="newProduct.emoji" style="max-width: 60px;" />
+                <label class="font-semibold text-slate-600 dark:text-slate-300">Emoji đại diện</label>
+                <input type="text" class="form-input w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg p-2 text-center text-lg text-slate-800 dark:text-slate-100" v-model="newProduct.emoji" style="max-width: 60px;" />
               </div>
               <div class="space-y-1">
-                <label class="font-semibold text-slate-600">Dung tích</label>
-                <input type="text" class="form-input w-full border border-slate-200 rounded-lg p-2" v-model="newProduct.volume" placeholder="VD: 330ml" />
+                <label class="font-semibold text-slate-600 dark:text-slate-300">Dung tích</label>
+                <input type="text" class="form-input w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg p-2 text-slate-800 dark:text-slate-100" v-model="newProduct.volume" placeholder="VD: 330ml" />
               </div>
               <div class="space-y-1">
-                <label class="font-semibold text-slate-600">Quy cách thùng (số lượng/thùng)</label>
-                <input type="number" class="form-input w-full border border-slate-200 rounded-lg p-2" v-model="newProduct.caseSize" placeholder="VD: 24" min="1" />
+                <label class="font-semibold text-slate-600 dark:text-slate-300">Quy cách thùng (số lượng/thùng)</label>
+                <input type="number" class="form-input w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg p-2 text-slate-800 dark:text-slate-100" v-model="newProduct.caseSize" placeholder="VD: 24" min="1" />
               </div>
             </div>
             <div class="space-y-1 text-xs">
-              <label class="font-semibold text-slate-600 block">Tên trên CUKCUK (các tên alias, cách nhau bằng dấu phẩy)</label>
-              <input type="text" class="form-input w-full border border-slate-200 rounded-lg p-2 text-xs" v-model="newProduct.aliases" placeholder="VD: heineken, bia heineken silver, ken bac" />
+              <label class="font-semibold text-slate-600 dark:text-slate-300 block">Tên trên CUKCUK (các tên alias, cách nhau bằng dấu phẩy)</label>
+              <input type="text" class="form-input w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg p-2 text-xs text-slate-800 dark:text-slate-100" v-model="newProduct.aliases" placeholder="VD: heineken, bia heineken silver, ken bac" />
               <p class="text-[10px] text-slate-400">Dùng để so khớp chính xác tên sản phẩm khi đồng bộ hóa đơn CUKCUK</p>
             </div>
             <button class="btn btn-primary btn-sm flex items-center gap-1 text-xs" @click="addProduct">
@@ -1764,39 +1764,39 @@ onMounted(async () => {
           <!-- Product Catalog List -->
           <div class="space-y-3">
             <div class="flex justify-between items-center">
-              <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">📋 Danh sách ({{ products.length }} sản phẩm)</h4>
+              <h4 class="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">📋 Danh sách ({{ products.length }} sản phẩm)</h4>
               <div class="flex gap-2">
-                <button class="btn btn-sm btn-outline text-blue-600 border-blue-200 hover:bg-blue-50 flex items-center gap-1" @click="handleSyncCukcukMenu" :disabled="isSyncingMenu" title="Đồng bộ thực đơn từ CUKCUK">
+                <button class="btn btn-sm btn-secondary flex items-center gap-1" @click="handleSyncCukcukMenu" :disabled="isSyncingMenu" title="Đồng bộ thực đơn từ CUKCUK">
                   <span class="material-symbols-rounded text-sm" :class="{ 'animate-spin': isSyncingMenu }">sync</span> Đồng bộ CUKCUK
                 </button>
-                <button class="btn btn-sm btn-outline text-rose-600 border-rose-200 hover:bg-rose-50 flex items-center gap-1" @click="handleResetProducts" title="Khôi phục mặc định">
+                <button class="btn btn-sm btn-danger flex items-center gap-1" @click="handleResetProducts" title="Khôi phục mặc định">
                   <span class="material-symbols-rounded text-sm">restart_alt</span> Khôi phục gốc
                 </button>
               </div>
             </div>
-            <div class="border border-slate-100 rounded-xl overflow-hidden max-h-[300px] overflow-y-auto space-y-4 p-3 bg-white">
+            <div class="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden max-h-[300px] overflow-y-auto space-y-4 p-3 bg-white dark:bg-slate-800">
               <div v-for="(items, catName) in categories" :key="catName" class="space-y-1.5">
-                <div class="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider border-b border-blue-50 pb-1 mb-1.5">
+                <div class="text-[10px] font-extrabold text-teal-600 dark:text-teal-400 uppercase tracking-wider border-b border-teal-50 dark:border-teal-900/40 pb-1 mb-1.5">
                   {{ catName }}
                 </div>
                 <div 
                   v-for="p in items" 
                   :key="p.id" 
-                  class="flex items-center justify-between gap-3 text-xs border border-slate-50 bg-slate-50/20 hover:bg-slate-50/50 p-2 rounded-lg"
+                  class="flex items-center justify-between gap-3 text-xs border border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg"
                 >
                   <div class="flex items-center gap-2 flex-1 min-w-0">
                     <span class="text-lg shrink-0">{{ p.emoji }}</span>
-                    <span class="font-bold text-slate-800 truncate">{{ p.name }}</span>
-                    <span class="text-slate-400 text-[10px]">
+                    <span class="font-bold text-slate-800 dark:text-slate-200 truncate">{{ p.name }}</span>
+                    <span class="text-slate-400 dark:text-slate-400 text-[10px]">
                       ({{ p.unit }}<span v-if="p.volume"> · {{ p.volume }}</span><span v-if="p.caseSize"> · {{ p.caseSize }}/ thùng</span>)
                     </span>
                   </div>
                   <div class="flex items-center gap-3">
                     <label class="toggle-switch relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" class="sr-only peer" v-model="p.active" @change="handleProductToggle(p)" />
-                      <div class="w-7 h-4 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                      <div class="w-7 h-4 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
                     </label>
-                    <button class="btn-icon hover:bg-rose-50 p-1 rounded" @click="handleDeleteProduct(p.id)">
+                    <button class="btn-icon hover:bg-rose-50 dark:hover:bg-rose-950/40 p-1 rounded" @click="handleDeleteProduct(p.id)">
                       <span class="material-symbols-rounded text-rose-500 text-base">delete</span>
                     </button>
                   </div>
@@ -1806,30 +1806,30 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="border-t border-slate-100 pt-3 mt-4 flex justify-end">
-          <button class="btn btn-outline" @click="showProductManager = false">Đóng</button>
+        <div class="border-t border-slate-100 dark:border-slate-800 pt-3 mt-4 flex justify-end">
+          <button class="btn btn-secondary" @click="showProductManager = false">Đóng</button>
         </div>
       </div>
     </div>
 
     <!-- ═══ REPORT PREVIEW MODAL ═══ -->
     <div v-if="showReport" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" @click.self="showReport = false">
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-5xl w-full p-6 animate-scale-in flex flex-col max-h-[90vh]">
-        <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-          <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
-            <span class="material-symbols-rounded text-indigo-600">summarize</span>
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl max-w-5xl w-full p-6 animate-scale-in flex flex-col max-h-[90vh]">
+        <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 class="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+            <span class="material-symbols-rounded text-teal-600 dark:text-teal-400">summarize</span>
             <span>Báo cáo kiểm kê kho nước uống</span>
           </h3>
-          <button class="text-slate-400 hover:text-slate-600" @click="showReport = false">
+          <button class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" @click="showReport = false">
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>
 
         <div class="flex-1 flex gap-5 overflow-hidden min-h-0 flex-col lg:flex-row">
           <!-- Left: Actions & Summary -->
-          <div class="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-slate-100 pb-4 lg:pb-0 lg:pr-5 flex flex-col gap-4 flex-shrink-0 justify-between">
+          <div class="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800 pb-4 lg:pb-0 lg:pr-5 flex flex-col gap-4 flex-shrink-0 justify-between">
             <div class="space-y-3">
-              <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Xuất dữ liệu</h4>
+              <h4 class="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Xuất dữ liệu</h4>
               <button class="w-full btn btn-primary flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold" @click="handlePrintReport">
                 <span class="material-symbols-rounded text-lg">print</span>
                 <div class="text-left leading-tight text-xs">
@@ -1837,8 +1837,8 @@ onMounted(async () => {
                   <span class="block text-[9px] font-normal text-white/80">In trực tiếp qua máy in</span>
                 </div>
               </button>
-              <button class="w-full btn bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold" @click="handlePngExport">
-                <span class="material-symbols-rounded text-lg text-slate-600">image</span>
+              <button class="w-full btn btn-secondary flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold" @click="handlePngExport">
+                <span class="material-symbols-rounded text-lg">image</span>
                 <div class="text-left leading-tight text-xs">
                   <span class="block">Xuất ảnh PNG</span>
                   <span class="block text-[9px] font-normal text-slate-400">Tải ảnh chất lượng cao</span>
@@ -1846,20 +1846,20 @@ onMounted(async () => {
               </button>
             </div>
 
-            <div class="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2 text-xs mt-auto">
+            <div class="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl p-3 space-y-2 text-xs mt-auto">
               <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Tóm tắt ca</h5>
-              <div class="flex justify-between"><span class="text-slate-500">✅ Khớp</span><strong class="text-emerald-600">{{ stats.match }}/{{ stats.total }}</strong></div>
-              <div class="flex justify-between"><span class="text-slate-500">📈 Chênh dư</span><strong class="text-amber-600">{{ stats.surplus }}</strong></div>
-              <div class="flex justify-between"><span class="text-slate-500">📉 Chênh thiếu</span><strong class="text-rose-600">{{ stats.shortage }}</strong></div>
-              <div class="border-t border-slate-200/80 my-2 pt-2 space-y-1">
-                <div class="flex justify-between"><span class="text-slate-500">Đã bán (thực)</span><strong>{{ formatNum(stats.totalActual) }}</strong></div>
-                <div class="flex justify-between"><span class="text-slate-500">Đã bán (app)</span><strong>{{ formatNum(stats.totalCukcuk) }}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">✅ Khớp</span><strong class="text-emerald-600 dark:text-emerald-400">{{ stats.match }}/{{ stats.total }}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">📈 Chênh dư</span><strong class="text-amber-600 dark:text-amber-400">{{ stats.surplus }}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">📉 Chênh thiếu</span><strong class="text-rose-600 dark:text-rose-400">{{ stats.shortage }}</strong></div>
+              <div class="border-t border-slate-200/80 dark:border-slate-700/80 my-2 pt-2 space-y-1">
+                <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Đã bán (thực)</span><strong class="dark:text-slate-200">{{ formatNum(stats.totalActual) }}</strong></div>
+                <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Đã bán (app)</span><strong class="dark:text-slate-200">{{ formatNum(stats.totalCukcuk) }}</strong></div>
               </div>
             </div>
           </div>
 
           <!-- Right: Document Preview -->
-          <div class="flex-1 overflow-y-auto bg-slate-900/10 p-4 rounded-xl border border-slate-100">
+          <div class="flex-1 overflow-y-auto bg-slate-900/10 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
             <div 
               id="diReportPreview" 
               class="bg-white rounded-lg shadow-sm border border-slate-200/80 mx-auto max-w-[800px] overflow-hidden"
@@ -1868,8 +1868,8 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="border-t border-slate-100 pt-3 mt-4 flex justify-end">
-          <button class="btn btn-outline" @click="showReport = false">Đóng</button>
+        <div class="border-t border-slate-100 dark:border-slate-800 pt-3 mt-4 flex justify-end">
+          <button class="btn btn-secondary" @click="showReport = false">Đóng</button>
         </div>
       </div>
     </div>

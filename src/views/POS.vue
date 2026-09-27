@@ -725,20 +725,20 @@ function saveProduct() {
 
     <!-- 1. TABLE MAP VIEW -->
     <div v-if="screen === 'tables'" class="space-y-6">
-      <div class="flex items-center justify-between flex-wrap gap-4 bg-white p-4 rounded-2xl border border-slate-100">
+      <div class="flex items-center justify-between flex-wrap gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/60 dark:to-teal-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/60 dark:border-emerald-800/60 shadow-xs">
             <span class="material-symbols-rounded">point_of_sale</span>
           </div>
           <div>
-            <h3 class="text-base font-bold text-slate-800">Sơ đồ bàn phục vụ</h3>
-            <p class="text-xs text-slate-500">
-              {{ Object.keys(orders).filter(k => orderTotal(orders[k]) > 0).length }} bàn có khách / {{ tables.length }} tổng bàn
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Sơ đồ bàn phục vụ</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+              <strong class="text-emerald-600 dark:text-emerald-400">{{ Object.keys(orders).filter(k => orderTotal(orders[k]) > 0).length }}</strong> bàn có khách / {{ tables.length }} tổng bàn
             </p>
           </div>
         </div>
         <button 
-          class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          class="btn-secondary px-4 py-2 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
           :disabled="isSyncing"
           @click="syncPOSWithCloud"
         >
@@ -754,36 +754,36 @@ function saveProduct() {
           :key="zone"
           class="space-y-3.5"
         >
-          <h4 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider pl-1">{{ zone }}</h4>
-          <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-4">
+          <h4 class="text-xs font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-1">{{ zone }}</h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-3.5">
             <button 
               v-for="t in tables.filter(tbl => tbl.zone === zone)" 
               :key="t.id"
-              class="group relative p-4 rounded-2xl border transition-all duration-200 text-left flex flex-col justify-between h-28 cursor-pointer overflow-hidden active:scale-97 select-none"
+              class="group relative p-4 rounded-2xl border transition-all duration-200 text-left flex flex-col justify-between h-28 cursor-pointer overflow-hidden active:scale-97 select-none shadow-xs"
               :class="orders[t.id] && orders[t.id].items?.length > 0 
-                ? 'bg-gradient-to-br from-indigo-50 to-purple-50/50 border-indigo-200/60 shadow-sm shadow-indigo-500/5' 
-                : 'bg-white hover:bg-slate-50/50 border-slate-100 hover:border-slate-200'"
+                ? 'bg-gradient-to-br from-emerald-50/90 to-teal-50/90 dark:from-emerald-950/40 dark:to-teal-950/40 border-emerald-300 dark:border-emerald-700/60 shadow-xs' 
+                : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700'"
               @click="selectTable(t.id)"
             >
               <div class="flex items-center justify-between w-full">
-                <span class="text-xs font-black" :class="orders[t.id] && orders[t.id].items?.length > 0 ? 'text-indigo-800' : 'text-slate-600'">
+                <span class="text-xs font-black" :class="orders[t.id] && orders[t.id].items?.length > 0 ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-200'">
                   {{ t.name }}
                 </span>
-                <span class="text-[9px] font-bold text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded-md">
+                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md" :class="orders[t.id] && orders[t.id].items?.length > 0 ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-400'">
                   {{ t.seats }} Ghế
                 </span>
               </div>
 
               <!-- Occupied Info vs Free Indicator -->
               <div v-if="orders[t.id] && orders[t.id].items?.length > 0">
-                <div class="text-[11px] font-black text-indigo-700 leading-tight">
+                <div class="text-[11px] font-black text-emerald-700 dark:text-emerald-400 leading-tight">
                   {{ formatMoney(orderTotal(orders[t.id])) }}
                 </div>
-                <div class="text-[9px] text-slate-500 font-medium mt-1">
+                <div class="text-[9px] text-slate-500 dark:text-slate-400 font-semibold mt-1">
                   {{ orders[t.id].items.reduce((acc: number, i: any) => i.status === 'cancelled' ? acc : acc + i.qty, 0) }} món
                 </div>
               </div>
-              <div v-else class="text-[10px] text-slate-400 font-semibold">
+              <div v-else class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
                 Bàn trống
               </div>
             </button>
@@ -795,40 +795,40 @@ function saveProduct() {
     <!-- 2. DETAILED ORDER SCREEN FOR SINGLE TABLE -->
     <div v-else-if="screen === 'order' && activeTable" class="space-y-6 animate-fade-in">
       <!-- Sub-header navbar -->
-      <div class="flex items-center justify-between flex-wrap gap-4 bg-white p-4 rounded-2xl border border-slate-100">
+      <div class="flex items-center justify-between flex-wrap gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
         <div class="flex items-center gap-3">
           <button 
-            class="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all cursor-pointer"
+            class="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700 rounded-xl transition-all cursor-pointer"
             @click="screen = 'tables'; activeTableId = null;"
           >
-            <span class="material-symbols-rounded text-base text-slate-600">arrow_back</span>
+            <span class="material-symbols-rounded text-base text-slate-600 dark:text-slate-300">arrow_back</span>
           </button>
           <div>
-            <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-indigo-500 text-lg">table_restaurant</span>
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span class="material-symbols-rounded text-emerald-500 text-lg">table_restaurant</span>
               Bàn {{ activeTable.name }}
             </h3>
-            <p class="text-xs text-slate-500">Khu vực: {{ activeTable.zone }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 font-semibold">Khu vực: {{ activeTable.zone }}</p>
           </div>
         </div>
         
         <div class="flex gap-2">
           <button 
-            class="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-100 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+            class="px-3 py-2 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-600 dark:text-sky-400 border border-sky-200/60 dark:border-sky-800/60 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-xs"
             @click="triggerTransferTable"
           >
             <span class="material-symbols-rounded text-sm">swap_horiz</span>
             Chuyển bàn
           </button>
           <button 
-            class="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-600 border border-purple-100 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+            class="px-3 py-2 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/60 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-xs"
             @click="triggerMergeTable"
           >
             <span class="material-symbols-rounded text-sm">call_merge</span>
             Ghép bàn
           </button>
           <button 
-            class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+            class="btn-secondary px-3 py-2 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs"
             @click="triggerCatalogMgr"
           >
             <span class="material-symbols-rounded text-sm">menu_book</span>
@@ -841,13 +841,13 @@ function saveProduct() {
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         
         <!-- Left Column: Menu Items Selectors (2/3 width) -->
-        <div class="lg:col-span-2 space-y-4 bg-white p-6 rounded-3xl border border-slate-100">
-          <div class="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-xl px-3 py-1">
+        <div class="lg:col-span-2 space-y-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
+          <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 rounded-xl px-3 py-1">
             <span class="material-symbols-rounded text-slate-400">search</span>
             <input 
               v-model="searchQ"
               type="text" 
-              class="w-full bg-transparent py-2 text-xs font-semibold text-slate-700 focus:outline-hidden"
+              class="w-full bg-transparent py-2 text-xs font-semibold text-slate-700 dark:text-slate-100 focus:outline-hidden"
               placeholder="Tìm kiếm món trong thực đơn..."
             />
           </div>
@@ -857,10 +857,10 @@ function saveProduct() {
             <button 
               v-for="cat in categories" 
               :key="cat"
-              class="px-4 py-2 text-xs font-bold rounded-xl border whitespace-nowrap transition-all cursor-pointer"
+              class="px-4 py-2 text-xs font-extrabold rounded-xl border whitespace-nowrap transition-all cursor-pointer shadow-xs"
               :class="activeCatFilter === cat 
-                ? 'bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/20' 
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-100 text-slate-600'"
+                ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 border-transparent text-white shadow-xs' 
+                : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200/60 dark:border-slate-700 text-slate-600 dark:text-slate-300'"
               @click="activeCatFilter = cat"
             >
               {{ cat }}
@@ -868,27 +868,27 @@ function saveProduct() {
           </div>
 
           <!-- Products grid -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[55vh] overflow-y-auto pr-1">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5 max-h-[55vh] overflow-y-auto pr-1">
             <button 
               v-for="prod in filteredProducts" 
               :key="prod.id"
-              class="p-4 bg-slate-50/50 hover:bg-blue-50/20 active:scale-97 border border-slate-100/50 hover:border-blue-200/50 rounded-2xl transition-all text-left flex flex-col justify-between h-28 cursor-pointer select-none"
+              class="p-4 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/30 active:scale-97 border border-slate-100 dark:border-slate-800 hover:border-emerald-300/60 dark:hover:border-emerald-700/60 rounded-2xl transition-all text-left flex flex-col justify-between h-28 cursor-pointer select-none shadow-xs"
               @click="addProductToCart(prod)"
             >
               <span class="text-2xl">{{ prod.emoji }}</span>
               <div>
-                <div class="text-xs font-bold text-slate-800 truncate">{{ prod.name }}</div>
-                <div class="text-[10px] font-extrabold text-blue-700 mt-1">{{ formatMoney(prod.price) }}</div>
+                <div class="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">{{ prod.name }}</div>
+                <div class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 mt-1">{{ formatMoney(prod.price) }}</div>
               </div>
             </button>
           </div>
         </div>
 
         <!-- Right Column: Cart / Active Bill Tally (1/3 width) -->
-        <div class="bg-white rounded-3xl border border-slate-100 p-6 flex flex-col justify-between min-h-[65vh]">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col justify-between min-h-[65vh] shadow-xs transition-colors">
           <div class="space-y-4">
-            <h4 class="font-extrabold text-xs text-slate-400 uppercase tracking-wider border-b border-slate-50 pb-3 flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-indigo-500">shopping_cart</span>
+            <h4 class="font-extrabold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-1.5">
+              <span class="material-symbols-rounded text-emerald-500">shopping_cart</span>
               Giỏ hàng phục vụ
             </h4>
 
@@ -897,7 +897,7 @@ function saveProduct() {
               <div 
                 v-for="item in activeOrder?.items" 
                 :key="item.id"
-                class="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-50/50 transition-opacity"
+                class="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800 transition-opacity"
                 :class="{ 'opacity-40 line-through decoration-rose-500': item.status === 'cancelled' }"
               >
                 <!-- Item detail -->
@@ -908,38 +908,38 @@ function saveProduct() {
                       :class="item.status === 'cancelled' ? 'bg-rose-500' : item.isPrinted ? 'bg-emerald-500' : 'bg-amber-500'"
                       :title="item.status === 'cancelled' ? 'Đã hủy' : item.isPrinted ? 'Đã báo bếp' : 'Món mới chưa báo'"
                     ></span>
-                    <span class="text-xs font-bold text-slate-800 truncate">{{ item.emoji }} {{ item.name }}</span>
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{{ item.emoji }} {{ item.name }}</span>
                     <!-- Destination Tag -->
                     <span 
                       v-if="item.isPrinted"
                       class="text-[8px] font-bold px-1 py-0.2 rounded-sm uppercase tracking-wider shrink-0"
                       :class="item.kitchenDest === 'sashimi' 
-                        ? 'bg-amber-50 text-amber-600 border border-amber-200/30' 
-                        : item.kitchenDest === 'bar' ? 'bg-indigo-50 text-indigo-600 border border-indigo-200/30' : 'bg-emerald-50 text-emerald-600 border border-emerald-200/30'"
+                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/30' 
+                        : item.kitchenDest === 'bar' ? 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border border-cyan-200/30' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/30'"
                     >
                       {{ item.kitchenDest }}
                     </span>
                   </div>
                   <!-- Note and Cancel reason -->
-                  <div v-if="item.note" class="text-[10px] text-slate-400 mt-0.5 font-semibold">{{ item.note }}</div>
+                  <div v-if="item.note" class="text-[10px] text-slate-400 dark:text-slate-400 mt-0.5 font-semibold">{{ item.note }}</div>
                   <div v-if="item.status === 'cancelled' && item.cancelReason" class="text-[9px] text-rose-500 mt-0.5 font-bold">Lý do hủy: {{ item.cancelReason }}</div>
                 </div>
 
                 <!-- Qty adjuster -->
-                <div v-if="item.status !== 'cancelled'" class="flex items-center bg-slate-50 rounded-lg border border-slate-100 shrink-0">
-                  <button @click="adjustQty(item.id, -1)" class="w-6 h-6 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200/50 rounded-l-lg cursor-pointer border-0 bg-transparent">-</button>
-                  <span class="text-xs font-extrabold text-slate-800 w-6 text-center select-none">{{ item.qty }}</span>
-                  <button @click="adjustQty(item.id, 1)" class="w-6 h-6 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200/50 rounded-r-lg cursor-pointer border-0 bg-transparent">+</button>
+                <div v-if="item.status !== 'cancelled'" class="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                  <button @click="adjustQty(item.id, -1)" class="w-6 h-6 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700 rounded-l-lg cursor-pointer border-0 bg-transparent">-</button>
+                  <span class="text-xs font-extrabold text-slate-800 dark:text-slate-100 w-6 text-center select-none">{{ item.qty }}</span>
+                  <button @click="adjustQty(item.id, 1)" class="w-6 h-6 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700 rounded-r-lg cursor-pointer border-0 bg-transparent">+</button>
                 </div>
                 <div v-else class="text-[10px] font-bold text-rose-500 shrink-0">HỦY</div>
 
                 <!-- Price and action -->
                 <div class="flex items-center gap-1.5 shrink-0">
-                  <span class="text-xs font-bold text-slate-800 w-16 text-right">{{ formatMoney(item.price * item.qty) }}</span>
+                  <span class="text-xs font-black text-slate-800 dark:text-slate-100 w-16 text-right">{{ formatMoney(item.price * item.qty) }}</span>
                   <!-- Cancel printed or remove pending -->
                   <button 
                     v-if="item.isPrinted && item.status !== 'cancelled'"
-                    class="text-rose-500 hover:bg-rose-50 p-1 rounded-lg border-0 cursor-pointer"
+                    class="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 p-1 rounded-lg border-0 cursor-pointer"
                     title="Hủy món đã in"
                     @click="triggerCancelItem(item.id)"
                   >
@@ -947,7 +947,7 @@ function saveProduct() {
                   </button>
                   <button 
                     v-else-if="item.status !== 'cancelled'"
-                    class="text-slate-400 hover:bg-slate-100 p-1 rounded-lg border-0 cursor-pointer"
+                    class="text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 p-1 rounded-lg border-0 cursor-pointer"
                     title="Xóa"
                     @click="removeDirect(item.id)"
                   >
@@ -962,27 +962,27 @@ function saveProduct() {
           </div>
 
           <!-- Cart calculations and triggers -->
-          <div class="pt-6 border-t border-slate-100 space-y-4">
-            <div class="flex items-center justify-between text-sm font-bold text-slate-800">
+          <div class="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
+            <div class="flex items-center justify-between text-sm font-bold text-slate-800 dark:text-slate-100">
               <span>Tổng cộng hóa đơn:</span>
-              <span class="text-base text-emerald-600 font-extrabold">{{ formatMoney(orderTotal(activeOrder)) }}</span>
+              <span class="text-lg text-emerald-600 dark:text-emerald-400 font-black">{{ formatMoney(orderTotal(activeOrder)) }}</span>
             </div>
 
             <div class="grid grid-cols-2 gap-2 text-xs font-bold">
               <button 
-                class="py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl transition-all cursor-pointer"
+                class="btn-secondary py-2.5 text-xs font-bold"
                 @click="screen = 'tables'; activeTableId = null;"
               >
                 Lưu & Thoát
               </button>
               <button 
-                class="py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-xs transition-all cursor-pointer"
+                class="py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-xs transition-all cursor-pointer font-bold"
                 @click="handlePrintTempBill"
               >
                 🖨️ Tạm tính
               </button>
               <button 
-                class="col-span-2 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-100 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
+                class="col-span-2 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer font-bold disabled:opacity-40 shadow-xs"
                 :disabled="!hasUnprinted"
                 @click="handleKitchenBell"
               >
@@ -990,12 +990,12 @@ function saveProduct() {
                 Báo bếp / bar
               </button>
               <button 
-                class="col-span-2 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/10 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                class="btn-primary col-span-2 py-3 text-xs uppercase tracking-wider font-extrabold shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 :disabled="!activeOrder?.items?.length"
                 @click="triggerCheckout"
               >
                 <span class="material-symbols-rounded text-base">credit_score</span>
-                Thanh Toán kết đơn
+                Thanh toán kết đơn
               </button>
             </div>
           </div>
@@ -1006,44 +1006,44 @@ function saveProduct() {
 
     <!-- 3. MODALS LAYER -->
     <!-- CANCEL ITEM MODAL -->
-    <div v-if="activeModal === 'cancel_item'" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-slide-up">
-        <h4 class="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
+    <div v-if="activeModal === 'cancel_item'" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 space-y-4 animate-slide-up transition-colors">
+        <h4 class="font-extrabold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
           <span class="material-symbols-rounded text-rose-500">block</span>
           Xác nhận hủy món ăn
         </h4>
         
         <div>
-          <label class="block text-[10px] font-bold text-slate-500 uppercase mb-2">Lý do hủy món *</label>
+          <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Lý do hủy món *</label>
           <input 
             v-model="cancelReason"
             type="text" 
-            class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+            class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
             placeholder="VD: Hết nguyên liệu, đổi bàn..."
           />
         </div>
 
         <div class="flex gap-2 text-xs font-bold pt-2">
-          <button @click="activeModal = null" class="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl cursor-pointer">Không</button>
-          <button @click="confirmCancelItem" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl cursor-pointer">Xác nhận hủy</button>
+          <button @click="activeModal = null" class="btn-secondary flex-1 py-2 text-xs font-bold">Không</button>
+          <button @click="confirmCancelItem" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl cursor-pointer font-bold shadow-xs">Xác nhận hủy</button>
         </div>
       </div>
     </div>
 
     <!-- TRANSFER TABLE MODAL -->
-    <div v-if="activeModal === 'transfer_table'" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-slide-up">
-        <div class="flex items-center justify-between border-b border-slate-50 pb-3">
-          <h4 class="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
+    <div v-if="activeModal === 'transfer_table'" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 space-y-4 animate-slide-up transition-colors">
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h4 class="font-extrabold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
             <span class="material-symbols-rounded text-sky-500">swap_horiz</span>
             Chuyển bàn phục vụ
           </h4>
-          <button @click="activeModal = null" class="text-slate-400 hover:text-slate-600 border-0 bg-transparent cursor-pointer">
+          <button @click="activeModal = null" class="text-slate-400 hover:text-slate-600 dark:hover:text-white border-0 bg-transparent cursor-pointer">
             <span class="material-symbols-rounded text-lg">close</span>
           </button>
         </div>
 
-        <p class="text-xs text-slate-500">Chọn bàn trống để chuyển toàn bộ hóa đơn từ bàn {{ activeTable?.name }}:</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Chọn bàn trống để chuyển toàn bộ hóa đơn từ bàn {{ activeTable?.name }}:</p>
 
         <div class="max-h-[50vh] overflow-y-auto space-y-4">
           <div 
@@ -1056,10 +1056,10 @@ function saveProduct() {
               <button 
                 v-for="t in tables.filter(tbl => tbl.zone === zone && tbl.id !== activeTableId)" 
                 :key="t.id"
-                class="px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                class="px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs"
                 :class="orders[t.id] && orders[t.id].items?.length > 0 
-                  ? 'bg-slate-100 text-slate-400 border border-slate-200 opacity-50 cursor-not-allowed'
-                  : 'bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-100'"
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                  : 'bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-600 dark:text-sky-400 border border-sky-200/60 dark:border-sky-800/60'"
                 :disabled="orders[t.id] && orders[t.id].items?.length > 0"
                 @click="confirmTransferTable(t.id)"
               >
@@ -1072,34 +1072,34 @@ function saveProduct() {
     </div>
 
     <!-- MERGE TABLE MODAL -->
-    <div v-if="activeModal === 'merge_table'" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-slide-up">
-        <div class="flex items-center justify-between border-b border-slate-50 pb-3">
-          <h4 class="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
+    <div v-if="activeModal === 'merge_table'" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 space-y-4 animate-slide-up transition-colors">
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h4 class="font-extrabold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
             <span class="material-symbols-rounded text-purple-500">call_merge</span>
             Ghép bàn vào {{ activeTable?.name }}
           </h4>
-          <button @click="activeModal = null" class="text-slate-400 hover:text-slate-600 border-0 bg-transparent cursor-pointer">
+          <button @click="activeModal = null" class="text-slate-400 hover:text-slate-600 dark:hover:text-white border-0 bg-transparent cursor-pointer">
             <span class="material-symbols-rounded text-lg">close</span>
           </button>
         </div>
 
-        <p class="text-xs text-slate-500">Chọn bàn có khách muốn gộp order vào bàn {{ activeTable?.name }}:</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Chọn bàn có khách muốn gộp order vào bàn {{ activeTable?.name }}:</p>
 
         <div class="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
           <button 
             v-for="t in tables.filter(tbl => tbl.id !== activeTableId && orders[tbl.id] && orders[tbl.id].items?.length > 0)"
             :key="t.id"
-            class="w-full text-left p-3 rounded-xl border border-purple-100 bg-purple-50/30 hover:bg-purple-50 transition-all flex items-center justify-between cursor-pointer"
+            class="w-full text-left p-3 rounded-xl border border-purple-200/60 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/30 hover:bg-purple-50 dark:hover:bg-purple-900/40 transition-all flex items-center justify-between cursor-pointer shadow-xs"
             @click="confirmMergeTable(t.id)"
           >
             <div>
-              <span class="text-xs font-bold text-slate-800">Bàn {{ t.name }}</span>
-              <div class="text-[10px] text-slate-500 mt-0.5">
+              <span class="text-xs font-bold text-slate-800 dark:text-slate-100">Bàn {{ t.name }}</span>
+              <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                 {{ orders[t.id].items.reduce((acc: number, i: any) => i.status === 'cancelled' ? acc : acc + i.qty, 0) }} món
               </div>
             </div>
-            <span class="text-xs font-extrabold text-purple-700">{{ formatMoney(orderTotal(orders[t.id])) }}</span>
+            <span class="text-xs font-extrabold text-purple-700 dark:text-purple-300">{{ formatMoney(orderTotal(orders[t.id])) }}</span>
           </button>
           <div 
             v-if="tables.filter(tbl => tbl.id !== activeTableId && orders[tbl.id] && orders[tbl.id].items?.length > 0).length === 0"
@@ -1112,11 +1112,11 @@ function saveProduct() {
     </div>
 
     <!-- CATALOG MANAGER MODAL -->
-    <div v-if="activeModal === 'catalog'" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-slide-up">
-        <div class="p-6 bg-slate-900 text-white flex items-center justify-between">
+    <div v-if="activeModal === 'catalog'" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-slide-up transition-colors">
+        <div class="p-6 bg-slate-900 dark:bg-slate-950 text-white flex items-center justify-between">
           <h4 class="font-extrabold text-sm flex items-center gap-1.5">
-            <span class="material-symbols-rounded text-blue-500">menu_book</span>
+            <span class="material-symbols-rounded text-emerald-400">menu_book</span>
             Quản lý Menu thực đơn
           </h4>
           <button @click="activeModal = null" class="text-slate-400 hover:text-white border-0 bg-transparent cursor-pointer">
@@ -1126,32 +1126,32 @@ function saveProduct() {
 
         <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
           <!-- 1. Editor panel -->
-          <div v-if="isCatalogEditMode" class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3.5 animate-fade-in">
-            <span class="text-xs font-bold text-slate-800">{{ catalogEditIndex === -1 ? 'Thêm món ăn mới' : 'Sửa món ăn' }}</span>
+          <div v-if="isCatalogEditMode" class="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-700 space-y-3.5 animate-fade-in">
+            <span class="text-xs font-bold text-slate-800 dark:text-slate-100">{{ catalogEditIndex === -1 ? 'Thêm món ăn mới' : 'Sửa món ăn' }}</span>
             
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-2">
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Tên món</label>
-                <input v-model="editProduct.name" type="text" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-bold transition-all" />
+                <input v-model="editProduct.name" type="text" class="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-bold transition-all" />
               </div>
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Biểu tượng</label>
-                <input v-model="editProduct.emoji" type="text" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs text-center transition-all" />
+                <input v-model="editProduct.emoji" type="text" class="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs text-center transition-all" />
               </div>
             </div>
 
             <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Danh mục</label>
-                <input v-model="editProduct.category" type="text" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all" placeholder="VD: Nướng, Lẩu..." />
+                <input v-model="editProduct.category" type="text" class="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-semibold transition-all" placeholder="VD: Nướng, Lẩu..." />
               </div>
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Giá bán (đ)</label>
-                <input v-model.number="editProduct.price" type="number" class="w-full px-2.5 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-extrabold transition-all" />
+                <input v-model.number="editProduct.price" type="number" class="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-extrabold transition-all" />
               </div>
               <div>
                 <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Loại món</label>
-                <select v-model="editProduct.type" class="w-full px-2 py-2 border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none rounded-xl text-xs font-semibold transition-all cursor-pointer">
+                <select v-model="editProduct.type" class="w-full px-2 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none rounded-xl text-xs font-semibold transition-all cursor-pointer">
                   <option value="food">Món ăn (Bếp)</option>
                   <option value="drink">Đồ uống (Bar)</option>
                 </select>
@@ -1159,33 +1159,33 @@ function saveProduct() {
             </div>
 
             <div class="flex gap-2 pt-1.5 justify-end">
-              <button @click="isCatalogEditMode = false" class="px-3 py-1.5 bg-slate-200 text-slate-600 rounded-lg text-xs font-bold cursor-pointer">Hủy</button>
-              <button @click="saveProduct" class="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold cursor-pointer">Lưu lại</button>
+              <button @click="isCatalogEditMode = false" class="btn-secondary px-3 py-1.5 text-xs font-bold cursor-pointer">Hủy</button>
+              <button @click="saveProduct" class="btn-primary px-4 py-1.5 text-xs font-bold cursor-pointer">Lưu lại</button>
             </div>
           </div>
 
           <!-- 2. Product list -->
-          <div class="divide-y divide-slate-100">
+          <div class="divide-y divide-slate-100 dark:divide-slate-800">
             <div 
               v-for="(prod, idx) in catalog" 
               :key="prod.id"
               class="flex items-center justify-between py-2.5 first:pt-0 last:pb-0"
             >
               <div class="flex items-center gap-2.5">
-                <span class="text-xl bg-slate-50 p-1.5 rounded-lg border border-slate-100 shrink-0">{{ prod.emoji }}</span>
+                <span class="text-xl bg-slate-50 dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200/60 dark:border-slate-700 shrink-0">{{ prod.emoji }}</span>
                 <div>
-                  <span class="text-xs font-bold text-slate-800">{{ prod.name }}</span>
+                  <span class="text-xs font-bold text-slate-800 dark:text-slate-100">{{ prod.name }}</span>
                   <div class="text-[10px] text-slate-400 mt-0.5">
-                    {{ prod.category }} · {{ prod.type === 'food' ? 'Bếp' : 'Bar' }} · <span class="font-extrabold text-blue-600">{{ formatMoney(prod.price) }}</span>
+                    {{ prod.category }} · {{ prod.type === 'food' ? 'Bếp' : 'Bar' }} · <span class="font-extrabold text-emerald-600 dark:text-emerald-400">{{ formatMoney(prod.price) }}</span>
                   </div>
                 </div>
               </div>
 
               <div class="flex gap-1">
-                <button @click="startEditProduct(idx)" class="p-1 text-blue-600 hover:bg-blue-50 border-0 rounded-lg cursor-pointer">
+                <button @click="startEditProduct(idx)" class="p-1 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border-0 rounded-lg cursor-pointer">
                   <span class="material-symbols-rounded text-base">edit</span>
                 </button>
-                <button @click="deleteProduct(idx)" class="p-1 text-rose-600 hover:bg-rose-50 border-0 rounded-lg cursor-pointer">
+                <button @click="deleteProduct(idx)" class="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-0 rounded-lg cursor-pointer">
                   <span class="material-symbols-rounded text-base">delete</span>
                 </button>
               </div>
@@ -1193,9 +1193,9 @@ function saveProduct() {
           </div>
         </div>
 
-        <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-between">
-          <button @click="activeModal = null" class="px-4 py-2 border rounded-xl text-xs font-bold bg-white text-slate-600">Đóng lại</button>
-          <button @click="startAddProduct" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer">
+        <div class="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between">
+          <button @click="activeModal = null" class="btn-secondary px-4 py-2 text-xs font-bold">Đóng lại</button>
+          <button @click="startAddProduct" class="btn-primary px-4 py-2 text-xs font-bold flex items-center gap-1 cursor-pointer">
             <span class="material-symbols-rounded text-sm">add</span>
             Thêm món ăn
           </button>
@@ -1204,12 +1204,12 @@ function saveProduct() {
     </div>
 
     <!-- CHECKOUT MODAL -->
-    <div v-if="activeModal === 'checkout'" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden my-8 animate-slide-up">
-        <div class="p-6 bg-slate-900 text-white flex items-center justify-between">
+    <div v-if="activeModal === 'checkout'" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden my-8 animate-slide-up transition-colors">
+        <div class="p-6 bg-slate-900 dark:bg-slate-950 text-white flex items-center justify-between">
           <div>
             <h4 class="font-extrabold text-sm flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-emerald-500">payments</span>
+              <span class="material-symbols-rounded text-emerald-400">payments</span>
               Hóa đơn thanh toán bàn {{ activeTable?.name }}
             </h4>
             <p class="text-[10px] text-slate-400 mt-0.5">Xác nhận thu ngân kết toán và in hóa đơn cuối cùng.</p>
@@ -1221,26 +1221,26 @@ function saveProduct() {
 
         <div class="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
           <!-- Items details billing breakdown -->
-          <div class="border border-slate-100 rounded-2xl overflow-hidden text-xs">
+          <div class="border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden text-xs">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                <tr class="bg-slate-50 dark:bg-slate-800/60 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
                   <th class="py-2.5 px-4">Tên món</th>
                   <th class="py-2.5 px-4 text-center">SL</th>
                   <th class="py-2.5 px-4 text-right">Giá</th>
                   <th class="py-2.5 px-4 text-right">Tổng</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-50 text-slate-700 font-medium">
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300 font-medium">
                 <tr v-for="item in activeOrder?.items" :key="item.id" :class="{ 'opacity-40': item.status === 'cancelled' }">
                   <td class="py-2 px-4">{{ item.emoji }} {{ item.name }}</td>
-                  <td class="py-2 px-4 text-center">{{ item.qty }}</td>
+                  <td class="py-2 px-4 text-center font-bold">{{ item.qty }}</td>
                   <td class="py-2 px-4 text-right">{{ formatMoney(item.price) }}</td>
-                  <td class="py-2 px-4 text-right font-bold">{{ formatMoney(item.price * item.qty) }}</td>
+                  <td class="py-2 px-4 text-right font-black text-slate-800 dark:text-slate-100">{{ formatMoney(item.price * item.qty) }}</td>
                 </tr>
-                <tr class="bg-slate-50/50 font-bold border-t border-slate-100">
+                <tr class="bg-slate-50/50 dark:bg-slate-800/50 font-bold border-t border-slate-200/80 dark:border-slate-800">
                   <td colspan="3" class="py-2.5 px-4">TỔNG CỘNG THU:</td>
-                  <td class="py-2.5 px-4 text-right text-emerald-600 text-sm font-extrabold">
+                  <td class="py-2.5 px-4 text-right text-emerald-600 dark:text-emerald-400 text-sm font-black">
                     {{ formatMoney(orderTotal(activeOrder)) }}
                   </td>
                 </tr>
@@ -1250,13 +1250,13 @@ function saveProduct() {
 
           <!-- Pay Method toggle selection -->
           <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-2">Phương thức thanh toán</label>
+            <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Phương thức thanh toán</label>
             <div class="flex gap-2">
               <button 
                 class="flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer"
                 :class="checkoutMethod === 'cash' 
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'"
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white border-transparent shadow-xs' 
+                  : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'"
                 @click="checkoutMethod = 'cash'"
               >
                 💵 Tiền mặt
@@ -1264,8 +1264,8 @@ function saveProduct() {
               <button 
                 class="flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer"
                 :class="checkoutMethod === 'transfer' 
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'"
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white border-transparent shadow-xs' 
+                  : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'"
                 @click="checkoutMethod = 'transfer'"
               >
                 🏦 Chuyển khoản
@@ -1273,8 +1273,8 @@ function saveProduct() {
               <button 
                 class="flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer"
                 :class="checkoutMethod === 'card' 
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'"
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white border-transparent shadow-xs' 
+                  : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'"
                 @click="checkoutMethod = 'card'"
               >
                 💳 Quẹt thẻ
@@ -1285,10 +1285,10 @@ function saveProduct() {
           <!-- Dynamic VietQR Code widget for bank transfers -->
           <div 
             v-if="checkoutMethod === 'transfer'" 
-            class="p-4 bg-sky-50/20 border border-sky-100 rounded-2xl text-center space-y-2 animate-fade-in"
+            class="p-4 bg-sky-50/20 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/50 rounded-2xl text-center space-y-2 animate-fade-in"
           >
             <div v-if="vietQrUrl">
-              <span class="text-[10px] font-black text-sky-700 uppercase tracking-widest flex items-center justify-center gap-1">
+              <span class="text-[10px] font-black text-sky-700 dark:text-sky-300 uppercase tracking-widest flex items-center justify-center gap-1">
                 <span class="material-symbols-rounded text-sm">qr_code_2</span> Quét VietQR nhận thanh toán
               </span>
               <div class="inline-block bg-white p-2 rounded-2xl border border-slate-100 shadow-xs mt-2">
@@ -1302,19 +1302,19 @@ function saveProduct() {
 
           <!-- Additional Notes -->
           <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Ghi chú hóa đơn (tùy chọn)</label>
+            <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Ghi chú hóa đơn (tùy chọn)</label>
             <input 
               v-model="checkoutNote" 
               type="text" 
-              class="w-full px-3 py-2 border rounded-xl text-xs font-semibold"
+              class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-semibold focus:border-emerald-500"
               placeholder="VD: Nhận phiếu voucher, giảm giá, số lượng khách..."
             />
           </div>
         </div>
 
-        <div class="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
-          <button @click="activeModal = null" class="px-4 py-2 border rounded-xl text-xs font-bold bg-white text-slate-600">Hủy bỏ</button>
-          <button @click="confirmCheckout" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-emerald-500/10">
+        <div class="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-2 justify-end">
+          <button @click="activeModal = null" class="btn-secondary px-4 py-2 text-xs font-bold">Hủy bỏ</button>
+          <button @click="confirmCheckout" class="btn-primary px-5 py-2.5 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-sm">
             <span class="material-symbols-rounded text-sm">check_circle</span>
             Xác nhận & In hóa đơn
           </button>

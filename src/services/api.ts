@@ -1046,6 +1046,7 @@ export async function getCukcukInvoicesFromCloud(params: {
         filtered = filtered.filter(r => r.workDate === params.workDate);
       }
       if (params.fromDate) {
+        const fromDate = params.fromDate;
         filtered = filtered.filter(r => (r.workDate && r.workDate >= fromDate) || (r.refDate && r.refDate >= fromDate));
       }
       if (params.toDate) {

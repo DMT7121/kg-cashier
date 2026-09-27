@@ -341,74 +341,74 @@ function handleImportFile(event: Event) {
     <!-- Left Column: Health Monitor & DB Backup -->
     <div class="flex flex-col gap-6 xl:col-span-1">
       <!-- Health check monitor card -->
-      <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
-        <div class="border-b border-slate-100 pb-3">
-          <h4 class="text-md font-bold text-slate-800 flex items-center gap-2">
+      <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
+        <div class="border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h4 class="text-md font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <span class="material-symbols-rounded text-emerald-500">health_and_safety</span>
             Trạng thái kết nối Hệ thống
           </h4>
         </div>
 
         <div class="flex flex-col gap-3 text-xs">
-          <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
-            <span class="text-slate-500">Google Apps Script API:</span>
-            <span class="font-bold flex items-center gap-1" :class="isGasOk ? 'text-emerald-600' : 'text-rose-500'">
-              <span class="w-1.5 h-1.5 rounded-full" :class="isGasOk ? 'bg-emerald-600' : 'bg-rose-500'"></span>
+          <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800/80">
+            <span class="text-slate-500 dark:text-slate-400">Google Apps Script API:</span>
+            <span class="font-bold flex items-center gap-1.5" :class="isGasOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'">
+              <span class="w-2 h-2 rounded-full" :class="isGasOk ? 'bg-emerald-500' : 'bg-rose-500'"></span>
               {{ gasApiStatus }}
             </span>
           </div>
 
-          <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
-            <span class="text-slate-500">Môi trường ứng dụng:</span>
-            <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold uppercase">
+          <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800/80">
+            <span class="text-slate-500 dark:text-slate-400">Môi trường ứng dụng:</span>
+            <span class="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-700 dark:text-slate-300 font-bold uppercase">
               {{ metadata?.environment || 'webapp' }}
             </span>
           </div>
 
-          <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
-            <span class="text-slate-500">Hàng đợi đồng bộ (offline queue):</span>
-            <span class="font-bold font-mono" :class="queueLength > 0 ? 'text-amber-600' : 'text-slate-600'">
+          <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800/80">
+            <span class="text-slate-500 dark:text-slate-400">Hàng đợi đồng bộ (offline queue):</span>
+            <span class="font-bold font-mono" :class="queueLength > 0 ? 'text-amber-500' : 'text-slate-700 dark:text-slate-300'">
               {{ queueLength }} tác vụ
             </span>
           </div>
 
-          <div class="flex justify-between items-center py-1.5 border-b border-slate-50">
-            <span class="text-slate-500">Mạng LAN/Internet:</span>
-            <span class="font-bold" :class="onlineStatus ? 'text-emerald-600' : 'text-rose-500'">
+          <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800/80">
+            <span class="text-slate-500 dark:text-slate-400">Mạng LAN/Internet:</span>
+            <span class="font-bold" :class="onlineStatus ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'">
               {{ onlineStatus ? 'ONLINE' : 'OFFLINE' }}
             </span>
           </div>
 
-          <div class="flex justify-between items-center py-1.5">
-            <span class="text-slate-500">ID Thiết bị hiện tại:</span>
-            <span class="font-mono text-slate-400 text-[10px] select-all">{{ metadata?.deviceId || 'server' }}</span>
+          <div class="flex justify-between items-center py-2">
+            <span class="text-slate-500 dark:text-slate-400">ID Thiết bị hiện tại:</span>
+            <span class="font-mono text-slate-400 dark:text-slate-500 text-[10px] select-all">{{ metadata?.deviceId || 'server' }}</span>
           </div>
         </div>
       </div>
 
       <!-- Backup and Restore card -->
-      <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
-        <div class="border-b border-slate-100 pb-3">
-          <h4 class="text-md font-bold text-slate-800 flex items-center gap-2">
-            <span class="material-symbols-rounded text-indigo-500">cloud_upload</span>
+      <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
+        <div class="border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h4 class="text-md font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-rounded text-cyan-600 dark:text-cyan-400">cloud_upload</span>
             Sao lưu & Khôi phục (JSON Database)
           </h4>
         </div>
 
-        <p class="text-xs text-slate-500 leading-relaxed">
+        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           Xuất toàn bộ cơ sở dữ liệu hiện tại bao gồm cấu hình, mẫu in, lịch sử ca và các giao dịch ra tệp JSON sao lưu cục bộ.
         </p>
 
-        <div class="flex flex-col gap-2 mt-2">
+        <div class="flex flex-col gap-2.5 mt-2">
           <!-- Export button -->
-          <button @click="handleExportBackup" class="btn w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors">
+          <button @click="handleExportBackup" class="btn-primary w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-all">
             <span class="material-symbols-rounded text-sm">download</span>
             Xuất file sao lưu cấu hình (.json)
           </button>
 
           <!-- Import file selector wrapper -->
-          <label class="btn w-full py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors text-center">
-            <span class="material-symbols-rounded text-sm text-indigo-500">upload_file</span>
+          <label class="btn-secondary w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-colors text-center">
+            <span class="material-symbols-rounded text-sm text-cyan-600 dark:text-cyan-400">upload_file</span>
             Khôi phục từ file sao lưu (.json)
             <input type="file" @change="handleImportFile" accept=".json" class="hidden">
           </label>
@@ -419,88 +419,88 @@ function handleImportFile(event: Event) {
     <!-- Right Column: Cloud Index Rebuild & Shift Registry Conflict solver -->
     <div class="flex flex-col gap-6 xl:col-span-2">
       <!-- CUKCUK index sync card -->
-      <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
-        <div class="border-b border-slate-100 pb-3">
-          <h4 class="text-md font-bold text-slate-800 flex items-center gap-2">
-            <span class="material-symbols-rounded text-orange-500">speed</span>
+      <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
+        <div class="border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h4 class="text-md font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-rounded text-amber-500">speed</span>
             Tối ưu hóa & Tái tạo CUKCUK Sync Index
           </h4>
         </div>
 
-        <p class="text-xs text-slate-500 leading-relaxed">
-          Ứng dụng lưu trữ tệp chỉ mục hóa đơn <code>CUKCUK_INDEX</code> trên đám mây để kiểm tra đối soát ca tức thời trong O(1). Nếu chỉ mục hóa đơn bị sai lệch, thiếu sót, hoặc bị lệch số tiền bán, hãy chạy tái thiết lập chỉ mục để đồng bộ sạch từ máy chủ CUKCUK.
+        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          Ứng dụng lưu trữ tệp chỉ mục hóa đơn <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">CUKCUK_INDEX</code> trên đám mây để kiểm tra đối soát ca tức thời trong O(1). Nếu chỉ mục hóa đơn bị sai lệch, thiếu sót, hoặc bị lệch số tiền bán, hãy chạy tái thiết lập chỉ mục để đồng bộ sạch từ máy chủ CUKCUK.
         </p>
 
         <!-- Progress bar when rebuilding is running -->
-        <div v-if="showRebuildProgress" class="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl flex flex-col gap-2 animate-scaleUp">
+        <div v-if="showRebuildProgress" class="p-4 bg-cyan-50/50 dark:bg-slate-800 border border-cyan-100 dark:border-slate-700 rounded-xl flex flex-col gap-2 animate-scaleUp">
           <div class="flex justify-between items-center text-xs">
-            <span class="font-bold text-indigo-900">{{ rebuildStatusText }}</span>
-            <span class="font-mono font-bold text-indigo-700">{{ rebuildProgressPercent }}%</span>
+            <span class="font-bold text-cyan-900 dark:text-cyan-200">{{ rebuildStatusText }}</span>
+            <span class="font-mono font-bold text-cyan-700 dark:text-cyan-400">{{ rebuildProgressPercent }}%</span>
           </div>
-          <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-            <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" :style="{ width: rebuildProgressPercent + '%' }"></div>
+          <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+            <div class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-2.5 rounded-full transition-all duration-300" :style="{ width: rebuildProgressPercent + '%' }"></div>
           </div>
-          <pre class="text-[10px] text-slate-500 font-mono whitespace-pre-wrap leading-tight mt-1">{{ rebuildDetailText }}</pre>
+          <pre class="text-[10px] text-slate-500 dark:text-slate-400 font-mono whitespace-pre-wrap leading-tight mt-1">{{ rebuildDetailText }}</pre>
         </div>
 
         <!-- Trigger buttons -->
         <div class="flex flex-col sm:flex-row gap-3 items-end mt-2">
           <div class="form-group flex-1 w-full">
-            <label class="text-[11px] font-bold text-slate-700 mb-1 block">🔐 Mật khẩu quản lý (Admin/Manager)</label>
-            <input type="password" v-model="managerPassword" class="form-input w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" style="letter-spacing: 2px;" placeholder="Nhập mật khẩu quản lý...">
+            <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">🔐 Mật khẩu quản lý (Admin/Manager)</label>
+            <input type="password" v-model="managerPassword" class="form-input w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-xs" style="letter-spacing: 2px;" placeholder="Nhập mật khẩu quản lý...">
           </div>
-          <button @click="handleRebuildIndex" :disabled="rebuildRunning" class="btn px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 h-9 shrink-0">
+          <button @click="handleRebuildIndex" :disabled="rebuildRunning" class="btn px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 h-10 shrink-0 shadow-sm">
             <span class="material-symbols-rounded text-sm">build_circle</span>
             Tái thiết lập CUKCUK Index
           </button>
         </div>
 
         <!-- Sync state logs block -->
-        <div class="mt-4 border border-slate-100 rounded-xl p-4 bg-slate-50">
-          <h5 class="text-xs font-bold text-slate-700 mb-2">Trạng thái đồng bộ đám mây hiện tại:</h5>
-          <div class="font-mono text-xs text-slate-600 flex flex-col gap-1.5 leading-relaxed">
-            <div><strong class="text-slate-800">Tác vụ:</strong> {{ cukSyncTaskName }}</div>
-            <div><strong class="text-slate-800">Trạng thái:</strong> <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="cukSyncStatus === 'RUNNING' ? 'bg-amber-50 text-amber-700 border border-amber-100' : cukSyncStatus === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500'">{{ cukSyncStatus }}</span></div>
-            <div><strong class="text-slate-800">Tiến độ dòng:</strong> {{ cukSyncProgress }}</div>
-            <div v-if="cukSyncDetails"><strong class="text-slate-800">Chi tiết:</strong> {{ cukSyncDetails }}</div>
-            <div><strong class="text-slate-800">Cập nhật:</strong> {{ cukSyncTime }}</div>
+        <div class="mt-4 border border-slate-100 dark:border-slate-800 rounded-xl p-4 bg-slate-50 dark:bg-slate-800/50">
+          <h5 class="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Trạng thái đồng bộ đám mây hiện tại:</h5>
+          <div class="font-mono text-xs text-slate-600 dark:text-slate-400 flex flex-col gap-1.5 leading-relaxed">
+            <div><strong class="text-slate-800 dark:text-slate-200">Tác vụ:</strong> {{ cukSyncTaskName }}</div>
+            <div><strong class="text-slate-800 dark:text-slate-200">Trạng thái:</strong> <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="cukSyncStatus === 'RUNNING' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-800' : cukSyncStatus === 'COMPLETED' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'">{{ cukSyncStatus }}</span></div>
+            <div><strong class="text-slate-800 dark:text-slate-200">Tiến độ dòng:</strong> {{ cukSyncProgress }}</div>
+            <div v-if="cukSyncDetails"><strong class="text-slate-800 dark:text-slate-200">Chi tiết:</strong> {{ cukSyncDetails }}</div>
+            <div><strong class="text-slate-800 dark:text-slate-200">Cập nhật:</strong> {{ cukSyncTime }}</div>
           </div>
         </div>
       </div>
 
       <!-- Cloud Shift registry management card -->
-      <div class="card p-6 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
-        <div class="border-b border-slate-100 pb-3 flex justify-between items-center flex-wrap gap-4">
+      <div class="card p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
+        <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h4 class="text-md font-bold text-slate-800 flex items-center gap-2">
+            <h4 class="text-md font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <span class="material-symbols-rounded text-amber-500">dns</span>
               Đăng ký Ca & Kiểm soát đa thiết bị (Cloud Registry)
             </h4>
-            <p class="text-xs text-slate-500 mt-0.5">Registry giám sát các ca đang hoạt động thực tế trên đám mây.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Registry giám sát các ca đang hoạt động thực tế trên đám mây.</p>
           </div>
 
           <div class="flex gap-2">
-            <button @click="loadRegistryAndSyncStates" :disabled="registryLoading" class="btn btn-outline flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50">
+            <button @click="loadRegistryAndSyncStates" :disabled="registryLoading" class="btn-secondary flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs disabled:opacity-50">
               <span class="material-symbols-rounded text-sm" :class="{ 'animate-spin': registryLoading }">refresh</span>
               Quét lại
             </button>
-            <button @click="handleRepairRegistry" class="btn btn-outline flex items-center justify-center gap-1.5 px-3 py-1.5 border border-rose-200 hover:bg-rose-50 text-rose-700 rounded-lg text-xs font-semibold transition-colors">
+            <button @click="handleRepairRegistry" class="btn-ghost flex items-center justify-center gap-1.5 px-3 py-1.5 border border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-semibold transition-colors">
               <span class="material-symbols-rounded text-sm">healing</span>
               Tự sửa lỗi Treo Ca
             </button>
           </div>
         </div>
 
-        <div v-if="registryError" class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 text-center">
+        <div v-if="registryError" class="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-800 dark:text-rose-300 text-center">
           Không thể tải Cloud Registry: {{ registryError }}
         </div>
 
         <!-- Shift registry tables -->
-        <div v-else class="border border-slate-100 rounded-xl overflow-hidden">
+        <div v-else class="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
               <thead>
-                <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-100">
+                <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-100 dark:border-slate-800">
                   <th class="p-3">ID Ca</th>
                   <th class="p-3">Ngày Làm Việc</th>
                   <th class="p-3">Số Ca</th>
@@ -510,24 +510,24 @@ function handleImportFile(event: Event) {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="registryList.length === 0" class="text-center text-slate-400">
+                <tr v-if="registryList.length === 0" class="text-center text-slate-400 dark:text-slate-500">
                   <td colspan="6" class="p-6">Hiện không có ca nào được đăng ký trên Cloud.</td>
                 </tr>
-                <tr v-else v-for="item in registryList" :key="item.id" class="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                  <td class="p-3 font-mono font-bold text-slate-800">{{ item.id }}</td>
-                  <td class="p-3">{{ item.date || item.workDay }}</td>
-                  <td class="p-3 font-semibold">Ca {{ item.shiftNumber }}</td>
-                  <td class="p-3">{{ item.cashierName }}</td>
+                <tr v-else v-for="item in registryList" :key="item.id" class="border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                  <td class="p-3 font-mono font-bold text-slate-800 dark:text-slate-200">{{ item.id }}</td>
+                  <td class="p-3 text-slate-600 dark:text-slate-300">{{ item.date || item.workDay }}</td>
+                  <td class="p-3 font-semibold text-slate-800 dark:text-slate-200">Ca {{ item.shiftNumber }}</td>
+                  <td class="p-3 text-slate-600 dark:text-slate-300">{{ item.cashierName }}</td>
                   <td class="p-3">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold border" :class="item.status === 'open' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : item.status === 'closed' ? 'bg-slate-50 text-slate-500 border-slate-100' : 'bg-rose-50 text-rose-700 border-rose-100'">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold border" :class="item.status === 'open' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800' : item.status === 'closed' ? 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-700' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-100 dark:border-rose-800'">
                       {{ item.status === 'open' ? 'Đang Mở' : item.status === 'closed' ? 'Đã Đóng' : 'Đã Hủy' }}
                     </span>
                   </td>
                   <td class="p-3 text-center">
-                    <button v-if="item.status === 'open'" @click="handleVoidShift(item.id)" class="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold transition-colors">
+                    <button v-if="item.status === 'open'" @click="handleVoidShift(item.id)" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-xs">
                       Hủy ca (Void)
                     </button>
-                    <span v-else class="text-slate-400">—</span>
+                    <span v-else class="text-slate-400 dark:text-slate-600">—</span>
                   </td>
                 </tr>
               </tbody>

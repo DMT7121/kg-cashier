@@ -194,16 +194,16 @@ onUnmounted(() => {
 <template>
   <div class="view-content p-6">
     <!-- If no shift is open -->
-    <div v-if="!shiftStore.currentShift" class="max-w-md mx-auto mt-12 text-center bg-white p-8 rounded-3xl border border-slate-100 shadow-xs space-y-6">
-      <div class="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+    <div v-if="!shiftStore.currentShift" class="max-w-md mx-auto mt-12 text-center bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-6 transition-colors">
+      <div class="w-16 h-16 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-200/60 dark:border-amber-800/60">
         <span class="material-symbols-rounded text-3xl">lock</span>
       </div>
       <div>
-        <h2 class="text-xl font-bold text-slate-800">Chưa mở ca làm việc</h2>
-        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">Bạn cần mở ca làm việc trước khi thực hiện kiểm kê tiền mặt.</p>
+        <h2 class="text-xl font-extrabold text-slate-800 dark:text-white">Chưa mở ca làm việc</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">Bạn cần mở ca làm việc trước khi thực hiện kiểm kê tiền mặt.</p>
       </div>
       <button 
-        class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all cursor-pointer shadow-md"
+        class="btn-primary w-full py-3.5 text-xs uppercase tracking-wider font-extrabold shadow-sm cursor-pointer transition-all"
         @click="shiftStore.loadShifts()"
       >
         Quay lại trang chủ
@@ -214,40 +214,41 @@ onUnmounted(() => {
     <div v-else class="space-y-6 max-w-4xl mx-auto animate-fade-in">
       <div class="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h3 class="text-lg font-black text-slate-800">💰 Kiểm kê tiền mặt</h3>
-          <p class="text-xs text-slate-400 font-semibold mt-0.5">📌 Ghim (két cố định) + 🔒 Giữ (giữ lại két) + 🤝 Giao (bàn giao)</p>
+          <h3 class="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <span class="text-xl">💰</span> Kiểm kê tiền mặt
+          </h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">📌 Ghim (két cố định) + 🔒 Giữ (giữ lại két) + 🤝 Giao (bàn giao)</p>
         </div>
         <button 
-          class="px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+          class="btn-secondary px-4 py-2 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
           @click="handleReset"
         >
-          <span class="material-symbols-rounded text-sm">restart_alt</span> Đặt lại
+          <span class="material-symbols-rounded text-base">restart_alt</span> Đặt lại
         </button>
       </div>
 
       <!-- Denominations Grid -->
-      <div class="bg-white rounded-3xl border border-slate-100 p-6 shadow-xs space-y-4">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs space-y-3.5 transition-colors">
         <div 
           v-for="d in denominations" 
           :key="d.value"
-          class="flex items-center justify-between border-b border-slate-50 pb-4 last:border-b-0 last:pb-0 flex-wrap gap-4"
+          class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3.5 last:border-b-0 last:pb-0 flex-wrap gap-4"
         >
-          <!-- Denomination Label Badge -->
+          <!-- Denomination Label Badge (Clean subtle pill) -->
           <div 
-            class="w-24 text-center py-1.5 rounded-xl font-black text-xs text-white select-none shadow-xs"
-            :style="{ backgroundColor: d.color }"
+            class="w-24 text-center py-2 rounded-xl font-black text-xs select-none shadow-xs border bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-slate-200/70 dark:border-slate-700"
           >
             {{ d.label }}
           </div>
 
           <!-- Input Fields Column -->
-          <div class="flex-1 min-w-[280px] grid grid-cols-3 gap-3">
+          <div class="flex-1 min-w-[300px] grid grid-cols-3 gap-3">
             <!-- Pin Column -->
             <div class="space-y-1">
-              <span class="block text-[10px] font-black text-amber-600/90 uppercase tracking-wider text-center">📌 Ghim</span>
-              <div class="flex items-center border border-slate-200/80 rounded-xl overflow-hidden bg-slate-50/50">
+              <span class="block text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider text-center">📌 Ghim</span>
+              <div class="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50/60 dark:bg-slate-800/60 h-10">
                 <button 
-                  class="p-1.5 hover:bg-slate-100 border-0 bg-transparent text-slate-500 cursor-pointer select-none"
+                  class="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-slate-700 border-0 bg-transparent text-slate-500 dark:text-slate-400 cursor-pointer select-none active:scale-90 transition-transform"
                   @mousedown="startPress('pin', d.value, -1)"
                   @mouseup="stopPress"
                   @mouseleave="stopPress"
@@ -259,11 +260,11 @@ onUnmounted(() => {
                 <input 
                   type="number" 
                   v-model.number="pinned[d.value]"
-                  class="w-full text-center bg-transparent border-0 font-extrabold text-xs focus:outline-none p-0 focus:ring-0"
+                  class="w-full text-center bg-transparent border-0 font-black text-xs text-slate-800 dark:text-slate-100 focus:outline-none p-0 focus:ring-0"
                   min="0"
                 />
                 <button 
-                  class="p-1.5 hover:bg-slate-100 border-0 bg-transparent text-slate-500 cursor-pointer select-none"
+                  class="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-slate-700 border-0 bg-transparent text-slate-500 dark:text-slate-400 cursor-pointer select-none active:scale-90 transition-transform"
                   @mousedown="startPress('pin', d.value, 1)"
                   @mouseup="stopPress"
                   @mouseleave="stopPress"
@@ -277,10 +278,10 @@ onUnmounted(() => {
 
             <!-- Keep Column -->
             <div class="space-y-1">
-              <span class="block text-[10px] font-black text-indigo-600/90 uppercase tracking-wider text-center">🔒 Giữ</span>
-              <div class="flex items-center border border-slate-200/80 rounded-xl overflow-hidden bg-slate-50/50">
+              <span class="block text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-wider text-center">🔒 Giữ</span>
+              <div class="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50/60 dark:bg-slate-800/60 h-10">
                 <button 
-                  class="p-1.5 hover:bg-slate-100 border-0 bg-transparent text-slate-500 cursor-pointer select-none"
+                  class="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-slate-700 border-0 bg-transparent text-slate-500 dark:text-slate-400 cursor-pointer select-none active:scale-90 transition-transform"
                   @mousedown="startPress('keep', d.value, -1)"
                   @mouseup="stopPress"
                   @mouseleave="stopPress"
@@ -292,11 +293,11 @@ onUnmounted(() => {
                 <input 
                   type="number" 
                   v-model.number="keep[d.value]"
-                  class="w-full text-center bg-transparent border-0 font-extrabold text-xs focus:outline-none p-0 focus:ring-0"
+                  class="w-full text-center bg-transparent border-0 font-black text-xs text-slate-800 dark:text-slate-100 focus:outline-none p-0 focus:ring-0"
                   min="0"
                 />
                 <button 
-                  class="p-1.5 hover:bg-slate-100 border-0 bg-transparent text-slate-500 cursor-pointer select-none"
+                  class="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-slate-700 border-0 bg-transparent text-slate-500 dark:text-slate-400 cursor-pointer select-none active:scale-90 transition-transform"
                   @mousedown="startPress('keep', d.value, 1)"
                   @mouseup="stopPress"
                   @mouseleave="stopPress"
@@ -310,10 +311,10 @@ onUnmounted(() => {
 
             <!-- Handover Column -->
             <div class="space-y-1">
-              <span class="block text-[10px] font-black text-emerald-600/90 uppercase tracking-wider text-center">🤝 Giao</span>
-              <div class="flex items-center border border-slate-200/80 rounded-xl overflow-hidden bg-slate-50/50">
+              <span class="block text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-center">🤝 Giao</span>
+              <div class="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50/60 dark:bg-slate-800/60 h-10">
                 <button 
-                  class="p-1.5 hover:bg-slate-100 border-0 bg-transparent text-slate-500 cursor-pointer select-none"
+                  class="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-slate-700 border-0 bg-transparent text-slate-500 dark:text-slate-400 cursor-pointer select-none active:scale-90 transition-transform"
                   @mousedown="startPress('hand', d.value, -1)"
                   @mouseup="stopPress"
                   @mouseleave="stopPress"
@@ -325,11 +326,11 @@ onUnmounted(() => {
                 <input 
                   type="number" 
                   v-model.number="hand[d.value]"
-                  class="w-full text-center bg-transparent border-0 font-extrabold text-xs focus:outline-none p-0 focus:ring-0"
+                  class="w-full text-center bg-transparent border-0 font-black text-xs text-slate-800 dark:text-slate-100 focus:outline-none p-0 focus:ring-0"
                   min="0"
                 />
                 <button 
-                  class="p-1.5 hover:bg-slate-100 border-0 bg-transparent text-slate-500 cursor-pointer select-none"
+                  class="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-slate-700 border-0 bg-transparent text-slate-500 dark:text-slate-400 cursor-pointer select-none active:scale-90 transition-transform"
                   @mousedown="startPress('hand', d.value, 1)"
                   @mouseup="stopPress"
                   @mouseleave="stopPress"
@@ -343,10 +344,10 @@ onUnmounted(() => {
           </div>
 
           <!-- Subtotal column -->
-          <div class="text-right min-w-[120px] font-bold text-[11px] text-slate-500 flex flex-col justify-center">
+          <div class="text-right min-w-[120px] font-bold text-[11px] text-slate-500 dark:text-slate-400 flex flex-col justify-center">
             <span>Két: {{ formatMoney(d.value * ((pinned[d.value] || 0) + (keep[d.value] || 0))) }}</span>
             <span>Giao: {{ formatMoney(d.value * (hand[d.value] || 0)) }}</span>
-            <span class="text-xs font-black text-slate-800">Σ {{ formatMoney(d.value * ((pinned[d.value] || 0) + (keep[d.value] || 0) + (hand[d.value] || 0))) }}</span>
+            <span class="text-xs font-black text-slate-800 dark:text-slate-100">Σ {{ formatMoney(d.value * ((pinned[d.value] || 0) + (keep[d.value] || 0) + (hand[d.value] || 0))) }}</span>
           </div>
 
         </div>
@@ -354,26 +355,26 @@ onUnmounted(() => {
 
       <!-- Expected Discrepancy Bar Card -->
       <div 
-        class="border p-5 rounded-3xl shadow-xs transition-all duration-300"
+        class="border p-5 rounded-3xl shadow-xs transition-all duration-300 dark:bg-slate-900 dark:border-slate-800"
         :class="discrepancyStatus.bg"
       >
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
           <div>
-            <div class="text-slate-500 text-[10px] font-black uppercase tracking-wider mb-1">💵 Tiền mặt kỳ vọng</div>
-            <div class="text-xl font-extrabold text-blue-600 tabular-nums">{{ formatMoney(expectedCash) }}</div>
-            <div class="text-[9px] text-slate-400 font-semibold mt-1">Đầu ca + TM thu − TM chi ± Khác</div>
+            <div class="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1">💵 Tiền mặt kỳ vọng</div>
+            <div class="text-xl font-black text-cyan-600 dark:text-cyan-400 tabular-nums">{{ formatMoney(expectedCash) }}</div>
+            <div class="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-1">Đầu ca + TM thu − TM chi ± Khác</div>
           </div>
           <div>
-            <div class="text-slate-500 text-[10px] font-black uppercase tracking-wider mb-1">💰 Thực tế kiểm kê</div>
-            <div class="text-xl font-extrabold text-slate-800 tabular-nums">{{ formatMoney(totalAll) }}</div>
-            <div class="text-[9px] text-slate-400 font-semibold mt-1">Két ({{ formatMoney(totalKet) }}) + Giao ({{ formatMoney(totalGiao) }})</div>
+            <div class="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1">💰 Thực tế kiểm kê</div>
+            <div class="text-xl font-black text-slate-800 dark:text-slate-100 tabular-nums">{{ formatMoney(totalAll) }}</div>
+            <div class="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-1">Két ({{ formatMoney(totalKet) }}) + Giao ({{ formatMoney(totalGiao) }})</div>
           </div>
           <div>
-            <div class="text-slate-500 text-[10px] font-black uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
+            <div class="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
               <span class="material-symbols-rounded text-sm" :class="discrepancyStatus.color">{{ discrepancyStatus.icon }}</span>
               Chênh lệch
             </div>
-            <div class="text-xl font-extrabold tabular-nums" :class="discrepancyStatus.color">
+            <div class="text-xl font-black tabular-nums" :class="discrepancyStatus.color">
               {{ discrepancy >= 0 ? '+' : '' }}{{ formatMoney(discrepancy) }}
             </div>
             <div class="text-[9px] font-black mt-1" :class="discrepancyStatus.color">
@@ -385,32 +386,32 @@ onUnmounted(() => {
 
       <!-- Quick totals visual list -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl flex items-center justify-between">
+        <div class="p-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 rounded-2xl flex items-center justify-between shadow-xs">
           <div class="space-y-1">
-            <span class="block text-[10px] font-black text-amber-700 uppercase tracking-wider">📌🔒 Tổng tiền két</span>
-            <strong class="text-sm font-black text-amber-900 tabular-nums">{{ formatMoney(totalKet) }}</strong>
+            <span class="block text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">📌🔒 Tổng tiền két</span>
+            <strong class="text-sm font-black text-amber-900 dark:text-amber-200 tabular-nums">{{ formatMoney(totalKet) }}</strong>
           </div>
           <span class="material-symbols-rounded text-amber-500 text-2xl">safe</span>
         </div>
-        <div class="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center justify-between">
+        <div class="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-2xl flex items-center justify-between shadow-xs">
           <div class="space-y-1">
-            <span class="block text-[10px] font-black text-emerald-700 uppercase tracking-wider">🤝 Tiền bàn giao</span>
-            <strong class="text-sm font-black text-emerald-900 tabular-nums">{{ formatMoney(totalGiao) }}</strong>
+            <span class="block text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">🤝 Tiền bàn giao</span>
+            <strong class="text-sm font-black text-emerald-900 dark:text-emerald-200 tabular-nums">{{ formatMoney(totalGiao) }}</strong>
           </div>
           <span class="material-symbols-rounded text-emerald-500 text-2xl">handshake</span>
         </div>
-        <div class="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl flex items-center justify-between">
+        <div class="p-4 bg-cyan-50/50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-900/50 rounded-2xl flex items-center justify-between shadow-xs">
           <div class="space-y-1">
-            <span class="block text-[10px] font-black text-indigo-700 uppercase tracking-wider">💰 TỔNG KIỂM KÊ</span>
-            <strong class="text-sm font-black text-indigo-900 tabular-nums">{{ formatMoney(totalAll) }}</strong>
+            <span class="block text-[10px] font-black text-cyan-700 dark:text-cyan-400 uppercase tracking-wider">💰 TỔNG KIỂM KÊ</span>
+            <strong class="text-sm font-black text-cyan-900 dark:text-cyan-200 tabular-nums">{{ formatMoney(totalAll) }}</strong>
           </div>
-          <span class="material-symbols-rounded text-indigo-500 text-2xl">monetization_on</span>
+          <span class="material-symbols-rounded text-cyan-500 text-2xl">monetization_on</span>
         </div>
       </div>
 
       <!-- Action Button Save -->
       <button 
-        class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm rounded-2xl transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 border border-blue-500"
+        class="btn-primary w-full py-3.5 text-xs uppercase tracking-wider font-extrabold shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
         @click="handleSave"
       >
         <span class="material-symbols-rounded text-lg">save</span> Lưu kiểm kê

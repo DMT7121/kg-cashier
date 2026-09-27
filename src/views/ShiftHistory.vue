@@ -793,27 +793,27 @@ async function saveInvoiceSnapshot(invoices: any[]) {
     <!-- Header Dashboard Section -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
       <div>
-        <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <span class="material-symbols-rounded text-indigo-600 text-3xl">auto_stories</span>
+        <h3 class="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400 text-3xl">auto_stories</span>
           Lịch sử ca làm việc
         </h3>
-        <p class="text-slate-500 mt-1">Quản lý, tìm kiếm và điều chỉnh các ca làm việc đã đóng.</p>
+        <p class="text-slate-500 dark:text-slate-400 mt-1">Quản lý, tìm kiếm và điều chỉnh các ca làm việc đã đóng.</p>
       </div>
       <div class="flex flex-wrap gap-2.5">
-        <button class="btn btn-outline btn-sm flex items-center gap-1.5" @click="rebuildSnapshots" title="Cập nhật lại số liệu lịch sử từ dữ liệu CUKCUK mới nhất">
+        <button class="btn btn-secondary btn-sm flex items-center gap-1.5" @click="rebuildSnapshots" title="Cập nhật lại số liệu lịch sử từ dữ liệu CUKCUK mới nhất">
           <span class="material-symbols-rounded text-lg">refresh</span> Làm mới số liệu
         </button>
-        <button class="btn btn-outline btn-sm flex items-center gap-1.5" @click="syncWithCloud" :disabled="isSyncingCloud">
+        <button class="btn btn-secondary btn-sm flex items-center gap-1.5" @click="syncWithCloud" :disabled="isSyncingCloud">
           <span class="material-symbols-rounded text-lg" :class="{ 'spin': isSyncingCloud }">cloud_sync</span> Đồng bộ Cloud
         </button>
-        <button class="btn btn-outline btn-sm flex items-center gap-1.5" @click="exportHistoryCSV">
+        <button class="btn btn-secondary btn-sm flex items-center gap-1.5" @click="exportHistoryCSV">
           <span class="material-symbols-rounded text-lg">download</span> Xuất CSV
         </button>
       </div>
     </div>
 
     <!-- Filter Fields -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-slate-50/55 p-4 rounded-2xl border border-slate-100 backdrop-blur-md">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-slate-50/70 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 backdrop-blur-md">
       <div class="md:col-span-2 relative">
         <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
           <span class="material-symbols-rounded text-xl">search</span>
@@ -821,12 +821,12 @@ async function saveInvoiceSnapshot(invoices: any[]) {
         <input 
           type="text" 
           v-model="searchQuery" 
-          class="form-input w-full pl-11" 
+          class="form-input w-full pl-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100" 
           placeholder="Tìm theo tên thu ngân, ngày ca, ghi chú..."
         >
       </div>
       <div>
-        <select v-model="filterShiftNumber" class="form-input w-full">
+        <select v-model="filterShiftNumber" class="form-input w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100">
           <option value="">Tất cả các ca</option>
           <option value="1">Ca 1</option>
           <option value="2">Ca 2</option>
@@ -835,45 +835,45 @@ async function saveInvoiceSnapshot(invoices: any[]) {
     </div>
 
     <!-- Cards Layout Grid -->
-    <div v-if="filteredShifts.length === 0" class="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-3xl border border-dashed border-slate-200">
-      <span class="material-symbols-rounded text-slate-300 text-6xl mb-3">history</span>
-      <h4 class="text-lg font-semibold text-slate-700">Chưa có lịch sử</h4>
-      <p class="text-slate-400 text-sm mt-1">Các ca làm việc đã đóng sẽ xuất hiện ở đây.</p>
+    <div v-if="filteredShifts.length === 0" class="flex flex-col items-center justify-center py-16 px-4 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+      <span class="material-symbols-rounded text-slate-300 dark:text-slate-600 text-6xl mb-3">history</span>
+      <h4 class="text-lg font-semibold text-slate-700 dark:text-slate-300">Chưa có lịch sử</h4>
+      <p class="text-slate-400 dark:text-slate-500 text-sm mt-1">Các ca làm việc đã đóng sẽ xuất hiện ở đây.</p>
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <div 
         v-for="sh in filteredShifts" 
         :key="sh.id" 
-        class="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between"
+        class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between"
       >
         <div>
           <!-- Card Title & Actions -->
           <div class="flex items-start justify-between gap-2 mb-3">
             <div>
-              <h4 class="font-bold text-slate-800 flex items-center gap-1.5">
+              <h4 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                 Ca {{ sh.shiftNumber }} — {{ sh.cashierName }}
                 <span 
                   v-if="sh.reclosedAt || sh.originalSummarySnapshot" 
-                  class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100"
+                  class="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-900/50"
                 >
                   Đã cập nhật
                 </span>
               </h4>
-              <p class="text-xs text-slate-400 mt-0.5">
+              <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                 {{ formatDate(sh.date) }} · {{ formatTime(sh.startTime) }} → {{ sh.endTime ? formatTime(sh.endTime) : '(Đang mở)' }}
               </p>
             </div>
             <div class="flex items-center gap-1">
               <button 
-                class="btn-icon p-1.5 hover:bg-slate-50 rounded-lg text-slate-500 hover:text-indigo-600 transition-colors"
+                class="btn-icon p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 @click="viewShiftDetail(sh)"
                 title="Xem chi tiết"
               >
                 <span class="material-symbols-rounded">visibility</span>
               </button>
               <button 
-                class="btn-icon p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
+                class="btn-icon p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
                 @click="deleteShift(sh.id)"
                 title="Xóa ca"
               >
@@ -883,33 +883,33 @@ async function saveInvoiceSnapshot(invoices: any[]) {
           </div>
 
           <!-- Quick Stats Panel -->
-          <div class="grid grid-cols-2 gap-3.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100 text-xs">
+          <div class="grid grid-cols-2 gap-3.5 bg-slate-50/70 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
             <div>
-              <span class="text-slate-400 block mb-0.5">Doanh thu</span>
-              <strong class="text-emerald-600 text-sm font-semibold">
+              <span class="text-slate-400 dark:text-slate-500 block mb-0.5">Doanh thu</span>
+              <strong class="text-emerald-600 dark:text-emerald-400 text-sm font-semibold">
                 {{ formatCurrency(summaries[sh.id]?.totalIncome ?? 0) }}
               </strong>
             </div>
             <div>
-              <span class="text-slate-400 block mb-0.5">Chi phí</span>
-              <strong class="text-rose-500 text-sm font-semibold">
+              <span class="text-slate-400 dark:text-slate-500 block mb-0.5">Chi phí</span>
+              <strong class="text-rose-500 dark:text-rose-400 text-sm font-semibold">
                 {{ formatCurrency(summaries[sh.id]?.totalExpense ?? 0) }}
               </strong>
             </div>
             <div>
-              <span class="text-slate-400 block mb-0.5">Hóa đơn</span>
-              <strong class="text-slate-700 text-sm font-semibold">
+              <span class="text-slate-400 dark:text-slate-500 block mb-0.5">Hóa đơn</span>
+              <strong class="text-slate-700 dark:text-slate-200 text-sm font-semibold">
                 {{ summaries[sh.id]?.billCount ?? 0 }}
-                <span v-if="summaries[sh.id]?.cukcukBills" class="text-[10px] text-emerald-600 font-normal">
+                <span v-if="summaries[sh.id]?.cukcukBills" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">
                   ({{ summaries[sh.id]?.cukcukBills }} POS)
                 </span>
               </strong>
             </div>
             <div>
-              <span class="text-slate-400 block mb-0.5">Chênh lệch</span>
+              <span class="text-slate-400 dark:text-slate-500 block mb-0.5">Chênh lệch</span>
               <strong 
                 class="text-sm font-semibold"
-                :class="(summaries[sh.id]?.discrepancy ?? 0) === 0 ? 'text-emerald-600' : 'text-rose-500'"
+                :class="(summaries[sh.id]?.discrepancy ?? 0) === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'"
               >
                 {{ (summaries[sh.id]?.discrepancy ?? 0) === 0 ? '✓ 0' : formatCurrency(summaries[sh.id]?.discrepancy ?? 0) }}
               </strong>
@@ -918,7 +918,7 @@ async function saveInvoiceSnapshot(invoices: any[]) {
         </div>
 
         <!-- Note snippet -->
-        <p v-if="sh.notes" class="text-slate-500 text-xs mt-3 bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+        <p v-if="sh.notes" class="text-slate-500 dark:text-slate-400 text-xs mt-3 bg-slate-50/70 dark:bg-slate-800 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
           📝 {{ sh.notes }}
         </p>
       </div>
@@ -926,24 +926,24 @@ async function saveInvoiceSnapshot(invoices: any[]) {
 
     <!-- ────────────────── DETAILS MODAL ────────────────── -->
     <div v-if="selectedShift" class="modal-overlay active z-50">
-      <div class="modal-content max-w-4xl w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white rounded-3xl shadow-xl">
+      <div class="modal-content max-w-4xl w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800">
         <!-- Header -->
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <h4 class="text-lg font-bold text-slate-800">
+            <h4 class="text-lg font-bold text-slate-800 dark:text-slate-100">
               Ca {{ selectedShift.shiftNumber }} — {{ selectedShift.cashierName }}
             </h4>
-            <p class="text-xs text-slate-400 mt-0.5">
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
               Ngày làm việc: {{ formatDate(selectedShift.date) }} · Bắt đầu: {{ formatTime(selectedShift.startTime) }}
             </p>
           </div>
-          <button @click="selectedShift = null" class="btn-icon p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
+          <button @click="selectedShift = null" class="btn-icon p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>
 
         <!-- Tabs Navigation -->
-        <div class="px-6 border-b border-slate-100 bg-slate-50/50 flex gap-2 overflow-x-auto">
+        <div class="px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800 flex gap-2 overflow-x-auto">
           <button 
             v-for="t in [
               { id: 'sum', icon: 'summarize', label: 'Tổng kết' },
@@ -954,47 +954,47 @@ async function saveInvoiceSnapshot(invoices: any[]) {
             ]" 
             :key="t.id"
             @click="activeTab = t.id as any"
-            class="py-3 px-3 border-b-2 flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap transition-colors"
-            :class="activeTab === t.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+            class="py-3 px-3 border-b-2 flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer"
+            :class="activeTab === t.id ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
           >
             <span class="material-symbols-rounded text-lg">{{ t.icon }}</span>
-            {{ t.label }}
+            <span>{{ t.label }}</span>
           </button>
         </div>
 
         <!-- Tab Body Scrollable Container -->
-        <div class="p-6 overflow-y-auto flex-1 max-h-[50vh]">
+        <div class="p-6 overflow-y-auto flex-1 max-h-[50vh] text-slate-700 dark:text-slate-200">
           <!-- ── TỔNG KẾT TAB ── -->
           <div v-if="activeTab === 'sum'" class="space-y-5">
             <table class="report-table text-sm">
               <tbody>
                 <tr>
-                  <td class="font-medium text-slate-500">Thời gian ca</td>
-                  <td class="text-slate-800">
+                  <td class="font-medium text-slate-500 dark:text-slate-400">Thời gian ca</td>
+                  <td class="text-slate-800 dark:text-slate-100">
                     {{ formatTime(selectedShift.startTime) }} → {{ selectedShift.endTime ? formatTime(selectedShift.endTime) : '(Đang mở ca)' }}
                   </td>
                 </tr>
                 <tr>
-                  <td class="font-medium text-slate-500 flex items-center gap-1.5">
+                  <td class="font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                     Tiền mặt đầu ca
-                    <button class="text-indigo-600 hover:text-indigo-800 p-0.5 hover:bg-indigo-50 rounded" @click="openEditStartingCash" title="Sửa đầu ca">
+                    <button class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 p-0.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded transition-colors" @click="openEditStartingCash" title="Sửa đầu ca">
                       <span class="material-symbols-rounded text-xs block">edit</span>
                     </button>
                   </td>
-                  <td class="font-semibold text-slate-800">{{ formatCurrency(selectedShift.startingCash) }}</td>
+                  <td class="font-semibold text-slate-800 dark:text-slate-100">{{ formatCurrency(selectedShift.startingCash) }}</td>
                 </tr>
               </tbody>
             </table>
 
             <!-- Revenue Breakdown CUKCUK -->
             <div v-if="activeSummary?.cukcukBills" class="space-y-2">
-              <h5 class="font-bold text-emerald-600 flex items-center justify-between text-sm">
+              <h5 class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-between text-sm">
                 <span>🏪 DOANH THU CUKCUK ({{ activeSummary.cukcukBills }} hóa đơn)</span>
                 <span :class="getFieldDiffClass('cukcukRevenue')">
                   {{ formatCurrency(activeSummary.cukcukRevenue) }}
                 </span>
               </h5>
-              <table class="report-table text-xs text-slate-600">
+              <table class="report-table text-xs text-slate-600 dark:text-slate-300">
                 <tbody>
                   <tr>
                     <td>Tiền mặt (TM)</td>
@@ -1020,8 +1020,8 @@ async function saveInvoiceSnapshot(invoices: any[]) {
 
             <!-- Total stats comparison -->
             <div class="space-y-2">
-              <h5 class="font-bold text-indigo-600 text-sm">📊 CHI TIẾT TỔNG KẾT</h5>
-              <table class="report-table text-xs text-slate-700 bg-indigo-50/20 rounded-xl overflow-hidden">
+              <h5 class="font-bold text-teal-600 dark:text-teal-400 text-sm">📊 CHI TIẾT TỔNG KẾT</h5>
+              <table class="report-table text-xs text-slate-700 dark:text-slate-200 bg-teal-50/20 dark:bg-slate-800 rounded-xl overflow-hidden border border-teal-100/50 dark:border-slate-800">
                 <tbody>
                   <tr v-if="activeSummary?.cukcukBills">
                     <td>Tiền mặt CUKCUK</td>
@@ -1031,7 +1031,7 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                   </tr>
                   <tr v-if="(activeSummary?.totalIncome ?? 0) - (activeSummary?.cukcukRevenue ?? 0) > 0">
                     <td>Thu ngoài POS (Thu ngoài)</td>
-                    <td class="text-right font-medium text-emerald-600">
+                    <td class="text-right font-medium text-emerald-600 dark:text-emerald-400">
                       +{{ formatCurrency((activeSummary?.totalIncome ?? 0) - (activeSummary?.cukcukRevenue ?? 0)) }}
                     </td>
                   </tr>
@@ -1041,21 +1041,21 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                       −{{ formatCurrency(activeSummary?.totalExpense ?? 0) }}
                     </td>
                   </tr>
-                  <tr class="border-t border-slate-100 bg-slate-50/50">
+                  <tr class="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
                     <td class="font-semibold">Tiền mặt kỳ vọng trong két</td>
-                    <td class="text-right font-bold text-slate-800" :class="getFieldDiffClass('expectedCash')">
+                    <td class="text-right font-bold text-slate-800 dark:text-slate-100" :class="getFieldDiffClass('expectedCash')">
                       {{ formatCurrency(activeSummary?.expectedCash ?? 0) }}
                     </td>
                   </tr>
                   <tr>
                     <td class="font-semibold">Tiền mặt thực tế kiểm kê</td>
-                    <td class="text-right font-semibold text-slate-800" :class="getFieldDiffClass('cashCountTotal')">
+                    <td class="text-right font-semibold text-slate-800 dark:text-slate-100" :class="getFieldDiffClass('cashCountTotal')">
                       {{ formatCurrency(activeSummary?.cashCountTotal ?? 0) }}
                     </td>
                   </tr>
-                  <tr class="border-t-2 border-slate-200" :class="(activeSummary?.discrepancy ?? 0) === 0 ? 'bg-emerald-50/40' : 'bg-rose-50/45'">
+                  <tr class="border-t-2 border-slate-200 dark:border-slate-700" :class="(activeSummary?.discrepancy ?? 0) === 0 ? 'bg-emerald-50/40 dark:bg-emerald-950/30' : 'bg-rose-50/45 dark:bg-rose-950/30'">
                     <td class="font-bold">CHÊNH LỆCH KÉT TIỀN</td>
-                    <td class="text-right font-bold" :class="(activeSummary?.discrepancy ?? 0) === 0 ? 'text-emerald-600' : 'text-rose-600'">
+                    <td class="text-right font-bold" :class="(activeSummary?.discrepancy ?? 0) === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
                       {{ (activeSummary?.discrepancy ?? 0) === 0 && !selectedShift.originalSummarySnapshot ? '✓ 0 đ' : formatCurrency(activeSummary?.discrepancy ?? 0) }}
                     </td>
                   </tr>
@@ -1064,12 +1064,12 @@ async function saveInvoiceSnapshot(invoices: any[]) {
             </div>
 
             <!-- Notes area -->
-            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex items-start justify-between gap-4 text-xs">
+            <div class="bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4 text-xs">
               <div class="flex-1">
-                <span class="font-bold text-slate-600 block mb-1">Ghi chú ca:</span>
-                <p class="text-slate-500 leading-relaxed">{{ selectedShift.notes || 'Không có ghi chú.' }}</p>
+                <span class="font-bold text-slate-600 dark:text-slate-300 block mb-1">Ghi chú ca:</span>
+                <p class="text-slate-500 dark:text-slate-400 leading-relaxed">{{ selectedShift.notes || 'Không có ghi chú.' }}</p>
               </div>
-              <button class="btn btn-outline btn-xs flex items-center gap-1" @click="openEditNotes">
+              <button class="btn-secondary btn-xs flex items-center gap-1 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300" @click="openEditNotes">
                 <span class="material-symbols-rounded text-xs">edit</span> Sửa
               </button>
             </div>
@@ -1078,23 +1078,23 @@ async function saveInvoiceSnapshot(invoices: any[]) {
           <!-- ── GIAO DỊCH TAB ── -->
           <div v-if="activeTab === 'tx'" class="space-y-5">
             <div class="flex gap-2">
-              <button class="btn btn-success btn-xs flex items-center gap-1" @click="openAddTx('income')">
+              <button class="btn-secondary btn-xs text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 flex items-center gap-1" @click="openAddTx('income')">
                 <span class="material-symbols-rounded text-xs">add</span> Thêm Thu
               </button>
-              <button class="btn btn-danger btn-xs flex items-center gap-1" @click="openAddTx('expense')">
+              <button class="btn-secondary btn-xs text-rose-500 dark:text-rose-400 border-rose-200 dark:border-rose-800/60 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-1" @click="openAddTx('expense')">
                 <span class="material-symbols-rounded text-xs">remove</span> Thêm Chi
               </button>
-              <button class="btn btn-outline btn-xs flex items-center gap-1" @click="openAddOtherTx">
+              <button class="btn-secondary btn-xs text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-1" @click="openAddOtherTx">
                 <span class="material-symbols-rounded text-xs">add</span> Thêm Khác
               </button>
             </div>
 
             <!-- Income Table -->
             <div v-if="selectedShift.transactions?.filter(t => t.type === 'income').length" class="space-y-1.5">
-              <h5 class="font-bold text-emerald-600 text-xs">✍️ DANH SÁCH THU</h5>
-              <table class="report-table text-xs text-slate-700">
+              <h5 class="font-bold text-emerald-600 dark:text-emerald-400 text-xs">✍️ DANH SÁCH THU</h5>
+              <table class="report-table text-xs text-slate-700 dark:text-slate-200">
                 <thead>
-                  <tr class="bg-slate-50">
+                  <tr class="bg-slate-50 dark:bg-slate-800">
                     <th>Danh mục</th>
                     <th>Ghi chú</th>
                     <th class="text-right">Số tiền</th>
@@ -1105,12 +1105,12 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                   <tr v-for="t in selectedShift.transactions.filter(t => t.type === 'income')" :key="t.id">
                     <td>{{ t.category }}</td>
                     <td>{{ t.note || '—' }}</td>
-                    <td class="text-right font-medium text-emerald-600">+{{ formatCurrency(t.amount) }}</td>
+                    <td class="text-right font-medium text-emerald-600 dark:text-emerald-400">+{{ formatCurrency(t.amount) }}</td>
                     <td class="flex items-center justify-end gap-1.5">
-                      <button class="btn-icon p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-indigo-600" @click="openEditTx(t)">
+                      <button class="btn-icon p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400" @click="openEditTx(t)">
                         <span class="material-symbols-rounded text-sm">edit</span>
                       </button>
-                      <button class="btn-icon p-1 hover:bg-rose-50 rounded text-slate-400 hover:text-rose-600" @click="deleteTx(t.id)">
+                      <button class="btn-icon p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400" @click="deleteTx(t.id)">
                         <span class="material-symbols-rounded text-sm">delete</span>
                       </button>
                     </td>
@@ -1121,10 +1121,10 @@ async function saveInvoiceSnapshot(invoices: any[]) {
 
             <!-- Expense Table -->
             <div v-if="selectedShift.transactions?.filter(t => t.type === 'expense').length" class="space-y-1.5">
-              <h5 class="font-bold text-rose-500 text-xs">💸 DANH SÁCH CHI</h5>
-              <table class="report-table text-xs text-slate-700">
+              <h5 class="font-bold text-rose-500 dark:text-rose-400 text-xs">💸 DANH SÁCH CHI</h5>
+              <table class="report-table text-xs text-slate-700 dark:text-slate-200">
                 <thead>
-                  <tr class="bg-slate-50">
+                  <tr class="bg-slate-50 dark:bg-slate-800">
                     <th>Danh mục</th>
                     <th>Ghi chú</th>
                     <th class="text-right">Số tiền</th>
@@ -1135,12 +1135,12 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                   <tr v-for="t in selectedShift.transactions.filter(t => t.type === 'expense')" :key="t.id">
                     <td>{{ t.category }}</td>
                     <td>{{ t.note || '—' }}</td>
-                    <td class="text-right font-medium text-rose-500">−{{ formatCurrency(t.amount) }}</td>
+                    <td class="text-right font-medium text-rose-500 dark:text-rose-400">−{{ formatCurrency(t.amount) }}</td>
                     <td class="flex items-center justify-end gap-1.5">
-                      <button class="btn-icon p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-indigo-600" @click="openEditTx(t)">
+                      <button class="btn-icon p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400" @click="openEditTx(t)">
                         <span class="material-symbols-rounded text-sm">edit</span>
                       </button>
-                      <button class="btn-icon p-1 hover:bg-rose-50 rounded text-slate-400 hover:text-rose-600" @click="deleteTx(t.id)">
+                      <button class="btn-icon p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400" @click="deleteTx(t.id)">
                         <span class="material-symbols-rounded text-sm">delete</span>
                       </button>
                     </td>
@@ -1151,10 +1151,10 @@ async function saveInvoiceSnapshot(invoices: any[]) {
 
             <!-- Other Transactions Table -->
             <div v-if="selectedShift.otherTransactions?.length" class="space-y-1.5">
-              <h5 class="font-bold text-orange-500 text-xs">📝 GIAO DỊCH KHÁC</h5>
-              <table class="report-table text-xs text-slate-700">
+              <h5 class="font-bold text-amber-500 dark:text-amber-400 text-xs">📝 GIAO DỊCH KHÁC</h5>
+              <table class="report-table text-xs text-slate-700 dark:text-slate-200">
                 <thead>
-                  <tr class="bg-slate-50">
+                  <tr class="bg-slate-50 dark:bg-slate-800">
                     <th>Loại</th>
                     <th>Danh mục</th>
                     <th>Ghi chú</th>
@@ -1165,17 +1165,17 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                 <tbody>
                   <tr v-for="t in selectedShift.otherTransactions" :key="t.id">
                     <td>
-                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="t.type === 'income' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="t.type === 'income' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800/40' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-800/40'">
                         {{ t.type === 'income' ? 'Thu' : 'Chi' }}
                       </span>
                     </td>
                     <td>{{ t.category }}</td>
                     <td>{{ t.note || '—' }}</td>
-                    <td class="text-right font-medium" :class="t.type === 'income' ? 'text-emerald-600' : 'text-rose-500'">
+                    <td class="text-right font-medium" :class="t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'">
                       {{ t.type === 'income' ? '+' : '−' }}{{ formatCurrency(t.amount) }}
                     </td>
                     <td class="flex justify-end">
-                      <button class="btn-icon p-1 hover:bg-rose-50 rounded text-slate-400 hover:text-rose-600" @click="deleteOtherTx(t.id)">
+                      <button class="btn-icon p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400" @click="deleteOtherTx(t.id)">
                         <span class="material-symbols-rounded text-sm">delete</span>
                       </button>
                     </td>
@@ -1184,42 +1184,42 @@ async function saveInvoiceSnapshot(invoices: any[]) {
               </table>
             </div>
 
-            <div v-if="!selectedShift.transactions?.length && !selectedShift.otherTransactions?.length" class="text-center py-6 text-slate-400 text-xs">
+            <div v-if="!selectedShift.transactions?.length && !selectedShift.otherTransactions?.length" class="text-center py-6 text-slate-400 dark:text-slate-500 text-xs">
               Chưa có giao dịch thu/chi ngoài POS nào phát sinh trong ca.
             </div>
           </div>
 
           <!-- ── HÓA ĐƠN POS TAB ── -->
           <div v-if="activeTab === 'pos'" class="space-y-4">
-            <div class="flex items-center justify-between gap-3 text-xs">
+            <div class="flex items-center justify-between gap-3 text-xs flex-wrap">
               <div>
                 <strong>{{ activeInvoices.length }}</strong> hóa đơn — Tổng tiền: 
-                <strong class="text-emerald-600 text-sm ml-1">{{ formatCurrency(activeInvoicesTotal) }}</strong>
-                <span v-if="activeInvoicesFromLive" class="ml-2 bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded text-[9px] font-semibold">
+                <strong class="text-emerald-600 dark:text-emerald-400 text-sm ml-1">{{ formatCurrency(activeInvoicesTotal) }}</strong>
+                <span v-if="activeInvoicesFromLive" class="ml-2 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-800/40 px-1.5 py-0.5 rounded text-[9px] font-semibold">
                   Live
                 </span>
               </div>
               <div class="flex gap-2">
-                <button class="btn btn-outline btn-xs flex items-center gap-1" @click="syncCukcukInvoices" :disabled="isSyncingCukcuk">
+                <button class="btn-secondary btn-xs flex items-center gap-1" @click="syncCukcukInvoices" :disabled="isSyncingCukcuk">
                   <span class="material-symbols-rounded text-xs" :class="{ 'spin': isSyncingCukcuk }">sync</span> Đồng bộ từ CUKCUK
                 </button>
-                <button v-if="activeInvoicesFromLive" class="btn btn-primary btn-xs flex items-center gap-1" @click="saveInvoiceSnapshot(activeInvoices)">
+                <button v-if="activeInvoicesFromLive" class="btn-primary btn-xs flex items-center gap-1" @click="saveInvoiceSnapshot(activeInvoices)">
                   <span class="material-symbols-rounded text-xs">save</span> Lưu snapshot
                 </button>
               </div>
             </div>
 
             <!-- Invoices List Table -->
-            <div v-if="activeInvoices.length === 0" class="text-center py-10 bg-slate-50/50 rounded-2xl text-slate-400 text-xs">
+            <div v-if="activeInvoices.length === 0" class="text-center py-10 bg-slate-50/50 dark:bg-slate-800 rounded-2xl text-slate-400 dark:text-slate-500 text-xs">
               <p>Chưa có dữ liệu snapshot hóa đơn.</p>
-              <button class="btn btn-primary btn-xs mt-3 flex items-center gap-1 mx-auto" @click="syncCukcukInvoices" :disabled="isSyncingCukcuk">
+              <button class="btn-primary btn-xs mt-3 flex items-center gap-1 mx-auto" @click="syncCukcukInvoices" :disabled="isSyncingCukcuk">
                 <span class="material-symbols-rounded text-xs">sync</span> Đồng bộ CUKCUK
               </button>
             </div>
 
-            <table v-else class="report-table text-xs text-slate-700">
+            <table v-else class="report-table text-xs text-slate-700 dark:text-slate-200">
               <thead>
-                <tr class="bg-slate-50">
+                <tr class="bg-slate-50 dark:bg-slate-800">
                   <th>Số Bill</th>
                   <th>Bàn</th>
                   <th>PTTT</th>
@@ -1232,16 +1232,16 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                 <tr 
                   v-for="inv in activeInvoices" 
                   :key="inv.refId"
-                  :style="invoiceDiff.added.includes(inv.refId) 
-                    ? { backgroundColor: '#f0fdf4' } 
+                  :class="invoiceDiff.added.includes(inv.refId) 
+                    ? 'bg-emerald-50/60 dark:bg-emerald-950/30' 
                     : invoiceDiff.modified.includes(inv.refId) 
-                      ? { backgroundColor: '#fffbeb' } 
-                      : {}"
+                      ? 'bg-amber-50/60 dark:bg-amber-950/30' 
+                      : ''"
                 >
                   <td class="font-medium">
                     {{ inv.refNo || '—' }}
-                    <span v-if="invoiceDiff.added.includes(inv.refId)" class="ml-1 bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1 rounded">Mới</span>
-                    <span v-if="invoiceDiff.modified.includes(inv.refId)" class="ml-1 bg-amber-100 text-amber-800 text-[8px] font-bold px-1 rounded">Sửa</span>
+                    <span v-if="invoiceDiff.added.includes(inv.refId)" class="ml-1 bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 text-[8px] font-bold px-1 rounded">Mới</span>
+                    <span v-if="invoiceDiff.modified.includes(inv.refId)" class="ml-1 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 text-[8px] font-bold px-1 rounded">Sửa</span>
                   </td>
                   <td>{{ inv.tableName || '—' }}</td>
                   <td class="text-base leading-none">
@@ -1249,11 +1249,11 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                       {{ p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦' }}
                     </span>
                   </td>
-                  <td class="text-right font-medium text-slate-800">
+                  <td class="text-right font-medium text-slate-800 dark:text-slate-100">
                     {{ formatCurrency(inv.amount) }}
                   </td>
                   <td>
-                    <button class="btn-icon p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-indigo-600" @click="openEditInvoicePayment(inv)">
+                    <button class="btn-icon p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400" @click="openEditInvoicePayment(inv)">
                       <span class="material-symbols-rounded text-sm">edit</span>
                     </button>
                   </td>
@@ -1263,11 +1263,11 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                 <tr 
                   v-for="inv in invoiceDiff.removed" 
                   :key="'rem_' + inv.refId"
-                  style="background-color: #fef2f2; text-decoration: line-through; opacity: 0.65;"
+                  class="bg-rose-50/50 dark:bg-rose-950/30 line-through opacity-70"
                 >
                   <td class="font-medium">
                     {{ inv.refNo || '—' }}
-                    <span class="ml-1 bg-rose-100 text-rose-800 text-[8px] font-bold px-1 rounded">Hủy/Xóa</span>
+                    <span class="ml-1 bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 text-[8px] font-bold px-1 rounded">Hủy/Xóa</span>
                   </td>
                   <td>{{ inv.tableName || '—' }}</td>
                   <td class="text-base leading-none">
@@ -1275,7 +1275,7 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                       {{ p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦' }}
                     </span>
                   </td>
-                  <td class="text-right font-medium">
+                  <td class="text-right font-medium text-slate-800 dark:text-slate-100">
                     {{ formatCurrency(inv.amount) }}
                   </td>
                   <td></td>
@@ -1287,21 +1287,21 @@ async function saveInvoiceSnapshot(invoices: any[]) {
           <!-- ── KIỂM KÊ TIỀN TAB ── -->
           <div v-if="activeTab === 'cash'" class="space-y-4">
             <div class="flex items-center justify-between gap-3">
-              <button class="btn btn-outline btn-xs flex items-center gap-1" @click="openEditCashCount">
+              <button class="btn-secondary btn-xs flex items-center gap-1" @click="openEditCashCount">
                 <span class="material-symbols-rounded text-xs">edit</span> Chỉnh sửa kiểm kê
               </button>
             </div>
 
             <!-- Empty State -->
-            <div v-if="!selectedShift?.cashCount || Object.keys(selectedShift.cashCount).filter(k => (selectedShift?.cashCount?.[k] ?? 0) > 0).length === 0" class="text-center py-8 text-slate-400 text-xs">
+            <div v-if="!selectedShift?.cashCount || Object.keys(selectedShift.cashCount).filter(k => (selectedShift?.cashCount?.[k] ?? 0) > 0).length === 0" class="text-center py-8 text-slate-400 dark:text-slate-500 text-xs">
               Chưa có thông tin kiểm kê tiền mặt chi tiết cho ca này.
             </div>
 
             <!-- Counts Table -->
             <div v-else class="space-y-4">
-              <table class="report-table text-xs text-slate-700">
+              <table class="report-table text-xs text-slate-700 dark:text-slate-200">
                 <thead>
-                  <tr class="bg-slate-50">
+                  <tr class="bg-slate-50 dark:bg-slate-800">
                     <th>Mệnh giá tiền mặt</th>
                     <th class="text-right font-semibold">Số lượng tờ</th>
                     <th class="text-right font-semibold">Thành tiền</th>
@@ -1310,16 +1310,16 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                 <tbody>
                   <tr v-for="d in denominations.filter(d => (selectedShift?.cashCount?.[String(d.value)] ?? 0) > 0)" :key="d.value">
                     <td>{{ d.label }}</td>
-                    <td class="text-right font-medium text-slate-700">
+                    <td class="text-right font-medium text-slate-700 dark:text-slate-300">
                       {{ selectedShift?.cashCount?.[String(d.value)] }}
                     </td>
-                    <td class="text-right font-medium text-slate-800">
+                    <td class="text-right font-medium text-slate-800 dark:text-slate-100">
                       {{ formatCurrency(d.value * (selectedShift?.cashCount?.[String(d.value)] ?? 0)) }}
                     </td>
                   </tr>
-                  <tr class="border-t-2 border-slate-200 bg-slate-50/50">
+                  <tr class="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40">
                     <td colspan="2" class="font-bold">Tổng tiền mặt kiểm đếm</td>
-                    <td class="text-right font-bold text-slate-900">
+                    <td class="text-right font-bold text-slate-900 dark:text-white">
                       {{ formatCurrency(selectedShift?.cashCountTotal ?? 0) }}
                     </td>
                   </tr>
@@ -1327,20 +1327,20 @@ async function saveInvoiceSnapshot(invoices: any[]) {
               </table>
 
               <!-- Detailed Breakdown (Két / Giao) -->
-              <div v-if="selectedShift?.pinnedCash || selectedShift?.keepCash || selectedShift?.handoverCash" class="bg-indigo-50/20 p-4 rounded-2xl border border-indigo-50/50 text-xs space-y-2">
-                <h6 class="font-bold text-indigo-600 text-xs uppercase tracking-wider mb-2">📌 Chi tiết phân chia két tiền</h6>
+              <div v-if="selectedShift?.pinnedCash || selectedShift?.keepCash || selectedShift?.handoverCash" class="bg-teal-50/20 dark:bg-slate-800 p-4 rounded-2xl border border-teal-100/50 dark:border-slate-800 text-xs space-y-2">
+                <h6 class="font-bold text-teal-600 dark:text-teal-400 text-xs uppercase tracking-wider mb-2">📌 Chi tiết phân chia két tiền</h6>
                 <div class="grid grid-cols-2 gap-4">
-                  <div class="p-3 bg-white rounded-xl border border-slate-100">
-                    <span class="text-slate-400 block mb-0.5">Để lại trong két (Ghim + Giữ)</span>
-                    <strong class="text-slate-800 text-sm font-semibold">
+                  <div class="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <span class="text-slate-400 dark:text-slate-500 block mb-0.5">Để lại trong két (Ghim + Giữ)</span>
+                    <strong class="text-slate-800 dark:text-slate-100 text-sm font-semibold">
                       {{ formatCurrency(
                         denominations.reduce((acc, d) => acc + d.value * ((selectedShift?.pinnedCash?.[String(d.value)] ?? 0) + (selectedShift?.keepCash?.[String(d.value)] ?? 0)), 0)
                       ) }}
                     </strong>
                   </div>
-                  <div class="p-3 bg-white rounded-xl border border-slate-100">
-                    <span class="text-slate-400 block mb-0.5">🤝 Bàn giao (Giao nộp)</span>
-                    <strong class="text-indigo-600 text-sm font-semibold">
+                  <div class="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <span class="text-slate-400 dark:text-slate-500 block mb-0.5">🤝 Bàn giao (Giao nộp)</span>
+                    <strong class="text-teal-600 dark:text-teal-400 text-sm font-semibold">
                       {{ formatCurrency(
                         denominations.reduce((acc, d) => acc + d.value * (selectedShift?.handoverCash?.[String(d.value)] ?? 0), 0)
                       ) }}
@@ -1354,20 +1354,20 @@ async function saveInvoiceSnapshot(invoices: any[]) {
           <!-- ── KIỂM KHO TAB ── -->
           <div v-if="activeTab === 'drink'" class="space-y-4">
             <div class="flex justify-between items-center">
-              <button class="btn btn-outline btn-xs flex items-center gap-1" @click="openEditDrinks">
+              <button class="btn-secondary btn-xs flex items-center gap-1" @click="openEditDrinks">
                 <span class="material-symbols-rounded text-xs">edit</span> Sửa kiểm kho
               </button>
             </div>
 
             <!-- Empty state -->
-            <div v-if="!selectedShift.drinkInventorySnapshot || !selectedShift.drinkInventorySnapshot.items" class="text-center py-8 text-slate-400 text-xs">
+            <div v-if="!selectedShift.drinkInventorySnapshot || !selectedShift.drinkInventorySnapshot.items" class="text-center py-8 text-slate-400 dark:text-slate-500 text-xs">
               Không có dữ liệu kiểm kho đồ uống.
             </div>
 
             <!-- Drink items table -->
-            <table v-else class="report-table text-xs text-slate-700">
+            <table v-else class="report-table text-xs text-slate-700 dark:text-slate-200">
               <thead>
-                <tr class="bg-slate-50">
+                <tr class="bg-slate-50 dark:bg-slate-800">
                   <th>Tên sản phẩm</th>
                   <th class="text-right">Đầu ca</th>
                   <th class="text-right">Cuối ca (Đếm)</th>
@@ -1376,10 +1376,10 @@ async function saveInvoiceSnapshot(invoices: any[]) {
               </thead>
               <tbody>
                 <tr v-for="(it, id) in selectedShift.drinkInventorySnapshot.items" :key="id">
-                  <td class="font-medium text-slate-800">{{ it.name || id }}</td>
-                  <td class="text-right text-slate-500">{{ it.start != null ? it.start : '—' }}</td>
-                  <td class="text-right font-semibold text-slate-800">{{ it.end != null ? it.end : '—' }}</td>
-                  <td class="text-right font-medium text-indigo-600">{{ it.sold != null ? it.sold : '—' }}</td>
+                  <td class="font-medium text-slate-800 dark:text-slate-100">{{ it.name || id }}</td>
+                  <td class="text-right text-slate-500 dark:text-slate-400">{{ it.start != null ? it.start : '—' }}</td>
+                  <td class="text-right font-semibold text-slate-800 dark:text-slate-100">{{ it.end != null ? it.end : '—' }}</td>
+                  <td class="text-right font-medium text-emerald-600 dark:text-emerald-400">{{ it.sold != null ? it.sold : '—' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1387,16 +1387,16 @@ async function saveInvoiceSnapshot(invoices: any[]) {
         </div>
 
         <!-- Footer actions -->
-        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3 bg-slate-50/50">
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3 bg-slate-50/50 dark:bg-slate-800">
           <div class="flex gap-2">
-            <button class="btn btn-outline flex items-center gap-1" @click="selectedShift = null">
+            <button class="btn-secondary flex items-center gap-1" @click="selectedShift = null">
               Đóng
             </button>
-            <button class="btn btn-outline text-indigo-600 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5" @click="reopenShift(selectedShift)">
+            <button class="btn-secondary text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 flex items-center gap-1.5" @click="reopenShift(selectedShift)">
               <span class="material-symbols-rounded text-lg">lock_open</span> Mở lại ca
             </button>
           </div>
-          <button class="btn btn-primary flex items-center gap-1.5" @click="printHandoverReport(selectedShift)">
+          <button class="btn-primary flex items-center gap-1.5" @click="printHandoverReport(selectedShift)">
             <span class="material-symbols-rounded">print</span> Phiếu bàn giao
           </button>
         </div>
@@ -1422,8 +1422,8 @@ async function saveInvoiceSnapshot(invoices: any[]) {
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-outline" @click="showEditStartingCashModal = false">Hủy</button>
-          <button class="btn btn-primary" @click="saveStartingCash">Cập nhật</button>
+          <button class="btn-secondary" @click="showEditStartingCashModal = false">Hủy</button>
+          <button class="btn-primary" @click="saveStartingCash">Cập nhật</button>
         </div>
       </div>
     </div>
@@ -1447,8 +1447,8 @@ async function saveInvoiceSnapshot(invoices: any[]) {
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-outline" @click="showEditNotesModal = false">Hủy</button>
-          <button class="btn btn-primary" @click="saveNotes">Lưu</button>
+          <button class="btn-secondary" @click="showEditNotesModal = false">Hủy</button>
+          <button class="btn-primary" @click="saveNotes">Lưu</button>
         </div>
       </div>
     </div>
@@ -1501,8 +1501,8 @@ async function saveInvoiceSnapshot(invoices: any[]) {
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-outline" @click="showEditTxModal = false">Hủy</button>
-          <button class="btn" :class="txType === 'income' ? 'btn-success' : 'btn-danger'" @click="saveTx">Lưu</button>
+          <button class="btn-secondary" @click="showEditTxModal = false">Hủy</button>
+          <button class="btn" :class="txType === 'income' ? 'btn-primary' : 'btn-danger'" @click="saveTx">Lưu</button>
         </div>
       </div>
     </div>
@@ -1511,7 +1511,7 @@ async function saveInvoiceSnapshot(invoices: any[]) {
     <div v-if="showEditOtherTxModal" class="modal-overlay active z-50">
       <div class="modal-content max-w-lg w-[90vw] p-5">
         <div class="modal-title">
-          <span class="material-symbols-rounded text-orange-500">note_add</span>
+          <span class="material-symbols-rounded text-amber-500">note_add</span>
           Thêm giao dịch thu chi khác
         </div>
 
@@ -1542,8 +1542,8 @@ async function saveInvoiceSnapshot(invoices: any[]) {
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-outline" @click="showEditOtherTxModal = false">Hủy</button>
-          <button class="btn btn-primary" @click="saveOtherTx">Lưu</button>
+          <button class="btn-secondary" @click="showEditOtherTxModal = false">Hủy</button>
+          <button class="btn-primary" @click="saveOtherTx">Lưu</button>
         </div>
       </div>
     </div>
@@ -1551,17 +1551,17 @@ async function saveInvoiceSnapshot(invoices: any[]) {
     <!-- ────────────────── SUB-MODAL: EDIT CASH COUNT ────────────────── -->
     <div v-if="showEditCashCountModal" class="modal-overlay active z-50">
       <div class="modal-content max-w-lg w-[95vw] max-h-[85vh] p-0 flex flex-col overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h5 class="modal-title m-0">
+        <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h5 class="modal-title m-0 pb-0 border-0">
             <span class="material-symbols-rounded text-amber-500">calculate</span>
             Chỉnh sửa kiểm kê tiền mặt (lịch sử)
           </h5>
         </div>
 
         <div class="p-5 overflow-y-auto flex-1">
-          <table class="report-table text-xs text-center">
+          <table class="report-table text-xs text-center text-slate-700 dark:text-slate-200">
             <thead>
-              <tr class="bg-slate-50">
+              <tr class="bg-slate-50 dark:bg-slate-800">
                 <th class="text-left font-bold">Mệnh giá</th>
                 <th class="font-bold">📌 Ghim</th>
                 <th class="font-bold">🔒 Giữ</th>
@@ -1585,9 +1585,9 @@ async function saveInvoiceSnapshot(invoices: any[]) {
           </table>
         </div>
 
-        <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/50">
-          <button class="btn btn-outline btn-sm" @click="showEditCashCountModal = false">Hủy</button>
-          <button class="btn btn-primary btn-sm flex items-center gap-1" @click="saveCashCount">
+        <div class="px-5 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-800">
+          <button class="btn-secondary btn-sm" @click="showEditCashCountModal = false">Hủy</button>
+          <button class="btn-primary btn-sm flex items-center gap-1" @click="saveCashCount">
             <span class="material-symbols-rounded text-sm">save</span> Lưu kiểm kê
           </button>
         </div>
@@ -1596,18 +1596,18 @@ async function saveInvoiceSnapshot(invoices: any[]) {
 
     <!-- ────────────────── SUB-MODAL: EDIT DRINK INVENTORY ────────────────── -->
     <div v-if="showEditDrinkModal" class="modal-overlay active z-50">
-      <div class="modal-content max-w-lg w-[95vw] max-h-[85vh] p-0 flex flex-col overflow-hidden bg-white">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h5 class="modal-title m-0">
-            <span class="material-symbols-rounded text-indigo-600">inventory_2</span>
+      <div class="modal-content max-w-lg w-[95vw] max-h-[85vh] p-0 flex flex-col overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+        <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h5 class="modal-title m-0 pb-0 border-0">
+            <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">inventory_2</span>
             Sửa kiểm kho đồ uống
           </h5>
         </div>
 
         <div class="p-5 overflow-y-auto flex-1">
-          <table class="report-table text-xs text-center">
+          <table class="report-table text-xs text-center text-slate-700 dark:text-slate-200">
             <thead>
-              <tr class="bg-slate-50">
+              <tr class="bg-slate-50 dark:bg-slate-800">
                 <th class="text-left font-bold">Tên món đồ uống</th>
                 <th class="font-bold w-24">Cuối ca (Đếm thực tế)</th>
               </tr>
@@ -1615,8 +1615,8 @@ async function saveInvoiceSnapshot(invoices: any[]) {
             <tbody>
               <template v-for="cat in settingsStore.settings?.posCatalog || []" :key="cat.name">
                 <template v-if="cat.items.some((i: any) => i.isDrink)">
-                  <tr class="bg-slate-100/50 font-bold text-left">
-                    <td colspan="2" class="text-slate-700 px-3 py-1.5">{{ cat.name }}</td>
+                  <tr class="bg-slate-100/50 dark:bg-slate-800/60 font-bold text-left">
+                    <td colspan="2" class="text-slate-700 dark:text-slate-200 px-3 py-1.5">{{ cat.name }}</td>
                   </tr>
                   <tr v-for="item in cat.items.filter((i: any) => i.isDrink)" :key="item.id">
                     <td class="text-left px-3">{{ item.name }}</td>
@@ -1635,9 +1635,9 @@ async function saveInvoiceSnapshot(invoices: any[]) {
           </table>
         </div>
 
-        <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/50">
-          <button class="btn btn-outline btn-sm" @click="showEditDrinkModal = false">Hủy</button>
-          <button class="btn btn-primary btn-sm flex items-center gap-1" @click="saveDrinks">
+        <div class="px-5 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-800">
+          <button class="btn-secondary btn-sm" @click="showEditDrinkModal = false">Hủy</button>
+          <button class="btn-primary btn-sm flex items-center gap-1" @click="saveDrinks">
             <span class="material-symbols-rounded text-sm">save</span> Lưu kiểm kho
           </button>
         </div>
@@ -1648,18 +1648,18 @@ async function saveInvoiceSnapshot(invoices: any[]) {
     <div v-if="showEditInvoicePaymentModal" class="modal-overlay active z-50">
       <div class="modal-content max-w-lg w-[95vw] p-5">
         <div class="modal-title">
-          <span class="material-symbols-rounded text-indigo-600">credit_card</span>
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">credit_card</span>
           Sửa PTTT — Bill {{ editingInvoice?.refNo || '?' }}
         </div>
-        <p class="text-xs text-slate-500 mb-4">
+        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">
           <strong>Bàn:</strong> {{ editingInvoice?.tableName || '—' }} — 
           <strong>Tổng bill:</strong> {{ formatCurrency(editingInvoice?.amount) }}
         </p>
 
         <div class="space-y-3">
-          <table class="report-table text-xs text-slate-700">
+          <table class="report-table text-xs text-slate-700 dark:text-slate-200">
             <thead>
-              <tr class="bg-slate-50">
+              <tr class="bg-slate-50 dark:bg-slate-800">
                 <th>Phương thức thanh toán</th>
                 <th class="text-right">Số tiền</th>
                 <th class="w-8"></th>
@@ -1680,7 +1680,7 @@ async function saveInvoiceSnapshot(invoices: any[]) {
                 <td class="text-center">
                   <button 
                     v-if="invoicePayments.length > 1" 
-                    class="text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded"
+                    class="text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
                     @click="removeInvoicePaymentLine(idx)"
                   >
                     <span class="material-symbols-rounded text-sm">delete</span>
@@ -1690,14 +1690,14 @@ async function saveInvoiceSnapshot(invoices: any[]) {
             </tbody>
           </table>
 
-          <button class="btn btn-outline btn-xs flex items-center gap-1" @click="addInvoicePaymentLine">
+          <button class="btn-secondary btn-xs flex items-center gap-1" @click="addInvoicePaymentLine">
             <span class="material-symbols-rounded text-xs">add</span> Thêm dòng
           </button>
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-outline btn-sm" @click="showEditInvoicePaymentModal = false">Hủy</button>
-          <button class="btn btn-primary btn-sm flex items-center gap-1" @click="saveInvoicePayments">
+          <button class="btn-secondary btn-sm" @click="showEditInvoicePaymentModal = false">Hủy</button>
+          <button class="btn-primary btn-sm flex items-center gap-1" @click="saveInvoicePayments">
             <span class="material-symbols-rounded text-sm">save</span> Lưu thanh toán
           </button>
         </div>

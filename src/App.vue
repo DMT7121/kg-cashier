@@ -78,6 +78,26 @@ const isQrCollapsed = ref(localStorage.getItem('kg_sidebar_qr_collapsed') === 't
 const timeStr = ref('');
 let clockTimer: any = null;
 
+// Theme management (Light Pastel vs Dark Midnight Obsidian)
+const isDark = ref(false);
+
+function applyTheme(dark: boolean) {
+  isDark.value = dark;
+  if (typeof document !== 'undefined') {
+    if (dark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('kg_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('kg_theme', 'light');
+    }
+  }
+}
+
+function toggleTheme() {
+  applyTheme(!isDark.value);
+}
+
 // Clock updates
 function updateClock() {
   const now = new Date();
@@ -128,6 +148,15 @@ function handleNav(view: string) {
 
 // Initialize on mount
 onMounted(async () => {
+  // Load saved theme or system preference
+  const savedTheme = localStorage.getItem('kg_theme');
+  if (savedTheme) {
+    applyTheme(savedTheme === 'dark');
+  } else {
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(prefersDark);
+  }
+
   await appStore.initializeApp();
   updateClock();
   clockTimer = setInterval(updateClock, 1000);
@@ -315,30 +344,30 @@ onUnmounted(() => {
         </div>
 
         <!-- Quick VietQR Sidebar Widget -->
-        <div v-if="activeQrConfig" class="w-full border-t border-slate-100 pt-2 mt-1">
+        <div v-if="activeQrConfig" class="w-full border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
           <div 
-            class="flex items-center justify-between cursor-pointer p-2 rounded-xl bg-emerald-50/70 border border-emerald-100/50 hover:bg-emerald-50 transition-all"
+            class="flex items-center justify-between cursor-pointer p-2 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100/50 dark:border-emerald-800/40 hover:bg-emerald-50 dark:hover:bg-emerald-900/40 transition-all"
             @click="toggleQrWidget"
           >
-            <span class="text-[11px] font-extrabold text-emerald-800 flex items-center gap-1.5 tracking-wider uppercase">
-              <span class="material-symbols-rounded text-base text-emerald-600">qr_code_2</span>
+            <span class="text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 tracking-wider uppercase">
+              <span class="material-symbols-rounded text-base text-emerald-600 dark:text-emerald-400">qr_code_2</span>
               VIETQR NHANH
             </span>
-            <span class="material-symbols-rounded text-sm text-emerald-700 transition-transform duration-200" :style="{ transform: isQrCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }">
+            <span class="material-symbols-rounded text-sm text-emerald-700 dark:text-emerald-400 transition-transform duration-200" :style="{ transform: isQrCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }">
               expand_less
             </span>
           </div>
 
           <div 
             v-show="!isQrCollapsed" 
-            class="mt-2 text-center overflow-hidden flex flex-col items-center gap-1.5 p-2 bg-white rounded-xl border border-slate-100 shadow-sm transition-all duration-300"
+            class="mt-2 text-center overflow-hidden flex flex-col items-center gap-1.5 p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300"
           >
-            <div class="bg-white p-1 rounded-xl shadow-xs border border-slate-100">
+            <div class="bg-white p-1 rounded-xl shadow-xs border border-slate-100 dark:border-slate-700">
               <img :src="qrUrl" alt="VietQR" class="w-28 h-28 object-cover rounded-lg" />
             </div>
-            <div class="text-[11px] font-bold text-slate-800 uppercase tracking-tight">{{ activeQrConfig.bank }} - {{ activeQrConfig.acc }}</div>
-            <div class="text-[10px] text-slate-500 font-semibold uppercase max-w-[170px] truncate">{{ activeQrConfig.name }}</div>
-            <div v-if="Number(activeQrConfig.amount) > 0" class="text-[10px] font-bold text-emerald-700 bg-emerald-50/70 px-2 py-0.5 rounded-full border border-emerald-100/40">
+            <div class="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">{{ activeQrConfig.bank }} - {{ activeQrConfig.acc }}</div>
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase max-w-[170px] truncate">{{ activeQrConfig.name }}</div>
+            <div v-if="Number(activeQrConfig.amount) > 0" class="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50/70 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-100/40 dark:border-emerald-800/40">
               {{ formatCurrency(Number(activeQrConfig.amount)) }} đ
             </div>
           </div>
@@ -358,6 +387,19 @@ onUnmounted(() => {
         <div class="topbar-right">
           <span class="clock">{{ timeStr }}</span>
           
+          <!-- Dark / Light Mode Switcher -->
+          <button 
+            type="button"
+            class="p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer border shadow-xs"
+            :class="isDark ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-amber-400' : 'bg-white border-slate-200/80 hover:bg-emerald-50 hover:border-emerald-200 text-slate-600 hover:text-emerald-600'"
+            :title="isDark ? 'Chuyển sang chế độ Sáng' : 'Chuyển sang chế độ Tối (chống mỏi mắt ca đêm)'"
+            @click="toggleTheme"
+          >
+            <span class="material-symbols-rounded text-lg transition-transform duration-300" :class="{ 'rotate-90': isDark }">
+              {{ isDark ? 'light_mode' : 'dark_mode' }}
+            </span>
+          </button>
+          
           <!-- Notifications dropdown -->
           <div class="relative">
             <div 
@@ -368,7 +410,7 @@ onUnmounted(() => {
               <span class="material-symbols-rounded text-slate-600 text-xl">notifications</span>
               <span 
                 v-if="notificationsStore.unreadCount > 0" 
-                class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-white animate-bounce"
+                class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900 animate-bounce"
               >
                 {{ notificationsStore.unreadCount }}
               </span>
@@ -377,20 +419,20 @@ onUnmounted(() => {
             <!-- Notifications Overlay List -->
             <div 
               v-if="isNotifDropdownOpen" 
-              class="absolute right-0 mt-2 w-80 bg-white rounded-2xl border border-slate-100 shadow-xl z-50 overflow-hidden"
+              class="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl z-50 overflow-hidden"
             >
-              <div class="flex items-center justify-between p-4 border-b border-slate-50 bg-slate-50/50">
-                <span class="font-bold text-slate-900 text-sm">Thông báo</span>
+              <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                <span class="font-bold text-slate-900 dark:text-slate-100 text-sm">Thông báo</span>
                 <div class="flex gap-2">
                   <button 
-                    v-if="notificationsStore.unreadCount > 0"
-                    class="text-[11px] font-bold text-blue-600 hover:underline bg-transparent border-0 cursor-pointer"
+                    v-if="notificationsStore.unreadCount > 0" 
+                    class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline bg-transparent border-0 cursor-pointer"
                     @click="notificationsStore.markAllRead"
                   >
                     Đọc tất cả
                   </button>
                   <button 
-                    class="text-[11px] font-bold text-rose-600 hover:underline bg-transparent border-0 cursor-pointer"
+                    class="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline bg-transparent border-0 cursor-pointer"
                     @click="notificationsStore.clearNotifications"
                   >
                     Xóa hết
@@ -398,12 +440,12 @@ onUnmounted(() => {
                 </div>
               </div>
               
-              <div class="max-h-72 overflow-y-auto divide-y divide-slate-50">
+              <div class="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                 <div 
                   v-for="notif in notificationsStore.notifications" 
                   :key="notif.id"
-                  class="p-3.5 flex gap-3 hover:bg-slate-50/50 transition-colors"
-                  :class="{ 'bg-blue-50/20': !notif.read }"
+                  class="p-3.5 flex gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors"
+                  :class="{ 'bg-emerald-50/20 dark:bg-emerald-950/20': !notif.read }"
                   @click="notif.read = true"
                 >
                   <span 
@@ -436,9 +478,9 @@ onUnmounted(() => {
             </div>
           </div>
           
-          <div class="topbar-user bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-full flex items-center gap-2">
-            <span class="material-symbols-rounded text-slate-500 text-lg">person</span>
-            <span class="text-sm font-semibold text-slate-700">
+          <div class="topbar-user bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 px-3 py-1.5 rounded-full flex items-center gap-2">
+            <span class="material-symbols-rounded text-emerald-500 dark:text-emerald-400 text-lg">person</span>
+            <span class="text-xs font-bold text-slate-800 dark:text-slate-100">
               {{ shiftStore.currentShift?.cashierName || authStore.currentUser?.name || '—' }}
             </span>
           </div>

@@ -835,23 +835,23 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50/50 p-4 md:p-6 lg:p-8">
+  <div class="min-h-screen bg-slate-50/50 dark:bg-slate-950 p-4 md:p-6 lg:p-8">
     <div class="max-w-7xl mx-auto flex flex-col gap-6">
       
       <!-- Page Title Header -->
       <div class="flex flex-col gap-1">
-        <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-          <span class="material-symbols-rounded text-indigo-600 text-3xl">construction</span>
+        <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400 text-3xl">construction</span>
           Tiện ích & Mở rộng
         </h2>
-        <p class="text-sm text-slate-500">Hỗ trợ các công cụ tính toán nhanh, tạo mã QR, phát âm loa thông báo và tra cứu nghiệp vụ phụ trợ.</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Hỗ trợ các công cụ tính toán nhanh, tạo mã QR, phát âm loa thông báo và tra cứu nghiệp vụ phụ trợ.</p>
       </div>
 
       <!-- Main Layout shell -->
       <div class="flex flex-col lg:flex-row gap-6 items-start">
         
         <!-- Sidebar Navigation -->
-        <aside class="w-full lg:w-64 bg-white rounded-2xl border border-slate-100 shadow-xs p-3 shrink-0">
+        <aside class="w-full lg:w-64 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs p-3 shrink-0">
           <nav class="flex flex-row lg:flex-col overflow-x-auto lg:overflow-visible gap-1 pb-2 lg:pb-0 scrollbar-none">
             <button 
               v-for="tab in tabs" 
@@ -859,12 +859,12 @@ onMounted(async () => {
               @click="activeTab = tab.key"
               class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 select-none group w-full text-left"
               :class="activeTab === tab.key 
-                ? 'bg-indigo-50/70 text-indigo-700 font-bold' 
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'"
+                ? 'bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold border-l-2 border-emerald-500' 
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'"
             >
               <span 
                 class="material-symbols-rounded text-xl transition-transform duration-200 group-hover:scale-105"
-                :class="activeTab === tab.key ? 'text-indigo-600' : 'text-slate-400'"
+                :class="activeTab === tab.key ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'"
               >
                 {{ tab.icon }}
               </span>
@@ -878,72 +878,72 @@ onMounted(async () => {
           
           <!-- ── TAB 1: TAX CALCULATOR ──────────────────────── -->
           <div v-if="activeTab === 'calc'" class="flex flex-col gap-6 animate-fade-in">
-            <div class="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-3xl opacity-60 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+            <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden relative">
+              <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-full blur-3xl opacity-60 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
               <div class="p-6 md:p-8 relative z-10 flex flex-col md:flex-row gap-8 items-stretch">
                 <!-- Inputs fields -->
                 <div class="w-full md:w-1/2 flex flex-col gap-5 justify-between">
                   <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
                       <span class="material-symbols-rounded text-2xl">calculate</span>
                     </div>
                     <div>
-                      <h3 class="font-extrabold text-slate-800 text-xl tracking-tight">Máy tính Thuế VAT</h3>
-                      <p class="text-xs text-slate-500 font-medium">Hỗ trợ các phép tính cơ bản (+ - * / k)</p>
+                      <h3 class="font-extrabold text-slate-800 dark:text-slate-100 text-xl tracking-tight">Máy tính Thuế VAT</h3>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Hỗ trợ các phép tính cơ bản (+ - * / k)</p>
                     </div>
                   </div>
 
                   <!-- Type Selector -->
                   <div class="flex flex-col gap-2">
-                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Cách tính toán</label>
+                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cách tính toán</label>
                     <div class="grid grid-cols-2 gap-2">
                       <button 
                         @click="selectCalcType('1')"
                         class="p-2.5 rounded-xl border-2 text-left transition-all text-xs flex flex-col gap-1"
-                        :class="calcType === '1' ? 'border-blue-500 bg-blue-50/30 text-blue-700 font-bold' : 'border-slate-100 bg-white text-slate-600 hover:bg-slate-50'"
+                        :class="calcType === '1' ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
                       >
                         <span class="flex items-center justify-between w-full">
                           <span>Chưa thuế ➔ Đã thuế</span>
-                          <span v-if="calcType === '1'" class="material-symbols-rounded text-sm text-blue-600 font-black">check_circle</span>
+                          <span v-if="calcType === '1'" class="material-symbols-rounded text-sm text-emerald-600 dark:text-emerald-400 font-black">check_circle</span>
                         </span>
-                        <span class="text-[9px] text-slate-400 font-normal uppercase">Cộng thuế VAT</span>
+                        <span class="text-[9px] text-slate-400 dark:text-slate-500 font-normal uppercase">Cộng thuế VAT</span>
                       </button>
 
                       <button 
                         @click="selectCalcType('2')"
                         class="p-2.5 rounded-xl border-2 text-left transition-all text-xs flex flex-col gap-1"
-                        :class="calcType === '2' ? 'border-blue-500 bg-blue-50/30 text-blue-700 font-bold' : 'border-slate-100 bg-white text-slate-600 hover:bg-slate-50'"
+                        :class="calcType === '2' ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
                       >
                         <span class="flex items-center justify-between w-full">
                           <span>Đã thuế ➔ Chưa thuế</span>
-                          <span v-if="calcType === '2'" class="material-symbols-rounded text-sm text-blue-600 font-black">check_circle</span>
+                          <span v-if="calcType === '2'" class="material-symbols-rounded text-sm text-emerald-600 dark:text-emerald-400 font-black">check_circle</span>
                         </span>
-                        <span class="text-[9px] text-slate-400 font-normal uppercase">Tách thuế ra</span>
+                        <span class="text-[9px] text-slate-400 dark:text-slate-500 font-normal uppercase">Tách thuế ra</span>
                       </button>
 
                       <button 
                         @click="selectCalcType('3')"
                         class="p-2.5 rounded-xl border-2 text-left transition-all text-xs flex flex-col gap-1"
-                        :class="calcType === '3' ? 'border-blue-500 bg-blue-50/30 text-blue-700 font-bold' : 'border-slate-100 bg-white text-slate-600 hover:bg-slate-50'"
+                        :class="calcType === '3' ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
                       >
                         <span class="flex items-center justify-between w-full">
                           <span>Tiền thuế ➔ Chưa thuế</span>
-                          <span v-if="calcType === '3'" class="material-symbols-rounded text-sm text-blue-600 font-black">check_circle</span>
+                          <span v-if="calcType === '3'" class="material-symbols-rounded text-sm text-emerald-600 dark:text-emerald-400 font-black">check_circle</span>
                         </span>
-                        <span class="text-[9px] text-slate-400 font-normal uppercase">Thuế ra tiền gốc</span>
+                        <span class="text-[9px] text-slate-400 dark:text-slate-500 font-normal uppercase">Thuế ra tiền gốc</span>
                       </button>
 
                       <button 
                         @click="selectCalcType('4')"
                         class="p-2.5 rounded-xl border-2 text-left transition-all text-xs flex flex-col gap-1"
-                        :class="calcType === '4' ? 'border-blue-500 bg-blue-50/30 text-blue-700 font-bold' : 'border-slate-100 bg-white text-slate-600 hover:bg-slate-50'"
+                        :class="calcType === '4' ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'"
                       >
                         <span class="flex items-center justify-between w-full">
                           <span>Tiền thuế ➔ Đã thuế</span>
-                          <span v-if="calcType === '4'" class="material-symbols-rounded text-sm text-blue-600 font-black">check_circle</span>
+                          <span v-if="calcType === '4'" class="material-symbols-rounded text-sm text-emerald-600 dark:text-emerald-400 font-black">check_circle</span>
                         </span>
-                        <span class="text-[9px] text-slate-400 font-normal uppercase">Thuế ra tiền tổng</span>
+                        <span class="text-[9px] text-slate-400 dark:text-slate-500 font-normal uppercase">Thuế ra tiền tổng</span>
                       </button>
                     </div>
                   </div>
@@ -951,8 +951,8 @@ onMounted(async () => {
                   <!-- Amount input field -->
                   <div class="flex flex-col gap-1.5">
                     <div class="flex justify-between items-center">
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Số tiền (VNĐ)</label>
-                      <div class="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md min-h-[22px]">
+                      <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Số tiền (VNĐ)</label>
+                      <div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md min-h-[22px]">
                         {{ calcFormulaLive }}
                       </div>
                     </div>
@@ -961,28 +961,28 @@ onMounted(async () => {
                       v-model="calcInputStr"
                       @input="formatInputValue(calcInputStr)"
                       @keydown="handleCalcKeydown"
-                      class="w-full text-right font-black text-2xl h-14 bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 rounded-xl px-4 text-slate-800 transition-all outline-none"
+                      class="w-full text-right font-black text-2xl h-14 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-xl px-4 text-slate-800 dark:text-slate-100 transition-all outline-none"
                       placeholder="0"
                     >
 
                     <!-- Thousand separator control -->
-                    <div class="mt-2 flex items-center justify-between p-2.5 border border-slate-100 bg-slate-50/50 rounded-xl">
-                      <span class="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                    <div class="mt-2 flex items-center justify-between p-2.5 border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/60 rounded-xl">
+                      <span class="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                         <span class="material-symbols-rounded text-base">tune</span>
                         Phân cách hàng nghìn:
                       </span>
-                      <div class="flex items-center gap-1 bg-slate-200/50 p-0.5 rounded-lg border border-slate-200">
+                      <div class="flex items-center gap-1 bg-slate-200/50 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                         <button 
                           @click="selectFormat('dot')"
                           class="px-2.5 py-1 rounded-md text-xs font-bold transition-all"
-                          :class="numFormat === 'dot' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'"
+                          :class="numFormat === 'dot' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'"
                         >
                           Dấu chấm (.)
                         </button>
                         <button 
                           @click="selectFormat('comma')"
                           class="px-2.5 py-1 rounded-md text-xs font-bold transition-all"
-                          :class="numFormat === 'comma' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'"
+                          :class="numFormat === 'comma' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'"
                         >
                           Dấu phẩy (,)
                         </button>
@@ -992,20 +992,20 @@ onMounted(async () => {
 
                   <!-- Tax Rate percentage -->
                   <div class="flex flex-col gap-2">
-                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Thuế suất (%)</label>
+                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Thuế suất (%)</label>
                     <div class="flex items-center gap-3">
                       <input 
                         type="number" 
                         v-model.number="calcTaxRate" 
-                        class="w-20 text-center font-bold text-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 rounded-xl h-11 transition-all outline-none"
+                        class="w-20 text-center font-bold text-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 rounded-xl h-11 text-slate-800 dark:text-slate-100 transition-all outline-none"
                       >
                       <div class="flex flex-wrap gap-1 flex-1">
                         <button 
                           v-for="r in [0, 5, 8, 10]" 
                           :key="r"
                           @click="selectPresetTax(r)"
-                          class="px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all border border-slate-200 bg-white"
-                          :class="calcTaxRate === r ? 'border-blue-500 bg-blue-50/20 text-blue-600 font-extrabold' : 'text-slate-500 hover:bg-slate-50'"
+                          class="px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                          :class="calcTaxRate === r ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 font-extrabold' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'"
                         >
                           {{ r }}%
                         </button>
@@ -1015,36 +1015,36 @@ onMounted(async () => {
                 </div>
 
                 <!-- Vertical divider -->
-                <div class="hidden md:block w-px bg-slate-100 mx-4"></div>
+                <div class="hidden md:block w-px bg-slate-100 dark:bg-slate-800 mx-4"></div>
 
                 <!-- Right calculated result panel -->
-                <div class="w-full md:w-1/2 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 rounded-2xl border border-slate-100">
-                  <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <span class="w-6 h-px bg-slate-200"></span>
+                <div class="w-full md:w-1/2 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span class="w-6 h-px bg-slate-200 dark:bg-slate-700"></span>
                     Kết quả tính toán
-                    <span class="w-6 h-px bg-slate-200"></span>
+                    <span class="w-6 h-px bg-slate-200 dark:bg-slate-700"></span>
                   </div>
 
                   <div class="w-full">
-                    <div class="text-3xl md:text-4xl font-black mb-4 text-slate-800 tracking-tight truncate w-full px-2">
+                    <div class="text-3xl md:text-4xl font-black mb-4 text-slate-800 dark:text-slate-100 tracking-tight truncate w-full px-2">
                       {{ formatWithFormat(calcResults.main) }} đ
                     </div>
                   </div>
 
-                  <div class="text-xs font-bold text-slate-600 mb-4 bg-white py-2.5 px-4 rounded-xl border border-slate-150 shadow-xs flex items-center gap-1.5">
+                  <div class="text-xs font-bold text-slate-600 dark:text-slate-300 mb-4 bg-white dark:bg-slate-900 py-2.5 px-4 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-xs flex items-center gap-1.5">
                     {{ calcResults.subLabel }}: 
-                    <span class="text-emerald-600 font-extrabold text-base">{{ formatWithFormat(calcResults.sub) }} đ</span>
+                    <span class="text-emerald-600 dark:text-emerald-400 font-extrabold text-base">{{ formatWithFormat(calcResults.sub) }} đ</span>
                   </div>
 
-                  <div class="text-xs font-medium italic text-slate-500 mb-6 leading-relaxed max-w-[280px]">
+                  <div class="text-xs font-medium italic text-slate-500 dark:text-slate-400 mb-6 leading-relaxed max-w-[280px]">
                     {{ calcResults.words }}
                   </div>
 
                   <button 
                     @click="copyCalcResult" 
-                    class="group flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white w-full max-w-[240px] py-3 rounded-xl font-bold shadow-md shadow-slate-900/10 transition-all active:scale-[0.98]"
+                    class="btn-primary w-full max-w-[240px] py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md"
                   >
-                    <span class="material-symbols-rounded text-lg text-blue-300">content_copy</span>
+                    <span class="material-symbols-rounded text-lg">content_copy</span>
                     <span>Sao chép kết quả</span>
                   </button>
                 </div>
@@ -1052,38 +1052,38 @@ onMounted(async () => {
             </div>
 
             <!-- Calculation history list -->
-            <div class="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
-              <div class="bg-slate-50/50 px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
+              <div class="bg-slate-50/50 dark:bg-slate-800 px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                  <span class="material-symbols-rounded text-slate-400 text-xl">history</span>
-                  <h4 class="font-bold text-slate-700 text-sm">Lịch sử tính toán</h4>
-                  <span class="text-[9px] font-black text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-md uppercase">10 phép tính gần nhất</span>
+                  <span class="material-symbols-rounded text-slate-400 dark:text-slate-500 text-xl">history</span>
+                  <h4 class="font-bold text-slate-700 dark:text-slate-200 text-sm">Lịch sử tính toán</h4>
+                  <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 bg-slate-200/60 dark:bg-slate-800 px-2 py-0.5 rounded-md uppercase">10 phép tính gần nhất</span>
                 </div>
                 <button 
                   v-if="calcHistory.length > 0" 
                   @click="clearCalcHistory"
-                  class="text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  class="text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
                 >
                   <span class="material-symbols-rounded text-sm">delete</span> Xóa lịch sử
                 </button>
               </div>
 
-              <div class="divide-y divide-slate-100 p-2">
-                <div v-if="calcHistory.length === 0" class="text-center text-slate-400 py-6 italic text-xs font-medium">
+              <div class="divide-y divide-slate-100 dark:divide-slate-800 p-2">
+                <div v-if="calcHistory.length === 0" class="text-center text-slate-400 dark:text-slate-500 py-6 italic text-xs font-medium">
                   Chưa có lịch sử tính toán nào trong phiên làm việc này.
                 </div>
                 <div 
                   v-for="(item, idx) in calcHistory" 
                   :key="idx" 
-                  class="flex justify-between items-center py-2.5 px-3 hover:bg-slate-50/55 rounded-lg transition-colors"
+                  class="flex justify-between items-center py-2.5 px-3 hover:bg-slate-50/55 dark:hover:bg-slate-800/40 rounded-lg transition-colors"
                 >
                   <div class="text-xs">
-                    <div class="font-bold text-slate-700">{{ item.typeStr }}</div>
-                    <div class="text-slate-400 text-[10px]">Đầu vào: {{ item.val }} | Thuế suất: {{ item.tax }}%</div>
+                    <div class="font-bold text-slate-700 dark:text-slate-200">{{ item.typeStr }}</div>
+                    <div class="text-slate-400 dark:text-slate-500 text-[10px]">Đầu vào: {{ item.val }} | Thuế suất: {{ item.tax }}%</div>
                   </div>
                   <div class="text-right">
-                    <div class="font-black text-blue-600 text-sm">{{ item.main }}</div>
-                    <div class="text-[10px] text-emerald-600 font-semibold">Thuế: {{ item.sub }}</div>
+                    <div class="font-black text-emerald-600 dark:text-emerald-400 text-sm">{{ item.main }}</div>
+                    <div class="text-[10px] text-teal-600 dark:text-teal-400 font-semibold">Thuế: {{ item.sub }}</div>
                   </div>
                 </div>
               </div>
@@ -1092,8 +1092,8 @@ onMounted(async () => {
 
           <!-- ── TAB 2: VIETQR GENERATOR ────────────────────── -->
           <div v-else-if="activeTab === 'qr'" class="flex flex-col gap-6 animate-fade-in">
-            <div class="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden relative">
-              <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-50/50 rounded-full blur-3xl opacity-60 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+            <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden relative">
+              <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-full blur-3xl opacity-60 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
               <div class="p-6 md:p-8 relative z-10 flex flex-col md:flex-row gap-8 items-stretch">
                 <!-- Generator form panel -->
@@ -1103,17 +1103,17 @@ onMounted(async () => {
                       <span class="material-symbols-rounded text-2xl">qr_code_2</span>
                     </div>
                     <div>
-                      <h3 class="font-extrabold text-slate-800 text-xl tracking-tight">Tạo mã VietQR</h3>
-                      <p class="text-xs text-slate-500 font-medium">Hỗ trợ thanh toán nhanh bằng ứng dụng ngân hàng</p>
+                      <h3 class="font-extrabold text-slate-800 dark:text-slate-100 text-xl tracking-tight">Tạo mã VietQR</h3>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Hỗ trợ thanh toán nhanh bằng ứng dụng ngân hàng</p>
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-3.5">
                     <div class="col-span-2 flex flex-col gap-1.5">
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Ngân hàng thụ hưởng</label>
+                      <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ngân hàng thụ hưởng</label>
                       <select 
                         v-model="qrBank"
-                        class="w-full bg-slate-50 border border-slate-200 hover:border-emerald-400 focus:bg-white focus:border-emerald-500 h-11 rounded-xl text-xs font-bold text-slate-700 px-3 transition-all outline-none"
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 h-11 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 px-3 transition-all outline-none"
                       >
                         <option value="">-- Chọn ngân hàng thụ hưởng --</option>
                         <optgroup label="Ngân hàng phổ biến nhất">
@@ -1126,43 +1126,43 @@ onMounted(async () => {
                     </div>
 
                     <div class="col-span-2 flex flex-col gap-1.5">
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Số tài khoản</label>
+                      <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Số tài khoản</label>
                       <input 
                         type="text" 
                         v-model="qrAcc"
-                        class="w-full h-10.5 bg-slate-50 border border-slate-200 hover:border-emerald-400 focus:bg-white focus:border-emerald-500 rounded-xl font-bold text-sm text-slate-800 px-3 transition-all outline-none"
+                        class="w-full h-10.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 rounded-xl font-bold text-sm text-slate-800 dark:text-slate-100 px-3 transition-all outline-none"
                         placeholder="Nhập số tài khoản ngân hàng"
                       >
                     </div>
 
                     <div class="col-span-2 flex flex-col gap-1.5">
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Tên chủ tài khoản (Không dấu)</label>
+                      <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tên chủ tài khoản (Không dấu)</label>
                       <input 
                         type="text" 
                         v-model="qrName"
                         @input="handleQrNameInput"
-                        class="w-full h-10.5 bg-slate-50 border border-slate-200 hover:border-emerald-400 focus:bg-white focus:border-emerald-500 rounded-xl font-bold uppercase text-sm text-slate-800 px-3 transition-all outline-none"
+                        class="w-full h-10.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 rounded-xl font-bold uppercase text-sm text-slate-800 dark:text-slate-100 px-3 transition-all outline-none"
                         placeholder="VD: NGUYEN VAN A"
                       >
                     </div>
 
                     <div class="flex flex-col gap-1.5">
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Số tiền (Tùy chọn)</label>
+                      <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Số tiền (Tùy chọn)</label>
                       <input 
                         type="text" 
                         v-model="qrAmountStr"
                         @input="handleQrAmountInput"
-                        class="w-full h-10.5 text-right font-black text-sm text-emerald-600 bg-slate-50 border border-slate-200 hover:border-emerald-400 focus:bg-white focus:border-emerald-500 rounded-xl px-3 transition-all outline-none"
+                        class="w-full h-10.5 text-right font-black text-sm text-emerald-600 dark:text-emerald-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 rounded-xl px-3 transition-all outline-none"
                         placeholder="0"
                       >
                     </div>
 
                     <div class="flex flex-col gap-1.5">
-                      <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Nội dung (Tùy chọn)</label>
+                      <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nội dung (Tùy chọn)</label>
                       <input 
                         type="text" 
                         v-model="qrContent"
-                        class="w-full h-10.5 bg-slate-50 border border-slate-200 hover:border-emerald-400 focus:bg-white focus:border-emerald-500 rounded-xl text-xs font-semibold text-slate-700 px-3 transition-all outline-none"
+                        class="w-full h-10.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 px-3 transition-all outline-none"
                         placeholder="Thanh toan"
                       >
                     </div>
@@ -1171,13 +1171,13 @@ onMounted(async () => {
                   <div class="flex gap-2 mt-2">
                     <button 
                       @click="generateVietQR"
-                      class="flex-1 py-3 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-[0.98] border-none shadow-sm shadow-emerald-500/10 cursor-pointer"
+                      class="btn-primary flex-1 py-3 text-sm font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <span class="material-symbols-rounded text-lg">magic_button</span> Tạo mã VietQR
                     </button>
                     <button 
                       @click="clearQrForm"
-                      class="w-12 flex items-center justify-center text-slate-400 hover:text-rose-500 bg-slate-100 hover:bg-rose-50 rounded-xl transition-colors border-none cursor-pointer"
+                      class="btn-secondary w-12 flex items-center justify-center text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 rounded-xl"
                       title="Xóa trắng form"
                     >
                       <span class="material-symbols-rounded text-lg">delete</span>
@@ -1186,52 +1186,52 @@ onMounted(async () => {
                 </div>
 
                 <!-- Vertical divider -->
-                <div class="hidden md:block w-px bg-slate-100 mx-4"></div>
+                <div class="hidden md:block w-px bg-slate-100 dark:bg-slate-800 mx-4"></div>
 
                 <!-- QR code output preview -->
-                <div class="w-full md:w-1/2 flex flex-col items-center justify-center min-h-[300px] p-6 bg-slate-50/50 rounded-2xl border border-slate-100 relative overflow-hidden">
+                <div class="w-full md:w-1/2 flex flex-col items-center justify-center min-h-[300px] p-6 bg-slate-50/50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800 relative overflow-hidden">
                   <div v-if="qrIsGenerated" class="text-center w-full flex flex-col items-center animate-scale-up">
                     <div class="bg-white p-3 rounded-2xl shadow-md border border-slate-200/80 mb-4 group relative overflow-hidden">
                       <img :src="qrUrlGenerated" class="rounded-lg w-48 h-48 object-cover relative z-10 transition-transform group-hover:scale-102">
                     </div>
                     
-                    <div class="text-xs font-medium text-slate-700 bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs w-full max-w-[280px] text-left flex flex-col gap-1">
-                      <div class="font-black text-blue-700 text-sm uppercase">{{ qrBank }}</div>
-                      <div class="text-[11px] text-slate-500">Số tài khoản: <b class="text-slate-800 text-xs">{{ qrAcc }}</b></div>
-                      <div class="text-[11px] text-slate-500 mb-1">Chủ tài khoản: <b class="text-slate-800 text-xs uppercase">{{ qrName || 'N/A' }}</b></div>
-                      <div class="pt-2 border-t border-slate-100 flex flex-col gap-0.5">
+                    <div class="text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-xs w-full max-w-[280px] text-left flex flex-col gap-1">
+                      <div class="font-black text-emerald-600 dark:text-emerald-400 text-sm uppercase">{{ qrBank }}</div>
+                      <div class="text-[11px] text-slate-500 dark:text-slate-400">Số tài khoản: <b class="text-slate-800 dark:text-slate-100 text-xs">{{ qrAcc }}</b></div>
+                      <div class="text-[11px] text-slate-500 dark:text-slate-400 mb-1">Chủ tài khoản: <b class="text-slate-800 dark:text-slate-100 text-xs uppercase">{{ qrName || 'N/A' }}</b></div>
+                      <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-0.5">
                         <div class="flex justify-between items-center">
-                          <span class="text-[10px] font-bold text-slate-400 uppercase">Số tiền</span>
-                          <span class="text-emerald-600 font-extrabold text-sm">{{ formatMoney(parseCurrency(qrAmountStr)) }}</span>
+                          <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Số tiền</span>
+                          <span class="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">{{ formatMoney(parseCurrency(qrAmountStr)) }}</span>
                         </div>
                         <div class="flex justify-between items-center" v-if="qrContent">
-                          <span class="text-[10px] font-bold text-slate-400 uppercase">Nội dung</span>
-                          <span class="text-xs text-slate-700 font-semibold truncate max-w-[140px]">{{ qrContent }}</span>
+                          <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nội dung</span>
+                          <span class="text-xs text-slate-700 dark:text-slate-200 font-semibold truncate max-w-[140px]">{{ qrContent }}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div v-else class="text-center text-slate-400 p-8 rounded-2xl border-2 border-dashed border-slate-200/80 bg-white/50 w-full max-w-[280px]">
-                    <span class="material-symbols-rounded text-5xl mb-3 opacity-30 text-emerald-600">qr_code_scanner</span>
-                    <p class="font-bold text-xs text-slate-500 leading-relaxed">Vui lòng điền thông tin tài khoản và nhấn nút Tạo mã để hiển thị QR động tại đây.</p>
+                  <div v-else class="text-center text-slate-400 dark:text-slate-500 p-8 rounded-2xl border-2 border-dashed border-slate-200/80 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 w-full max-w-[280px]">
+                    <span class="material-symbols-rounded text-5xl mb-3 opacity-30 text-emerald-600 dark:text-emerald-400">qr_code_scanner</span>
+                    <p class="font-bold text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Vui lòng điền thông tin tài khoản và nhấn nút Tạo mã để hiển thị QR động tại đây.</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Saved templates registry -->
-            <div class="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
-              <div class="bg-slate-50/50 px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
+              <div class="bg-slate-50/50 dark:bg-slate-800 px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                  <span class="material-symbols-rounded text-slate-400 text-xl">bookmarks</span>
-                  <h4 class="font-bold text-slate-700 text-sm">Danh sách tài khoản lưu nhanh</h4>
-                  <span class="text-[9px] font-black text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-md uppercase">Lưu trữ cục bộ</span>
+                  <span class="material-symbols-rounded text-slate-400 dark:text-slate-500 text-xl">bookmarks</span>
+                  <h4 class="font-bold text-slate-700 dark:text-slate-200 text-sm">Danh sách tài khoản lưu nhanh</h4>
+                  <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 bg-slate-200/60 dark:bg-slate-800 px-2 py-0.5 rounded-md uppercase">Lưu trữ cục bộ</span>
                 </div>
               </div>
 
               <div class="p-4">
-                <div v-if="savedQrTemplates.length === 0" class="text-center text-slate-400 py-6 italic text-xs">
+                <div v-if="savedQrTemplates.length === 0" class="text-center text-slate-400 dark:text-slate-500 py-6 italic text-xs">
                   Chưa lưu tài khoản nào. Tạo mã QR thành công sẽ tự động ghi nhớ tài khoản này.
                 </div>
                 <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1239,20 +1239,20 @@ onMounted(async () => {
                     v-for="(tpl, idx) in savedQrTemplates" 
                     :key="idx"
                     @click="loadQrTemplate(tpl)"
-                    class="flex items-center justify-between p-3 border border-slate-150 bg-slate-50/30 rounded-xl hover:bg-emerald-50/30 hover:border-emerald-200 transition-all cursor-pointer group"
+                    class="flex items-center justify-between p-3 border border-slate-150 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/60 rounded-xl hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 hover:border-emerald-200 dark:hover:border-emerald-800/60 transition-all cursor-pointer group"
                   >
                     <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-lg bg-white border border-slate-250 flex items-center justify-center font-extrabold text-emerald-600 text-xs shadow-xs group-hover:scale-102 transition-transform">
+                      <div class="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-extrabold text-emerald-600 dark:text-emerald-400 text-xs shadow-xs group-hover:scale-102 transition-transform">
                         {{ tpl.bank }}
                       </div>
                       <div>
-                        <div class="font-bold text-slate-700 text-xs">{{ tpl.acc }}</div>
-                        <div class="text-[9px] font-semibold text-slate-400 uppercase tracking-tight truncate max-w-[120px]">{{ tpl.nameRaw || 'N/A' }}</div>
+                        <div class="font-bold text-slate-700 dark:text-slate-200 text-xs">{{ tpl.acc }}</div>
+                        <div class="text-[9px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-tight truncate max-w-[120px]">{{ tpl.nameRaw || 'N/A' }}</div>
                       </div>
                     </div>
                     <button 
                       @click="deleteQrTemplate(idx, $event)"
-                      class="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition-colors shadow-xs"
+                      class="w-7 h-7 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center transition-colors shadow-xs"
                       title="Xóa mẫu này"
                     >
                       <span class="material-symbols-rounded text-sm">close</span>
@@ -1266,14 +1266,14 @@ onMounted(async () => {
           <!-- ── TAB 3: TEXT TO SPEECH (TTS) ────────────────── -->
           <div v-else-if="activeTab === 'tts'" class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
             <!-- Left inputs panel -->
-            <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
-              <div class="bg-gradient-to-r from-purple-50/50 to-white p-5 border-b border-purple-50 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-purple-100/60 text-purple-600 flex items-center justify-center shadow-inner">
+            <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
+              <div class="bg-gradient-to-r from-teal-50/50 to-white dark:from-teal-950/30 dark:to-slate-900 p-5 border-b border-teal-100/50 dark:border-slate-800 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-100/60 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center shadow-inner">
                   <span class="material-symbols-rounded">campaign</span>
                 </div>
                 <div>
-                  <h3 class="font-extrabold text-slate-800 text-lg">Phát loa thông báo (TTS)</h3>
-                  <p class="text-xs text-slate-500">Gọi khách thanh toán hoặc chuyển tiếp thông điệp bằng loa</p>
+                  <h3 class="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Phát loa thông báo (TTS)</h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Gọi khách thanh toán hoặc chuyển tiếp thông điệp bằng loa</p>
                 </div>
               </div>
 
@@ -1281,42 +1281,42 @@ onMounted(async () => {
                 <!-- Announcement templates list -->
                 <div class="flex flex-col gap-2">
                   <div class="flex justify-between items-center">
-                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Mẫu thông báo sẵn có</label>
+                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Mẫu thông báo sẵn có</label>
                     <button 
                       @click="showAddTtsForm = !showAddTtsForm"
-                      class="flex items-center gap-1 text-[11px] font-bold text-purple-600 hover:text-purple-700 transition-colors border-none bg-transparent cursor-pointer"
+                      class="flex items-center gap-1 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 transition-colors border-none bg-transparent cursor-pointer"
                     >
                       <span class="material-symbols-rounded text-sm">add_circle</span> Thêm mẫu câu mới
                     </button>
                   </div>
 
                   <!-- Inline addition form -->
-                  <div v-if="showAddTtsForm" class="flex flex-col gap-2.5 p-3.5 bg-purple-50/20 rounded-xl border border-purple-100 shadow-inner">
-                    <div class="text-[10px] font-black text-purple-800 uppercase tracking-wider">Tạo mẫu câu phát loa mới</div>
+                  <div v-if="showAddTtsForm" class="flex flex-col gap-2.5 p-3.5 bg-teal-50/20 dark:bg-slate-800 rounded-xl border border-teal-100 dark:border-slate-800 shadow-inner">
+                    <div class="text-[10px] font-black text-teal-800 dark:text-teal-300 uppercase tracking-wider">Tạo mẫu câu phát loa mới</div>
                     <div class="grid grid-cols-1 gap-2">
                       <input 
                         type="text" 
                         v-model="newTtsName"
-                        class="w-full text-xs font-bold bg-white border border-slate-200 rounded-lg px-2.5 h-8.5 outline-none"
+                        class="w-full text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2.5 h-8.5 outline-none"
                         placeholder="Tên nhãn (Ví dụ: Nhắc dọn xe 🚗)"
                       >
                       <input 
                         type="text" 
                         v-model="newTtsValue"
-                        class="w-full text-xs bg-white border border-slate-200 rounded-lg px-2.5 h-8.5 outline-none"
+                        class="w-full text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2.5 h-8.5 outline-none"
                         placeholder="Nội dung phát (Ví dụ: Xin mời bàn {ban} qua quầy)"
                       >
                     </div>
                     <div class="flex justify-end gap-1.5 mt-1">
                       <button 
                         @click="showAddTtsForm = false"
-                        class="px-3 py-1 text-xs border border-slate-200 rounded-lg bg-white cursor-pointer"
+                        class="btn-secondary px-3 py-1 text-xs rounded-lg cursor-pointer"
                       >
                         Hủy
                       </button>
                       <button 
                         @click="saveNewTtsTemplate"
-                        class="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold border-none cursor-pointer"
+                        class="btn-primary px-3 py-1 text-xs rounded-lg font-bold cursor-pointer"
                       >
                         Lưu mẫu câu
                       </button>
@@ -1331,8 +1331,8 @@ onMounted(async () => {
                       @click="applyTtsTemplate(idx)"
                       class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer group"
                       :class="activeTtsTplIdx === idx 
-                        ? 'bg-purple-50 border-purple-300 text-purple-700' 
-                        : 'bg-slate-50/50 border-slate-200 text-slate-600 hover:border-purple-200'"
+                        ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300' 
+                        : 'bg-slate-50/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-teal-200'"
                     >
                       <span>{{ item.name }}</span>
                       <button 
@@ -1348,19 +1348,19 @@ onMounted(async () => {
                 <!-- Variable input parameter fields -->
                 <div 
                   v-if="Object.keys(ttsVariables).length > 0"
-                  class="grid grid-cols-2 gap-3 bg-purple-50/20 p-3.5 rounded-xl border border-purple-100 shadow-inner"
+                  class="grid grid-cols-2 gap-3 bg-teal-50/20 dark:bg-slate-800 p-3.5 rounded-xl border border-teal-100 dark:border-slate-800 shadow-inner"
                 >
                   <div 
                     v-for="(vVal, vKey) in ttsVariables" 
                     :key="vKey"
                     class="flex flex-col gap-1"
                   >
-                    <label class="text-[9px] font-black text-purple-800 uppercase tracking-wider">Giá trị biến {{ vKey.replace('_', ' ') }}</label>
+                    <label class="text-[9px] font-black text-teal-800 dark:text-teal-300 uppercase tracking-wider">Giá trị biến {{ vKey.replace('_', ' ') }}</label>
                     <input 
                       type="text" 
                       v-model="ttsVariables[vKey]"
                       @input="handleVariableChange"
-                      class="w-full text-xs font-bold border border-purple-200 focus:border-purple-500 rounded-lg px-2.5 h-8 outline-none bg-white"
+                      class="w-full text-xs font-bold border border-teal-200 dark:border-teal-800/60 focus:border-teal-500 rounded-lg px-2.5 h-8 outline-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                       placeholder="Nhập tham số..."
                     >
                   </div>
@@ -1368,22 +1368,22 @@ onMounted(async () => {
 
                 <!-- Textarea announcement input -->
                 <div class="flex flex-col gap-1.5">
-                  <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Nội dung phát thanh thực tế</label>
+                  <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nội dung phát thanh thực tế</label>
                   <textarea 
                     v-model="ttsText"
                     rows="3"
-                    class="w-full resize-none bg-slate-50/50 border border-slate-200 hover:border-purple-250 focus:border-purple-500 focus:bg-white rounded-2xl p-4 text-sm font-semibold text-slate-800 transition-all outline-none leading-relaxed"
+                    class="w-full resize-none bg-slate-50/50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-teal-300 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-2xl p-4 text-sm font-semibold text-slate-800 dark:text-slate-100 transition-all outline-none leading-relaxed"
                     placeholder="Nhấp vào mẫu câu ở trên hoặc tự gõ nội dung thông báo muốn phát ở đây..."
                   ></textarea>
                 </div>
 
                 <!-- Voice / Speed adjustment -->
-                <div class="grid grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                <div class="grid grid-cols-2 gap-3 bg-slate-50/50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                   <div class="flex flex-col gap-1">
-                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Giọng đọc</label>
+                    <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Giọng đọc</label>
                     <select 
                       v-model="ttsVoice"
-                      class="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 h-9.5 rounded-lg px-2 outline-none"
+                      class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 h-9.5 rounded-lg px-2 outline-none"
                     >
                       <option value="nu-bac">Nữ miền Bắc</option>
                       <option value="nam-bac">Nam miền Bắc</option>
@@ -1393,10 +1393,10 @@ onMounted(async () => {
                   </div>
 
                   <div class="flex flex-col gap-1">
-                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Tốc độ phát</label>
+                    <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tốc độ phát</label>
                     <select 
                       v-model="ttsSpeed"
-                      class="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 h-9.5 rounded-lg px-2 outline-none"
+                      class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 h-9.5 rounded-lg px-2 outline-none"
                     >
                       <option value="0.8">Tốc độ chậm (0.8x)</option>
                       <option value="1.0">Bình thường (1.0x)</option>
@@ -1409,15 +1409,15 @@ onMounted(async () => {
                 <div class="flex gap-3">
                   <button 
                     @click="playSystemTts"
-                    class="flex-1 h-11 rounded-xl border border-slate-250 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                    class="btn-secondary flex-1 h-11 rounded-xl text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <span class="material-symbols-rounded text-slate-500">volume_up</span> Đọc (Loa Hệ Thống)
+                    <span class="material-symbols-rounded text-slate-500 dark:text-slate-400">volume_up</span> Đọc (Loa Hệ Thống)
                   </button>
                   
                   <button 
                     @click="playAiTts"
                     :disabled="ttsIsLoading"
-                    class="flex-[1.2] h-11 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all border-none shadow-sm cursor-pointer"
+                    class="btn-primary flex-[1.2] h-11 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <span class="material-symbols-rounded" :class="{'animate-pulse': ttsIsLoading}">graphic_eq</span>
                     <span>{{ ttsIsLoading ? 'Đang tổng hợp...' : 'Đọc (Giọng AI)' }}</span>
@@ -1427,10 +1427,10 @@ onMounted(async () => {
             </div>
 
             <!-- Right settings panel -->
-            <div class="bg-slate-50 rounded-3xl border border-slate-100 shadow-xs overflow-hidden flex flex-col justify-between">
-              <div class="p-5 border-b border-slate-200 bg-white/50">
-                <h4 class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-                  <span class="material-symbols-rounded text-slate-400 text-xl">settings_applications</span>
+            <div class="bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col justify-between">
+              <div class="p-5 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
+                <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
+                  <span class="material-symbols-rounded text-slate-400 dark:text-slate-500 text-xl">settings_applications</span>
                   Cấu hình kết nối API AI
                 </h4>
               </div>
@@ -1438,10 +1438,10 @@ onMounted(async () => {
               <div class="p-5 flex-1 flex flex-col justify-between gap-4">
                 <div class="flex flex-col gap-3">
                   <div class="flex flex-col gap-1.5">
-                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Nhà cung cấp giọng đọc</label>
+                    <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Nhà cung cấp giọng đọc</label>
                     <select 
                       v-model="ttsProvider"
-                      class="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 h-10 rounded-lg px-2 outline-none"
+                      class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 h-10 rounded-lg px-2 outline-none"
                     >
                       <option value="google">Google Cloud TTS (Miễn phí & Cực nhanh)</option>
                       <option value="fpt">FPT.AI Voice TTS</option>
@@ -1450,17 +1450,17 @@ onMounted(async () => {
                   </div>
 
                   <div class="flex flex-col gap-1.5" v-if="ttsProvider !== 'google'">
-                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider">API Token / Key</label>
+                    <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">API Token / Key</label>
                     <input 
                       type="password"
                       v-model="ttsKey"
-                      class="w-full bg-white border border-slate-200 text-xs font-bold text-slate-700 h-10 rounded-lg px-3 outline-none"
+                      class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 h-10 rounded-lg px-3 outline-none"
                       placeholder="Dùng Key hệ thống mặc định"
                     >
                   </div>
                 </div>
 
-                <div class="bg-purple-50 text-purple-700 text-[10px] leading-relaxed p-3 rounded-xl border border-purple-100 shadow-inner">
+                <div class="bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 text-[10px] leading-relaxed p-3 rounded-xl border border-teal-100 dark:border-teal-900/40 shadow-inner">
                   <span class="font-bold block mb-1">💡 Hướng dẫn phát loa thông báo:</span>
                   - <b>Google Translate Engine</b>: Hoàn toàn miễn phí, không giới hạn ký tự và không yêu cầu cấu hình API key.<br>
                   - <b>FPT / Viettel AI Engine</b>: Giọng điệu tự nhiên, ngắt nghỉ câu từ chuẩn chỉ hơn, yêu cầu điền API Key cá nhân để hoạt động lâu dài.
@@ -1469,13 +1469,13 @@ onMounted(async () => {
                 <div class="flex flex-col gap-2 mt-2">
                   <button 
                     @click="syncTtsCloud"
-                    class="w-full h-10.5 rounded-xl border border-dashed border-purple-200 bg-white hover:bg-purple-50/20 text-purple-600 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    class="btn-secondary w-full h-10.5 rounded-xl border-dashed text-teal-600 dark:text-teal-400 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <span class="material-symbols-rounded text-sm">sync</span> Đồng bộ đám mây
                   </button>
                   <button 
                     @click="saveTtsSettings"
-                    class="w-full h-10.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center border-none cursor-pointer"
+                    class="btn-primary w-full h-10.5 rounded-xl font-bold text-xs flex items-center justify-center cursor-pointer"
                   >
                     Lưu cấu hình
                   </button>
@@ -1488,33 +1488,33 @@ onMounted(async () => {
           <div v-else-if="activeTab === 'tools'" class="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
             
             <!-- Tax Code Search panel -->
-            <div class="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden flex flex-col justify-between">
-              <div class="p-5 border-b border-slate-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-inner">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col justify-between">
+              <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-inner">
                   <span class="material-symbols-rounded text-xl">corporate_fare</span>
                 </div>
                 <div>
-                  <h3 class="font-extrabold text-slate-800 text-base">Tra cứu Mã số thuế</h3>
-                  <p class="text-[11px] text-slate-500">Tra cứu nhanh tên doanh nghiệp theo mã số thuế</p>
+                  <h3 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">Tra cứu Mã số thuế</h3>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">Tra cứu nhanh tên doanh nghiệp theo mã số thuế</p>
                 </div>
               </div>
 
               <div class="p-6 flex-1 flex flex-col gap-4">
                 <div class="flex gap-2">
                   <div class="relative flex-1">
-                    <span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+                    <span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-lg">search</span>
                     <input 
                       type="text" 
                       v-model="mstInput"
                       @keydown.enter="lookupTaxCode"
-                      class="w-full h-10 bg-slate-50 border border-slate-200 hover:border-orange-300 focus:bg-white focus:border-orange-500 rounded-xl pl-9 pr-3 text-xs font-bold outline-none transition-all" 
+                      class="w-full h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-400 focus:bg-white dark:focus:bg-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none transition-all" 
                       placeholder="Nhập mã số thuế công ty..."
                     >
                   </div>
                   <button 
                     @click="lookupTaxCode"
                     :disabled="mstLoading"
-                    class="px-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl border-none cursor-pointer shadow-xs shadow-orange-100"
+                    class="px-4 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl border-none cursor-pointer shadow-xs shadow-amber-500/10"
                   >
                     {{ mstLoading ? '...' : 'Tra cứu' }}
                   </button>
@@ -1523,17 +1523,17 @@ onMounted(async () => {
                 <div 
                   v-if="mstResult"
                   class="p-4 rounded-xl border flex-1 text-xs"
-                  :class="mstResult.success ? 'bg-orange-50/10 border-orange-100' : 'bg-rose-50/10 border-rose-100 text-rose-600'"
+                  :class="mstResult.success ? 'bg-amber-50/20 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-900/40 text-slate-800 dark:text-slate-200' : 'bg-rose-50/20 dark:bg-rose-950/30 border-rose-200/60 dark:border-rose-900/40 text-rose-600 dark:text-rose-400'"
                 >
                   <div v-if="mstResult.success" class="flex flex-col gap-2 justify-between h-full">
                     <div>
-                      <div class="font-extrabold text-orange-700 text-sm mb-1 leading-snug">{{ mstResult.name }}</div>
-                      <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Mã số thuế: <span class="text-slate-800 text-xs font-black">{{ mstResult.id }}</span></div>
-                      <div class="text-slate-500 mt-1 leading-relaxed">{{ mstResult.address }}</div>
+                      <div class="font-extrabold text-amber-700 dark:text-amber-400 text-sm mb-1 leading-snug">{{ mstResult.name }}</div>
+                      <div class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Mã số thuế: <span class="text-slate-800 dark:text-slate-100 text-xs font-black">{{ mstResult.id }}</span></div>
+                      <div class="text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{{ mstResult.address }}</div>
                     </div>
                     <button 
                       @click="copyMstCompany"
-                      class="self-start mt-3 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 font-bold flex items-center gap-1"
+                      class="btn-secondary self-start mt-3 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-200 font-bold flex items-center gap-1"
                     >
                       <span class="material-symbols-rounded text-sm">content_copy</span> Sao chép tên doanh nghiệp
                     </button>
@@ -1543,24 +1543,24 @@ onMounted(async () => {
                   </div>
                 </div>
 
-                <div v-else class="flex-1 flex items-center justify-center p-8 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                  <div class="text-center text-slate-400">
-                    <span class="material-symbols-rounded text-4xl opacity-20 text-orange-500">search_check</span>
-                    <p class="text-xs font-semibold text-slate-500 mt-1.5">Kết quả tra cứu sẽ hiển thị tại đây.</p>
+                <div v-else class="flex-1 flex items-center justify-center p-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/50">
+                  <div class="text-center text-slate-400 dark:text-slate-500">
+                    <span class="material-symbols-rounded text-4xl opacity-20 text-amber-500">search_check</span>
+                    <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1.5">Kết quả tra cứu sẽ hiển thị tại đây.</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Currency Exchange panel -->
-            <div class="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden flex flex-col justify-between">
-              <div class="p-5 border-b border-slate-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center shadow-inner">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col justify-between">
+              <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center shadow-inner">
                   <span class="material-symbols-rounded text-xl">currency_exchange</span>
                 </div>
                 <div>
-                  <h3 class="font-extrabold text-slate-800 text-base">Công cụ đổi ngoại tệ</h3>
-                  <p class="text-[11px] text-slate-500">Quy đổi ngoại tệ theo tỷ giá cập nhật trực tuyến</p>
+                  <h3 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">Công cụ đổi ngoại tệ</h3>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">Quy đổi ngoại tệ theo tỷ giá cập nhật trực tuyến</p>
                 </div>
               </div>
 
@@ -1568,18 +1568,18 @@ onMounted(async () => {
                 <div class="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
                   <select 
                     v-model="exFrom"
-                    class="h-10 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-center outline-none"
+                    class="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 text-center outline-none"
                   >
                     <option value="USD">USD ($)</option>
                     <option value="EUR">EUR (€)</option>
                     <option value="VND">VND (đ)</option>
                   </select>
                   
-                  <span class="material-symbols-rounded text-slate-300">arrow_forward</span>
+                  <span class="material-symbols-rounded text-slate-300 dark:text-slate-600">arrow_forward</span>
 
                   <select 
                     v-model="exTo"
-                    class="h-10 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-center outline-none"
+                    class="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 text-center outline-none"
                   >
                     <option value="VND">VND (đ)</option>
                     <option value="USD">USD ($)</option>
@@ -1588,21 +1588,21 @@ onMounted(async () => {
                 </div>
 
                 <div class="flex flex-col gap-1">
-                  <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Số tiền quy đổi</label>
+                  <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Số tiền quy đổi</label>
                   <input 
                     type="text"
                     v-model="exAmountStr"
                     @input="handleExAmountInput"
-                    class="w-full h-11 text-center font-bold text-base bg-slate-50 border border-slate-200 focus:bg-white focus:border-cyan-500 rounded-xl px-3 outline-none transition-all"
+                    class="w-full h-11 text-center font-bold text-base bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-teal-500 rounded-xl px-3 text-slate-800 dark:text-slate-100 outline-none transition-all"
                     placeholder="Nhập số tiền..."
                   >
                 </div>
 
-                <div class="p-4 rounded-xl bg-slate-50/50 border border-slate-100 flex flex-col justify-center items-center text-center mt-2">
-                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Giá trị quy đổi</span>
-                  <div class="text-2xl font-black text-cyan-600">{{ exResultFormatted }}</div>
+                <div class="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 flex flex-col justify-center items-center text-center mt-2">
+                  <span class="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Giá trị quy đổi</span>
+                  <div class="text-2xl font-black text-teal-600 dark:text-teal-400">{{ exResultFormatted }}</div>
                   
-                  <div class="text-[9px] text-slate-400 mt-2.5 flex items-center gap-1 font-medium">
+                  <div class="text-[9px] text-slate-400 dark:text-slate-500 mt-2.5 flex items-center gap-1 font-medium">
                     <span class="material-symbols-rounded text-xs">schedule</span>
                     <span>Tỷ giá trực tuyến. {{ exRatesTime ? `Cập nhật lúc: ${exRatesTime}` : '' }}</span>
                   </div>

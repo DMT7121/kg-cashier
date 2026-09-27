@@ -22,37 +22,37 @@ const tabs = [
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50/50 p-4 md:p-6 lg:p-8">
+  <div class="min-h-screen bg-slate-50/50 dark:bg-slate-950 p-4 md:p-6 lg:p-8">
     <div class="max-w-7xl mx-auto flex flex-col gap-6">
       
       <!-- Page Header -->
       <div class="flex flex-col gap-1">
-        <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-          <span class="material-symbols-rounded text-indigo-600 text-3xl">tune</span>
+        <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400 text-3xl">tune</span>
           Trung tâm Cấu hình hệ thống
         </h2>
-        <p class="text-sm text-slate-500">Cấu hình kết nối API, phần cứng máy in, nhân sự và quản trị dữ liệu.</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Cấu hình kết nối API, phần cứng máy in, nhân sự và quản trị dữ liệu.</p>
       </div>
 
       <!-- Main Layout -->
       <div class="flex flex-col lg:flex-row gap-6 items-start">
         
         <!-- Sidebar Navigation -->
-        <aside class="w-full lg:w-64 bg-white rounded-2xl border border-slate-100 shadow-xs p-3 shrink-0">
+        <aside class="w-full lg:w-64 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs p-3 shrink-0">
           <!-- Mobile tab scroll, Desktop vertical list -->
           <nav class="flex flex-row lg:flex-col overflow-x-auto lg:overflow-visible gap-1 pb-2 lg:pb-0 scrollbar-none">
             <button 
               v-for="tab in tabs" 
               :key="tab.key"
               @click="activeTab = tab.key"
-              class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 select-none group"
+              class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 select-none group w-full text-left"
               :class="activeTab === tab.key 
-                ? 'bg-indigo-50 text-indigo-700' 
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'"
+                ? 'bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold border-l-2 border-emerald-500' 
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'"
             >
               <span 
                 class="material-symbols-rounded text-xl transition-transform duration-200 group-hover:scale-105"
-                :class="activeTab === tab.key ? 'text-indigo-600' : 'text-slate-400'"
+                :class="activeTab === tab.key ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'"
               >
                 {{ tab.icon }}
               </span>

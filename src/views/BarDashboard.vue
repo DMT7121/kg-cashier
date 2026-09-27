@@ -294,15 +294,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="view-content p-0 h-full flex flex-col bg-slate-50/50">
+  <div class="view-content p-0 h-full flex flex-col bg-slate-50/50 dark:bg-slate-950/40">
     <div class="bar-shell flex-1 flex flex-col h-full overflow-hidden">
       <!-- Station header & filters -->
-      <div class="bar-header shrink-0 p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+      <div class="bar-header shrink-0 p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
         <div class="bar-header-left flex items-center gap-3">
           <span class="material-symbols-rounded text-3xl" :style="{ color: modes[viewMode].color }">monitor_heart</span>
           <div>
-            <h3 class="margin-0 font-bold text-lg text-slate-800">Màn hình {{ modes[viewMode].label }}</h3>
-            <small class="text-slate-500 font-medium">
+            <h3 class="margin-0 font-bold text-lg text-slate-800 dark:text-slate-100">Màn hình {{ modes[viewMode].label }}</h3>
+            <small class="text-slate-500 dark:text-slate-400 font-medium">
               {{ stats.activeTickets }} phiếu &middot; {{ stats.pendingItems }} món chờ chế biến
             </small>
           </div>
@@ -314,11 +314,11 @@ onUnmounted(() => {
             :key="key"
             class="bar-mode-tab cursor-pointer px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all"
             :class="{ 
-              'bg-slate-50 border-slate-200 text-slate-600': viewMode !== key,
+              'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300': viewMode !== key,
               'active': viewMode === key
             }"
             :style="viewMode === key ? { 
-              backgroundColor: info.color + '12', 
+              backgroundColor: info.color + '18', 
               color: info.color, 
               borderColor: info.color + '44' 
             } : {}"
@@ -363,34 +363,34 @@ onUnmounted(() => {
               <div 
                 v-for="item in ticket.items" 
                 :key="item.id"
-                class="bar-item-row flex items-center justify-between p-2 rounded-xl hover:bg-slate-50/75 transition-all border border-transparent"
-                :class="{ 'cooked bg-slate-50/50 opacity-60': item.status === 'cooked' }"
+                class="bar-item-row flex items-center justify-between p-2 rounded-xl hover:bg-slate-50/75 dark:hover:bg-slate-800/75 transition-all border border-transparent"
+                :class="{ 'cooked bg-slate-50/50 dark:bg-slate-900/60 opacity-60': item.status === 'cooked' }"
               >
                 <div class="bar-item-info flex-1 pr-2">
                   <div class="flex items-baseline gap-1.5">
-                    <span class="bar-item-qty font-extrabold text-sm" :class="item.status === 'cooked' ? 'text-slate-400' : 'text-blue-600'">
+                    <span class="bar-item-qty font-extrabold text-sm" :class="item.status === 'cooked' ? 'text-slate-400 dark:text-slate-500' : 'text-emerald-600 dark:text-emerald-400'">
                       {{ item.qty }}×
                     </span>
-                    <span class="bar-item-name font-bold text-sm text-slate-800" :class="{ 'line-through text-slate-400 font-medium': item.status === 'cooked' }">
+                    <span class="bar-item-name font-bold text-sm text-slate-800 dark:text-slate-200" :class="{ 'line-through text-slate-400 dark:text-slate-500 font-medium': item.status === 'cooked' }">
                       {{ item.name }}
                     </span>
                   </div>
-                  <div v-if="item.note" class="bar-item-note text-xs text-rose-500 font-semibold bg-rose-50/40 px-2 py-0.5 rounded-lg mt-0.5 border border-rose-100/30 w-fit">
+                  <div v-if="item.note" class="bar-item-note text-xs text-rose-500 dark:text-rose-400 font-semibold bg-rose-50/40 dark:bg-rose-950/40 px-2 py-0.5 rounded-lg mt-0.5 border border-rose-100/30 dark:border-rose-900/30 w-fit">
                     📝 {{ item.note }}
                   </div>
                 </div>
 
                 <!-- Cook triggers -->
                 <div>
-                  <span v-if="item.status === 'cooked'" class="bar-item-done text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                  <span v-if="item.status === 'cooked'" class="bar-item-done text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
                     ✔ Xong
                   </span>
-                  <span v-else-if="!item.isPrinted" class="bar-item-pending text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                  <span v-else-if="!item.isPrinted" class="bar-item-pending text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
                     ⏳ Chờ
                   </span>
                   <button 
                     v-else
-                    class="bar-item-cook-btn cursor-pointer bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 hover:border-blue-200 font-bold text-xs px-2.5 py-1 rounded-xl transition-all"
+                    class="bar-item-cook-btn cursor-pointer font-bold text-xs px-2.5 py-1 rounded-xl transition-all"
                     @click="markItemCooked(ticket.tableId, item.id)"
                   >
                     ✅ Xong
@@ -400,13 +400,13 @@ onUnmounted(() => {
             </div>
 
             <!-- Card Footer (Bulk Done) -->
-            <div v-if="ticket.hasUncooked" class="bar-ticket-footer border-t border-slate-50 p-3 flex justify-end">
+            <div v-if="ticket.hasUncooked" class="bar-ticket-footer border-t border-slate-50 dark:border-slate-800 p-3 flex justify-end">
               <button 
                 class="btn btn-sm cursor-pointer flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl transition-all"
                 :style="{ 
                   backgroundColor: (modes[ticket.dest]?.color || '#10b981') + '15',
                   color: modes[ticket.dest]?.color || '#10b981',
-                  border: '1px solid ' + (modes[ticket.dest]?.color || '#10b981') + '25'
+                  border: '1px solid ' + (modes[ticket.dest]?.color || '#10b981') + '35'
                 }"
                 @click="markAllCooked(ticket.tableId, ticket.dest)"
               >
@@ -419,9 +419,9 @@ onUnmounted(() => {
 
         <!-- Empty state -->
         <div v-else class="bar-empty flex flex-col items-center justify-center py-24 text-center">
-          <span class="material-symbols-rounded text-6xl text-slate-200 mb-4">restaurant</span>
-          <h3 class="font-bold text-lg text-slate-700 mb-1">Trống trải & Sạch sẽ</h3>
-          <p class="text-xs text-slate-400 max-w-[280px]">Không có phiếu chế biến nào. Phiếu sẽ tự động xuất hiện khi thu ngân gửi lệnh báo bếp hoặc bar.</p>
+          <span class="material-symbols-rounded text-6xl text-slate-200 dark:text-slate-700 mb-4">restaurant</span>
+          <h3 class="font-bold text-lg text-slate-700 dark:text-slate-200 mb-1">Trống trải & Sạch sẽ</h3>
+          <p class="text-xs text-slate-400 dark:text-slate-500 max-w-[280px]">Không có phiếu chế biến nào. Phiếu sẽ tự động xuất hiện khi thu ngân gửi lệnh báo bếp hoặc bar.</p>
         </div>
       </div>
     </div>
