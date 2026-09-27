@@ -962,54 +962,60 @@ onUnmounted(() => {
 
 <template>
   <div class="view-content p-4 md:p-6" :class="{ 'printing-active': printingA4 }">
-    <!-- Sub-Module Navigation Header -->
-    <div class="no-print flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs">
+    <!-- Compact Sub-Module Header (Replaces redundant tab bar) -->
+    <div class="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
       <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
-            <span class="material-symbols-rounded text-xl">analytics</span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">Báo cáo doanh thu /</span>
+          <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+            {{ activeTab === 'report' ? 'Báo cáo ca & Bàn giao' : activeTab === 'invoices' ? 'Hóa đơn POS CUKCUK' : activeTab === 'analytics' ? 'Phân tích & Biểu đồ' : 'Đối soát & Sửa tay' }}
           </span>
-          <h3 class="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Doanh thu & Báo cáo</h3>
-          <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">CUKCUK Sync</span>
         </div>
-        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">Theo dõi kết quả bán hàng, hóa đơn POS CUKCUK và kết ca bàn giao.</p>
+        <h2 class="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2 mt-0.5">
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">
+            {{ activeTab === 'report' ? 'summarize' : activeTab === 'invoices' ? 'receipt_long' : activeTab === 'analytics' ? 'monitoring' : 'fact_check' }}
+          </span>
+          <span>
+            {{ activeTab === 'report' ? 'Báo cáo ca & Phiếu bàn giao' : activeTab === 'invoices' ? 'Danh sách Hóa đơn POS CUKCUK' : activeTab === 'analytics' ? 'Phân tích Doanh thu & Mặt hàng' : 'Đối soát Dữ liệu CUKCUK' }}
+          </span>
+        </h2>
       </div>
-      
-      <!-- Sub-module Navigation Pills -->
-      <nav aria-label="Phân hệ báo cáo doanh thu" class="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex-wrap gap-1.5 shadow-inner">
-        <button 
-          @click="switchTab('report')"
-          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'report' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
-        >
-          <span class="material-symbols-rounded text-lg">summarize</span>
-          <span>Báo cáo ca & Bàn giao</span>
-        </button>
-        <button 
-          @click="switchTab('invoices')"
-          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'invoices' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
-        >
-          <span class="material-symbols-rounded text-lg">receipt_long</span>
-          <span>Hóa đơn POS CUKCUK</span>
-        </button>
-        <button 
-          @click="switchTab('analytics')"
-          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'analytics' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
-        >
-          <span class="material-symbols-rounded text-lg">bar_chart</span>
-          <span>Phân tích & Biểu đồ</span>
-        </button>
-        <button 
-          @click="switchTab('audit')"
-          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'audit' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
-        >
-          <span class="material-symbols-rounded text-lg">fact_check</span>
-          <span>Đối soát & Sửa tay</span>
-        </button>
-      </nav>
+
+      <!-- Quick Action Buttons for the active sub-module -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <template v-if="activeTab === 'report'">
+          <button @click="showConfigModal = true" class="btn btn-secondary btn-sm" title="Tùy biến hiển thị các phần">
+            <span class="material-symbols-rounded text-base">tune</span>
+            <span class="hidden md:inline">Bố cục</span>
+          </button>
+          <button @click="exportCSV" class="btn btn-secondary btn-sm" title="Xuất file Excel/CSV">
+            <span class="material-symbols-rounded text-base">download</span>
+            <span class="hidden md:inline">Xuất CSV</span>
+          </button>
+          <button @click="printHandover" class="btn btn-primary btn-sm shadow-xs" title="In phiếu bàn giao khổ A4">
+            <span class="material-symbols-rounded text-base">print</span>
+            <span>In phiếu A4</span>
+          </button>
+        </template>
+        <template v-else-if="activeTab === 'invoices'">
+          <button @click="refreshReportData" class="btn btn-primary btn-sm shadow-xs" :disabled="isSyncing">
+            <span class="material-symbols-rounded text-base" :class="{ 'animate-spin': isSyncing }">sync</span>
+            <span>{{ isSyncing ? 'Đang tải...' : 'Đồng bộ CUKCUK' }}</span>
+          </button>
+        </template>
+        <template v-else-if="activeTab === 'analytics'">
+          <button @click="refreshReportData" class="btn btn-secondary btn-sm">
+            <span class="material-symbols-rounded text-base">refresh</span>
+            <span>Làm mới biểu đồ</span>
+          </button>
+        </template>
+        <template v-else-if="activeTab === 'audit'">
+          <button @click="refreshReportData" class="btn btn-secondary btn-sm">
+            <span class="material-symbols-rounded text-base">sync</span>
+            <span>Đối soát lại</span>
+          </button>
+        </template>
+      </div>
     </div>
 
     <!-- TAB 1: BÁO CÁO DOANH THU & PHIẾU BÀN GIAO CA -->
@@ -1641,32 +1647,33 @@ onUnmounted(() => {
         </div>
 
         <!-- Detailed Item Sales Card breakdown -->
-        <div class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+        <!-- Detailed Item Sales Card -->
+        <div class="card p-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
-              <h4 class="font-extrabold text-slate-800 text-base">🍽️ Doanh số bán món chi tiết</h4>
-              <p class="text-xs text-slate-500 font-medium">Danh sách các món ăn & đồ uống bán ra trong kỳ.</p>
+              <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">🍽️ Doanh số bán món chi tiết</h4>
+              <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Danh sách các món ăn & đồ uống bán ra trong kỳ.</p>
             </div>
-            <span class="text-xs bg-indigo-50 text-indigo-600 font-bold px-2.5 py-1 rounded-full border border-indigo-100 self-start">
+            <span class="text-xs bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-bold px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/40 self-start">
               {{ detailedItemSales.length }} món đã bán
             </span>
           </div>
 
-          <div v-if="detailedItemSales.length === 0" class="text-center py-8 text-slate-400 text-xs italic">
+          <div v-if="detailedItemSales.length === 0" class="text-center py-8 text-slate-400 dark:text-slate-500 text-xs italic">
             Không tìm thấy thông tin món ăn nào bán ra trong kỳ báo cáo này.
           </div>
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Food List -->
             <div class="space-y-3">
-              <div class="font-bold text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded-lg px-2.5 py-1.5 tracking-wide uppercase">🍔 Đồ ăn</div>
+              <div class="font-bold text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-100 dark:border-orange-900/40 rounded-lg px-2.5 py-1.5 tracking-wide uppercase">🍔 Đồ ăn</div>
               <div class="space-y-2 max-h-[350px] overflow-y-auto pr-1">
                 <div v-for="item in detailedItemSales.filter(i => i.category === 'Đồ ăn')" :key="item.name" class="space-y-1">
-                  <div class="flex justify-between text-xs font-semibold text-slate-700">
+                  <div class="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-200">
                     <span>{{ item.name }}</span>
                     <span>{{ item.quantity }} suất</span>
                   </div>
-                  <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div class="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                     <div class="bg-orange-500 h-full rounded-full transition-all duration-300" :style="{ width: (item.quantity / maxItemQty) * 100 + '%' }"></div>
                   </div>
                 </div>
@@ -1675,14 +1682,14 @@ onUnmounted(() => {
 
             <!-- Drinks List -->
             <div class="space-y-3">
-              <div class="font-bold text-xs text-teal-600 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5 tracking-wide uppercase">🍻 Đồ uống</div>
+              <div class="font-bold text-xs text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/40 rounded-lg px-2.5 py-1.5 tracking-wide uppercase">🍻 Đồ uống</div>
               <div class="space-y-2 max-h-[350px] overflow-y-auto pr-1">
                 <div v-for="item in detailedItemSales.filter(i => i.category === 'Đồ uống')" :key="item.name" class="space-y-1">
-                  <div class="flex justify-between text-xs font-semibold text-slate-700">
+                  <div class="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-200">
                     <span>{{ item.name }}</span>
                     <span>{{ item.quantity }} ly/lon</span>
                   </div>
-                  <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div class="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                     <div class="bg-teal-500 h-full rounded-full transition-all duration-300" :style="{ width: (item.quantity / maxItemQty) * 100 + '%' }"></div>
                   </div>
                 </div>
@@ -1735,23 +1742,11 @@ onUnmounted(() => {
       <!-- Top actions & filter bar -->
       <div class="card p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-base">Hóa đơn POS CUKCUK</h4>
-            <button 
-              @click="triggerCukcukSync"
-              :disabled="isSyncing"
-              class="btn btn-secondary flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs disabled:opacity-50"
-            >
-              <span class="material-symbols-rounded text-sm flex" :class="{ 'animate-spin': isSyncing }">sync</span>
-              Đồng bộ CUKCUK
-            </button>
-          </div>
-          
-          <div class="flex flex-wrap items-center gap-2">
-            <!-- Period Selector -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Thời gian:</span>
             <select 
               v-model="invoicePeriod"
-              class="form-select text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 px-3 py-1.5"
+              class="form-select text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 px-3 py-1.5 cursor-pointer"
             >
               <option value="day">Hôm nay</option>
               <option value="week">7 ngày qua</option>
@@ -1763,8 +1758,12 @@ onUnmounted(() => {
             <input 
               type="date"
               v-model="invoiceDate"
-              class="form-input text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 px-3 py-1.5"
+              class="form-input text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 px-3 py-1.5 cursor-pointer"
             />
+          </div>
+
+          <div class="text-xs text-slate-500 dark:text-slate-400">
+            Tổng cộng: <strong class="text-slate-800 dark:text-slate-100 font-bold">{{ filteredInvoices.length }}</strong> hóa đơn
           </div>
         </div>
 
@@ -2074,22 +2073,20 @@ onUnmounted(() => {
 
     <!-- TAB 4: ĐỐI SOÁT & SỬA TAY (AUDIT) -->
     <div v-else-if="activeTab === 'audit'" class="space-y-6 animate-fade-in">
-      <div class="card p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
-        <h3 class="font-extrabold text-slate-800 text-base">🔍 Nhật ký sửa tay và đối soát thanh toán</h3>
-        <p class="text-xs text-slate-500 font-semibold mt-1">Danh sách hóa đơn CUKCUK được sửa thủ công phương thức thanh toán.</p>
-      </div>
-
-      <div class="card p-6 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
+      <div class="card p-6 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl shadow-xs space-y-4">
         <div class="flex justify-between items-center pb-2">
-          <h4 class="font-extrabold text-slate-800 text-sm">Hóa đơn đã sửa</h4>
-          <span class="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-1">
+          <div>
+            <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-sm">Hóa đơn CUKCUK đã can thiệp sửa tay</h4>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Lịch sử điều chỉnh phân bổ phương thức thanh toán</p>
+          </div>
+          <span class="text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1">
             {{ invoices.filter(i => i.manualOverride || (i as any).isManuallyEdited).length }} bill sửa đổi
           </span>
         </div>
 
-        <div class="overflow-x-auto w-full border border-slate-150 rounded-xl">
+        <div class="overflow-x-auto w-full border border-slate-200/80 dark:border-slate-800 rounded-xl">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-150">
+            <thead class="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th class="px-4 py-3">Mã Bill</th>
                 <th class="px-4 py-3">Bàn</th>
@@ -2101,47 +2098,47 @@ onUnmounted(() => {
                 <th class="px-4 py-3 text-right font-bold">Tổng tiền</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 text-slate-700 font-medium">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300 font-medium">
               <tr 
                 v-for="inv in invoices.filter(i => i.manualOverride || (i as any).isManuallyEdited)" 
                 :key="'audit-' + inv.refId"
-                class="hover:bg-slate-50/60 transition-all duration-150"
+                class="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 transition-all duration-150"
               >
-                <td class="px-4 py-3.5 font-bold text-slate-900">
+                <td class="px-4 py-3.5 font-bold text-slate-900 dark:text-slate-100">
                   {{ inv.refNo || inv.refId.substring(0, 8) }}
                 </td>
                 <td class="px-4 py-3.5">{{ inv.tableName || '-' }}</td>
-                <td class="px-4 py-3.5 text-slate-600">
+                <td class="px-4 py-3.5 text-slate-600 dark:text-slate-400">
                   {{ (inv as any).overrideBy || 'THU NGÂN' }}
                 </td>
-                <td class="px-4 py-3.5 text-slate-400">
+                <td class="px-4 py-3.5 text-slate-400 dark:text-slate-500">
                   {{ (inv as any).overrideAt ? formatDateTime((inv as any).overrideAt) : '-' }}
                 </td>
-                <td class="px-4 py-3.5 text-amber-700 max-w-[200px] truncate" :title="(inv as any).overrideReason">
+                <td class="px-4 py-3.5 text-amber-700 dark:text-amber-400 max-w-[200px] truncate" :title="(inv as any).overrideReason">
                   {{ (inv as any).overrideReason || 'Sửa thủ công' }}
                 </td>
                 
                 <!-- Original Payments representation -->
-                <td class="px-4 py-3.5 text-right font-medium text-slate-400">
+                <td class="px-4 py-3.5 text-right font-medium text-slate-400 dark:text-slate-500">
                   <div v-for="p in getOriginalPayments(inv)" :key="p.method" class="text-[10px]">
                     {{ p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦' }} {{ formatCurrency(p.amount) }}
                   </div>
-                  <div v-if="getOriginalPayments(inv).length === 0" class="text-[10px] italic text-slate-300">Chưa ghi log</div>
+                  <div v-if="getOriginalPayments(inv).length === 0" class="text-[10px] italic text-slate-300 dark:text-slate-600">Chưa ghi log</div>
                 </td>
                 
                 <!-- Current (Edited) Payments representation -->
-                <td class="px-4 py-3.5 text-right font-semibold text-slate-800">
+                <td class="px-4 py-3.5 text-right font-semibold text-slate-800 dark:text-slate-200">
                   <div v-for="p in inv.payments" :key="p.method" class="text-[10px]">
                     {{ p.method === 'cash' ? '💵' : p.method === 'card' ? '💳' : '🏦' }} {{ formatCurrency(p.amount) }}
                   </div>
                 </td>
                 
-                <td class="px-4 py-3.5 text-right font-bold text-slate-900 bg-slate-50/20">
+                <td class="px-4 py-3.5 text-right font-bold text-slate-900 dark:text-slate-100 bg-slate-50/40 dark:bg-slate-800/40">
                   {{ formatCurrency(inv.amount) }}
                 </td>
               </tr>
               <tr v-if="invoices.filter(i => i.manualOverride || (i as any).isManuallyEdited).length === 0">
-                <td colspan="8" class="px-4 py-8 text-center text-slate-400 italic">Không tìm thấy hóa đơn sửa tay nào trong kỳ này.</td>
+                <td colspan="8" class="px-4 py-8 text-center text-slate-400 dark:text-slate-500 italic">Không tìm thấy hóa đơn sửa tay nào trong kỳ này.</td>
               </tr>
             </tbody>
           </table>

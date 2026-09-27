@@ -144,6 +144,7 @@ function toggleSidebar() {
 }
 
 const expandedMenus = ref<Record<string, boolean>>({
+  transactions: false,
   revenue: true,
   vat: false,
   extension: false,
@@ -258,16 +259,44 @@ onUnmounted(() => {
           <span>Bán hàng POS</span>
           <span class="nav-hint">3</span>
         </a>
-        <a 
-          href="#transactions" 
-          class="nav-item" 
-          :class="{ active: appStore.currentView === 'transactions' }" 
-          @click.prevent="handleNav('transactions')"
-        >
-          <span class="material-symbols-rounded">receipt_long</span>
-          <span>Giao dịch thu/chi</span>
-          <span class="nav-hint">4</span>
-        </a>
+        <!-- Giao dịch thu/chi (Group with sub-modules) -->
+        <div class="nav-group">
+          <div 
+            class="nav-item cursor-pointer" 
+            :class="{ active: appStore.currentView === 'transactions' }"
+            @click.prevent="handleNav('transactions')"
+          >
+            <span class="material-symbols-rounded">payments</span>
+            <span class="flex-1">Giao dịch thu/chi</span>
+            <span class="nav-hint">4</span>
+            <span 
+              class="material-symbols-rounded nav-chevron ml-1" 
+              :class="{ rotated: expandedMenus.transactions }"
+              @click.stop="toggleSubmenu('transactions')"
+            >
+              expand_more
+            </span>
+          </div>
+          <div v-show="expandedMenus.transactions" class="nav-sub-list animate-fadeIn">
+            <a 
+              class="nav-sub-item" 
+              :class="{ active: appStore.currentView === 'transactions' && (!appStore.currentSubView || appStore.currentSubView === 'transactions') }"
+              @click.prevent="handleNav('transactions', 'transactions')"
+            >
+              <span class="material-symbols-rounded">account_balance_wallet</span>
+              <span>Sổ thu chi trong ca</span>
+            </a>
+            <a 
+              class="nav-sub-item" 
+              :class="{ active: appStore.currentView === 'transactions' && appStore.currentSubView === 'invoices' }"
+              @click.prevent="handleNav('transactions', 'invoices')"
+            >
+              <span class="material-symbols-rounded">receipt_long</span>
+              <span>Hồ sơ chứng từ</span>
+            </a>
+          </div>
+        </div>
+
         <a 
           href="#cash-count" 
           class="nav-item" 
@@ -325,43 +354,35 @@ onUnmounted(() => {
           <div v-show="expandedMenus.revenue" class="nav-sub-list animate-fadeIn">
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'revenue' && (!appStore.currentSubView || appStore.currentSubView === 'summary') }"
-              @click.prevent="handleNav('revenue', 'summary')"
+              :class="{ active: appStore.currentView === 'revenue' && (!appStore.currentSubView || appStore.currentSubView === 'report') }"
+              @click.prevent="handleNav('revenue', 'report')"
             >
-              <span class="material-symbols-rounded">monitoring</span>
-              <span>Tổng hợp doanh thu</span>
+              <span class="material-symbols-rounded">summarize</span>
+              <span>Báo cáo ca & Bàn giao</span>
             </a>
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'revenue' && appStore.currentSubView === 'hourly' }"
-              @click.prevent="handleNav('revenue', 'hourly')"
-            >
-              <span class="material-symbols-rounded">schedule</span>
-              <span>Theo khung giờ</span>
-            </a>
-            <a 
-              class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'revenue' && appStore.currentSubView === 'table' }"
-              @click.prevent="handleNav('revenue', 'table')"
-            >
-              <span class="material-symbols-rounded">table_restaurant</span>
-              <span>Theo bàn & khu vực</span>
-            </a>
-            <a 
-              class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'revenue' && appStore.currentSubView === 'item' }"
-              @click.prevent="handleNav('revenue', 'item')"
-            >
-              <span class="material-symbols-rounded">restaurant_menu</span>
-              <span>Theo món bán chạy</span>
-            </a>
-            <a 
-              class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'revenue' && appStore.currentSubView === 'cukcuk' }"
-              @click.prevent="handleNav('revenue', 'cukcuk')"
+              :class="{ active: appStore.currentView === 'revenue' && appStore.currentSubView === 'invoices' }"
+              @click.prevent="handleNav('revenue', 'invoices')"
             >
               <span class="material-symbols-rounded">receipt_long</span>
-              <span>Đối soát CUKCUK</span>
+              <span>Hóa đơn POS CUKCUK</span>
+            </a>
+            <a 
+              class="nav-sub-item" 
+              :class="{ active: appStore.currentView === 'revenue' && appStore.currentSubView === 'analytics' }"
+              @click.prevent="handleNav('revenue', 'analytics')"
+            >
+              <span class="material-symbols-rounded">monitoring</span>
+              <span>Phân tích & Biểu đồ</span>
+            </a>
+            <a 
+              class="nav-sub-item" 
+              :class="{ active: appStore.currentView === 'revenue' && appStore.currentSubView === 'audit' }"
+              @click.prevent="handleNav('revenue', 'audit')"
+            >
+              <span class="material-symbols-rounded">fact_check</span>
+              <span>Đối soát & Sửa tay</span>
             </a>
           </div>
         </div>
@@ -405,19 +426,19 @@ onUnmounted(() => {
             </a>
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'vat' && appStore.currentSubView === 'manage' }"
-              @click.prevent="handleNav('vat', 'manage')"
+              :class="{ active: appStore.currentView === 'vat' && appStore.currentSubView === 'search' }"
+              @click.prevent="handleNav('vat', 'search')"
             >
-              <span class="material-symbols-rounded">folder_open</span>
-              <span>Tra cứu & Quản lý</span>
+              <span class="material-symbols-rounded">inventory_2</span>
+              <span>Kho Lưu Trữ & Tra Cứu</span>
             </a>
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'vat' && appStore.currentSubView === 'report' }"
-              @click.prevent="handleNav('vat', 'report')"
+              :class="{ active: appStore.currentView === 'vat' && appStore.currentSubView === 'history' }"
+              @click.prevent="handleNav('vat', 'history')"
             >
-              <span class="material-symbols-rounded">analytics</span>
-              <span>Báo cáo & Gửi thuế</span>
+              <span class="material-symbols-rounded">history_edu</span>
+              <span>Báo Cáo & Nhật Ký Thuế</span>
             </a>
           </div>
         </div>
@@ -445,19 +466,19 @@ onUnmounted(() => {
           <div v-show="expandedMenus.extension" class="nav-sub-list animate-fadeIn">
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'extension' && (!appStore.currentSubView || appStore.currentSubView === 'tax') }"
-              @click.prevent="handleNav('extension', 'tax')"
+              :class="{ active: appStore.currentView === 'extension' && (!appStore.currentSubView || appStore.currentSubView === 'calc') }"
+              @click.prevent="handleNav('extension', 'calc')"
             >
-              <span class="material-symbols-rounded">percent</span>
-              <span>Tính thuế VAT</span>
+              <span class="material-symbols-rounded">calculate</span>
+              <span>Tính thuế VAT (8% / 10%)</span>
             </a>
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'extension' && appStore.currentSubView === 'vietqr' }"
-              @click.prevent="handleNav('extension', 'vietqr')"
+              :class="{ active: appStore.currentView === 'extension' && appStore.currentSubView === 'qr' }"
+              @click.prevent="handleNav('extension', 'qr')"
             >
               <span class="material-symbols-rounded">qr_code_2</span>
-              <span>VietQR Napas 247</span>
+              <span>Tạo mã VietQR Napas</span>
             </a>
             <a 
               class="nav-sub-item" 
@@ -465,12 +486,12 @@ onUnmounted(() => {
               @click.prevent="handleNav('extension', 'tts')"
             >
               <span class="material-symbols-rounded">volume_up</span>
-              <span>Loa thông báo TTS</span>
+              <span>Loa thông báo & AI Voice</span>
             </a>
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'extension' && appStore.currentSubView === 'business' }"
-              @click.prevent="handleNav('extension', 'business')"
+              :class="{ active: appStore.currentView === 'extension' && appStore.currentSubView === 'tools' }"
+              @click.prevent="handleNav('extension', 'tools')"
             >
               <span class="material-symbols-rounded">domain</span>
               <span>Tra cứu MST & Tỷ giá</span>
@@ -531,10 +552,10 @@ onUnmounted(() => {
             </a>
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'settings' && appStore.currentSubView === 'print-forms' }"
-              @click.prevent="handleNav('settings', 'print-forms')"
+              :class="{ active: appStore.currentView === 'settings' && (appStore.currentSubView === 'print' || appStore.currentSubView === 'print-forms') }"
+              @click.prevent="handleNav('settings', 'print')"
             >
-              <span class="material-symbols-rounded">tune</span>
+              <span class="material-symbols-rounded">description</span>
               <span>Mẫu in ấn K80/A4</span>
             </a>
             <a 
@@ -547,11 +568,11 @@ onUnmounted(() => {
             </a>
             <a 
               class="nav-sub-item" 
-              :class="{ active: appStore.currentView === 'settings' && appStore.currentSubView === 'cloud-admin' }"
-              @click.prevent="handleNav('settings', 'cloud-admin')"
+              :class="{ active: appStore.currentView === 'settings' && (appStore.currentSubView === 'cloud' || appStore.currentSubView === 'cloud-admin') }"
+              @click.prevent="handleNav('settings', 'cloud')"
             >
               <span class="material-symbols-rounded">cloud_sync</span>
-              <span>Quản trị Cloud</span>
+              <span>Quản trị Cloud & Sheets</span>
             </a>
           </div>
         </div>

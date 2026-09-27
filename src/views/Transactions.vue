@@ -408,38 +408,43 @@ onMounted(() => {
 <template>
   <div class="view-content p-6">
     
-    <!-- Sub-Module Navigation Header -->
-    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs">
+    <!-- Compact Sub-Module Header (Replaces redundant tab bar) -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-2 border-b border-slate-100 dark:border-slate-800">
       <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
-            <span class="material-symbols-rounded text-xl">payments</span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">Giao dịch /</span>
+          <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+            {{ activeTab === 'transactions' ? 'Sổ Thu Chi Trong Ca' : 'Hồ Sơ Chứng Từ & Hóa Đơn' }}
           </span>
-          <h3 class="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Sổ Quỹ Thu Chi & Chứng Từ</h3>
-          <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Quỹ tiền ca</span>
         </div>
-        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">Theo dõi các khoản thu chi phát sinh ngoài POS và hóa đơn chứng từ kèm theo.</p>
+        <h2 class="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2 mt-0.5">
+          <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400">
+            {{ activeTab === 'transactions' ? 'account_balance_wallet' : 'receipt_long' }}
+          </span>
+          <span>
+            {{ activeTab === 'transactions' ? 'Sổ Quỹ Thu Chi Trong Ca' : 'Quản Lý Hồ Sơ Chứng Từ' }}
+          </span>
+        </h2>
       </div>
 
-      <!-- Sub-module Navigation Pills -->
-      <nav aria-label="Phân hệ thu chi" class="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex-wrap gap-1.5 shadow-inner">
-        <button 
-          @click="switchTab('transactions')"
-          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'transactions' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
-        >
-          <span class="material-symbols-rounded text-lg">account_balance_wallet</span>
-          <span>Sổ Thu Chi Ca</span>
-        </button>
-        <button 
-          @click="switchTab('invoices')"
-          class="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer"
-          :class="activeTab === 'invoices' ? 'btn-primary shadow-sm text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/60 dark:hover:bg-slate-700/50'"
-        >
-          <span class="material-symbols-rounded text-lg">receipt_long</span>
-          <span>Hồ Sơ Chứng Từ</span>
-        </button>
-      </nav>
+      <div class="flex items-center gap-2">
+        <template v-if="activeTab === 'transactions' && shiftStore.currentShift">
+          <button @click="triggerAddExpense" class="btn btn-secondary btn-sm text-rose-600 hover:text-rose-700">
+            <span class="material-symbols-rounded text-base">remove_circle</span>
+            <span>Tạo phiếu chi</span>
+          </button>
+          <button @click="triggerAddIncome" class="btn btn-primary btn-sm shadow-xs">
+            <span class="material-symbols-rounded text-base">add_circle</span>
+            <span>Tạo phiếu thu</span>
+          </button>
+        </template>
+        <template v-else-if="activeTab === 'invoices' && shiftStore.currentShift">
+          <button @click="triggerFileSelect" class="btn btn-primary btn-sm shadow-xs">
+            <span class="material-symbols-rounded text-base">cloud_upload</span>
+            <span>Tải lên chứng từ</span>
+          </button>
+        </template>
+      </div>
     </div>
 
     <!-- If no shift is open -->
@@ -460,29 +465,7 @@ onMounted(() => {
     </div>
 
     <!-- ACTIVE TAB: TRANSACTIONS (THU CHI) -->
-    <div v-else-if="activeTab === 'transactions'" class="space-y-6 animate-fade-in">
-      
-      <div class="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h3 class="text-lg font-extrabold text-slate-900 dark:text-white">Quản lý Thu Chi</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">Ghi nhận các luồng tiền thu chi phát sinh thủ công</p>
-        </div>
-        <div class="flex gap-2.5">
-          <button 
-            class="btn-primary px-4 py-2.5 text-xs uppercase tracking-wider font-extrabold flex items-center gap-1.5 cursor-pointer shadow-sm"
-            @click="triggerAddIncome"
-          >
-            <span class="material-symbols-rounded text-base">add</span> Thêm khoản Thu
-          </button>
-          <button 
-            class="px-4 py-2.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-200/60 dark:border-rose-900/50 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-            @click="triggerAddExpense"
-          >
-            <span class="material-symbols-rounded text-base">remove</span> Thêm khoản Chi
-          </button>
-        </div>
-      </div>
-
+    <div v-else-if="activeTab === 'transactions'" class="space-y-4 animate-fade-in">
       <!-- Filters Ribbon -->
       <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between flex-wrap gap-4 shadow-xs transition-colors">
         <div class="flex items-center gap-3 flex-wrap flex-1">
@@ -689,12 +672,7 @@ onMounted(() => {
     </div>
 
     <!-- ACTIVE TAB: INVOICES (CHỨNG TỪ) -->
-    <div v-else-if="activeTab === 'invoices'" class="space-y-6 animate-fade-in">
-      
-      <div>
-        <h3 class="text-lg font-extrabold text-slate-900 dark:text-white">📑 Chứng từ / Hóa đơn đính kèm</h3>
-        <p class="text-xs text-slate-400 font-semibold mt-0.5">Lưu trữ ảnh hóa đơn mua hàng, biên lai lên Google Drive</p>
-      </div>
+    <div v-else-if="activeTab === 'invoices'" class="space-y-5 animate-fade-in">
 
       <!-- Drag and drop zone -->
       <div 
