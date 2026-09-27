@@ -65,7 +65,11 @@ export const useAppStore = defineStore('app', () => {
       if (!settingsStore.settings.autoSync) return;
 
       try {
-        await shiftStore.syncCurrentShiftWithCloud();
+        if (shiftStore.isSyncDirty) {
+          await shiftStore.syncCurrentShiftImmediate();
+        } else {
+          await shiftStore.syncCurrentShiftWithCloud();
+        }
         await shiftStore.syncShiftHistory();
       } catch (e) {
         console.warn('[SyncInterval] Auto-sync failed:', e);

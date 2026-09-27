@@ -17,6 +17,10 @@ export const GAS_WEBAPP_URL =
   (import.meta.env.VITE_GAS_URL as string) ||
   'https://script.google.com/macros/s/AKfycbyStvCPpvjlBVIUa4eLE5uZghbqT8Vfwrz9wk1GqLN94tHeI3K3TgITl1JBhTLV5o8Y/exec';
 
+export const GAS_VAT_URL =
+  (import.meta.env.VITE_GAS_VAT_URL as string) ||
+  'https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec';
+
 export function normalizeUrl(url: string | null | undefined): string {
   return String(url || '').replace(/\/+$/, '');
 }

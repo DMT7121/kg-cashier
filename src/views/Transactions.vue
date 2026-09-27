@@ -4,7 +4,7 @@ import { useShiftStore } from '../stores/shift';
 import { useCategoriesStore } from '../stores/categories';
 import { useSettingsStore } from '../stores/settings';
 import { uploadFileToCloud, deleteFileFromCloud } from '../services/api';
-import { formatMoney, showToast, showConfirm } from '../utils';
+import { formatMoney, showToast, showConfirm, parseMathExpression } from '../utils';
 
 // State & Stores
 const shiftStore = useShiftStore();
@@ -66,16 +66,7 @@ const parsedAmountPreview = computed(() => {
 });
 
 function evaluateExpression(val: string): number {
-  if (!val) return 0;
-  let cleaned = val.toLowerCase().replace(/k/g, '*1000');
-  cleaned = cleaned.replace(/[^0-9+\-*/().\s]/g, '');
-  try {
-    const fn = new Function(`return ${cleaned}`);
-    const res = fn();
-    return typeof res === 'number' && !isNaN(res) && isFinite(res) ? Math.round(res) : 0;
-  } catch (e) {
-    return 0;
-  }
+  return parseMathExpression(val);
 }
 
 // Computeds

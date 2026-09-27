@@ -112,14 +112,8 @@ function _sheetsClear(range) {
   } catch(e) { /* ignore */ }
 }
 
-// ── Web App Handlers ─────────────────────────
-function doGet(e) {
-  return _handleCashierRequest(e);
-}
-
-function doPost(e) {
-  return _handleCashierRequest(e);
-}
+// Handlers for doGet and doPost are centrally managed in 00_Router.js
+// which delegates cashier operations to _handleCashierRequest(e).
 
 function _validateMetadata(data, action) {
   const origin = data.origin || '';
@@ -1335,9 +1329,9 @@ function _saveSettings(data) {
 
 function _getCukcukConfigSecure(data) {
   if (!data) data = {};
-  // Validate admin password or PIN (master pin 712121)
-  const adminPass = String(_getSettings().settings.adminPassword || '712121').trim();
-  if (String(data.adminPassword || '').trim() !== adminPass && String(data.pin || '').trim() !== '712121') {
+  // Validate admin password
+  const adminPass = String(_getSettings().settings.adminPassword || '').trim();
+  if (!adminPass || String(data.adminPassword || '').trim() !== adminPass) {
     return { success: false, message: 'Chưa xác thực quyền quản trị' };
   }
   const props = PropertiesService.getScriptProperties();
@@ -3859,14 +3853,12 @@ function _loadCukcukInvoicesAction(data) {
     let invoices = [];
     if (data.workDate) {
       const monthKey = data.workDate.substring(0, 7);
-      // Try to load from Month JSON chunks first
       let cached = loadMonthJsonFast(monthKey);
       if (!cached) {
         // Automatically build monthly JSON cache if missing
         buildMonthJsonFromRaw(monthKey);
         cached = loadMonthJsonFast(monthKey);
       }
-      
       if (cached && cached.invoices) {
         invoices = cached.invoices.filter(function(r) { return r.workDate === data.workDate; });
       } else {

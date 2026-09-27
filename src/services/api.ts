@@ -1046,12 +1046,11 @@ export async function getCukcukInvoicesFromCloud(params: {
         filtered = filtered.filter(r => r.workDate === params.workDate);
       }
       if (params.fromDate) {
-        const fromDate = params.fromDate;
-        filtered = filtered.filter(r => r.workDate >= fromDate || r.refDate >= fromDate);
+        filtered = filtered.filter(r => (r.workDate && r.workDate >= fromDate) || (r.refDate && r.refDate >= fromDate));
       }
       if (params.toDate) {
         const toDate = params.toDate;
-        filtered = filtered.filter(r => r.workDate <= toDate || r.refDate <= toDate);
+        filtered = filtered.filter(r => (r.workDate && r.workDate <= toDate) || (r.refDate && r.refDate <= toDate));
       }
       
       const mapped = filtered.map(r => mapInvoiceRow(r));

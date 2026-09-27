@@ -388,6 +388,17 @@ function _safeEval(expr: string): number | null {
   }
 }
 
+/**
+ * Safely parse arithmetic expressions (e.g. "500k + 250k", "100000*3 - 50000")
+ * without eval() or Function() constructor.
+ */
+export function parseMathExpression(val: string): number {
+  if (!val) return 0;
+  const cleaned = val.toLowerCase().replace(/k/g, '*1000');
+  const res = _safeEval(cleaned);
+  return (res !== null && !isNaN(res) && isFinite(res)) ? Math.round(res) : 0;
+}
+
 export interface MoneyInputControl {
   getValue: () => number;
   getExpression: () => string | null;

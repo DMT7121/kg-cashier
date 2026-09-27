@@ -6,6 +6,7 @@ import {
   showConfirm, 
   showToast 
 } from '../utils';
+import { ENDPOINTS } from '../config/endpoints';
 
 // Interfaces
 interface VatInvoice {
@@ -42,7 +43,7 @@ interface ActivityLog {
 const settingsStore = useSettingsStore();
 
 // Constants
-const API_URL = "https://script.google.com/macros/s/AKfycbw7MOPPDT0jzBRd_RrTPKAMeY1hNjGMEdilW9-1n8wHV59YipjHfaNlb71Txc9P6-es/exec";
+const API_URL = ENDPOINTS.vat;
 const MAX_CONCURRENT_SCANS = 8;
 
 const PROVIDER_MAP: Record<string, { label: string; runner: (key: string, prompt: string) => Promise<string> }> = {

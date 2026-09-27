@@ -18,6 +18,15 @@ const STORE_VERSION = 1;
 
 // ── CRUD Operations ──
 
+let _cachedAllInvoices: SAInvoice[] | null = null;
+let _cachedAllInvoicesTime = 0;
+const CACHE_TTL_MS = 20000;
+
+export function invalidateInvoiceCache(): void {
+  _cachedAllInvoices = null;
+  _cachedAllInvoicesTime = 0;
+}
+
 /** Check if an invoice exists by RefId */
 export async function hasInvoice(refId: string): Promise<boolean> {
   const val = await invoicesDb.getItem(refId);
@@ -28,6 +37,7 @@ export async function hasInvoice(refId: string): Promise<boolean> {
  * Add or update an invoice. Returns true if NEWLY added, false if updated/existed.
  */
 export async function upsertInvoice(invoice: SAInvoice): Promise<boolean> {
+  invalidateInvoiceCache();
   const key = String(invoice.refId);
   const existing = await invoicesDb.getItem<SAInvoice>(key);
   const isNew = !existing;
@@ -45,6 +55,7 @@ export async function upsertInvoice(invoice: SAInvoice): Promise<boolean> {
 
 /** Bulk upsert — returns count of newly added */
 export async function bulkUpsert(invoices: SAInvoice[]): Promise<number> {
+  invalidateInvoiceCache();
   let newCount = 0;
   for (let i = 0; i < invoices.length; i++) {
     const inv = invoices[i];
@@ -69,44 +80,51 @@ export async function getInvoice(refId: string): Promise<SAInvoice | null> {
   return await invoicesDb.getItem<SAInvoice>(refId);
 }
 
-/** Get all invoices as array */
-export async function getAllInvoices(): Promise<SAInvoice[]> {
+/** Get all invoices as array (cached with 20s TTL) */
+export async function getAllInvoices(forceFresh = false): Promise<SAInvoice[]> {
+  const now = Date.now();
+  if (!forceFresh && _cachedAllInvoices && (now - _cachedAllInvoicesTime < CACHE_TTL_MS)) {
+    return _cachedAllInvoices;
+  }
   const result: SAInvoice[] = [];
   await invoicesDb.iterate<SAInvoice, void>((value) => {
     result.push(value);
   });
+  _cachedAllInvoices = result;
+  _cachedAllInvoicesTime = now;
   return result;
 }
 
 /** Get total invoice count */
 export async function getInvoiceCount(): Promise<number> {
+  if (_cachedAllInvoices) return _cachedAllInvoices.length;
   const keys = await invoicesDb.keys();
   return keys.length;
 }
 
 /** Get invoice count for a specific date (working day YYYY-MM-DD) */
 export async function getCountByDate(dateStr: string): Promise<number> {
+  const all = await getAllInvoices();
   let count = 0;
-  await invoicesDb.iterate<SAInvoice, void>((value) => {
-    const workDate = value.workDate || (value as any).date;
+  for (let i = 0; i < all.length; i++) {
+    const workDate = all[i].workDate || (all[i] as any).date;
     if (workDate === dateStr) {
       count++;
     }
-  });
+  }
   return count;
 }
 
 /** Check if there are any unpaid invoices for a given date */
 export async function hasUnpaidInvoices(dateStr: string): Promise<boolean> {
-  let foundUnpaid = false;
-  await invoicesDb.iterate<SAInvoice, void>((value) => {
-    const workDate = value.workDate || (value as any).date;
-    if (workDate === dateStr && (value as any).unpaid) {
-      foundUnpaid = true;
-      return; // Stop iteration early
+  const all = await getAllInvoices();
+  for (let i = 0; i < all.length; i++) {
+    const workDate = all[i].workDate || (all[i] as any).date;
+    if (workDate === dateStr && (all[i] as any).unpaid) {
+      return true;
     }
-  });
-  return foundUnpaid;
+  }
+  return false;
 }
 
 // ── Working Day Boundaries ──

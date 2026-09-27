@@ -385,9 +385,10 @@ async function refreshReportData() {
   if (selectedPeriod.value === 'day') {
     const dateStr = startStr;
     const dayShifts = [...shiftStore.shifts];
-    if (shiftStore.currentShift && shiftStore.currentShift.date === dateStr) {
-      if (!dayShifts.some(s => s.id === shiftStore.currentShift.id)) {
-        dayShifts.unshift(shiftStore.currentShift);
+    const cur = shiftStore.currentShift;
+    if (cur && cur.date === dateStr) {
+      if (!dayShifts.some(s => s.id === cur.id)) {
+        dayShifts.unshift(cur);
       }
     }
     const filteredShifts = dayShifts.filter(s => s.date === dateStr);

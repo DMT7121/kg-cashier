@@ -179,58 +179,43 @@ onUnmounted(() => {
   <div class="view-content p-6">
 
     <!-- 1. EMPTY STATE (No active shift) -->
-    <div v-if="!shiftStore.currentShift" class="relative max-w-md mx-auto mt-20">
-      <!-- Ambient background glow -->
-      <div class="absolute -inset-4 bg-gradient-to-tr from-blue-500/15 via-indigo-500/10 to-purple-500/15 rounded-[40px] blur-2xl opacity-75 animate-pulse"></div>
-      
-      <!-- Glassmorphic Card -->
-      <div class="relative bg-white/85 backdrop-blur-xl p-8 rounded-[32px] border border-white/60 shadow-[0_20px_50px_rgba(37,99,235,0.06)] space-y-6 text-center animate-fade-in">
-        
-        <!-- Icon Container -->
-        <div class="relative w-18 h-18 mx-auto">
-          <!-- Soft glowing halo behind icon -->
-          <div class="absolute -inset-1 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-2xl blur-md opacity-30 animate-pulse"></div>
-          <!-- Real Icon block -->
-          <div class="relative w-18 h-18 bg-gradient-to-tr from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 transition-transform duration-300 hover:scale-105">
-            <span class="material-symbols-rounded text-4xl">storefront</span>
-          </div>
+    <div v-if="!shiftStore.currentShift" class="relative max-w-md mx-auto mt-16 animate-fade-in">
+      <div class="bg-white p-8 rounded-3xl border border-slate-200/90 shadow-xs space-y-6 text-center">
+        <!-- Logo / Icon Container -->
+        <div class="w-16 h-16 mx-auto bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-200/80 shadow-xs">
+          <span class="material-symbols-rounded text-3xl text-amber-600">storefront</span>
         </div>
 
         <!-- Typography -->
-        <div class="space-y-2">
-          <h2 class="text-xl font-extrabold text-slate-800 tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-            Chào mừng đến KING's GRILL
+        <div class="space-y-1.5">
+          <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">
+            Hệ thống Thu ngân KING's GRILL
           </h2>
-          <p class="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-[280px] mx-auto">
-            Vui lòng bắt đầu mở ca làm việc mới để tiến hành bán hàng, quản lý thu chi và đồng bộ dữ liệu.
+          <p class="text-xs text-slate-500 leading-relaxed max-w-[280px] mx-auto font-medium">
+            Chưa có ca làm việc nào đang mở. Bắt đầu ca mới để quản lý thu chi, bán hàng và đồng bộ hóa đơn.
           </p>
         </div>
 
         <!-- Feature Badges -->
-        <div class="flex flex-wrap justify-center gap-2 py-2 border-t border-b border-slate-100/50">
-          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/50 border border-slate-100/50 rounded-xl text-[10px] font-extrabold text-slate-500 transition-all hover:bg-slate-100/50">
-            <span class="material-symbols-rounded text-sm text-blue-500">point_of_sale</span> POS & Bán hàng
+        <div class="flex flex-wrap justify-center gap-2 py-3 border-t border-b border-slate-100">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200/60 rounded-xl text-[10px] font-bold text-slate-600">
+            <span class="material-symbols-rounded text-sm text-amber-600">point_of_sale</span> POS & Gọi món
           </span>
-          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/50 border border-slate-100/50 rounded-xl text-[10px] font-extrabold text-slate-500 transition-all hover:bg-slate-100/50">
-            <span class="material-symbols-rounded text-sm text-indigo-500">sync</span> Đồng bộ CUKCUK
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200/60 rounded-xl text-[10px] font-bold text-slate-600">
+            <span class="material-symbols-rounded text-sm text-emerald-600">sync</span> Đồng bộ CUKCUK
           </span>
-          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50/50 border border-slate-100/50 rounded-xl text-[10px] font-extrabold text-slate-500 transition-all hover:bg-slate-100/50">
-            <span class="material-symbols-rounded text-sm text-emerald-500">receipt</span> Hóa đơn VAT
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200/60 rounded-xl text-[10px] font-bold text-slate-600">
+            <span class="material-symbols-rounded text-sm text-blue-600">receipt</span> Hóa đơn VAT
           </span>
         </div>
 
         <!-- Action Button -->
         <button 
-          class="group relative w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-2xl transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer shadow-md shadow-blue-500/15 hover:shadow-lg hover:shadow-blue-500/25 overflow-hidden"
+          class="btn btn-primary w-full py-3.5 text-xs uppercase tracking-wider font-extrabold shadow-xs flex items-center justify-center gap-2"
           @click="emit('navigate', 'shift')"
         >
-          <!-- Shine effect -->
-          <div class="animate-shine"></div>
-          
-          <div class="relative flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
-            <span class="material-symbols-rounded text-base transition-transform duration-300 group-hover:translate-x-0.5">play_arrow</span>
-            Mở ca làm việc mới
-          </div>
+          <span class="material-symbols-rounded text-base">play_arrow</span>
+          Bắt đầu mở ca làm việc
         </button>
       </div>
     </div>
@@ -239,15 +224,15 @@ onUnmounted(() => {
     <div v-else class="space-y-6 animate-fade-in">
       
       <!-- Meta Information Topbar -->
-      <div class="flex items-center justify-between flex-wrap gap-4 bg-white p-4 rounded-2xl border border-slate-100">
+      <div class="flex items-center justify-between flex-wrap gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/60">
             <span class="material-symbols-rounded">person_play</span>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-slate-800">Ca {{ shiftStore.currentShift.shiftNumber }} đang hoạt động</h3>
+            <h3 class="text-sm font-bold text-slate-900">Ca {{ shiftStore.currentShift.shiftNumber }} đang hoạt động</h3>
             <div class="flex items-center gap-3 text-xs text-slate-500 font-semibold mt-0.5">
-              <span>Thu ngân: {{ shiftStore.currentShift.cashierName }}</span>
+              <span>Thu ngân: <strong class="text-slate-700">{{ shiftStore.currentShift.cashierName }}</strong></span>
               <span>•</span>
               <span>Ngày: {{ formatVN(shiftStore.currentShift.date) }}</span>
             </div>
@@ -255,7 +240,7 @@ onUnmounted(() => {
         </div>
 
         <div class="flex items-center gap-3 shrink-0">
-          <div class="bg-indigo-50/50 text-indigo-700 text-xs font-black px-3 py-1.5 rounded-xl border border-indigo-100">
+          <div class="bg-slate-900 text-amber-400 text-xs font-black px-3.5 py-1.5 rounded-xl border border-slate-800 shadow-xs">
             ⏳ Trực ca: {{ activeShiftTime }}
           </div>
         </div>
@@ -321,13 +306,13 @@ onUnmounted(() => {
         </div>
 
         <!-- Expected cash in drawer -->
-        <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 p-5 rounded-2xl text-white flex items-center gap-4 shadow-sm shadow-indigo-500/5">
-          <div class="w-12 h-12 bg-white/10 text-white rounded-xl flex items-center justify-center shrink-0">
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl text-white flex items-center gap-4 shadow-xs">
+          <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center shrink-0 border border-amber-500/30">
             <span class="material-symbols-rounded">payments</span>
           </div>
           <div class="flex-1 min-w-0">
-            <span class="text-[10px] font-black text-indigo-200 uppercase tracking-wider block">Tiền mặt kỳ vọng két</span>
-            <span class="text-lg font-black mt-1 block truncate">
+            <span class="text-[10px] font-black text-amber-400/80 uppercase tracking-wider block">Tiền mặt kỳ vọng két</span>
+            <span class="text-xl font-black text-amber-400 mt-1 block truncate">
               {{ currentShiftSummary ? formatMoney(currentShiftSummary.expectedCash) : 'đang tính...' }}
             </span>
           </div>
@@ -379,12 +364,12 @@ onUnmounted(() => {
             Phân tích tổng doanh thu CUKCUK
           </h4>
 
-          <div class="flex bg-slate-50 border border-slate-100 p-1 rounded-xl">
+          <div class="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200/60">
             <button 
               v-for="p in ['month', 'quarter', 'year']" 
               :key="p"
-              class="px-3 py-1 text-[11px] font-black rounded-lg transition-all border-0 bg-transparent cursor-pointer"
-              :class="revenuePeriod === p ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-700'"
+              class="px-3 py-1 text-[11px] font-bold rounded-lg transition-all border-0 bg-transparent cursor-pointer"
+              :class="revenuePeriod === p ? 'bg-slate-900 text-amber-400 shadow-xs' : 'text-slate-500 hover:text-slate-800'"
               @click="revenuePeriod = p as any"
             >
               {{ p === 'month' ? 'Tháng' : p === 'quarter' ? 'Quý' : 'Năm' }}
@@ -400,7 +385,7 @@ onUnmounted(() => {
             <span class="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
               Thời gian: {{ periodStats.periodLabel }}
             </span>
-            <span class="text-3xl font-black text-indigo-600 block">{{ formatMoney(periodStats.totalRevenue) }}</span>
+            <span class="text-2xl font-black text-slate-900 block">{{ formatMoney(periodStats.totalRevenue) }}</span>
             <span class="text-[10px] text-slate-500 font-semibold block">
               {{ periodStats.totalBills }} bills · trung bình {{ formatMoney(periodStats.avgDaily) }}/ngày làm việc
             </span>
@@ -438,7 +423,7 @@ onUnmounted(() => {
               v-for="item in [
                 { label: 'Tiền mặt', icon: 'payments', value: currentShiftSummary.cashIncome, colorClass: 'bg-emerald-500 text-emerald-600' },
                 { label: 'Quẹt thẻ', icon: 'credit_card', value: currentShiftSummary.cardIncome, colorClass: 'bg-sky-500 text-sky-600' },
-                { label: 'Chuyển khoản', icon: 'swap_horiz', value: currentShiftSummary.transferIncome, colorClass: 'bg-indigo-500 text-indigo-600' }
+                { label: 'Chuyển khoản', icon: 'swap_horiz', value: currentShiftSummary.transferIncome, colorClass: 'bg-amber-500 text-amber-600' }
               ]"
               :key="item.label"
               class="space-y-1.5"

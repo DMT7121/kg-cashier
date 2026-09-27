@@ -82,7 +82,7 @@ const tables = computed(() => {
   return list;
 });
 
-// Sync POS orders local vs cloud
+// Sync POS orders local vs cloud with Smart Conflict-Free Merge
 async function syncPOSWithCloud() {
   if (isSyncing.value) return;
   isSyncing.value = true;
@@ -114,19 +114,25 @@ async function syncPOSWithCloud() {
     });
 
     // Completed local sync queue
-    const completedSyncs = JSON.parse(localStorage.getItem('kg-pos-completed-syncs') || '[]');
+    let completedSyncs: any[] = [];
+    try {
+      completedSyncs = JSON.parse(localStorage.getItem('kg-pos-completed-syncs') || '[]');
+    } catch (e) {
+      completedSyncs = [];
+    }
+    const sentCompletedOrderIds = new Set(completedSyncs.map((c: any) => c.orderId || c.tableId));
     completedSyncs.forEach((o: any) => {
       ordersToSend.push({ ...o, status: 'completed', updatedAt: new Date().toISOString() });
     });
 
     const res = await syncPosOrdersWithCloud(ordersToSend);
     if (res && res.success && res.orders) {
-      const updatedLocal: Record<string, any> = {};
+      const cloudOrdersMap: Record<string, any> = {};
       res.orders.forEach((co: any) => {
         if (co.status === 'active') {
           let items = [];
           try { items = JSON.parse(co.itemsJson || '[]'); } catch (e) {}
-          updatedLocal[co.tableId] = {
+          cloudOrdersMap[co.tableId] = {
             id: co.orderId,
             tableId: co.tableId,
             items: items,
@@ -136,9 +142,55 @@ async function syncPOSWithCloud() {
           };
         }
       });
-      orders.value = updatedLocal;
-      localStorage.setItem('kg-pos-orders', JSON.stringify(updatedLocal));
-      localStorage.setItem('kg-pos-completed-syncs', '[]');
+
+      // Smart merge: preserve local changes that occurred while sync was in-flight
+      const currentLocal = { ...orders.value };
+      const mergedLocal: Record<string, any> = {};
+
+      // 1. Incorporate all cloud active tables
+      Object.keys(cloudOrdersMap).forEach(tableId => {
+        const cloudOrder = cloudOrdersMap[tableId];
+        const localOrder = currentLocal[tableId];
+
+        // If table is currently active on screen or locally newer, check revision/timestamp
+        if (localOrder) {
+          const localTime = new Date(localOrder.updatedAt || 0).getTime();
+          const cloudTime = new Date(cloudOrder.updatedAt || 0).getTime();
+          const localRev = Number(localOrder.revision) || 1;
+          const cloudRev = Number(cloudOrder.revision) || 1;
+
+          if (localRev > cloudRev || (localRev === cloudRev && localTime > cloudTime)) {
+            // Local is newer: keep local order, will be pushed in next sync
+            mergedLocal[tableId] = localOrder;
+            return;
+          }
+        }
+        mergedLocal[tableId] = cloudOrder;
+      });
+
+      // 2. Preserve any tables added locally during sync
+      Object.keys(currentLocal).forEach(tableId => {
+        if (!cloudOrdersMap[tableId] && currentLocal[tableId]) {
+          const localOrder = currentLocal[tableId];
+          const localTime = new Date(localOrder.updatedAt || 0).getTime();
+          // If created or updated within last 30s, don't drop it yet
+          if (Date.now() - localTime < 30000) {
+            mergedLocal[tableId] = localOrder;
+          }
+        }
+      });
+
+      orders.value = mergedLocal;
+      localStorage.setItem('kg-pos-orders', JSON.stringify(mergedLocal));
+
+      // Remove only the completed syncs that were successfully sent
+      try {
+        const freshQueue = JSON.parse(localStorage.getItem('kg-pos-completed-syncs') || '[]');
+        const remainingQueue = freshQueue.filter((item: any) => !sentCompletedOrderIds.has(item.orderId || item.tableId));
+        localStorage.setItem('kg-pos-completed-syncs', JSON.stringify(remainingQueue));
+      } catch (e) {
+        localStorage.setItem('kg-pos-completed-syncs', '[]');
+      }
     }
   } catch (e) {
     console.warn('[POS Sync] cloud synchronization failed:', e);
@@ -148,6 +200,11 @@ async function syncPOSWithCloud() {
 }
 
 function saveOrders(newOrders: any) {
+  const now = new Date().toISOString();
+  if (activeTableId.value && newOrders[activeTableId.value]) {
+    newOrders[activeTableId.value].updatedAt = now;
+    newOrders[activeTableId.value].revision = (newOrders[activeTableId.value].revision || 1) + 1;
+  }
   orders.value = newOrders;
   localStorage.setItem('kg-pos-orders', JSON.stringify(newOrders));
   syncPOSWithCloud();

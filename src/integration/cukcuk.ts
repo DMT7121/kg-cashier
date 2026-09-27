@@ -129,7 +129,6 @@ export async function loginAndGetToken(): Promise<{ success: boolean; message: s
     if (settings && settings.adminPassword) {
       reqHeaders['X-Admin-Password'] = settings.adminPassword;
     }
-    reqHeaders['X-Cukcuk-Pin'] = '712121';
 
     const response = await fetch(CUKCUK_API_BASE + '/health', {
       headers: reqHeaders
@@ -169,7 +168,6 @@ export async function testConnection(): Promise<{ success: boolean; message: str
     if (settings && settings.adminPassword) {
       reqHeaders['X-Admin-Password'] = settings.adminPassword;
     }
-    reqHeaders['X-Cukcuk-Pin'] = '712121';
 
     const response = await fetch(CUKCUK_API_BASE + '/auth/refresh', {
       method: 'POST',
@@ -217,7 +215,6 @@ async function _cukcukApiCall(url: string, options: { method?: string; headers?:
   if (settings && settings.adminPassword) {
     reqHeaders['X-Admin-Password'] = settings.adminPassword;
   }
-  reqHeaders['X-Cukcuk-Pin'] = '712121';
 
   const fetchOpts: RequestInit = { 
     method: options.method || 'GET', 

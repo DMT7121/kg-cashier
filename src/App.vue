@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
 import { useAppStore } from './stores/app';
 import { useShiftStore } from './stores/shift';
 import { useSettingsStore } from './stores/settings';
 import { useNotificationsStore } from './stores/notifications';
 import { useAuthStore } from './stores/auth';
 
-// Import View Components
-import Dashboard from './views/Dashboard.vue';
-import ShiftManager from './views/ShiftManager.vue';
-import Transactions from './views/Transactions.vue';
-import CashCount from './views/CashCount.vue';
-import DrinkInventory from './views/DrinkInventory.vue';
-import POS from './views/POS.vue';
-import BarDashboard from './views/BarDashboard.vue';
-import RevenueReport from './views/RevenueReport.vue';
-import ShiftHistory from './views/ShiftHistory.vue';
-import VATInvoice from './views/VATInvoice.vue';
-import Extensions from './views/Extensions.vue';
-import UserGuide from './views/UserGuide.vue';
-import SettingsHub from './views/SettingsHub.vue';
-import ChatbotAssistant from './components/ChatbotAssistant.vue';
+// Lazy-loaded View Components for optimal bundle performance & CWV
+const Dashboard = defineAsyncComponent(() => import('./views/Dashboard.vue'));
+const ShiftManager = defineAsyncComponent(() => import('./views/ShiftManager.vue'));
+const Transactions = defineAsyncComponent(() => import('./views/Transactions.vue'));
+const CashCount = defineAsyncComponent(() => import('./views/CashCount.vue'));
+const DrinkInventory = defineAsyncComponent(() => import('./views/DrinkInventory.vue'));
+const POS = defineAsyncComponent(() => import('./views/POS.vue'));
+const BarDashboard = defineAsyncComponent(() => import('./views/BarDashboard.vue'));
+const RevenueReport = defineAsyncComponent(() => import('./views/RevenueReport.vue'));
+const ShiftHistory = defineAsyncComponent(() => import('./views/ShiftHistory.vue'));
+const VATInvoice = defineAsyncComponent(() => import('./views/VATInvoice.vue'));
+const Extensions = defineAsyncComponent(() => import('./views/Extensions.vue'));
+const UserGuide = defineAsyncComponent(() => import('./views/UserGuide.vue'));
+const SettingsHub = defineAsyncComponent(() => import('./views/SettingsHub.vue'));
+const ChatbotAssistant = defineAsyncComponent(() => import('./components/ChatbotAssistant.vue'));
 
 // Pinia Stores
 const appStore = useAppStore();

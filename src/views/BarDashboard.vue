@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useSettingsStore } from '../stores/settings';
+import { getPosOrdersFromCloud } from '../services/api';
 import { showToast } from '../utils';
 
 // Types
@@ -200,9 +201,62 @@ function markAllCooked(tableId: string, dest: 'bar' | 'kitchen' | 'sashimi') {
   showToast('Tất cả món đã hoàn thành!', 'success');
 }
 
+async function fetchCloudOrders() {
+  try {
+    const res = await getPosOrdersFromCloud();
+    if (res && res.success && Array.isArray(res.orders)) {
+      const cloudOrders: Record<string, any> = {};
+      res.orders.forEach((co: any) => {
+        if (co.status === 'active') {
+          let items = [];
+          try { items = JSON.parse(co.itemsJson || '[]'); } catch (e) {}
+          cloudOrders[co.tableId] = {
+            id: co.orderId,
+            tableId: co.tableId,
+            items: items,
+            createdAt: co.createdAt,
+            updatedAt: co.updatedAt,
+            revision: Number(co.revision) || 1
+          };
+        }
+      });
+      // Merge with local state, preserving any local items marked cooked
+      const merged: Record<string, TableOrder> = { ...orders.value };
+      Object.keys(cloudOrders).forEach(tableId => {
+        const cloudOrder = cloudOrders[tableId];
+        const localOrder = merged[tableId];
+        if (!localOrder) {
+          merged[tableId] = cloudOrder;
+        } else {
+          // Merge items status (cookedAt, status)
+          const mergedItems = cloudOrder.items.map((ci: any) => {
+            const li = localOrder.items?.find((item: any) => item.id === ci.id);
+            if (li && li.status === 'cooked') {
+              return { ...ci, status: 'cooked', cookedAt: li.cookedAt };
+            }
+            return ci;
+          });
+          merged[tableId] = { ...cloudOrder, items: mergedItems };
+        }
+      });
+      // Remove any tables no longer active on cloud
+      Object.keys(merged).forEach(tId => {
+        if (!cloudOrders[tId]) {
+          delete merged[tId];
+        }
+      });
+      orders.value = merged;
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(merged));
+    }
+  } catch (e) {
+    console.warn('[BarDashboard] Cloud order poll error:', e);
+  }
+}
+
 // Lifecycle Hooks
 onMounted(() => {
   loadOrders();
+  fetchCloudOrders();
 
   // Listen on the broadcast sync channel
   try {
@@ -216,10 +270,11 @@ onMounted(() => {
     console.warn('[BarDashboard] BroadcastChannel not supported in this browser');
   }
 
-  // Periodic polling check as fallback
+  // Periodic cloud polling (10s) and local refresh (5s)
   refreshTimer = setInterval(() => {
     loadOrders();
-  }, 5000);
+    fetchCloudOrders();
+  }, 10000);
 
   // Recalculate elapsed timer
   timeTimer = setInterval(() => {

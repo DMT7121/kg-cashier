@@ -2096,7 +2096,7 @@ function disableCukcukAutoSyncTrigger() {
 }
 
 function apiClearCukcukSyncLock(data) {
-  const workDateStr = data.workDate || _getWorkingDayGas(new Date());
+  const workDateStr = (data && data.workDate) || _getWorkingDayGas(new Date());
   const cache = CacheService.getScriptCache();
   const cacheKey = 'cukcuk_sync_active_' + workDateStr;
   cache.remove(cacheKey);
@@ -2108,5 +2108,3 @@ function apiClearCukcukSyncLock(data) {
   
   return { success: true, message: 'Đã giải phóng khóa đồng bộ cho ngày: ' + workDateStr };
 }
-
-
